@@ -217,8 +217,17 @@ export interface SampleMaterialCheckItem {
 // 자재 요청 항목
 export interface SampleMaterialRequest {
   itemName: string;
+  vendor?: string;    // 업체 (창성, 아이금속, 기타 등)
+  color?: string;     // 컬러
   qty: number;
   unit: string;
+}
+
+// 샘플 첨부 문서 (PDF, 엑셀 등)
+export interface SampleDocument {
+  name: string;
+  url: string;          // base64 데이터 URL
+  fileType: 'pdf' | 'excel' | 'image';
 }
 
 export interface Sample {
@@ -244,6 +253,7 @@ export interface Sample {
   costKrw?: number;
   approvedBy?: string;
   imageUrls: string[];
+  documents?: SampleDocument[];                    // 첨부 문서 (PDF, 엑셀 등)
   materialChecklist?: SampleMaterialCheckItem[];  // 자재 준비 체크리스트
   materialRequests?: SampleMaterialRequest[];      // 자재 요청 목록
   billingStatus: SampleBillingStatus;             // 청구 상태 (접수 후 명세표 발행 시 업데이트)

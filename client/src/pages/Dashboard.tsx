@@ -1,21 +1,43 @@
 // AMESCOTES ERP — 대시보드 (Phase 1 개편: 납기위험 중심)
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import {
   store, formatKRW, formatNumber, calcDDay, dDayLabel, dDayColor,
+  type Sample,
 } from '@/lib/store';
 import {
-  AlertTriangle, TrendingUp, Package,
+  AlertTriangle, TrendingUp,
   ArrowRight, ShoppingCart, FlaskConical, FileText,
-  Activity, Clock, Truck, Microscope,
+  Activity, Clock, Truck, Microscope, PackageSearch, File, FileSpreadsheet, Camera,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+
+// 문서 아이콘
+function DocIconSmall({ fileType }: { fileType: string }) {
+  if (fileType === 'pdf') return <File className="w-4 h-4 text-red-500" />;
+  if (fileType === 'excel') return <FileSpreadsheet className="w-4 h-4 text-green-600" />;
+  return <Camera className="w-4 h-4 text-stone-400" />;
+}
+
+const STAGE_COLOR: Record<string, string> = {
+  '1차':    'bg-blue-50 text-blue-700 border-blue-200',
+  '2차':    'bg-indigo-50 text-indigo-700 border-indigo-200',
+  '3차':    'bg-purple-50 text-purple-700 border-purple-200',
+  '4차':    'bg-amber-50 text-amber-700 border-amber-200',
+  '최종승인': 'bg-green-50 text-green-700 border-green-200',
+  '반려':   'bg-red-50 text-red-600 border-red-200',
+};
 
 export default function Dashboard() {
   const orders = store.getOrders();
   const samples = store.getSamples();
+  // 샘플자재구매 — 선택한 샘플 상세 모달
+  const [selectedSample, setSelectedSample] = useState<Sample | null>(null);
   const settlements = store.getSettlements();
   const salesRecords = store.getSalesRecords();
   const items = store.getItems();
@@ -75,6 +97,19 @@ export default function Dashboard() {
     ).slice(0, 6),
     [orders]
   );
+
+  // 자재 요청이 있는 샘플 목록
+  const samplesWithMaterials = useMemo(() => {
+    const vendors = store.getVendors().filter(v => v.type === '바이어');
+    return samples
+      .filter(s => (s.materialRequests || []).length > 0)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 10)
+      .map(s => ({
+        ...s,
+        buyerName: vendors.find(v => v.id === s.buyerId)?.name || '미지정',
+      }));
+  }, [samples]);
 
   // 미청구 샘플 (거래처별)
   const unbilledSamples = useMemo(() => {
@@ -357,6 +392,177 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      {/* ── 샘플자재구매 ── */}
+      <div className="bg-white rounded-xl border border-stone-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-stone-700 flex items-center gap-2">
+            <PackageSearch className="w-4 h-4 text-amber-600" />
+            🧵 샘플자재구매
+            {samplesWithMaterials.length > 0 && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                {samplesWithMaterials.length}건
+              </span>
+            )}
+          </h3>
+          <Link href="/samples" className="text-xs text-stone-500 hover:text-stone-700 flex items-center gap-1">
+            전체 <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+        {samplesWithMaterials.length === 0 ? (
+          <p className="text-xs text-stone-400 py-6 text-center">자재 요청이 있는 샘플이 없습니다</p>
+        ) : (
+          <div className="space-y-2">
+            {samplesWithMaterials.map(s => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedSample(s)}
+                className="w-full text-left flex items-center justify-between py-2 px-3 rounded-lg border border-stone-100 hover:bg-amber-50 hover:border-amber-200 transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  {/* 썸네일 */}
+                  {(s.imageUrls || []).length > 0 ? (
+                    <img src={s.imageUrls[0]} alt={s.styleNo} className="w-10 h-10 object-cover rounded-lg border border-stone-200 shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center shrink-0">
+                      <Camera className="w-4 h-4 text-stone-400" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-stone-700">{s.buyerName}</span>
+                      <span className="text-xs text-stone-400">·</span>
+                      <span className="text-xs font-mono text-stone-600">{s.styleNo}</span>
+                      <span className="text-xs text-stone-400">·</span>
+                      <span className="text-xs text-stone-600 truncate max-w-[120px]">{s.styleName}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${STAGE_COLOR[s.stage] || 'bg-stone-50 text-stone-600 border-stone-200'}`}>
+                        {s.stage}
+                      </span>
+                      <span className="text-[10px] text-stone-400">
+                        자재 {(s.materialRequests || []).length}종 요청
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-stone-300 group-hover:text-amber-500 transition-colors shrink-0" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 샘플 접수 상세 모달 */}
+      {selectedSample && (
+        <Dialog open={!!selectedSample} onOpenChange={() => setSelectedSample(null)}>
+          <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 flex-wrap">
+                <span>{selectedSample.styleNo}</span>
+                <span className="text-stone-400 font-normal text-sm">—</span>
+                <span className="text-stone-600 font-medium text-sm">{selectedSample.styleName}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full border ${STAGE_COLOR[selectedSample.stage] || 'bg-stone-50 text-stone-600 border-stone-200'}`}>
+                  {selectedSample.stage}
+                </span>
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 text-sm">
+              {/* 기본 정보 */}
+              <div className="grid grid-cols-2 gap-2 p-3 bg-stone-50 rounded-lg text-xs">
+                <div><span className="text-stone-500">의뢰일:</span> <span className="text-stone-700 font-medium">{selectedSample.requestDate}</span></div>
+                <div><span className="text-stone-500">목표완료:</span> <span className="text-stone-700 font-medium">{selectedSample.expectedDate || '—'}</span></div>
+                <div><span className="text-stone-500">장소:</span> <span className="text-stone-700 font-medium">{selectedSample.location || '—'}</span></div>
+                <div><span className="text-stone-500">담당자:</span> <span className="text-stone-700 font-medium">{selectedSample.assignee || '—'}</span></div>
+                {selectedSample.color && (
+                  <div className="col-span-2"><span className="text-stone-500">컬러:</span> <span className="text-stone-700 font-medium">{selectedSample.color}</span></div>
+                )}
+                {selectedSample.memo && (
+                  <div className="col-span-2"><span className="text-stone-500">비고:</span> <span className="text-stone-700">{selectedSample.memo}</span></div>
+                )}
+              </div>
+
+              {/* 이미지 */}
+              {(selectedSample.imageUrls || []).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-stone-600 mb-2">샘플 이미지</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedSample.imageUrls || []).map((url, idx) => (
+                      <img
+                        key={idx}
+                        src={url}
+                        alt={`이미지 ${idx + 1}`}
+                        className="w-16 h-16 object-cover rounded-lg border border-stone-200 cursor-pointer hover:opacity-80"
+                        onClick={() => window.open(url, '_blank')}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 자재 요청 목록 */}
+              <div>
+                <p className="text-xs font-semibold text-stone-600 mb-2">🧵 자재 요청 목록</p>
+                <div className="rounded-lg border border-stone-200 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-stone-50 border-b border-stone-100">
+                        <th className="text-left px-3 py-1.5 text-stone-500 font-medium">자재명</th>
+                        <th className="text-left px-3 py-1.5 text-stone-500 font-medium">업체</th>
+                        <th className="text-left px-3 py-1.5 text-stone-500 font-medium">컬러</th>
+                        <th className="text-right px-3 py-1.5 text-stone-500 font-medium">수량</th>
+                        <th className="text-left px-3 py-1.5 text-stone-500 font-medium">단위</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(selectedSample.materialRequests || []).map((req, i) => (
+                        <tr key={i} className="border-b border-stone-50 last:border-0">
+                          <td className="px-3 py-2 text-stone-700 font-medium">{req.itemName}</td>
+                          <td className="px-3 py-2 text-stone-600">{req.vendor || <span className="text-stone-300">—</span>}</td>
+                          <td className="px-3 py-2 text-stone-600">{req.color || <span className="text-stone-300">—</span>}</td>
+                          <td className="px-3 py-2 text-right text-stone-700">{req.qty}</td>
+                          <td className="px-3 py-2 text-stone-500">{req.unit}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 첨부 문서 */}
+              {(selectedSample.documents || []).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-stone-600 mb-2">📎 첨부 문서</p>
+                  <div className="space-y-1">
+                    {(selectedSample.documents || []).map((doc, idx) => (
+                      <button
+                        key={idx}
+                        className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg border border-stone-100 hover:bg-stone-50"
+                        onClick={() => window.open(doc.url, '_blank')}
+                      >
+                        <DocIconSmall fileType={doc.fileType} />
+                        <span className="text-xs text-stone-700 truncate">{doc.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelectedSample(null)}>닫기</Button>
+              <Button
+                className="bg-amber-700 hover:bg-amber-800 text-white text-xs"
+                onClick={() => { setSelectedSample(null); window.location.hash = '/samples'; }}
+                asChild
+              >
+                <Link href="/samples">샘플 관리로 이동</Link>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* ── 최근 활동 피드 ── */}
       {(() => {
         // 최근 샘플 접수 + 발주 등록 통합 피드 (최근 8개)

@@ -5,7 +5,7 @@ import {
   store, genId, formatKRW, formatNumber,
   type Sample, type SampleStage, type Season, type SampleBillingStatus,
   type SampleLocation, type SampleRevisionNote, type SampleMaterialCheckItem,
-  type SampleMaterialRequest,
+  type SampleMaterialRequest, type SampleDocument,
   type Item, type TradeStatement, type TradeStatementLine,
 } from '@/lib/store';
 import { resizeImage } from '@/lib/utils';
@@ -17,9 +17,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
-  Plus, Search, Trash2, Camera, CheckCircle, FileText,
-  ClipboardCheck, MessageSquarePlus, Eye, PackagePlus,
+  Plus, Search, Trash2, Camera, FileText,
+  ClipboardCheck, Eye, PackagePlus, FileSpreadsheet, File,
 } from 'lucide-react';
+
+// 자재 업체 목록 (고정 옵션 + 직접입력)
+const VENDOR_OPTIONS = ['창성', '아이금속', '세화', '한일금속', '기타'];
+
+// 파일 타입 판별
+function getFileType(name: string): SampleDocument['fileType'] {
+  const lower = name.toLowerCase();
+  if (lower.endsWith('.pdf')) return 'pdf';
+  if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) return 'excel';
+  return 'image';
+}
+
+// 문서 아이콘 렌더링
+function DocIcon({ fileType }: { fileType: SampleDocument['fileType'] }) {
+  if (fileType === 'pdf') return <File className="w-6 h-6 text-red-500" />;
+  if (fileType === 'excel') return <FileSpreadsheet className="w-6 h-6 text-green-600" />;
+  return <Camera className="w-6 h-6 text-stone-400" />;
+}
 
 const STAGES: SampleStage[] = ['1차', '2차', '3차', '4차', '최종승인', '반려'];
 const BILLING_STATUSES: SampleBillingStatus[] = ['미청구', '청구완료', '수금완료'];
@@ -99,6 +117,8 @@ export default function SampleManagement() {
 
   // 이미지 업로드
   const imageFileRef = useRef<HTMLInputElement>(null);
+  // 문서 업로드 (PDF, 엑셀)
+  const docFileRef = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -115,6 +135,58 @@ export default function SampleManagement() {
       toast.error('이미지 업로드 실패');
     }
     if (imageFileRef.current) imageFileRef.current.value = '';
+  };
+
+  // 파일/이미지 통합 업로드 (이미지는 imageUrls, 문서는 documents)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+    const docFiles = files.filter(f => !f.type.startsWith('image/'));
+
+    const currentImages = form.imageUrls || [];
+    const currentDocs = form.documents || [];
+
+    // 이미지 처리 (최대 5장)
+    if (imageFiles.length > 0) {
+      const available = 5 - currentImages.length;
+      if (available <= 0) {
+        toast.error('이미지는 최대 5장까지 업로드 가능합니다');
+      } else {
+        try {
+          const resized = await Promise.all(imageFiles.slice(0, available).map(f => resizeImage(f)));
+          setForm(f => ({ ...f, imageUrls: [...(f.imageUrls || []), ...resized] }));
+        } catch {
+          toast.error('이미지 업로드 실패');
+        }
+      }
+    }
+
+    // 문서 처리 (PDF, 엑셀, 최대 5개)
+    if (docFiles.length > 0) {
+      const available = 5 - currentDocs.length;
+      if (available <= 0) {
+        toast.error('문서는 최대 5개까지 업로드 가능합니다');
+      } else {
+        const toProcess = docFiles.slice(0, available);
+        const newDocs: SampleDocument[] = await Promise.all(
+          toProcess.map(f => new Promise<SampleDocument>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve({
+              name: f.name,
+              url: reader.result as string,
+              fileType: getFileType(f.name),
+            });
+            reader.onerror = reject;
+            reader.readAsDataURL(f);
+          }))
+        );
+        setForm(f => ({ ...f, documents: [...(f.documents || []), ...newDocs] }));
+      }
+    }
+
+    if (docFileRef.current) docFileRef.current.value = '';
   };
 
   // 차수 메모 추가
@@ -159,7 +231,7 @@ export default function SampleManagement() {
       billingStatus: '미청구',  // 항상 미청구로 시작 (청구는 명세표 발행 시 업데이트)
       requestDate: new Date().toISOString().split('T')[0],
       location: '내부개발실', round: 1,
-      costCny: 0, imageUrls: [], revisionHistory: [], materialChecklist: [], materialRequests: [],
+      costCny: 0, imageUrls: [], documents: [], revisionHistory: [], materialChecklist: [], materialRequests: [],
     });
     setEditId(null);
     setCreateTempMode(false);
@@ -248,6 +320,7 @@ export default function SampleManagement() {
         costKrw,
         approvedBy: form.approvedBy,
         imageUrls: form.imageUrls || [],
+        documents: form.documents || [],
         materialChecklist: form.materialChecklist || [],
         materialRequests: form.materialRequests || [],
         billingStatus: '미청구',  // 접수 시 항상 미청구 (청구 상태는 명세표 발행 시 자동 업데이트)
@@ -1033,7 +1106,7 @@ export default function SampleManagement() {
                   type="button" variant="outline" size="sm" className="h-7 text-xs"
                   onClick={() => setForm(f => ({
                     ...f,
-                    materialRequests: [...(f.materialRequests || []), { itemName: '', qty: 1, unit: '개' }],
+                    materialRequests: [...(f.materialRequests || []), { itemName: '', vendor: '', color: '', qty: 1, unit: '개' }],
                   }))}
                 >
                   <Plus className="w-3 h-3 mr-1" />행 추가
@@ -1042,96 +1115,190 @@ export default function SampleManagement() {
               {(form.materialRequests || []).length === 0 ? (
                 <p className="text-xs text-stone-400 text-center py-2">자재 요청 없음 (행 추가 버튼으로 추가)</p>
               ) : (
-                <div className="space-y-1.5">
+                <div className="space-y-2">
+                  {/* 헤더 */}
                   <div className="grid grid-cols-12 gap-1 text-xs text-stone-500 px-1">
-                    <span className="col-span-6">자재명</span>
-                    <span className="col-span-2 text-center">수량</span>
-                    <span className="col-span-3">단위</span>
+                    <span className="col-span-3">자재명</span>
+                    <span className="col-span-3">업체</span>
+                    <span className="col-span-2">컬러</span>
+                    <span className="col-span-1 text-center">수량</span>
+                    <span className="col-span-2">단위</span>
                     <span className="col-span-1"></span>
                   </div>
-                  {(form.materialRequests || []).map((req, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-1 items-center">
-                      <Input
-                        className="col-span-6 h-8 text-sm"
-                        value={req.itemName}
-                        onChange={e => setForm(f => {
-                          const reqs = [...(f.materialRequests || [])];
-                          reqs[idx] = { ...reqs[idx], itemName: e.target.value };
-                          return { ...f, materialRequests: reqs };
-                        })}
-                        placeholder="예: 가죽 네이키드 블랙"
-                      />
-                      <Input
-                        type="number"
-                        min={1}
-                        className="col-span-2 h-8 text-sm text-center"
-                        value={req.qty}
-                        onChange={e => setForm(f => {
-                          const reqs = [...(f.materialRequests || [])];
-                          reqs[idx] = { ...reqs[idx], qty: parseFloat(e.target.value) || 1 };
-                          return { ...f, materialRequests: reqs };
-                        })}
-                      />
-                      <Input
-                        className="col-span-3 h-8 text-sm"
-                        value={req.unit}
-                        onChange={e => setForm(f => {
-                          const reqs = [...(f.materialRequests || [])];
-                          reqs[idx] = { ...reqs[idx], unit: e.target.value };
-                          return { ...f, materialRequests: reqs };
-                        })}
-                        placeholder="장/개/m"
-                      />
-                      <Button
-                        type="button" variant="ghost" size="sm" className="col-span-1 h-8 w-8 p-0 text-red-400 hover:text-red-600"
-                        onClick={() => setForm(f => ({
-                          ...f,
-                          materialRequests: (f.materialRequests || []).filter((_, i) => i !== idx),
-                        }))}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
+                  {(form.materialRequests || []).map((req, idx) => {
+                    const isCustomVendor = !!req.vendor && !VENDOR_OPTIONS.includes(req.vendor);
+                    const selectVal = isCustomVendor ? '기타' : (req.vendor || 'none');
+                    return (
+                      <div key={idx} className="space-y-1">
+                        <div className="grid grid-cols-12 gap-1 items-center">
+                          {/* 자재명 */}
+                          <Input
+                            className="col-span-3 h-8 text-xs"
+                            value={req.itemName}
+                            onChange={e => setForm(f => {
+                              const reqs = [...(f.materialRequests || [])];
+                              reqs[idx] = { ...reqs[idx], itemName: e.target.value };
+                              return { ...f, materialRequests: reqs };
+                            })}
+                            placeholder="가죽 네이키드"
+                          />
+                          {/* 업체 선택 */}
+                          <Select
+                            value={selectVal}
+                            onValueChange={v => setForm(f => {
+                              const reqs = [...(f.materialRequests || [])];
+                              reqs[idx] = { ...reqs[idx], vendor: v === 'none' ? '' : v };
+                              return { ...f, materialRequests: reqs };
+                            })}
+                          >
+                            <SelectTrigger className="col-span-3 h-8 text-xs">
+                              <SelectValue placeholder="업체" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">선택 안 함</SelectItem>
+                              {VENDOR_OPTIONS.map(v => (
+                                <SelectItem key={v} value={v}>{v}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {/* 컬러 */}
+                          <Input
+                            className="col-span-2 h-8 text-xs"
+                            value={req.color || ''}
+                            onChange={e => setForm(f => {
+                              const reqs = [...(f.materialRequests || [])];
+                              reqs[idx] = { ...reqs[idx], color: e.target.value };
+                              return { ...f, materialRequests: reqs };
+                            })}
+                            placeholder="블랙"
+                          />
+                          {/* 수량 */}
+                          <Input
+                            type="number"
+                            min={1}
+                            className="col-span-1 h-8 text-xs text-center"
+                            value={req.qty}
+                            onChange={e => setForm(f => {
+                              const reqs = [...(f.materialRequests || [])];
+                              reqs[idx] = { ...reqs[idx], qty: parseFloat(e.target.value) || 1 };
+                              return { ...f, materialRequests: reqs };
+                            })}
+                          />
+                          {/* 단위 */}
+                          <Input
+                            className="col-span-2 h-8 text-xs"
+                            value={req.unit}
+                            onChange={e => setForm(f => {
+                              const reqs = [...(f.materialRequests || [])];
+                              reqs[idx] = { ...reqs[idx], unit: e.target.value };
+                              return { ...f, materialRequests: reqs };
+                            })}
+                            placeholder="장/개/m"
+                          />
+                          {/* 삭제 */}
+                          <Button
+                            type="button" variant="ghost" size="sm" className="col-span-1 h-8 w-8 p-0 text-red-400 hover:text-red-600"
+                            onClick={() => setForm(f => ({
+                              ...f,
+                              materialRequests: (f.materialRequests || []).filter((_, i) => i !== idx),
+                            }))}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        {/* 기타 업체 직접입력 */}
+                        {(selectVal === '기타' || isCustomVendor) && (
+                          <Input
+                            className="h-7 text-xs ml-[25%] w-[25%]"
+                            value={isCustomVendor ? req.vendor || '' : ''}
+                            onChange={e => setForm(f => {
+                              const reqs = [...(f.materialRequests || [])];
+                              reqs[idx] = { ...reqs[idx], vendor: e.target.value };
+                              return { ...f, materialRequests: reqs };
+                            })}
+                            placeholder="업체명 직접입력"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
-            {/* 이미지 업로드 */}
+            {/* 파일/이미지 업로드 */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>샘플 이미지 (최대 5장)</Label>
+                <Label>파일/이미지 첨부 <span className="text-xs text-stone-400 font-normal">(이미지 최대 5장 + 문서 최대 5개)</span></Label>
                 <Button
                   type="button" variant="outline" size="sm" className="h-7 text-xs gap-1"
-                  onClick={() => imageFileRef.current?.click()}
-                  disabled={(form.imageUrls || []).length >= 5}
+                  onClick={() => docFileRef.current?.click()}
+                  disabled={(form.imageUrls || []).length >= 5 && (form.documents || []).length >= 5}
                 >
-                  <Camera className="w-3 h-3" />이미지 추가
+                  <Camera className="w-3 h-3" />파일/이미지 추가
                 </Button>
               </div>
+              {/* 통합 파일 입력 (이미지 + PDF + 엑셀) */}
               <input
-                ref={imageFileRef}
+                ref={docFileRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.pdf,.xlsx,.xls"
                 multiple
                 className="hidden"
-                onChange={handleImageUpload}
+                onChange={handleFileUpload}
               />
-              {(form.imageUrls || []).length > 0 ? (
-                <div className="flex flex-wrap gap-2 p-2 bg-stone-50 rounded-lg border border-stone-100">
-                  {(form.imageUrls || []).map((url, idx) => (
-                    <div key={idx} className="relative group">
-                      <img src={url} alt={`샘플 이미지 ${idx + 1}`} className="w-16 h-16 object-cover rounded-lg border border-stone-200" />
-                      <button
-                        type="button"
-                        onClick={() => setForm(f => ({ ...f, imageUrls: (f.imageUrls || []).filter((_, i) => i !== idx) }))}
-                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >×</button>
-                    </div>
-                  ))}
+              {/* 이미지 미리보기 */}
+              {(form.imageUrls || []).length > 0 && (
+                <div>
+                  <p className="text-xs text-stone-500 mb-1">이미지 ({(form.imageUrls || []).length}/5)</p>
+                  <div className="flex flex-wrap gap-2 p-2 bg-stone-50 rounded-lg border border-stone-100">
+                    {(form.imageUrls || []).map((url, idx) => (
+                      <div key={idx} className="relative group">
+                        <img
+                          src={url}
+                          alt={`샘플 이미지 ${idx + 1}`}
+                          className="w-16 h-16 object-cover rounded-lg border border-stone-200 cursor-pointer"
+                          onClick={() => window.open(url, '_blank')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, imageUrls: (f.imageUrls || []).filter((_, i) => i !== idx) }))}
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <p className="text-xs text-stone-400 text-center py-3 border border-dashed border-stone-200 rounded-lg">이미지 없음 — 위 버튼으로 추가하세요</p>
+              )}
+              {/* 문서 목록 */}
+              {(form.documents || []).length > 0 && (
+                <div>
+                  <p className="text-xs text-stone-500 mb-1">첨부 문서 ({(form.documents || []).length}/5)</p>
+                  <div className="space-y-1">
+                    {(form.documents || []).map((doc, idx) => (
+                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-stone-50 rounded-lg border border-stone-100 group">
+                        <DocIcon fileType={doc.fileType} />
+                        <button
+                          type="button"
+                          className="flex-1 text-xs text-stone-700 text-left hover:text-blue-600 truncate"
+                          onClick={() => window.open(doc.url, '_blank')}
+                        >
+                          {doc.name}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, documents: (f.documents || []).filter((_, i) => i !== idx) }))}
+                          className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(form.imageUrls || []).length === 0 && (form.documents || []).length === 0 && (
+                <p className="text-xs text-stone-400 text-center py-3 border border-dashed border-stone-200 rounded-lg">
+                  파일 없음 — 위 버튼으로 이미지·PDF·엑셀을 추가하세요
+                </p>
               )}
             </div>
 
@@ -1157,6 +1324,73 @@ export default function SampleManagement() {
               </DialogHeader>
 
               <div className="space-y-5 py-2">
+                {/* 자재 요청 목록 */}
+                {(detailSample.materialRequests || []).length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-stone-600 uppercase tracking-wider flex items-center gap-1">
+                      🧵 자재 요청 목록
+                    </p>
+                    <div className="rounded-lg border border-stone-200 overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-stone-50 border-b border-stone-100">
+                            <th className="text-left px-3 py-1.5 text-stone-500 font-medium">자재명</th>
+                            <th className="text-left px-3 py-1.5 text-stone-500 font-medium">업체</th>
+                            <th className="text-left px-3 py-1.5 text-stone-500 font-medium">컬러</th>
+                            <th className="text-right px-3 py-1.5 text-stone-500 font-medium">수량</th>
+                            <th className="text-left px-3 py-1.5 text-stone-500 font-medium">단위</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(detailSample.materialRequests || []).map((req, i) => (
+                            <tr key={i} className="border-b border-stone-50 last:border-0">
+                              <td className="px-3 py-2 text-stone-700 font-medium">{req.itemName}</td>
+                              <td className="px-3 py-2 text-stone-600">{req.vendor || <span className="text-stone-300">—</span>}</td>
+                              <td className="px-3 py-2 text-stone-600">{req.color || <span className="text-stone-300">—</span>}</td>
+                              <td className="px-3 py-2 text-right text-stone-700">{req.qty}</td>
+                              <td className="px-3 py-2 text-stone-500">{req.unit}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 첨부 파일/이미지 */}
+                {((detailSample.imageUrls || []).length > 0 || (detailSample.documents || []).length > 0) && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-stone-600 uppercase tracking-wider">📎 첨부 파일</p>
+                    {(detailSample.imageUrls || []).length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {(detailSample.imageUrls || []).map((url, idx) => (
+                          <img
+                            key={idx}
+                            src={url}
+                            alt={`이미지 ${idx + 1}`}
+                            className="w-16 h-16 object-cover rounded-lg border border-stone-200 cursor-pointer hover:opacity-80"
+                            onClick={() => window.open(url, '_blank')}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {(detailSample.documents || []).length > 0 && (
+                      <div className="space-y-1">
+                        {(detailSample.documents || []).map((doc, idx) => (
+                          <button
+                            key={idx}
+                            className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg border border-stone-100 hover:bg-stone-50"
+                            onClick={() => window.open(doc.url, '_blank')}
+                          >
+                            <DocIcon fileType={doc.fileType} />
+                            <span className="text-xs text-stone-700 truncate">{doc.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* 차수별 수정 요청 메모 */}
                 <div className="space-y-3">
                   <p className="text-xs font-semibold text-stone-600 uppercase tracking-wider">차수별 수정 요청 히스토리</p>
