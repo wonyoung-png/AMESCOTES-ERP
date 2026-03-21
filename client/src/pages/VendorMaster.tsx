@@ -26,16 +26,17 @@ const TYPE_COLOR: Record<VendorType, string> = {
 };
 
 // 자재 유형 옵션
-const MATERIAL_TYPE_OPTIONS: ('장식' | '원단' | '가죽')[] = ['장식', '원단', '가죽'];
+const MATERIAL_TYPE_OPTIONS: ('장식' | '원단' | '가죽' | '기타')[] = ['장식', '원단', '가죽', '기타'];
 
 const EMPTY_VENDOR: Partial<Vendor> = {
-  name: '', nameEn: '', nameCn: '', type: '자재거래처', country: '한국', currency: 'KRW',
+  name: '', nameEn: '', nameCn: '', type: '바이어', country: '한국', currency: 'KRW',
   contactName: '', contactEmail: '', contactPhone: '',
   leadTimeDays: undefined,
   billingType: undefined, settlementCycle: '', bankInfo: '', memo: '',
   contactHistory: [],
   materialTypes: [],
   customType: '',
+  customMaterialType: '',
 };
 
 export default function VendorMaster() {
@@ -57,7 +58,7 @@ export default function VendorMaster() {
     // 자재유형 필터 (자재거래처만 해당)
     if (filterMaterialType !== 'all') {
       list = list.filter(v =>
-        v.type === '자재거래처' && (v.materialTypes || []).includes(filterMaterialType as '장식' | '원단' | '가죽')
+        v.type === '자재거래처' && (v.materialTypes || []).includes(filterMaterialType as '장식' | '원단' | '가죽' | '기타')
       );
     }
     if (search) list = list.filter(v =>
@@ -284,7 +285,7 @@ export default function VendorMaster() {
                     <div className="flex flex-wrap gap-1">
                       {(v.materialTypes || []).map(mt => (
                         <span key={mt} className="text-xs px-1.5 py-0.5 rounded bg-green-50 border border-green-200 text-green-700">
-                          {mt}
+                          {mt === '기타' && v.customMaterialType ? `기타 (${v.customMaterialType})` : mt}
                         </span>
                       ))}
                     </div>
@@ -430,7 +431,7 @@ export default function VendorMaster() {
             {editVendor.type === '자재거래처' && (
               <div className="space-y-1.5">
                 <Label>자재 유형 <span className="text-stone-400 text-xs font-normal">(복수 선택 가능)</span></Label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {MATERIAL_TYPE_OPTIONS.map(mt => {
                     const isSelected = (editVendor.materialTypes || []).includes(mt);
                     return (
@@ -455,7 +456,16 @@ export default function VendorMaster() {
                     );
                   })}
                 </div>
-                <p className="text-[11px] text-stone-400">장식, 원단, 가죽 중 해당 유형을 모두 선택해주세요</p>
+                {/* "기타" 선택 시 직접 입력 필드 */}
+                {(editVendor.materialTypes || []).includes('기타') && (
+                  <Input
+                    value={editVendor.customMaterialType || ''}
+                    onChange={e => update('customMaterialType', e.target.value)}
+                    placeholder="자재 유형 직접 입력 (예: 부자재, 포장재)"
+                    className="mt-1.5 text-sm"
+                  />
+                )}
+                <p className="text-[11px] text-stone-400">장식, 원단, 가죽, 기타 중 해당 유형을 모두 선택해주세요</p>
               </div>
             )}
 

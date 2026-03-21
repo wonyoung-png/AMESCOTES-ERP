@@ -377,7 +377,8 @@ export interface Vendor {
   vendorCode?: string;       // 거래처 코드 (전표번호용, 예: LLL)
   type: VendorType;
   customType?: string;       // 거래처 유형 "기타" 선택 시 직접 입력값
-  materialTypes?: ('장식' | '원단' | '가죽')[];  // 자재거래처 자재 유형 (복수 선택)
+  materialTypes?: ('장식' | '원단' | '가죽' | '기타')[];  // 자재거래처 자재 유형 (복수 선택)
+  customMaterialType?: string;   // 자재유형 "기타" 선택 시 직접 입력값
   country: string;
   currency: Currency;
   contactName?: string;

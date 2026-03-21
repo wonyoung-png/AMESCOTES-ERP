@@ -492,15 +492,24 @@ export default function SampleManagement() {
   };
 
   // 품목 등록 (최종승인 샘플에서 품목 마스터로 이동 + prefill)
+  // styleNo가 품목 마스터에 없는 경우에만 노출됨
   const handleRegisterItem = (s: Sample) => {
-    localStorage.setItem('ames_prefill_item', JSON.stringify({
+    // localStorage + URL 파라미터 두 방식 모두 지원
+    const prefillData = {
       styleNo: s.styleNo,
       buyerId: s.buyerId,
       season: s.season,
       styleName: s.styleName,
       imageUrl: s.imageUrls?.[0] ?? undefined,
-    }));
-    navigate('/items');
+    };
+    localStorage.setItem('ames_prefill_item', JSON.stringify(prefillData));
+    // URL 파라미터로도 핵심 정보 전달 (styleNo, styleName, buyerId)
+    const params = new URLSearchParams();
+    params.set('styleNo', s.styleNo);
+    if (s.styleName) params.set('styleName', s.styleName);
+    if (s.buyerId) params.set('buyerId', s.buyerId);
+    if (s.season) params.set('season', s.season);
+    navigate(`/items?${params.toString()}`);
     toast.success('품목 마스터로 이동합니다. 샘플 정보가 자동 입력됩니다.');
   };
 
@@ -836,16 +845,19 @@ export default function SampleManagement() {
                           onClick={() => handleApprove(s)}>승인</Button>
                       )}
                       {s.stage === '최종승인' && (() => {
-                        const registeredItem = items.find(i => i.id === s.styleId && i.itemStatus !== 'TEMP');
+                        // styleNo 기반으로 품목 마스터 등록 여부 확인 (더 정확)
+                        const registeredItem = items.find(i => i.styleNo === s.styleNo && i.itemStatus !== 'TEMP');
                         return (
                           <>
                             {!registeredItem && (
-                              <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-blue-700 hover:text-blue-900 border border-blue-200"
+                              /* 품목 미등록 → 노란색/주황색 계열 "품목등록" 버튼 */
+                              <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-orange-700 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 border border-orange-300"
                                 onClick={() => handleRegisterItem(s)}>
-                                <PackagePlus className="w-3 h-3 mr-1" />품목 등록
+                                <PackagePlus className="w-3 h-3 mr-1" />품목등록
                               </Button>
                             )}
                             {registeredItem && (
+                              /* 품목 등록 완료 → 기존 스타일 "발주 생성" 버튼 */
                               <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-amber-700 hover:text-amber-900 border border-amber-300"
                                 onClick={() => handleCreateOrder(s)}>
                                 <FileText className="w-3 h-3 mr-1" />발주 생성
