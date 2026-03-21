@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { toast } from 'sonner';
 import { RefreshCw, History, TrendingUp, DollarSign, Trash2, Save } from 'lucide-react';
+import { manualFetchExchangeRate } from '@/hooks/useAutoExchangeRate';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 
@@ -16,6 +17,25 @@ export default function ExchangeSettings() {
   const [usdInput, setUsdInput] = useState(String(settings.usdKrw));
   const [cnyInput, setCnyInput] = useState(String(settings.cnyKrw));
   const [historyMemo, setHistoryMemo] = useState('');
+  const [isFetching, setIsFetching] = useState(false);
+
+  const lastAutoDate = localStorage.getItem('erp_exchange_last_date');
+
+  const handleAutoFetch = async () => {
+    setIsFetching(true);
+    try {
+      await manualFetchExchangeRate();
+      const updated = store.getSettings();
+      setSettings(updated);
+      setUsdInput(String(updated.usdKrw));
+      setCnyInput(String(updated.cnyKrw));
+      toast.success(`환율 새로고침 완료 — USD ${updated.usdKrw.toLocaleString()} / CNY ${updated.cnyKrw.toLocaleString()}`);
+    } catch {
+      toast.error('환율 가져오기 실패 — 네트워크를 확인해주세요');
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
   const handleApply = () => {
     const usd = parseFloat(usdInput);
@@ -125,9 +145,26 @@ export default function ExchangeSettings() {
       {/* 현재 환율 + 시스템 설정 */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border border-stone-200 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <DollarSign className="w-5 h-5 text-green-600" />
-            <span className="font-semibold text-stone-700">현재 적용 환율</span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-green-600" />
+              <span className="font-semibold text-stone-700">현재 적용 환율</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {lastAutoDate && (
+                <span className="text-xs text-stone-400">마지막 업데이트: {lastAutoDate}</span>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleAutoFetch}
+                disabled={isFetching}
+                className="h-7 text-xs gap-1"
+              >
+                <RefreshCw className={`w-3 h-3 ${isFetching ? 'animate-spin' : ''}`} />
+                {isFetching ? '가져오는 중...' : '실시간 새로고침'}
+              </Button>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

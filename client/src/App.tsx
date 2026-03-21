@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAutoExchangeRate } from '@/hooks/useAutoExchangeRate';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, Redirect } from "wouter";
@@ -28,6 +29,7 @@ import NotFound from "./pages/NotFound";
 
 function Router() {
   const [, forceUpdate] = useState(0);
+  useAutoExchangeRate(); // 매일 자동 환율 업데이트
 
   const handleLogin = () => forceUpdate(n => n + 1);
   const handleLogout = () => forceUpdate(n => n + 1);
