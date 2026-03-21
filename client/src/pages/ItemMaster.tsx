@@ -94,9 +94,12 @@ export default function ItemMaster() {
 
   const filtered = useMemo(() => {
     return items.filter(item => {
+      // 바이어 이름 검색 포함
+      const buyerName = vendors.find(v => v.id === item.buyerId)?.name || '';
       const matchSearch = !search ||
         item.styleNo.toLowerCase().includes(search.toLowerCase()) ||
-        item.name.toLowerCase().includes(search.toLowerCase());
+        item.name.toLowerCase().includes(search.toLowerCase()) ||
+        buyerName.toLowerCase().includes(search.toLowerCase());
       const matchSeason = filterSeason === '전체' || item.season === filterSeason;
       const matchCat = filterCategory === '전체' || item.category === filterCategory;
       const matchStatus = filterStatus === '전체' || item.itemStatus === filterStatus;
@@ -267,7 +270,7 @@ export default function ItemMaster() {
         <CardContent className="p-3 flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[200px]">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-            <Input placeholder="스타일번호 / 품명 검색" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
+            <Input placeholder="스타일번호 / 품명 / 바이어 검색" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
           </div>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-28 h-9"><SelectValue placeholder="상태" /></SelectTrigger>
