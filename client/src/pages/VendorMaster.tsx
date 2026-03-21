@@ -1,5 +1,6 @@
 // AMESCOTES ERP — 거래처 마스터 (Phase 1 개편)
 import { useState, useMemo, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { store, genId, type Vendor, type VendorType, type Currency, type BillingType } from '@/lib/store';
 import { parseBizLicense } from '@/lib/bizLicense';
 import { Button } from '@/components/ui/button';
@@ -123,11 +124,103 @@ export default function VendorMaster() {
     toast.success('삭제되었습니다');
   };
 
+  // 헤더 이름을 정규화하는 헬퍼 함수
+  const normalizeHeader = (h: string) => String(h).toLowerCase().trim();
+
+  // 헤더 목록에서 키워드 중 하나와 매칭되는 컬럼 인덱스 찾기
+  const findColIndex = (headers: string[], keywords: string[]): number => {
+    return headers.findIndex(h => keywords.some(kw => normalizeHeader(h) === kw.toLowerCase()));
+  };
+
+  // 엑셀 파일에서 거래처 정보 파싱
+  const parseVendorExcel = (file: File): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = ev.target?.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          // 헤더 포함 전체 데이터를 2D 배열로 읽기
+          const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+          if (rows.length < 2) {
+            reject(new Error('데이터가 없습니다 (헤더 + 최소 1행 필요)'));
+            return;
+          }
+
+          const headers = (rows[0] as unknown[]).map(h => String(h));
+          const dataRows = rows.slice(1).filter(row => (row as unknown[]).some(cell => String(cell).trim() !== ''));
+
+          if (dataRows.length === 0) {
+            reject(new Error('데이터 행이 없습니다'));
+            return;
+          }
+
+          if (dataRows.length > 1) {
+            toast.info(`${dataRows.length}개 거래처 데이터 발견, 첫 번째 행을 입력합니다`);
+          }
+
+          const row = dataRows[0] as unknown[];
+          const get = (keywords: string[]): string => {
+            const idx = findColIndex(headers, keywords);
+            return idx >= 0 ? String(row[idx] ?? '').trim() : '';
+          };
+
+          const companyName = get(['회사명', '상호', 'company', 'name']);
+          const bizRegNo   = get(['사업자번호', '사업자등록번호', 'bizno', 'business_number']);
+          const vendorName = get(['거래처', '거래처명', 'vendor']);
+          const contactName = get(['담당자', '담당자명', 'contact', 'manager']);
+          const contactPhone = get(['전화', '전화번호', 'phone', 'tel']);
+          const contactEmail = get(['이메일', 'email']);
+          const address    = get(['주소', 'address']);
+          const leadTime   = get(['리드타임', '납기', 'leadtime']);
+          const code       = get(['코드', 'code']);
+
+          setEditVendor(v => ({
+            ...v,
+            companyName: companyName || v.companyName,
+            bizRegNo: bizRegNo || v.bizRegNo,
+            name: vendorName || v.name,
+            contactName: contactName || v.contactName,
+            contactPhone: contactPhone || v.contactPhone,
+            contactEmail: contactEmail || v.contactEmail,
+            address: address || v.address,
+            leadTimeDays: leadTime ? Number(leadTime) : v.leadTimeDays,
+            code: code ? code.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 2) : v.code,
+          }));
+
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(new Error('파일 읽기 실패'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
   const handleBizLicenseUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     // 파일 선택 초기화 (같은 파일 재선택 가능)
     if (fileInputRef.current) fileInputRef.current.value = '';
+
+    // 엑셀 파일인 경우 별도 처리
+    const isExcel = /\.(xlsx|xls)$/i.test(file.name);
+    if (isExcel) {
+      setIsOcrLoading(true);
+      try {
+        await parseVendorExcel(file);
+        toast.success('엑셀 거래처 정보가 자동 입력되었습니다 ✅');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '알 수 없는 오류';
+        toast.error(`엑셀 파싱 실패: ${msg}`);
+      } finally {
+        setIsOcrLoading(false);
+      }
+      return;
+    }
 
     setIsOcrLoading(true);
     try {
@@ -149,11 +242,91 @@ export default function VendorMaster() {
     }
   };
 
+  // 엑셀에서 계좌정보 파싱
+  const parseBankInfoExcel = (file: File): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = ev.target?.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+          if (rows.length < 2) {
+            reject(new Error('데이터가 없습니다'));
+            return;
+          }
+
+          const headers = (rows[0] as unknown[]).map(h => String(h));
+          const dataRows = rows.slice(1).filter(row => (row as unknown[]).some(cell => String(cell).trim() !== ''));
+
+          if (dataRows.length === 0) {
+            reject(new Error('데이터 행이 없습니다'));
+            return;
+          }
+
+          const row = dataRows[0] as unknown[];
+          const get = (keywords: string[]): string => {
+            const idx = headers.findIndex(h =>
+              keywords.some(kw => String(h).toLowerCase().trim() === kw.toLowerCase())
+            );
+            return idx >= 0 ? String(row[idx] ?? '').trim() : '';
+          };
+
+          const parsed: NonNullable<Vendor['bankInfo']> = {};
+          parsed.beneficiary  = get(['beneficiary', '수취인', 'account name']) || undefined;
+          parsed.swiftCode    = get(['swift code', 'swift', 'bic', 'swift_code']) || undefined;
+          parsed.bankName     = get(['bank name', 'bank', '은행명', '은행', 'bank_name']) || undefined;
+          parsed.bankAccount  = get(['bank account', 'account', 'account no', 'account number', '계좌번호', 'bank_account']) || undefined;
+          parsed.bankCode     = get(['bank code', 'bank_code', '은행코드']) || undefined;
+          parsed.branchCode   = get(['branch code', 'branch_code', '지점코드']) || undefined;
+          parsed.bankAddress  = get(['bank address', 'bank_address', '은행주소']) || undefined;
+          parsed.address      = get(['address', '주소', 'beneficiary address']) || undefined;
+
+          const filledCount = Object.values(parsed).filter(Boolean).length;
+
+          if (filledCount === 0) {
+            reject(new Error('매칭되는 컬럼을 찾을 수 없습니다'));
+            return;
+          }
+
+          setEditVendor(v => ({
+            ...v,
+            bankInfo: { ...(v.bankInfo || {}), ...Object.fromEntries(Object.entries(parsed).filter(([, val]) => val)) },
+          }));
+
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(new Error('파일 읽기 실패'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
   // 계좌정보 파일 업로드 — 텍스트 패턴 매칭으로 필드 자동 추출
   const handleBankInfoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (bankFileInputRef.current) bankFileInputRef.current.value = '';
+
+    // 엑셀 파일인 경우 별도 처리
+    const isExcel = /\.(xlsx|xls)$/i.test(file.name);
+    if (isExcel) {
+      setIsBankFileLoading(true);
+      try {
+        await parseBankInfoExcel(file);
+        toast.success('엑셀 계좌정보가 자동 입력되었습니다 ✅');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '알 수 없는 오류';
+        toast.error(`엑셀 파싱 실패: ${msg}`);
+      } finally {
+        setIsBankFileLoading(false);
+      }
+      return;
+    }
 
     setIsBankFileLoading(true);
     try {
@@ -437,12 +610,12 @@ export default function VendorMaster() {
           <DialogHeader><DialogTitle>{isEdit ? '거래처 수정' : '거래처 등록'}</DialogTitle></DialogHeader>
           <div className="space-y-5 py-2">
 
-            {/* 사업자등록증 업로드 */}
+            {/* 사업자등록증 / 거래처정보 업로드 */}
             <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".jpg,.jpeg,.png,.pdf"
+                accept="image/*, .pdf, .xlsx, .xls"
                 className="hidden"
                 onChange={handleBizLicenseUpload}
                 disabled={isOcrLoading}
@@ -458,10 +631,10 @@ export default function VendorMaster() {
                 {isOcrLoading ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />인식 중...</>
                 ) : (
-                  <><Paperclip className="w-4 h-4" />사업자등록증 업로드</>
+                  <><Paperclip className="w-4 h-4" />사업자등록증 / 거래처정보 업로드</>
                 )}
               </Button>
-              <p className="text-xs text-amber-700">업로드하면 회사명·사업자번호·담당자명이 자동 입력됩니다</p>
+              <p className="text-xs text-amber-700">이미지·PDF → 사업자등록증 OCR | 엑셀(.xlsx/.xls) → 거래처 정보 자동 매핑</p>
             </div>
 
             {/* 코드 + 회사명 섹션 */}
@@ -644,7 +817,7 @@ export default function VendorMaster() {
                     <input
                       ref={bankFileInputRef}
                       type="file"
-                      accept=".jpg,.jpeg,.png,.pdf"
+                      accept="image/*, .pdf, .xlsx, .xls"
                       className="hidden"
                       onChange={handleBankInfoFileUpload}
                       disabled={isBankFileLoading}
@@ -665,7 +838,7 @@ export default function VendorMaster() {
                     </Button>
                   </div>
                 </div>
-                <p className="text-[11px] text-sky-600">PDF 또는 이미지 업로드 시 BENEFICIARY, BANK NAME, SWIFT CODE 등 자동 추출을 시도합니다.</p>
+                <p className="text-[11px] text-sky-600">엑셀(.xlsx/.xls) 또는 PDF/이미지 업로드 시 BENEFICIARY, BANK NAME, SWIFT CODE 등 자동 추출을 시도합니다.</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5 col-span-2">
                     <Label className="text-xs">수취인 (BENEFICIARY)</Label>
