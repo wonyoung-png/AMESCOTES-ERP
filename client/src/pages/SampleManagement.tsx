@@ -1537,18 +1537,35 @@ export default function SampleManagement() {
                             <th className="text-left px-3 py-1.5 text-stone-500 font-medium">컬러</th>
                             <th className="text-right px-3 py-1.5 text-stone-500 font-medium">수량</th>
                             <th className="text-left px-3 py-1.5 text-stone-500 font-medium">단위</th>
+                            <th className="text-center px-3 py-1.5 text-stone-500 font-medium">이미지</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {(detailSample.materialRequests || []).map((req, i) => (
+                          {(detailSample.materialRequests || []).map((req, i) => {
+                            // 업체명: 직접입력이면 customVendor 표시
+                            const vendorDisplay = req.vendor === '직접입력'
+                              ? (req.customVendor || '—')
+                              : (req.vendor || '—');
+                            return (
                             <tr key={i} className="border-b border-stone-50 last:border-0">
                               <td className="px-3 py-2 text-stone-700 font-medium">{req.itemName}</td>
-                              <td className="px-3 py-2 text-stone-600">{req.vendor || <span className="text-stone-300">—</span>}</td>
+                              <td className="px-3 py-2 text-stone-600">{vendorDisplay === '—' ? <span className="text-stone-300">—</span> : vendorDisplay}</td>
                               <td className="px-3 py-2 text-stone-600">{req.color || <span className="text-stone-300">—</span>}</td>
                               <td className="px-3 py-2 text-right text-stone-700">{req.qty}</td>
                               <td className="px-3 py-2 text-stone-500">{req.unit}</td>
+                              <td className="px-3 py-2 text-center">
+                                {req.imageUrl ? (
+                                  <img
+                                    src={req.imageUrl}
+                                    alt="자재"
+                                    className="w-8 h-8 object-cover rounded border border-stone-200 cursor-pointer hover:opacity-80 inline-block"
+                                    onClick={() => window.open(req.imageUrl, '_blank')}
+                                  />
+                                ) : <span className="text-stone-300">—</span>}
+                              </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

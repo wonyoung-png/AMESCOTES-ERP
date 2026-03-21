@@ -245,7 +245,8 @@ export interface Sample {
   round?: SampleRound;             // 1, 2, 3, 4, 5... 제한 없음
   roundName?: string;              // 작업방식 예: "가봉", "직봉", "수정 직봉"
   color?: string;                  // 컬러 예: "블랙", "카멜", "RED"
-  assignee?: string;               // 담당자
+  assignee?: string;               // 작업담당자 (내부)
+  salesPerson?: string;            // 영업담당자 (외부/영업)
   requestDate: string;
   expectedDate?: string;
   receivedDate?: string;
