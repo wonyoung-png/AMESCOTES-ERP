@@ -8,7 +8,7 @@ import { store } from '@/lib/store';
 import { getCurrentUser, logout } from '@/lib/auth';
 import {
   BarChart3, Package, ClipboardList, FlaskConical, Factory, CalendarClock,
-  Coins, ShoppingCart, Building2, FileText, Receipt, CreditCard, Settings,
+  ShoppingCart, Building2, FileText, Receipt, CreditCard, Settings,
   ChevronLeft, ChevronRight, TrendingUp, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal,
 } from 'lucide-react';
@@ -43,7 +43,7 @@ const navGroups: NavGroup[] = [
       { path: '/samples', label: '샘플 관리', icon: <FlaskConical size={17} /> },
       { path: '/items', label: '품목 마스터', icon: <Package size={17} /> },
       { path: '/materials', label: '자재 마스터', icon: <Layers size={17} /> },
-      { path: '/bom', label: '원가 관리 (BOM)', icon: <ClipboardList size={17} /> },
+      { path: '/bom', label: 'BOM / 원가 관리', icon: <ClipboardList size={17} /> },
       { path: '/orders', label: '생산 발주', icon: <Factory size={17} /> },
       { path: '/deadline', label: '납기 관리', icon: <CalendarClock size={17} /> },
     ]
@@ -51,7 +51,6 @@ const navGroups: NavGroup[] = [
   {
     label: '원가/구매',
     items: [
-      { path: '/cost', label: '원가 관리', icon: <Coins size={17} /> },
       { path: '/purchase', label: '자재 구매', icon: <ShoppingCart size={17} /> },
     ]
   },

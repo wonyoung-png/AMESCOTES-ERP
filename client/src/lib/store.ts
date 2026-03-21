@@ -123,9 +123,9 @@ export interface Bom {
   brandNo?: number;           // 브랜드 번호
   version: number;
   season: Season;
-  lines: BomLine[];           // 원자재~포장재 섹션 행들
+  lines: BomLine[];           // 원자재~포장재 섹션 행들 (사전원가)
   postProcessLines: PostProcessLine[]; // 후가공비 행들
-  processingFee: number;      // 임가공비 (CNY)
+  processingFee: number;      // 임가공비 (CNY) — 사전원가
   logisticsCostKrw?: number;  // 물류비 (KRW, PCS 배분 후)
   packagingCostKrw?: number;  // 포장/검사비
   packingCostKrw?: number;    // 패킹재
@@ -133,7 +133,18 @@ export interface Bom {
   snapshotCnyKrw: number;     // 적용 환율 (CNY→KRW)
   snapshotUsdKrw?: number;    // 적용 환율 (USD→KRW)
   pnl?: BomPnlAssumptions;    // P&L 가정값
-  sourceFileName?: string;    // 업로드한 엑셀 파일명
+  sourceFileName?: string;    // 업로드한 엑셀 파일명 (사전원가)
+  // ─── 사후원가 필드 ───
+  preMaterials?: BomLine[];       // 사전원가 자재 (lines와 동일, 호환성)
+  postMaterials?: BomLine[];      // 사후원가 자재
+  preProcessingFee?: number;      // 사전원가 임가공비 (processingFee와 동일)
+  postProcessingFee?: number;     // 사후원가 임가공비
+  currency?: 'CNY' | 'USD' | 'KRW';
+  manufacturingCountry?: '중국' | '한국' | '기타';
+  exchangeRateCny?: number;       // 사후원가 CNY 환율
+  exchangeRateUsd?: number;       // 사후원가 USD 환율
+  postDeliveryPrice?: number;     // 사후원가용 납품가 (직접입력)
+  postSourceFileName?: string;    // 사후원가 업로드 파일명
   createdAt: string;
   updatedAt: string;
   memo?: string;
