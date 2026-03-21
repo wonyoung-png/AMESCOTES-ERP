@@ -155,23 +155,39 @@ export default function ItemMaster() {
   useEffect(() => {
     // 1) URL 파라미터 우선 체크 (샘플관리 → 품목등록 버튼 클릭 시)
     const urlParams = new URLSearchParams(searchString);
+    const urlSampleId = urlParams.get('sampleId'); // 샘플-품목 연결용 sampleId
     const urlStyleNo = urlParams.get('styleNo');
-    if (urlStyleNo) {
-      const pf = {
-        styleNo: urlStyleNo,
-        styleName: urlParams.get('styleName') || '',
-        buyerId: urlParams.get('buyerId') || '',
-        season: urlParams.get('season') || '26SS',
+    const urlStyleName = urlParams.get('styleName');
+    const urlBuyerId = urlParams.get('buyerId');
+    const urlSeason = urlParams.get('season');
+
+    if (urlStyleName || urlBuyerId || urlSampleId) {
+      // 샘플 관리에서 넘어온 경우 (styleNo는 빈값 — 담당자가 직접 입력)
+      const pf: {
+        styleNo: string;
+        styleName: string;
+        buyerId: string;
+        season: string;
+        sampleId?: string;
+        imageUrl?: string;
+      } = {
+        styleNo: urlStyleNo || '',   // TEMP 번호 대신 빈값 — 담당자가 정확한 번호 직접 입력
+        styleName: urlStyleName || '',
+        buyerId: urlBuyerId || '',
+        season: urlSeason || '26SS',
+        sampleId: urlSampleId || undefined,
       };
-      // localStorage에도 저장된 prefill이 있으면 imageUrl 등 병합
+      // localStorage prefill에서 imageUrl 병합
       const storedPrefill = localStorage.getItem('ames_prefill_item');
       if (storedPrefill) {
         try {
           const stored = JSON.parse(storedPrefill);
-          Object.assign(pf, { imageUrl: stored.imageUrl });
+          if (stored.imageUrl) pf.imageUrl = stored.imageUrl;
           localStorage.removeItem('ames_prefill_item');
         } catch { /* 무시 */ }
       }
+      // sampleId를 sessionStorage에 보관 (handleSave에서 샘플-품목 연결에 사용)
+      if (pf.sampleId) sessionStorage.setItem('ames_link_sampleId', pf.sampleId);
       openAdd(pf);
       // URL 파라미터 클린업 (히스토리 정리)
       navigate('/items', { replace: true });
@@ -182,6 +198,7 @@ export default function ItemMaster() {
     if (storedPrefill) {
       try {
         const pf = JSON.parse(storedPrefill);
+        if (pf.sampleId) sessionStorage.setItem('ames_link_sampleId', pf.sampleId);
         openAdd(pf);
       } catch {
         localStorage.removeItem('ames_prefill_item');
@@ -216,8 +233,31 @@ export default function ItemMaster() {
       toast.success('품목이 수정되었습니다');
     } else {
       // 신규 등록: materialType 완제품, itemStatus ACTIVE 강제
-      store.addItem({ ...editItem, buyerId, id: genId(), hasBom: false, createdAt: new Date().toISOString(), materialType: '완제품', itemStatus: 'ACTIVE', customCategory: customCategory || undefined } as Item);
-      toast.success('품목이 등록되었습니다');
+      const newId = genId();
+      store.addItem({ ...editItem, buyerId, id: newId, hasBom: false, createdAt: new Date().toISOString(), materialType: '완제품', itemStatus: 'ACTIVE', customCategory: customCategory || undefined } as Item);
+
+      // 샘플-품목 연결: 샘플 관리에서 넘어온 경우 해당 샘플의 styleId를 새 품목 ID로 업데이트
+      const linkedSampleId = sessionStorage.getItem('ames_link_sampleId');
+      if (linkedSampleId) {
+        try {
+          const samples = store.getSamples();
+          const linkedSample = samples.find(s => s.id === linkedSampleId);
+          if (linkedSample) {
+            store.updateSample(linkedSampleId, {
+              styleId: newId,
+              styleNo: editItem.styleNo || '',   // 정식 스타일번호로 업데이트
+            });
+            toast.success(`품목 등록 완료 — 샘플 "${linkedSample.styleName}"에 연결되었습니다`);
+          } else {
+            toast.success('품목이 등록되었습니다');
+          }
+        } catch {
+          toast.success('품목이 등록되었습니다');
+        }
+        sessionStorage.removeItem('ames_link_sampleId');
+      } else {
+        toast.success('품목이 등록되었습니다');
+      }
     }
     setModalOpen(false);
     refresh();

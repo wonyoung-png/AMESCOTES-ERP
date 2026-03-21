@@ -461,13 +461,7 @@ export default function SampleManagement() {
     const updates: Partial<Sample> = { stage };
     if (stage === '최종승인') {
       updates.approvedBy = '관리자';
-      const s = samples.find(x => x.id === id);
-      if (s) {
-        const item = store.getItems().find(i => i.id === s.styleId);
-        if (item && item.itemStatus === 'TEMP') {
-          store.updateItem(item.id, { itemStatus: 'ACTIVE' });
-        }
-      }
+      // ⚠️ 자동 ACTIVE 전환 제거: 승인 후 담당자가 정식 스타일번호로 품목 마스터에 직접 등록해야 함
     }
     store.updateSample(id, updates);
     refresh();
@@ -576,38 +570,39 @@ export default function SampleManagement() {
     refresh();
   };
 
-  // 샘플 승인 처리 (TEMP → ACTIVE)
+  // 샘플 승인 처리 — TEMP 품목은 TEMP 상태 그대로 유지
+  // 승인 후 담당자가 정확한 스타일번호로 품목 마스터에 직접 등록해야 함
   const handleApprove = (s: Sample) => {
     store.updateSample(s.id, { stage: '최종승인', approvedBy: '관리자' });
-    // 해당 품목 상태를 ACTIVE로
-    const item = items.find(i => i.id === s.styleId);
-    if (item && item.itemStatus === 'TEMP') {
-      store.updateItem(item.id, { itemStatus: 'ACTIVE' });
-    }
+    // ⚠️ 자동 ACTIVE 전환 제거: 승인은 샘플 단계만 "최종승인"으로 변경
+    // TEMP 품목은 TEMP 상태 그대로 유지 (정식 스타일번호 등록 후 ACTIVE 처리)
     refresh();
-    toast.success(`${s.styleNo} 최종 승인 — 품목이 ACTIVE 상태로 전환됩니다`);
+    toast.success(`${s.styleNo} 최종 승인 완료 — "품목등록" 버튼으로 정식 스타일번호를 등록해주세요`);
   };
 
   // 품목 등록 (최종승인 샘플에서 품목 마스터로 이동 + prefill)
-  // styleNo가 품목 마스터에 없는 경우에만 노출됨
+  // TEMP 스타일번호 대신 빈 스타일번호 전달 — 담당자가 정확한 번호를 직접 입력
+  // 품명(styleName), 바이어(buyerId), 시즌(season)은 자동 입력
   const handleRegisterItem = (s: Sample) => {
     // localStorage + URL 파라미터 두 방식 모두 지원
     const prefillData = {
-      styleNo: s.styleNo,
+      styleNo: '',          // TEMP 번호 대신 빈값 — 담당자가 직접 입력
       buyerId: s.buyerId,
       season: s.season,
       styleName: s.styleName,
+      sampleId: s.id,       // 샘플-품목 연결을 위해 샘플 ID 전달
       imageUrl: s.imageUrls?.[0] ?? undefined,
     };
     localStorage.setItem('ames_prefill_item', JSON.stringify(prefillData));
-    // URL 파라미터로도 핵심 정보 전달 (styleNo, styleName, buyerId)
+    // URL 파라미터로도 핵심 정보 전달 (styleNo는 빈값, styleName/buyerId/season 자동입력)
     const params = new URLSearchParams();
-    params.set('styleNo', s.styleNo);
+    // styleNo는 전달하지 않음 — 담당자가 정확한 번호 직접 입력
     if (s.styleName) params.set('styleName', s.styleName);
     if (s.buyerId) params.set('buyerId', s.buyerId);
     if (s.season) params.set('season', s.season);
+    params.set('sampleId', s.id); // 샘플-품목 연결용
     navigate(`/items?${params.toString()}`);
-    toast.success('품목 마스터로 이동합니다. 샘플 정보가 자동 입력됩니다.');
+    toast.info('정확한 스타일번호를 입력 후 품목을 등록해주세요', { duration: 5000 });
   };
 
   // 발주 생성 (이미 품목 등록된 최종승인 샘플에서)
@@ -1015,19 +1010,27 @@ export default function SampleManagement() {
                           onClick={() => handleApprove(s)}>승인</Button>
                       )}
                       {s.stage === '최종승인' && (() => {
-                        // styleNo 기반으로 품목 마스터 등록 여부 확인 (더 정확)
-                        const registeredItem = items.find(i => i.styleNo === s.styleNo && i.itemStatus !== 'TEMP');
+                        // 품목 등록 여부 확인:
+                        // 1) TEMP 스타일번호가 아닌 정식 스타일번호로 등록된 ACTIVE 품목 찾기
+                        // 2) 스타일번호가 TEMP로 시작하면 → 품목등록 버튼 표시
+                        const isTempStyleNo = s.styleNo.startsWith('TEMP');
+                        const registeredItem = items.find(i =>
+                          i.itemStatus === 'ACTIVE' &&
+                          !i.styleNo.startsWith('TEMP') &&
+                          (i.id === s.styleId || (i.name === s.styleName && i.buyerId === s.buyerId))
+                        );
+                        const needsRegistration = isTempStyleNo || !registeredItem;
                         return (
                           <>
-                            {!registeredItem && (
-                              /* 품목 미등록 → 노란색/주황색 계열 "품목등록" 버튼 */
+                            {needsRegistration && (
+                              /* TEMP 스타일번호 or 품목 미등록 → 품목등록 버튼 (주황색) */
                               <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-orange-700 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 border border-orange-300"
                                 onClick={() => handleRegisterItem(s)}>
                                 <PackagePlus className="w-3 h-3 mr-1" />품목등록
                               </Button>
                             )}
-                            {registeredItem && (
-                              /* 품목 등록 완료 → 기존 스타일 "발주 생성" 버튼 */
+                            {!needsRegistration && registeredItem && (
+                              /* 정식 스타일번호로 품목 등록 완료(ACTIVE) → 발주 생성 버튼 */
                               <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-amber-700 hover:text-amber-900 border border-amber-300"
                                 onClick={() => handleCreateOrder(s)}>
                                 <FileText className="w-3 h-3 mr-1" />발주 생성
@@ -1121,17 +1124,25 @@ export default function SampleManagement() {
                     <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-green-700" onClick={() => handleApprove(s)}>승인</Button>
                   )}
                   {s.stage === '최종승인' && (() => {
-                    // 모바일 뷰: styleNo 기반 품목 등록 여부 확인
-                    const registeredItem = items.find(i => i.styleNo === s.styleNo && i.itemStatus !== 'TEMP');
-                    return registeredItem ? (
-                      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-amber-700 border border-amber-300"
-                        onClick={() => handleCreateOrder(s)}>
-                        <FileText className="w-3 h-3 mr-1" />발주
-                      </Button>
-                    ) : (
+                    // 모바일 뷰: TEMP 스타일번호 여부 + 정식 ACTIVE 품목 등록 여부 확인
+                    const isTempStyleNo = s.styleNo.startsWith('TEMP');
+                    const registeredItem = items.find(i =>
+                      i.itemStatus === 'ACTIVE' &&
+                      !i.styleNo.startsWith('TEMP') &&
+                      (i.id === s.styleId || (i.name === s.styleName && i.buyerId === s.buyerId))
+                    );
+                    const needsRegistration = isTempStyleNo || !registeredItem;
+                    return needsRegistration ? (
+                      /* TEMP 스타일번호 or 품목 미등록 → 품목등록 버튼 */
                       <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-orange-700 bg-orange-50 border border-orange-300"
                         onClick={() => handleRegisterItem(s)}>
                         <PackagePlus className="w-3 h-3 mr-1" />품목
+                      </Button>
+                    ) : (
+                      /* 정식 스타일번호로 ACTIVE 품목 등록 완료 → 발주 생성 버튼 */
+                      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-amber-700 border border-amber-300"
+                        onClick={() => handleCreateOrder(s)}>
+                        <FileText className="w-3 h-3 mr-1" />발주
                       </Button>
                     );
                   })()}
