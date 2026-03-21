@@ -1,6 +1,6 @@
 // AMESCOTES ERP — 샘플 관리 (Phase 1 전면 재작성)
-import { useState, useMemo, useRef } from 'react';
-import { useLocation } from 'wouter';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useLocation, useSearch } from 'wouter';
 import {
   store, genId, formatKRW, formatNumber,
   type Sample, type SampleStage, type Season, type SampleBillingStatus,
@@ -21,8 +21,7 @@ import {
   ClipboardCheck, Eye, PackagePlus, FileSpreadsheet, File,
 } from 'lucide-react';
 
-// 자재 업체 목록 (고정 옵션 + 직접입력)
-const VENDOR_OPTIONS = ['창성', '아이금속', '세화', '한일금속', '기타'];
+// 자재 업체 목록은 store의 자재거래처에서 동적으로 불러옴 (하드코딩 제거)
 
 // 파일 타입 판별
 function getFileType(name: string): SampleDocument['fileType'] {
@@ -86,9 +85,13 @@ function createTempItem(styleName: string, season: Season): Item {
 
 export default function SampleManagement() {
   const [, navigate] = useLocation();
+  // URL 파라미터 읽기 (Dashboard에서 "샘플 관리로 이동" 클릭 시 openId 전달됨)
+  const searchString = useSearch();
   const [samples, setSamples] = useState<Sample[]>(() => store.getSamples());
   const [items, setItems] = useState<Item[]>(() => store.getItems());
   const [vendors] = useState(() => store.getVendors().filter(v => v.type === '바이어'));
+  // 자재거래처 목록 (store에서 동적으로 불러옴)
+  const [materialVendors] = useState(() => store.getVendors().filter(v => v.type === '자재거래처'));
   const settings = store.getSettings();
 
   // 월별 통계 상태
@@ -253,6 +256,21 @@ export default function SampleManagement() {
     setNewCheckItem('');
     setShowDetail(true);
   };
+
+  // Dashboard에서 "샘플 관리로 이동" 클릭 시 URL 파라미터로 전달된 sampleId로 자동 모달 열기
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const openId = params.get('openId');
+    if (openId) {
+      const target = samples.find(s => s.id === openId);
+      if (target) {
+        openDetail(target);
+        // URL에서 파라미터 제거 (히스토리 클린업)
+        navigate('/samples', { replace: true });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchString, samples]);
 
   const handleStyleSelect = (styleId: string) => {
     const item = items.find(i => i.id === styleId);
@@ -1126,7 +1144,9 @@ export default function SampleManagement() {
                     <span className="col-span-1"></span>
                   </div>
                   {(form.materialRequests || []).map((req, idx) => {
-                    const isCustomVendor = !!req.vendor && !VENDOR_OPTIONS.includes(req.vendor);
+                    // 자재거래처 이름 목록 + 기타 옵션
+                    const materialVendorNames = materialVendors.map(v => v.name);
+                    const isCustomVendor = !!req.vendor && req.vendor !== '기타' && !materialVendorNames.includes(req.vendor);
                     const selectVal = isCustomVendor ? '기타' : (req.vendor || 'none');
                     return (
                       <div key={idx} className="space-y-1">
@@ -1142,12 +1162,12 @@ export default function SampleManagement() {
                             })}
                             placeholder="가죽 네이키드"
                           />
-                          {/* 업체 선택 */}
+                          {/* 업체 선택 (자재거래처 목록에서 동적 로드) */}
                           <Select
                             value={selectVal}
                             onValueChange={v => setForm(f => {
                               const reqs = [...(f.materialRequests || [])];
-                              reqs[idx] = { ...reqs[idx], vendor: v === 'none' ? '' : v };
+                              reqs[idx] = { ...reqs[idx], vendor: v === 'none' ? '' : (v === '기타' ? '' : v) };
                               return { ...f, materialRequests: reqs };
                             })}
                           >
@@ -1156,9 +1176,10 @@ export default function SampleManagement() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="none">선택 안 함</SelectItem>
-                              {VENDOR_OPTIONS.map(v => (
-                                <SelectItem key={v} value={v}>{v}</SelectItem>
+                              {materialVendors.map(v => (
+                                <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>
                               ))}
+                              <SelectItem value="기타">기타 (직접입력)</SelectItem>
                             </SelectContent>
                           </Select>
                           {/* 컬러 */}
@@ -1210,7 +1231,7 @@ export default function SampleManagement() {
                         {(selectVal === '기타' || isCustomVendor) && (
                           <Input
                             className="h-7 text-xs ml-[25%] w-[25%]"
-                            value={isCustomVendor ? req.vendor || '' : ''}
+                            value={req.vendor || ''}
                             onChange={e => setForm(f => {
                               const reqs = [...(f.materialRequests || [])];
                               reqs[idx] = { ...reqs[idx], vendor: e.target.value };

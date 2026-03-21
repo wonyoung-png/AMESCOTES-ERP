@@ -1,4 +1,4 @@
-// AMESCOTES ERP — 바이어 마스터 (Phase 1 개편)
+// AMESCOTES ERP — 거래처 마스터 (Phase 1 개편)
 import { useState, useMemo, useRef } from 'react';
 import { store, genId, type Vendor, type VendorType, type Currency, type BillingType } from '@/lib/store';
 import { parseBizLicense } from '@/lib/bizLicense';
@@ -25,18 +25,24 @@ const TYPE_COLOR: Record<VendorType, string> = {
   '기타':      'bg-stone-50 text-stone-600 border-stone-200',
 };
 
+// 자재 유형 옵션
+const MATERIAL_TYPE_OPTIONS: ('장식' | '원단' | '가죽')[] = ['장식', '원단', '가죽'];
+
 const EMPTY_VENDOR: Partial<Vendor> = {
   name: '', nameEn: '', nameCn: '', type: '자재거래처', country: '한국', currency: 'KRW',
   contactName: '', contactEmail: '', contactPhone: '',
   leadTimeDays: undefined,
   billingType: undefined, settlementCycle: '', bankInfo: '', memo: '',
   contactHistory: [],
+  materialTypes: [],
+  customType: '',
 };
 
 export default function VendorMaster() {
   const [vendors, setVendors] = useState<Vendor[]>(() => store.getVendors());
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterMaterialType, setFilterMaterialType] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [editVendor, setEditVendor] = useState<Partial<Vendor>>({ ...EMPTY_VENDOR });
@@ -48,6 +54,12 @@ export default function VendorMaster() {
   const filtered = useMemo(() => {
     let list = vendors;
     if (filterType !== 'all') list = list.filter(v => v.type === filterType);
+    // 자재유형 필터 (자재거래처만 해당)
+    if (filterMaterialType !== 'all') {
+      list = list.filter(v =>
+        v.type === '자재거래처' && (v.materialTypes || []).includes(filterMaterialType as '장식' | '원단' | '가죽')
+      );
+    }
     if (search) list = list.filter(v =>
       v.name.toLowerCase().includes(search.toLowerCase()) ||
       (v.nameEn || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -56,13 +68,13 @@ export default function VendorMaster() {
       (v.contactName || '').toLowerCase().includes(search.toLowerCase())
     );
     return list;
-  }, [vendors, search, filterType]);
+  }, [vendors, search, filterType, filterMaterialType]);
 
   const openAdd = () => { setEditVendor({ ...EMPTY_VENDOR }); setIsEdit(false); setShowModal(true); };
   const openEdit = (v: Vendor) => { setEditVendor({ ...v }); setIsEdit(true); setShowModal(true); };
 
   const handleSave = () => {
-    if (!editVendor.name) { toast.error('브랜드명을 입력해주세요'); return; }
+    if (!editVendor.name) { toast.error('거래처명을 입력해주세요'); return; }
     if (!editVendor.type) { toast.error('거래처 유형을 선택해주세요'); return; }
 
     // 코드 중복 검사
@@ -161,7 +173,7 @@ export default function VendorMaster() {
       </div>
 
       {/* 유형별 통계 */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-6 gap-3">
         {VENDOR_TYPES.map(t => (
           <div key={t} className="bg-white rounded-xl border border-stone-200 p-3 text-center">
             <p className="text-xl font-bold text-stone-800">{typeCounts[t] || 0}</p>
@@ -175,7 +187,7 @@ export default function VendorMaster() {
         {(['all', ...VENDOR_TYPES] as const).map(t => (
           <button
             key={t}
-            onClick={() => setFilterType(t)}
+            onClick={() => { setFilterType(t); setFilterMaterialType('all'); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
               filterType === t
                 ? 'bg-white text-stone-800 shadow-sm'
@@ -190,6 +202,28 @@ export default function VendorMaster() {
         ))}
       </div>
 
+      {/* 자재유형 필터 (자재거래처 탭 선택 시 표시) */}
+      {filterType === '자재거래처' && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-stone-500">자재 유형:</span>
+          <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl w-fit">
+            {(['all', ...MATERIAL_TYPE_OPTIONS] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setFilterMaterialType(t)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                  filterMaterialType === t
+                    ? 'bg-white text-stone-800 shadow-sm'
+                    : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                {t === 'all' ? '전체' : t}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 검색 */}
       <div className="relative max-w-xs">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
@@ -201,24 +235,23 @@ export default function VendorMaster() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50">
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">브랜드명</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">거래처명</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">코드</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">유형</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">자재유형</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">담당자</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">연락처</th>
-              
-              
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">결제조건</th>
               <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={9} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={8} className="text-center py-12 text-stone-400">
                 <Building2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 거래처가 없습니다</p>
               </td></tr>
-            ) : filtered.map(v => (
+) : filtered.map(v => (
               <tr key={v.id} className="border-b border-stone-50 hover:bg-stone-50/50">
                 <td className="px-4 py-3">
                   <p className="font-medium text-stone-800">{v.name}</p>
@@ -242,8 +275,22 @@ export default function VendorMaster() {
                 </td>
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full border ${TYPE_COLOR[v.type] || 'bg-stone-50 text-stone-600 border-stone-200'}`}>
-                    {v.type}
+                    {v.type === '기타' && v.customType ? `기타 (${v.customType})` : v.type}
                   </span>
+                </td>
+                {/* 자재유형 (자재거래처만 표시) */}
+                <td className="px-4 py-3">
+                  {v.type === '자재거래처' && (v.materialTypes || []).length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {(v.materialTypes || []).map(mt => (
+                        <span key={mt} className="text-xs px-1.5 py-0.5 rounded bg-green-50 border border-green-200 text-green-700">
+                          {mt}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-stone-300 text-xs">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <p className="text-stone-700">{v.contactName || '-'}</p>
@@ -368,13 +415,63 @@ export default function VendorMaster() {
                   <SelectItem value="기타">기타</SelectItem>
                 </SelectContent>
               </Select>
+              {/* 기타 선택 시 직접 입력 */}
+              {editVendor.type === '기타' && (
+                <Input
+                  value={editVendor.customType || ''}
+                  onChange={e => update('customType', e.target.value)}
+                  placeholder="유형명 직접 입력 (예: 샘플업체, 용역업체)"
+                  className="mt-1.5 text-sm"
+                />
+              )}
             </div>
 
-            {/* 브랜드명 */}
+            {/* 자재 유형 (자재거래처만 표시) */}
+            {editVendor.type === '자재거래처' && (
+              <div className="space-y-1.5">
+                <Label>자재 유형 <span className="text-stone-400 text-xs font-normal">(복수 선택 가능)</span></Label>
+                <div className="flex items-center gap-2">
+                  {MATERIAL_TYPE_OPTIONS.map(mt => {
+                    const isSelected = (editVendor.materialTypes || []).includes(mt);
+                    return (
+                      <button
+                        key={mt}
+                        type="button"
+                        onClick={() => {
+                          const current = editVendor.materialTypes || [];
+                          const next = isSelected
+                            ? current.filter(x => x !== mt)
+                            : [...current, mt];
+                          update('materialTypes', next);
+                        }}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                          isSelected
+                            ? 'bg-green-600 text-white border-green-600'
+                            : 'bg-white text-stone-600 border-stone-300 hover:border-green-400'
+                        }`}
+                      >
+                        {mt}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-stone-400">장식, 원단, 가죽 중 해당 유형을 모두 선택해주세요</p>
+              </div>
+            )}
+
+            {/* 거래처명 */}
             <div className="space-y-1.5">
-              <Label>브랜드명 <span className="text-red-500">*</span></Label>
+              <Label>거래처명 <span className="text-red-500">*</span></Label>
               <Input value={editVendor.name || ''} onChange={e => update('name', e.target.value)} placeholder="아뜰리에 드 루멘" />
             </div>
+
+            {/* 브랜딩 (바이어만 표시) */}
+            {editVendor.type === '바이어' && (
+              <div className="space-y-1.5">
+                <Label>브랜드명 <span className="text-stone-400 text-xs font-normal">(브랜딩 표기용, 바이어 전용)</span></Label>
+                <Input value={editVendor.nameEn || ''} onChange={e => update('nameEn', e.target.value)} placeholder="Atelier de LUMEN" />
+              </div>
+            )}
 
             {/* 담당자 정보 */}
             <div className="space-y-3">

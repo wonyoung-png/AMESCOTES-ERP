@@ -1,6 +1,6 @@
 // AMESCOTES ERP — 대시보드 (Phase 1 개편: 납기위험 중심)
 import { useMemo, useState } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import {
   store, formatKRW, formatNumber, calcDDay, dDayLabel, dDayColor,
   type Sample,
@@ -38,6 +38,7 @@ export default function Dashboard() {
   const samples = store.getSamples();
   // 샘플자재구매 — 선택한 샘플 상세 모달
   const [selectedSample, setSelectedSample] = useState<Sample | null>(null);
+  const [, navigate] = useLocation();
   const settlements = store.getSettlements();
   const salesRecords = store.getSalesRecords();
   const items = store.getItems();
@@ -483,17 +484,27 @@ export default function Dashboard() {
               </div>
 
               {/* 이미지 */}
-              {(selectedSample.imageUrls || []).length > 0 && (
+              {Array.isArray(selectedSample.imageUrls) && selectedSample.imageUrls.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-stone-600 mb-2">샘플 이미지</p>
                   <div className="flex flex-wrap gap-2">
-                    {(selectedSample.imageUrls || []).map((url, idx) => (
+                    {selectedSample.imageUrls.filter(url => url && typeof url === 'string').map((url, idx) => (
                       <img
                         key={idx}
                         src={url}
                         alt={`이미지 ${idx + 1}`}
                         className="w-16 h-16 object-cover rounded-lg border border-stone-200 cursor-pointer hover:opacity-80"
-                        onClick={() => window.open(url, '_blank')}
+                        onClick={() => {
+                          try {
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          } catch {
+                            // URL 열기 실패 시 무시
+                          }
+                        }}
+                        onError={(e) => {
+                          // 이미지 로드 실패 시 숨김 처리
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
                       />
                     ))}
                   </div>
@@ -553,10 +564,14 @@ export default function Dashboard() {
               <Button variant="outline" onClick={() => setSelectedSample(null)}>닫기</Button>
               <Button
                 className="bg-amber-700 hover:bg-amber-800 text-white text-xs"
-                onClick={() => { setSelectedSample(null); window.location.hash = '/samples'; }}
-                asChild
+                onClick={() => {
+                  const sampleId = selectedSample?.id;
+                  setSelectedSample(null);
+                  // URL 파라미터로 sampleId를 전달하여 SampleManagement에서 바로 상세 모달 열기
+                  navigate(`/samples?openId=${sampleId}`);
+                }}
               >
-                <Link href="/samples">샘플 관리로 이동</Link>
+                샘플 관리로 이동
               </Button>
             </DialogFooter>
           </DialogContent>
