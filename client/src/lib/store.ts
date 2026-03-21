@@ -231,7 +231,8 @@ export interface Sample {
   stage: SampleStage;
   location?: SampleLocation;       // 내부개발실 / 중국공장
   round?: SampleRound;             // 1, 2, 3, 4, 5... 제한 없음
-  roundName?: string;              // 차수명 예: "가봉", "직봉", "수정 직봉"
+  roundName?: string;              // 작업방식 예: "가봉", "직봉", "수정 직봉"
+  color?: string;                  // 컬러 예: "블랙", "카멜", "RED"
   assignee?: string;               // 담당자
   requestDate: string;
   expectedDate?: string;

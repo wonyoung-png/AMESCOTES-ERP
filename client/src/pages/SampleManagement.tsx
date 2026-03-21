@@ -236,6 +236,7 @@ export default function SampleManagement() {
         location: form.location,
         round: form.round,
         roundName: form.roundName,
+        color: form.color,
         assignee: form.assignee,
         requestDate: form.requestDate!,
         expectedDate: form.expectedDate,
@@ -890,59 +891,61 @@ export default function SampleManagement() {
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* 바이어 (맨 위) */}
+              <div className="col-span-2 space-y-1.5">
+                <Label>바이어</Label>
+                <Select value={form.buyerId || 'none'} onValueChange={v => setForm(f => ({ ...f, buyerId: v === 'none' ? undefined : v }))}>
+                  <SelectTrigger><SelectValue placeholder="바이어 선택 (선택사항)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">미지정</SelectItem>
+                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* 스타일 선택 (TEMP 자동생성이 아닐 때) */}
               {!createTempMode && (
                 <div className="col-span-2 space-y-2">
                   <Label>기존 스타일에서 이미지 불러오기 <span className="text-stone-400 font-normal text-xs">(선택사항 — 컬러 추가 등)</span></Label>
-                  <div className="flex gap-2">
-                    <Select value={form.buyerId || 'none'} onValueChange={v => {
-                      setForm(f => ({ ...f, buyerId: v === 'none' ? undefined : v }));
-                    }}>
-                      <SelectTrigger className="w-36 text-xs h-8"><SelectValue placeholder="바이어" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">전체 바이어</SelectItem>
-                        {vendors.filter(v => v.type === '바이어').map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Select value={form.styleId || 'none'} onValueChange={v => {
-                      if (v === 'none') { setForm(f => ({ ...f, styleId: undefined })); return; }
-                      const item = items.find(i => i.id === v);
-                      if (item) {
-                        // 이미지만 불러오고 스타일번호/품명은 그대로 유지
-                        setForm(f => ({ ...f, styleId: item.id, imageUrls: item.imageUrl ? [item.imageUrl] : [] }));
-                      }
-                    }}>
-                      <SelectTrigger className="flex-1 text-xs h-8"><SelectValue placeholder="스타일 선택 (이미지 불러오기)" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">선택 안 함</SelectItem>
-                        {items
-                          .filter(i => !form.buyerId || form.buyerId === 'none' || i.buyerId === form.buyerId)
-                          .map(i => (
-                          <SelectItem key={i.id} value={i.id} className="text-xs">
-                            {i.styleNo} — {i.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Select value={form.styleId || 'none'} onValueChange={v => {
+                    if (v === 'none') { setForm(f => ({ ...f, styleId: undefined })); return; }
+                    const item = items.find(i => i.id === v);
+                    if (item) {
+                      // 컬러추가 샘플: 스타일번호 자동생성(기존번호-1,-2,...), 품명 자동입력, 이미지 불러오기
+                      const existingColorSamples = store.getSamples().filter(s =>
+                        s.styleNo.startsWith(item.styleNo + '-') && /^.+-\d+$/.test(s.styleNo)
+                      );
+                      const maxSuffix = existingColorSamples.length > 0
+                        ? Math.max(...existingColorSamples.map(s => parseInt(s.styleNo.split('-').pop() || '0') || 0)) + 1
+                        : 1;
+                      const newStyleNo = `${item.styleNo}-${maxSuffix}`;
+                      setForm(f => ({
+                        ...f,
+                        styleId: item.id,
+                        styleNo: newStyleNo,
+                        styleName: item.name,
+                        buyerId: item.buyerId || f.buyerId,
+                        imageUrls: item.imageUrl ? [item.imageUrl] : (f.imageUrls || []),
+                      }));
+                    }
+                  }}>
+                    <SelectTrigger className="text-xs h-8"><SelectValue placeholder="스타일 선택 → 번호/품명 자동입력 + 이미지 불러오기" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">선택 안 함</SelectItem>
+                      {items
+                        .filter(i => !form.buyerId || form.buyerId === 'none' || i.buyerId === form.buyerId)
+                        .map(i => (
+                        <SelectItem key={i.id} value={i.id} className="text-xs">
+                          {i.styleNo} — {i.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs text-stone-500">새 스타일번호 *</Label>
-                      <Input value={form.styleNo || ''} onChange={e => {
-                        const newStyleNo = e.target.value;
-                        setForm(f => {
-                          // 같은 스타일번호로 이미 등록된 샘플 중 최대 차수 + 1 자동 설정
-                          if (newStyleNo && !editId) {
-                            const existingSamples = store.getSamples().filter(s => s.styleNo === newStyleNo);
-                            if (existingSamples.length > 0) {
-                              const maxRound = Math.max(...existingSamples.map(s => s.round || 1));
-                              return { ...f, styleNo: newStyleNo, round: maxRound + 1 };
-                            }
-                          }
-                          return { ...f, styleNo: newStyleNo };
-                        });
-                      }} placeholder="예: AT2603HB01" className="h-8 text-xs" />
-                      {/* C. 스타일번호 중복 체크 */}
+                      <Input value={form.styleNo || ''} onChange={e => setForm(f => ({ ...f, styleNo: e.target.value }))} placeholder="예: AT2603HB01" className="h-8 text-xs" />
+                      {/* 스타일번호 중복 체크 */}
                       {form.styleNo && !editId && (() => {
                         const dupSample = store.getSamples().find(s => s.styleNo === form.styleNo && s.id !== editId);
                         const dupItem = store.getItems().find(i => i.styleNo === form.styleNo);
@@ -964,6 +967,12 @@ export default function SampleManagement() {
                 </div>
               )}
 
+              {/* 컬러 */}
+              <div className="col-span-2 space-y-1.5">
+                <Label>컬러 <span className="text-stone-400 text-xs">(선택)</span></Label>
+                <Input value={form.color || ''} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} placeholder="예: 블랙, 카멜, RED" className="h-9" />
+              </div>
+
               <div className="space-y-1.5">
                 <Label>시즌</Label>
                 <Select value={form.season || '26SS'} onValueChange={v => setForm(f => ({ ...f, season: v as Season }))}>
@@ -978,30 +987,21 @@ export default function SampleManagement() {
                   <SelectContent>{STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
+              {/* 작업방식 (단계 바로 다음) */}
+              <div className="space-y-1.5">
+                <Label>작업방식 <span className="text-stone-400 text-xs">(선택)</span></Label>
+                <Input
+                  value={form.roundName || ''}
+                  onChange={e => setForm(f => ({ ...f, roundName: e.target.value }))}
+                  placeholder="예: 가봉, 직봉, 수정 직봉"
+                />
+              </div>
               <div className="space-y-1.5">
                 <Label>샘플 장소</Label>
                 <Select value={form.location || '내부개발실'} onValueChange={v => setForm(f => ({ ...f, location: v as SampleLocation }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{LOCATIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>차수 번호</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={form.round ?? 1}
-                  onChange={e => setForm(f => ({ ...f, round: parseInt(e.target.value) || 1 }))}
-                  placeholder="1"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>차수명 <span className="text-stone-400 text-xs">(선택)</span></Label>
-                <Input
-                  value={form.roundName || ''}
-                  onChange={e => setForm(f => ({ ...f, roundName: e.target.value }))}
-                  placeholder="예: 가봉, 직봉, 수정 직봉"
-                />
               </div>
               <div className="space-y-1.5">
                 <Label>담당자</Label>
@@ -1015,23 +1015,10 @@ export default function SampleManagement() {
                 <Label>목표 완료일</Label>
                 <Input type="date" value={form.expectedDate || ''} onChange={e => setForm(f => ({ ...f, expectedDate: e.target.value }))} />
               </div>
-
               <div className="space-y-1.5">
                 <Label>샘플 단가 (원)</Label>
                 <Input type="number" step="100" value={form.sampleUnitPrice ?? ''} onChange={e => setForm(f => ({ ...f, sampleUnitPrice: parseFloat(e.target.value) || undefined }))} placeholder="예: 35000" />
               </div>
-
-              <div className="space-y-1.5">
-                <Label>바이어</Label>
-                <Select value={form.buyerId || 'none'} onValueChange={v => setForm(f => ({ ...f, buyerId: v === 'none' ? undefined : v }))}>
-                  <SelectTrigger><SelectValue placeholder="바이어 선택 (선택사항)" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">미지정</SelectItem>
-                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="space-y-1.5 col-span-2">
                 <Label>비고</Label>
                 <Input value={form.memo || ''} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="비고" />
