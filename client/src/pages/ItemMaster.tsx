@@ -1,7 +1,7 @@
-// AMESCOTES ERP — 품목 마스터 (Phase 1 개편)
+// AMESCOTES ERP — 품목 마스터 (대규모 개편)
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { store, genId, formatKRW, type Item, type Season, type Category, type ErpCategory, type ItemStatus, type ProductionOrder } from '@/lib/store';
+import { store, genId, formatKRW, type Item, type Season, type Category, type ErpCategory, type ProductionOrder } from '@/lib/store';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,25 +9,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, Database, BarChart2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const CATEGORIES: Category[] = ['숄더백', '토트백', '크로스백', '클러치', '백팩', '기타'];
+// HB 전용 세부 카테고리
+const HB_CATEGORIES: Category[] = ['숄더백', '토트백', '크로스백', '클러치', '백팩', '기타'];
+// SLG 전용 세부 카테고리
+const SLG_CATEGORIES: Category[] = ['파우치', '키링', '지갑', '기타'];
+
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
-const ERP_CATEGORIES: ErpCategory[] = ['HB', 'SLG'];
-// 상태 영문→한글 매핑
-const ITEM_STATUS_LABEL: Record<ItemStatus, string> = { 'TEMP': '임시', 'ACTIVE': '활성', 'INACTIVE': '비활성' };
 
 // 카테고리 → 제품유형코드 매핑
 const CATEGORY_CODE_MAP: Record<Category, string> = {
-  '숄더백': 'HB', '토트백': 'HB', '크로스백': 'HB', '클러치': 'SL', '백팩': 'BP', '기타': 'ETC',
-};
-
-const STATUS_COLOR: Record<ItemStatus, string> = {
-  'TEMP':     'bg-amber-50 text-amber-700 border-amber-200',
-  'ACTIVE':   'bg-green-50 text-green-700 border-green-200',
-  'INACTIVE': 'bg-stone-50 text-stone-500 border-stone-200',
+  '숄더백': 'HB', '토트백': 'HB', '크로스백': 'HB', '클러치': 'HB', '백팩': 'BP',
+  '파우치': 'SL', '키링': 'SL', '지갑': 'SL', '기타': 'ETC',
 };
 
 const ERP_CAT_COLOR: Record<ErpCategory, string> = {
@@ -35,12 +30,20 @@ const ERP_CAT_COLOR: Record<ErpCategory, string> = {
   'SLG': 'bg-purple-50 text-purple-700 border-purple-200',
 };
 
-function generateStyleNo(brandCode: string, registDate: Date, category: Category, existingItems: Item[], currentItemId?: string, erpCategory?: ErpCategory): string {
+function generateStyleNo(
+  brandCode: string,
+  registDate: Date,
+  category: Category,
+  existingItems: Item[],
+  currentItemId?: string,
+  erpCategory?: ErpCategory
+): string {
   const yy = String(registDate.getFullYear()).slice(2);
   const mm = String(registDate.getMonth() + 1).padStart(2, '0');
   // erpCategory가 SLG면 'SL'로 강제 적용
   let typeCode = CATEGORY_CODE_MAP[category] || 'HB';
   if (erpCategory === 'SLG') typeCode = 'SL';
+  else if (erpCategory === 'HB' && typeCode === 'SL') typeCode = 'HB'; // SLG 카테고리가 HB로 변경 시 복원
   const prefix = `${brandCode.toUpperCase()}${yy}${mm}${typeCode}`;
   const existing = existingItems.filter(it => it.styleNo.startsWith(prefix) && it.id !== currentItemId);
   let maxSeq = 0;
@@ -53,7 +56,7 @@ function generateStyleNo(brandCode: string, registDate: Date, category: Category
 
 const emptyItem: Partial<Item> = {
   styleNo: '', name: '', nameEn: '', season: '26SS', category: '숄더백',
-  erpCategory: 'HB', itemStatus: 'ACTIVE', materialType: '완제품',
+  erpCategory: 'HB', materialType: '완제품',
   material: '', salePriceKrw: 0, targetSalePrice: 0,
   colors: [], memo: '',
 };
@@ -67,7 +70,7 @@ export default function ItemMaster() {
   const [search, setSearch] = useState('');
   const [filterSeason, setFilterSeason] = useState('전체');
   const [filterCategory, setFilterCategory] = useState('전체');
-  const [filterStatus, setFilterStatus] = useState('전체');
+  const [filterErpCategory, setFilterErpCategory] = useState('전체');
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<Partial<Item>>({ ...emptyItem });
   const [isEdit, setIsEdit] = useState(false);
@@ -98,6 +101,17 @@ export default function ItemMaster() {
 
   const refresh = () => setItems(store.getItems());
 
+  // 현재 선택된 erpCategory에 따른 세부 카테고리 옵션
+  const subCategories = editItem.erpCategory === 'SLG' ? SLG_CATEGORIES : HB_CATEGORIES;
+
+  // 마진 계산
+  const calcMargin = (salePrice: number, deliveryPrice: number) => {
+    if (!salePrice || !deliveryPrice) return { rate: null, amount: null };
+    const amount = salePrice - deliveryPrice;
+    const rate = (amount / salePrice) * 100;
+    return { rate, amount };
+  };
+
   const filtered = useMemo(() => {
     return items.filter(item => {
       // 바이어 이름 검색 포함
@@ -108,12 +122,12 @@ export default function ItemMaster() {
         buyerName.toLowerCase().includes(search.toLowerCase());
       const matchSeason = filterSeason === '전체' || item.season === filterSeason;
       const matchCat = filterCategory === '전체' || item.category === filterCategory;
-      const matchStatus = filterStatus === '전체' || item.itemStatus === filterStatus;
+      const matchErpCat = filterErpCategory === '전체' || item.erpCategory === filterErpCategory;
       const matchBuyer = filterBuyer === '전체' || item.buyerId === filterBuyer;
-      const matchNoBom = !filterNoBom || (!item.hasBom && (item.itemStatus || 'ACTIVE') === 'ACTIVE');
-      return matchSearch && matchSeason && matchCat && matchStatus && matchBuyer && matchNoBom;
+      const matchNoBom = !filterNoBom || !item.hasBom;
+      return matchSearch && matchSeason && matchCat && matchErpCat && matchBuyer && matchNoBom;
     });
-  }, [items, search, filterSeason, filterCategory, filterStatus, filterBuyer, filterNoBom]);
+  }, [items, search, filterSeason, filterCategory, filterErpCategory, filterBuyer, filterNoBom]);
 
   // 자동생성 미리보기
   useEffect(() => {
@@ -155,14 +169,13 @@ export default function ItemMaster() {
   useEffect(() => {
     // 1) URL 파라미터 우선 체크 (샘플관리 → 품목등록 버튼 클릭 시)
     const urlParams = new URLSearchParams(searchString);
-    const urlSampleId = urlParams.get('sampleId'); // 샘플-품목 연결용 sampleId
+    const urlSampleId = urlParams.get('sampleId');
     const urlStyleNo = urlParams.get('styleNo');
     const urlStyleName = urlParams.get('styleName');
     const urlBuyerId = urlParams.get('buyerId');
     const urlSeason = urlParams.get('season');
 
     if (urlStyleName || urlBuyerId || urlSampleId) {
-      // 샘플 관리에서 넘어온 경우 (styleNo는 빈값 — 담당자가 직접 입력)
       const pf: {
         styleNo: string;
         styleName: string;
@@ -171,13 +184,12 @@ export default function ItemMaster() {
         sampleId?: string;
         imageUrl?: string;
       } = {
-        styleNo: urlStyleNo || '',   // TEMP 번호 대신 빈값 — 담당자가 정확한 번호 직접 입력
+        styleNo: urlStyleNo || '',
         styleName: urlStyleName || '',
         buyerId: urlBuyerId || '',
         season: urlSeason || '26SS',
         sampleId: urlSampleId || undefined,
       };
-      // localStorage prefill에서 imageUrl 병합
       const storedPrefill = localStorage.getItem('ames_prefill_item');
       if (storedPrefill) {
         try {
@@ -186,10 +198,8 @@ export default function ItemMaster() {
           localStorage.removeItem('ames_prefill_item');
         } catch { /* 무시 */ }
       }
-      // sampleId를 sessionStorage에 보관 (handleSave에서 샘플-품목 연결에 사용)
       if (pf.sampleId) sessionStorage.setItem('ames_link_sampleId', pf.sampleId);
       openAdd(pf);
-      // URL 파라미터 클린업 (히스토리 정리)
       navigate('/items', { replace: true });
       return;
     }
@@ -204,7 +214,6 @@ export default function ItemMaster() {
         localStorage.removeItem('ames_prefill_item');
       }
     }
-    // 최초 진입 시만 실행
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -228,15 +237,27 @@ export default function ItemMaster() {
     const buyerId = selectedVendorId || editItem.buyerId;
 
     if (isEdit && editItem.id) {
-      // 수정 시: materialType 완제품 강제, customCategory 저장
-      store.updateItem(editItem.id, { ...editItem, buyerId, materialType: '완제품', customCategory: customCategory || undefined } as Partial<Item>);
+      store.updateItem(editItem.id, {
+        ...editItem,
+        buyerId,
+        materialType: '완제품',
+        customCategory: customCategory || undefined,
+      } as Partial<Item>);
       toast.success('품목이 수정되었습니다');
     } else {
-      // 신규 등록: materialType 완제품, itemStatus ACTIVE 강제
       const newId = genId();
-      store.addItem({ ...editItem, buyerId, id: newId, hasBom: false, createdAt: new Date().toISOString(), materialType: '완제품', itemStatus: 'ACTIVE', customCategory: customCategory || undefined } as Item);
+      store.addItem({
+        ...editItem,
+        buyerId,
+        id: newId,
+        hasBom: false,
+        createdAt: new Date().toISOString(),
+        materialType: '완제품',
+        itemStatus: 'ACTIVE',
+        customCategory: customCategory || undefined,
+      } as Item);
 
-      // 샘플-품목 연결: 샘플 관리에서 넘어온 경우 해당 샘플의 styleId를 새 품목 ID로 업데이트
+      // 샘플-품목 연결
       const linkedSampleId = sessionStorage.getItem('ames_link_sampleId');
       if (linkedSampleId) {
         try {
@@ -245,7 +266,7 @@ export default function ItemMaster() {
           if (linkedSample) {
             store.updateSample(linkedSampleId, {
               styleId: newId,
-              styleNo: editItem.styleNo || '',   // 정식 스타일번호로 업데이트
+              styleNo: editItem.styleNo || '',
             });
             toast.success(`품목 등록 완료 — 샘플 "${linkedSample.styleName}"에 연결되었습니다`);
           } else {
@@ -287,11 +308,10 @@ export default function ItemMaster() {
       return {
         season,
         total: seasonItems.length,
-        temp: seasonItems.filter(i => i.itemStatus === 'TEMP').length,
-        active: seasonItems.filter(i => i.itemStatus === 'ACTIVE').length,
-        inactive: seasonItems.filter(i => i.itemStatus === 'INACTIVE').length,
+        hb: seasonItems.filter(i => i.erpCategory === 'HB').length,
+        slg: seasonItems.filter(i => i.erpCategory === 'SLG').length,
         hasBom: seasonItems.filter(i => i.hasBom).length,
-        noBom: seasonItems.filter(i => !i.hasBom && i.itemStatus === 'ACTIVE').length,
+        noBom: seasonItems.filter(i => !i.hasBom).length,
       };
     });
   }, [items, seasonStatsTarget]);
@@ -299,12 +319,6 @@ export default function ItemMaster() {
   // 바이어 거래처만
   const buyerVendors = vendors.filter(v => v.type === '바이어');
   const brandVendors = vendors.filter(v => v.code);
-
-  // 마진율 계산
-  const marginRate = (item: Item) => {
-    if (!item.targetSalePrice || !item.baseCostKrw) return null;
-    return ((item.targetSalePrice - item.baseCostKrw) / item.targetSalePrice * 100);
-  };
 
   // 미발주기간 계산: 마지막 발주일 기준 경과 개월 수
   const monthsSinceLastOrder = (item: Item): number | null => {
@@ -320,7 +334,7 @@ export default function ItemMaster() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-stone-800">품목 마스터</h1>
-          <p className="text-sm text-stone-500 mt-0.5">스타일별 품목 정보 · HB / SLG · TEMP → ACTIVE 전환</p>
+          <p className="text-sm text-stone-500 mt-0.5">스타일별 품목 정보 · HB (핸드백) / SLG (소품)</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowSeasonStats(true)} className="gap-2 border-stone-300 text-stone-600 hover:bg-stone-50">
@@ -332,17 +346,16 @@ export default function ItemMaster() {
         </div>
       </div>
 
-      {/* 상태별 통계 */}
-      <div className="grid grid-cols-4 gap-3">
-        {(['TEMP', 'ACTIVE', 'INACTIVE'] as ItemStatus[]).map(s => {
-          const count = items.filter(i => (i.itemStatus || 'ACTIVE') === s).length;
-          return (
-            <div key={s} className={`rounded-xl border p-3 text-center ${STATUS_COLOR[s]}`}>
-              <p className="text-xl font-bold">{count}</p>
-              <p className="text-xs mt-0.5">{ITEM_STATUS_LABEL[s]}</p>
-            </div>
-          );
-        })}
+      {/* 품목 수 통계 */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-blue-50 rounded-xl border border-blue-200 p-3 text-center">
+          <p className="text-xl font-bold text-blue-700">{items.filter(i => i.erpCategory === 'HB').length}</p>
+          <p className="text-xs text-blue-600 mt-0.5">HB (핸드백)</p>
+        </div>
+        <div className="bg-purple-50 rounded-xl border border-purple-200 p-3 text-center">
+          <p className="text-xl font-bold text-purple-700">{items.filter(i => i.erpCategory === 'SLG').length}</p>
+          <p className="text-xs text-purple-600 mt-0.5">SLG (소품)</p>
+        </div>
         <div className="bg-white rounded-xl border border-stone-200 p-3 text-center">
           <p className="text-xl font-bold text-stone-800">{items.length}</p>
           <p className="text-xs text-stone-500 mt-0.5">전체</p>
@@ -356,13 +369,12 @@ export default function ItemMaster() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
             <Input placeholder="스타일번호 / 품명 / 바이어 검색" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
           </div>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-28 h-9"><SelectValue placeholder="상태" /></SelectTrigger>
+          <Select value={filterErpCategory} onValueChange={setFilterErpCategory}>
+            <SelectTrigger className="w-32 h-9"><SelectValue placeholder="카테고리" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="전체">전체 상태</SelectItem>
-              <SelectItem value="TEMP">임시</SelectItem>
-              <SelectItem value="ACTIVE">활성</SelectItem>
-              <SelectItem value="INACTIVE">비활성</SelectItem>
+              <SelectItem value="전체">전체 카테고리</SelectItem>
+              <SelectItem value="HB">HB (핸드백)</SelectItem>
+              <SelectItem value="SLG">SLG (소품)</SelectItem>
             </SelectContent>
           </Select>
           <Select value={filterSeason} onValueChange={setFilterSeason}>
@@ -375,8 +387,10 @@ export default function ItemMaster() {
           <Select value={filterCategory} onValueChange={setFilterCategory}>
             <SelectTrigger className="w-28 h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="전체">전체 카테고리</SelectItem>
-              {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              <SelectItem value="전체">세부 카테고리</SelectItem>
+              {[...HB_CATEGORIES, ...SLG_CATEGORIES.filter(c => !HB_CATEGORIES.includes(c))].map(c => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={filterBuyer} onValueChange={setFilterBuyer}>
@@ -390,7 +404,7 @@ export default function ItemMaster() {
             onClick={() => setFilterNoBom(v => !v)}
             className={`h-9 px-3 rounded-lg border text-xs font-medium transition-colors ${filterNoBom ? 'bg-red-50 border-red-300 text-red-700' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
           >
-            BOM 미작성 {filterNoBom && `(${items.filter(i => !i.hasBom && (i.itemStatus || 'ACTIVE') === 'ACTIVE').length}건)`}
+            BOM 미작성 {filterNoBom && `(${items.filter(i => !i.hasBom).length}건)`}
           </button>
         </CardContent>
       </Card>
@@ -405,21 +419,22 @@ export default function ItemMaster() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">스타일번호</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">바이어</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">품명</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">구분</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">상태</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">카테고리</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">컬러</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">납품가</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">납품가(KRW)</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">판매가</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">미발주</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">마진율</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">미발주기간</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">BOM</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(item => {
-                const margin = marginRate(item);
+                const { rate: marginRate, amount: marginAmount } = calcMargin(item.salePriceKrw, item.targetSalePrice || 0);
+                const months = monthsSinceLastOrder(item);
                 return (
-                  <tr key={item.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${item.itemStatus === 'INACTIVE' ? 'opacity-50' : ''}`}>
+                  <tr key={item.id} className="border-b border-stone-50 hover:bg-stone-50/50">
                     <td className="px-3 py-2.5">
                       {item.imageUrl ? (
                         <img src={item.imageUrl} alt={item.name} className="w-10 h-10 object-cover rounded-lg border border-stone-200" />
@@ -448,13 +463,10 @@ export default function ItemMaster() {
                             {item.erpCategory}
                           </span>
                         )}
-                        <span className="text-xs text-stone-400">{item.category}</span>
+                        <span className="text-xs text-stone-400">
+                          {item.customCategory || item.category}
+                        </span>
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLOR[item.itemStatus || 'ACTIVE']}`}>
-                        {item.itemStatus === 'TEMP' ? '임시' : item.itemStatus === 'INACTIVE' ? '비활성' : '활성'}
-                      </span>
                     </td>
                     <td className="px-4 py-3">
                       {(item.colors || []).length > 0 ? (
@@ -468,31 +480,38 @@ export default function ItemMaster() {
                         </div>
                       ) : <span className="text-stone-300 text-xs">—</span>}
                     </td>
+                    {/* 납품가(KRW) */}
                     <td className="px-4 py-3 text-right">
                       {item.targetSalePrice ? (
+                        <p className="font-mono text-xs text-stone-700">{formatKRW(item.targetSalePrice)}</p>
+                      ) : <span className="text-stone-300 text-xs">—</span>}
+                    </td>
+                    {/* 판매가 */}
+                    <td className="px-4 py-3 text-right font-mono text-xs text-stone-600">
+                      {item.salePriceKrw ? formatKRW(item.salePriceKrw) : <span className="text-stone-300">—</span>}
+                    </td>
+                    {/* 마진율 */}
+                    <td className="px-4 py-3 text-right">
+                      {marginRate !== null ? (
                         <div>
-                          <p className="font-mono text-xs text-stone-700">{formatKRW(item.targetSalePrice)}</p>
-                          {margin !== null && (
-                            <p className={`text-[11px] ${margin >= 30 ? 'text-green-600' : margin >= 20 ? 'text-amber-600' : 'text-red-500'}`}>
-                              마진 {margin.toFixed(1)}%
-                            </p>
+                          <p className={`text-xs font-medium ${marginRate >= 30 ? 'text-green-600' : marginRate >= 20 ? 'text-amber-600' : 'text-red-500'}`}>
+                            {marginRate.toFixed(1)}%
+                          </p>
+                          {marginAmount !== null && (
+                            <p className="text-[10px] text-stone-400">{formatKRW(marginAmount)}</p>
                           )}
                         </div>
                       ) : <span className="text-stone-300 text-xs">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-xs text-stone-600">
-                      {formatKRW(item.salePriceKrw)}
-                    </td>
+                    {/* 미발주기간 */}
                     <td className="px-4 py-3 text-center">
-                      {(() => {
-                        const months = monthsSinceLastOrder(item);
-                        if (months === null) return <span className="text-stone-300 text-xs">-</span>;
-                        return (
-                          <span className={`text-xs font-medium ${months >= 12 ? 'text-red-500' : months >= 6 ? 'text-amber-600' : 'text-stone-500'}`}>
-                            {months}개월
-                          </span>
-                        );
-                      })()}
+                      {months === null ? (
+                        <span className="text-xs text-stone-400 font-medium">미발주</span>
+                      ) : (
+                        <span className={`text-xs font-medium ${months >= 12 ? 'text-red-500' : months >= 6 ? 'text-amber-600' : 'text-stone-500'}`}>
+                          {months}개월
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
@@ -503,12 +522,10 @@ export default function ItemMaster() {
                         className={`text-xs px-2 py-0.5 rounded border transition-colors font-medium ${
                           item.hasBom
                             ? 'text-green-700 border-green-300 bg-green-50 hover:bg-green-100'
-                            : item.itemStatus === 'ACTIVE'
-                              ? 'text-red-600 border-red-300 bg-red-50 hover:bg-red-100'
-                              : 'text-stone-400 border-stone-200 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50'
+                            : 'text-red-600 border-red-300 bg-red-50 hover:bg-red-100'
                         }`}
                       >
-                        {item.hasBom ? 'BOM ✓' : item.itemStatus === 'ACTIVE' ? 'BOM ⚠' : 'BOM'}
+                        {item.hasBom ? 'BOM ✓' : 'BOM ⚠'}
                       </button>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -560,9 +577,8 @@ export default function ItemMaster() {
                   <tr className="bg-stone-50 border-b border-stone-200">
                     <th className="text-left px-4 py-2.5 text-xs font-medium text-stone-500">시즌</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-stone-500">전체</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-amber-600">TEMP</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-green-600">ACTIVE</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-stone-400">INACTIVE</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-600">HB</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-medium text-purple-600">SLG</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-600">BOM완료</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-red-500">BOM미작성</th>
                   </tr>
@@ -572,9 +588,8 @@ export default function ItemMaster() {
                     <tr key={row.season} className="border-b border-stone-50 hover:bg-stone-50">
                       <td className="px-4 py-2.5 font-semibold text-stone-700">{row.season}</td>
                       <td className="px-3 py-2.5 text-center font-bold text-stone-800">{row.total}</td>
-                      <td className="px-3 py-2.5 text-center text-amber-700">{row.temp}</td>
-                      <td className="px-3 py-2.5 text-center text-green-700">{row.active}</td>
-                      <td className="px-3 py-2.5 text-center text-stone-400">{row.inactive}</td>
+                      <td className="px-3 py-2.5 text-center text-blue-700">{row.hb}</td>
+                      <td className="px-3 py-2.5 text-center text-purple-700">{row.slg}</td>
                       <td className="px-3 py-2.5 text-center text-blue-600">{row.hasBom}</td>
                       <td className="px-3 py-2.5 text-center">
                         {row.noBom > 0 ? (
@@ -667,37 +682,55 @@ export default function ItemMaster() {
             {/* 기본 정보 */}
             <div className="space-y-3">
               <p className="text-xs font-medium text-stone-600">기본 정보</p>
+
+              {/* 카테고리 */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>카테고리</Label>
-                  <Select value={editItem.erpCategory || 'HB'} onValueChange={v => setEditItem({ ...editItem, erpCategory: v as ErpCategory })}>
+                  <Select
+                    value={editItem.erpCategory || 'HB'}
+                    onValueChange={v => {
+                      const newErpCat = v as ErpCategory;
+                      // erpCategory 변경 시 세부 카테고리 기본값 변경
+                      const defaultCategory = newErpCat === 'SLG' ? '파우치' : '숄더백';
+                      setEditItem({ ...editItem, erpCategory: newErpCat, category: defaultCategory });
+                      setCustomCategory('');
+                    }}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="HB">HB (핸드백)</SelectItem>
-                      <SelectItem value="SLG">SLG (소가죽소품)</SelectItem>
+                      <SelectItem value="SLG">SLG (소품)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>세부 카테고리</Label>
-                  <Select value={editItem.category || '숄더백'} onValueChange={v => {
-                    setEditItem({ ...editItem, category: v as Category });
-                    if (v !== '기타') setCustomCategory('');
-                  }}>
+                  <Select
+                    value={editItem.category || (editItem.erpCategory === 'SLG' ? '파우치' : '숄더백')}
+                    onValueChange={v => {
+                      setEditItem({ ...editItem, category: v as Category });
+                      if (v !== '기타') setCustomCategory('');
+                    }}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                    <SelectContent>
+                      {subCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      <SelectItem value="비고(직접입력)">비고(직접입력)</SelectItem>
+                    </SelectContent>
                   </Select>
-                  {/* 기타 선택 시 직접 입력 */}
-                  {editItem.category === '기타' && (
+                  {/* 기타 또는 비고(직접입력) 선택 시 직접 입력 */}
+                  {(editItem.category === '기타' || (editItem.category as string) === '비고(직접입력)') && (
                     <Input
                       value={customCategory}
                       onChange={e => setCustomCategory(e.target.value)}
-                      placeholder="직접 입력 (예: 지갑, 파우치, 카드케이스)"
+                      placeholder="직접 입력 (예: 카드케이스, 파우치)"
                       className="mt-1.5 text-sm"
                     />
                   )}
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>품명 (국문) *</Label>
@@ -728,14 +761,49 @@ export default function ItemMaster() {
               <p className="text-xs font-medium text-stone-600">가격 정보</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>납품가 (KRW)</Label>
-                  <Input type="number" value={editItem.targetSalePrice || ''} onChange={e => setEditItem({ ...editItem, targetSalePrice: Number(e.target.value) })} placeholder="납품가" />
+                  <Label>납품가(KRW)</Label>
+                  <Input
+                    type="number"
+                    value={editItem.targetSalePrice || ''}
+                    onChange={e => setEditItem({ ...editItem, targetSalePrice: Number(e.target.value) })}
+                    placeholder="납품가 입력"
+                  />
+                  <p className="text-[10px] text-stone-400">※ 추후 BOM 완성 시 원가 기반 납품가 자동 연동 예정</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>판매가 (KRW)</Label>
-                  <Input type="number" value={editItem.salePriceKrw || ''} onChange={e => setEditItem({ ...editItem, salePriceKrw: Number(e.target.value) })} placeholder="218000" />
+                  <Label>판매가(KRW)</Label>
+                  <Input
+                    type="number"
+                    value={editItem.salePriceKrw || ''}
+                    onChange={e => setEditItem({ ...editItem, salePriceKrw: Number(e.target.value) })}
+                    placeholder="218000"
+                  />
                 </div>
               </div>
+              {/* 마진 자동 계산 표시 */}
+              {(() => {
+                const { rate, amount } = calcMargin(editItem.salePriceKrw || 0, editItem.targetSalePrice || 0);
+                if (rate === null) return null;
+                return (
+                  <div className="p-3 bg-stone-50 rounded-lg border border-stone-100 flex gap-4">
+                    <div>
+                      <p className="text-xs text-stone-500">마진금액</p>
+                      <p className={`text-sm font-semibold ${(amount || 0) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                        {formatKRW(amount || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-stone-500">마진율</p>
+                      <p className={`text-sm font-semibold ${rate >= 30 ? 'text-green-700' : rate >= 20 ? 'text-amber-600' : 'text-red-600'}`}>
+                        {rate.toFixed(1)}%
+                      </p>
+                    </div>
+                    <div className="ml-auto text-xs text-stone-400 self-center">
+                      마진율 = (판매가 - 납품가) / 판매가 × 100
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 컬러 목록 */}
