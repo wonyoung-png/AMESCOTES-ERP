@@ -94,8 +94,12 @@ export default function SampleManagement() {
   const [materialVendors] = useState(() => store.getVendors().filter(v => v.type === '자재거래처'));
   const settings = store.getSettings();
 
-  // 월별 통계 상태
+  // 월별 통계 상태 + 필터
   const [statMonth, setStatMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [statFilterSalesPerson, setStatFilterSalesPerson] = useState('all');
+  const [statFilterAssignee, setStatFilterAssignee] = useState('all');
+  const [statFilterBuyer, setStatFilterBuyer] = useState('all');
+  const [statFilterSeason, setStatFilterSeason] = useState('all');
 
   const [search, setSearch] = useState('');
   const [filterStage, setFilterStage] = useState('진행중');
@@ -242,10 +246,17 @@ export default function SampleManagement() {
 
   const IN_PROGRESS_STAGES: SampleStage[] = ['1차', '2차', '3차', '4차'];
 
-  // 담당자 목록 추출 (store에서 동적으로)
+  // 작업담당자 목록 추출 (store에서 동적으로)
   const assigneeList = useMemo(() => {
     const set = new Set<string>();
     samples.forEach(s => { if (s.assignee) set.add(s.assignee); });
+    return Array.from(set).sort();
+  }, [samples]);
+
+  // 영업담당자 목록 추출 (store에서 동적으로)
+  const salesPersonList = useMemo(() => {
+    const set = new Set<string>();
+    samples.forEach(s => { if (s.salesPerson) set.add(s.salesPerson); });
     return Array.from(set).sort();
   }, [samples]);
 
@@ -413,6 +424,7 @@ export default function SampleManagement() {
         roundName: form.roundName,
         color: form.color,
         assignee: form.assignee,
+        salesPerson: form.salesPerson,
         requestDate: form.requestDate!,
         expectedDate: form.expectedDate,
         receivedDate: form.receivedDate,
@@ -610,23 +622,29 @@ export default function SampleManagement() {
     toast.success('생산 발주 페이지로 이동합니다. 스타일이 자동 선택됩니다.');
   };
 
-  // 월별 담당자별 처리량 통계
+  // 월별 담당자별 처리량 통계 (필터 적용)
   const monthlyStats = useMemo(() => {
     const [year, month] = statMonth.split('-');
-    const filtered = samples.filter(s => {
+    let list = samples.filter(s => {
       const d = s.createdAt.slice(0, 7);
       return d === `${year}-${month}`;
     });
-    const map = new Map<string, { total: number; done: number }>();
-    filtered.forEach(s => {
+    // 필터 적용
+    if (statFilterSalesPerson !== 'all') list = list.filter(s => (s.salesPerson || '미지정') === statFilterSalesPerson);
+    if (statFilterAssignee !== 'all') list = list.filter(s => (s.assignee || '미지정') === statFilterAssignee);
+    if (statFilterBuyer !== 'all') list = list.filter(s => s.buyerId === statFilterBuyer);
+    if (statFilterSeason !== 'all') list = list.filter(s => s.season === statFilterSeason);
+
+    const map = new Map<string, { total: number; done: number; salesPerson: string }>();
+    list.forEach(s => {
       const key = s.assignee || '미지정';
-      const cur = map.get(key) || { total: 0, done: 0 };
+      const cur = map.get(key) || { total: 0, done: 0, salesPerson: s.salesPerson || '' };
       cur.total++;
       if (s.stage === '최종승인') cur.done++;
       map.set(key, cur);
     });
     return Array.from(map.entries()).map(([assignee, data]) => ({ assignee, ...data }));
-  }, [samples, statMonth]);
+  }, [samples, statMonth, statFilterSalesPerson, statFilterAssignee, statFilterBuyer, statFilterSeason]);
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -703,22 +721,66 @@ export default function SampleManagement() {
 
       {/* 월별 담당자별 처리량 통계 */}
       <div className="bg-white rounded-xl border border-stone-200 p-4">
-        <div className="flex items-center gap-3 mb-3">
-          <p className="text-sm font-semibold text-stone-700">월별 담당자별 처리량</p>
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <p className="text-sm font-semibold text-stone-700 mr-1">월별 담당자별 처리량</p>
+          {/* 월 선택 */}
           <Input
             type="month"
             value={statMonth}
             onChange={e => setStatMonth(e.target.value)}
-            className="w-40 h-8 text-sm"
+            className="w-36 h-8 text-sm"
           />
+          {/* 영업담당자 필터 */}
+          <Select value={statFilterSalesPerson} onValueChange={setStatFilterSalesPerson}>
+            <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="영업담당자" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 영업</SelectItem>
+              <SelectItem value="미지정">미지정</SelectItem>
+              {salesPersonList.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {/* 작업담당자 필터 */}
+          <Select value={statFilterAssignee} onValueChange={setStatFilterAssignee}>
+            <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="작업담당자" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 작업</SelectItem>
+              <SelectItem value="미지정">미지정</SelectItem>
+              {assigneeList.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {/* 바이어 필터 */}
+          <Select value={statFilterBuyer} onValueChange={setStatFilterBuyer}>
+            <SelectTrigger className="w-28 h-8 text-xs"><SelectValue placeholder="바이어" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 바이어</SelectItem>
+              {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {/* 시즌 필터 */}
+          <Select value={statFilterSeason} onValueChange={setStatFilterSeason}>
+            <SelectTrigger className="w-24 h-8 text-xs"><SelectValue placeholder="시즌" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 시즌</SelectItem>
+              {SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {/* 필터 초기화 */}
+          {(statFilterSalesPerson !== 'all' || statFilterAssignee !== 'all' || statFilterBuyer !== 'all' || statFilterSeason !== 'all') && (
+            <button
+              onClick={() => { setStatFilterSalesPerson('all'); setStatFilterAssignee('all'); setStatFilterBuyer('all'); setStatFilterSeason('all'); }}
+              className="text-xs text-stone-400 hover:text-red-500 px-2 py-1 rounded border border-stone-200 hover:border-red-300"
+            >
+              필터 초기화
+            </button>
+          )}
         </div>
         {monthlyStats.length === 0 ? (
-          <p className="text-xs text-stone-400 text-center py-2">해당 월 샘플 없음</p>
+          <p className="text-xs text-stone-400 text-center py-2">해당 월 / 조건에 맞는 샘플 없음</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100">
-                <th className="text-left py-1.5 text-xs text-stone-500">담당자</th>
+                <th className="text-left py-1.5 text-xs text-stone-500">작업담당자</th>
                 <th className="text-center py-1.5 text-xs text-stone-500">전체 건수</th>
                 <th className="text-center py-1.5 text-xs text-stone-500">최종승인</th>
                 <th className="text-center py-1.5 text-xs text-stone-500">승인율</th>
@@ -1230,8 +1292,12 @@ export default function SampleManagement() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>담당자</Label>
-                <Input value={form.assignee || ''} onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))} placeholder="담당자명" />
+                <Label>작업담당자</Label>
+                <Input value={form.assignee || ''} onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))} placeholder="작업담당자명 (내부)" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>영업담당자</Label>
+                <Input value={form.salesPerson || ''} onChange={e => setForm(f => ({ ...f, salesPerson: e.target.value }))} placeholder="영업담당자명 (외부/영업)" />
               </div>
               <div className="space-y-1.5">
                 <Label>의뢰일 *</Label>
