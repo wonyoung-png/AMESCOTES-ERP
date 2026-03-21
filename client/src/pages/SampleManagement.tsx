@@ -102,6 +102,9 @@ export default function SampleManagement() {
   const [filterBilling, setFilterBilling] = useState('all');
   const [filterSeason, setFilterSeason] = useState('all');
   const [filterBuyer, setFilterBuyer] = useState('all');
+  const [filterAssignee, setFilterAssignee] = useState('all');
+  // 정렬: 의뢰일 최신순 기본값
+  const [sortBy, setSortBy] = useState('requestDate_desc');
   const [billingModal, setBillingModal] = useState(false);
   const [billingTarget, setBillingTarget] = useState<typeof samples[0] | null>(null);
   const [billingMode, setBillingMode] = useState<'new' | 'link'>('new');
@@ -122,6 +125,8 @@ export default function SampleManagement() {
   const imageFileRef = useRef<HTMLInputElement>(null);
   // 문서 업로드 (PDF, 엑셀)
   const docFileRef = useRef<HTMLInputElement>(null);
+  // 자재별 이미지 업로드 ref (동적으로 관리)
+  const materialImageRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -192,6 +197,37 @@ export default function SampleManagement() {
     if (docFileRef.current) docFileRef.current.value = '';
   };
 
+  // 자재 행 이미지 업로드 핸들러
+  const handleMaterialImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const resized = await resizeImage(file);
+      setForm(f => {
+        const reqs = [...(f.materialRequests || [])];
+        reqs[idx] = { ...reqs[idx], imageUrl: resized };
+        return { ...f, materialRequests: reqs };
+      });
+    } catch {
+      toast.error('이미지 업로드 실패');
+    }
+    if (materialImageRefs.current[idx]) materialImageRefs.current[idx]!.value = '';
+  };
+
+  // 파일 열기/다운로드 헬퍼
+  const openFile = (url: string, fileType: SampleDocument['fileType'], name: string) => {
+    if (fileType === 'excel') {
+      // 엑셀은 다운로드
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+    } else {
+      // 이미지, PDF는 새 탭에서 열기
+      window.open(url, '_blank');
+    }
+  };
+
   // 차수 메모 추가
   const [newRevNote, setNewRevNote] = useState('');
   const [newRevRound, setNewRevRound] = useState<number>(1);
@@ -205,6 +241,19 @@ export default function SampleManagement() {
   };
 
   const IN_PROGRESS_STAGES: SampleStage[] = ['1차', '2차', '3차', '4차'];
+
+  // 담당자 목록 추출 (store에서 동적으로)
+  const assigneeList = useMemo(() => {
+    const set = new Set<string>();
+    samples.forEach(s => { if (s.assignee) set.add(s.assignee); });
+    return Array.from(set).sort();
+  }, [samples]);
+
+  // 단계 정렬 순서
+  const STAGE_ORDER: Record<SampleStage, number> = {
+    '1차': 1, '2차': 2, '3차': 3, '4차': 4, '최종승인': 5, '반려': 6,
+  };
+
   const filtered = useMemo(() => {
     let list = samples;
     if (filterStage === '진행중') list = list.filter(s => IN_PROGRESS_STAGES.includes(s.stage));
@@ -212,12 +261,48 @@ export default function SampleManagement() {
     if (filterBilling !== 'all') list = list.filter(s => s.billingStatus === filterBilling);
     if (filterSeason !== 'all') list = list.filter(s => s.season === filterSeason);
     if (filterBuyer !== 'all') list = list.filter(s => s.buyerId === filterBuyer);
+    if (filterAssignee !== 'all') list = list.filter(s => (s.assignee || '미지정') === filterAssignee);
     if (search) list = list.filter(s =>
       s.styleNo.toLowerCase().includes(search.toLowerCase()) ||
       s.styleName.toLowerCase().includes(search.toLowerCase())
     );
-    return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [samples, filterStage, filterBilling, filterSeason, filterBuyer, search]);
+    // 정렬 적용
+    list = [...list].sort((a, b) => {
+      switch (sortBy) {
+        case 'requestDate_desc':
+          return (b.requestDate || '').localeCompare(a.requestDate || '');
+        case 'requestDate_asc':
+          return (a.requestDate || '').localeCompare(b.requestDate || '');
+        case 'buyer_asc': {
+          const nameA = vendors.find(v => v.id === a.buyerId)?.name || '';
+          const nameB = vendors.find(v => v.id === b.buyerId)?.name || '';
+          return nameA.localeCompare(nameB, 'ko');
+        }
+        case 'stage_asc':
+          return (STAGE_ORDER[a.stage] || 0) - (STAGE_ORDER[b.stage] || 0);
+        case 'expectedDate_asc': {
+          const da = a.expectedDate || '9999-99-99';
+          const db = b.expectedDate || '9999-99-99';
+          return da.localeCompare(db);
+        }
+        case 'cost_desc': {
+          const ca = a.costKrw || Math.round((a.costCny || 0) * settings.cnyKrw);
+          const cb = b.costKrw || Math.round((b.costCny || 0) * settings.cnyKrw);
+          return cb - ca;
+        }
+        case 'cost_asc': {
+          const ca = a.costKrw || Math.round((a.costCny || 0) * settings.cnyKrw);
+          const cb = b.costKrw || Math.round((b.costCny || 0) * settings.cnyKrw);
+          return ca - cb;
+        }
+        case 'styleNo_asc':
+          return a.styleNo.localeCompare(b.styleNo, 'ko');
+        default:
+          return (b.requestDate || '').localeCompare(a.requestDate || '');
+      }
+    });
+    return list;
+  }, [samples, filterStage, filterBilling, filterSeason, filterBuyer, filterAssignee, search, sortBy, vendors, settings.cnyKrw]);
 
   const stats = useMemo(() => {
     const unclaimed = samples.filter(s => s.billingStatus === '미청구');
@@ -691,8 +776,8 @@ export default function SampleManagement() {
       </div>
 
       {/* 검색 + 필터 */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="스타일번호 / 품명 검색" className="pl-9 h-9" />
         </div>
@@ -710,11 +795,34 @@ export default function SampleManagement() {
             {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
           </SelectContent>
         </Select>
+        {/* 담당자 필터 */}
+        <Select value={filterAssignee} onValueChange={setFilterAssignee}>
+          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="담당자" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">전체 담당자</SelectItem>
+            <SelectItem value="미지정">미지정</SelectItem>
+            {assigneeList.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Select value={filterBilling} onValueChange={setFilterBilling}>
           <SelectTrigger className="w-28 h-9"><SelectValue placeholder="청구상태" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">전체</SelectItem>
             {BILLING_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {/* 정렬 드롭다운 */}
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-40 h-9"><SelectValue placeholder="정렬" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="requestDate_desc">의뢰일 최신순</SelectItem>
+            <SelectItem value="requestDate_asc">의뢰일 오래된순</SelectItem>
+            <SelectItem value="buyer_asc">바이어순 (가나다)</SelectItem>
+            <SelectItem value="stage_asc">단계순 (1차→반려)</SelectItem>
+            <SelectItem value="expectedDate_asc">목표완료일 임박순</SelectItem>
+            <SelectItem value="cost_desc">비용 높은순</SelectItem>
+            <SelectItem value="cost_asc">비용 낮은순</SelectItem>
+            <SelectItem value="styleNo_asc">스타일번호순</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -1167,14 +1275,16 @@ export default function SampleManagement() {
                     <span className="col-span-3">업체</span>
                     <span className="col-span-2">컬러</span>
                     <span className="col-span-1 text-center">수량</span>
-                    <span className="col-span-2">단위</span>
+                    <span className="col-span-1">단위</span>
+                    <span className="col-span-1 text-center">이미지</span>
                     <span className="col-span-1"></span>
                   </div>
                   {(form.materialRequests || []).map((req, idx) => {
-                    // 자재거래처 이름 목록 + 기타 옵션
+                    // 자재거래처 이름 목록 + 직접입력 옵션
                     const materialVendorNames = materialVendors.map(v => v.name);
-                    const isCustomVendor = !!req.vendor && req.vendor !== '기타' && !materialVendorNames.includes(req.vendor);
-                    const selectVal = isCustomVendor ? '기타' : (req.vendor || 'none');
+                    // vendor 값이 '직접입력'이거나, customVendor가 있으면 직접입력 모드
+                    const isDirectInput = req.vendor === '직접입력' || (!!req.customVendor && !materialVendorNames.includes(req.vendor || ''));
+                    const selectVal = isDirectInput ? '직접입력' : (req.vendor || 'none');
                     return (
                       <div key={idx} className="space-y-1">
                         <div className="grid grid-cols-12 gap-1 items-center">
@@ -1194,19 +1304,27 @@ export default function SampleManagement() {
                             value={selectVal}
                             onValueChange={v => setForm(f => {
                               const reqs = [...(f.materialRequests || [])];
-                              reqs[idx] = { ...reqs[idx], vendor: v === 'none' ? '' : (v === '기타' ? '' : v) };
+                              if (v === 'none') {
+                                reqs[idx] = { ...reqs[idx], vendor: '', customVendor: '' };
+                              } else if (v === '직접입력') {
+                                reqs[idx] = { ...reqs[idx], vendor: '직접입력', customVendor: reqs[idx].customVendor || '' };
+                              } else {
+                                reqs[idx] = { ...reqs[idx], vendor: v, customVendor: '' };
+                              }
                               return { ...f, materialRequests: reqs };
                             })}
                           >
                             <SelectTrigger className="col-span-3 h-8 text-xs">
-                              <SelectValue placeholder="업체" />
+                              <SelectValue placeholder="업체">
+                                {selectVal === '직접입력' ? (req.customVendor || '직접입력') : (selectVal === 'none' ? '선택 안 함' : selectVal)}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="none">선택 안 함</SelectItem>
                               {materialVendors.map(v => (
                                 <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>
                               ))}
-                              <SelectItem value="기타">기타 (직접입력)</SelectItem>
+                              <SelectItem value="직접입력">직접입력</SelectItem>
                             </SelectContent>
                           </Select>
                           {/* 컬러 */}
@@ -1234,7 +1352,7 @@ export default function SampleManagement() {
                           />
                           {/* 단위 */}
                           <Input
-                            className="col-span-2 h-8 text-xs"
+                            className="col-span-1 h-8 text-xs"
                             value={req.unit}
                             onChange={e => setForm(f => {
                               const reqs = [...(f.materialRequests || [])];
@@ -1243,6 +1361,36 @@ export default function SampleManagement() {
                             })}
                             placeholder="장/개/m"
                           />
+                          {/* 이미지 첨부 */}
+                          <div className="col-span-1 flex items-center justify-center">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              ref={el => { materialImageRefs.current[idx] = el; }}
+                              onChange={e => handleMaterialImageUpload(e, idx)}
+                            />
+                            {req.imageUrl ? (
+                              <img
+                                src={req.imageUrl}
+                                alt="자재 이미지"
+                                className="w-8 h-8 object-cover rounded border border-stone-200 cursor-pointer hover:opacity-80"
+                                onClick={() => window.open(req.imageUrl, '_blank')}
+                                title="클릭하면 새 탭에서 열림"
+                              />
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-stone-400 hover:text-amber-600"
+                                onClick={() => materialImageRefs.current[idx]?.click()}
+                                title="이미지 첨부"
+                              >
+                                📎
+                              </Button>
+                            )}
+                          </div>
                           {/* 삭제 */}
                           <Button
                             type="button" variant="ghost" size="sm" className="col-span-1 h-8 w-8 p-0 text-red-400 hover:text-red-600"
@@ -1254,17 +1402,18 @@ export default function SampleManagement() {
                             <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
-                        {/* 기타 업체 직접입력 */}
-                        {(selectVal === '기타' || isCustomVendor) && (
+                        {/* 직접입력 업체명 텍스트 필드 */}
+                        {isDirectInput && (
                           <Input
                             className="h-7 text-xs ml-[25%] w-[25%]"
-                            value={req.vendor || ''}
+                            value={req.customVendor || ''}
                             onChange={e => setForm(f => {
                               const reqs = [...(f.materialRequests || [])];
-                              reqs[idx] = { ...reqs[idx], vendor: e.target.value };
+                              reqs[idx] = { ...reqs[idx], customVendor: e.target.value };
                               return { ...f, materialRequests: reqs };
                             })}
                             placeholder="업체명 직접입력"
+                            autoFocus
                           />
                         )}
                       </div>
@@ -1329,7 +1478,8 @@ export default function SampleManagement() {
                         <button
                           type="button"
                           className="flex-1 text-xs text-stone-700 text-left hover:text-blue-600 truncate"
-                          onClick={() => window.open(doc.url, '_blank')}
+                          onClick={() => openFile(doc.url, doc.fileType, doc.name)}
+                          title={doc.fileType === 'excel' ? '클릭하면 다운로드' : '클릭하면 새 탭에서 열림'}
                         >
                           {doc.name}
                         </button>
@@ -1428,7 +1578,8 @@ export default function SampleManagement() {
                           <button
                             key={idx}
                             className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg border border-stone-100 hover:bg-stone-50"
-                            onClick={() => window.open(doc.url, '_blank')}
+                            onClick={() => openFile(doc.url, doc.fileType, doc.name)}
+                            title={doc.fileType === 'excel' ? '클릭하면 다운로드' : '클릭하면 새 탭에서 열림'}
                           >
                             <DocIcon fileType={doc.fileType} />
                             <span className="text-xs text-stone-700 truncate">{doc.name}</span>

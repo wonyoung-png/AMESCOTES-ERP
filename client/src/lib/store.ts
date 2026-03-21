@@ -218,10 +218,12 @@ export interface SampleMaterialCheckItem {
 // 자재 요청 항목
 export interface SampleMaterialRequest {
   itemName: string;
-  vendor?: string;    // 업체 (창성, 아이금속, 기타 등)
-  color?: string;     // 컬러
+  vendor?: string;      // 업체 (자재거래처 목록에서 선택 또는 직접입력)
+  customVendor?: string; // 직접입력 시 업체명
+  color?: string;       // 컬러
   qty: number;
   unit: string;
+  imageUrl?: string;    // 자재 이미지 URL (base64)
 }
 
 // 샘플 첨부 문서 (PDF, 엑셀 등)
