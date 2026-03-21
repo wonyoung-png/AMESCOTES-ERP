@@ -127,6 +127,38 @@ export default function MaterialMaster() {
     toast.success('삭제되었습니다');
   };
 
+  // 체크박스 다중 선택 관련
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const isAllSelected = filtered.length > 0 && filtered.every(m => selectedIds.has(m.id));
+  const isIndeterminate = filtered.some(m => selectedIds.has(m.id)) && !isAllSelected;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(m => m.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
+      selectedIds.forEach(id => store.deleteMaterial(id));
+      setSelectedIds(new Set());
+      refresh();
+      toast.success(`${selectedIds.size}개 항목이 삭제되었습니다`);
+    }
+  };
+
   const catCounts = useMemo(() => {
     const map: Record<string, number> = {};
     materials.forEach(m => { map[m.category] = (map[m.category] || 0) + 1; });
@@ -170,11 +202,39 @@ export default function MaterialMaster() {
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="자재명 / 영문명 / 스펙 검색" className="pl-9 h-9" />
       </div>
 
+      {/* 다중 선택 액션 바 */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-stone-800 text-white rounded-xl">
+          <span className="text-sm font-medium">{selectedIds.size}개 선택됨</span>
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            🗑️ 선택 삭제
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="flex items-center gap-1 px-3 py-1.5 bg-stone-600 hover:bg-stone-500 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            ✕ 선택 해제
+          </button>
+        </div>
+      )}
+
       {/* 테이블 */}
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50">
+              <th className="px-3 py-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
+                />
+              </th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500 w-12">이미지</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">카테고리</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">자재명</th>
@@ -188,13 +248,23 @@ export default function MaterialMaster() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-12 text-stone-400">
+                <td colSpan={9} className="text-center py-12 text-stone-400">
                   <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">등록된 자재가 없습니다</p>
                 </td>
               </tr>
-            ) : filtered.map(m => (
-              <tr key={m.id} className="border-b border-stone-50 hover:bg-stone-50/50">
+            ) : filtered.map(m => {
+  const isChecked = selectedIds.has(m.id);
+  return (
+              <tr key={m.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${isChecked ? 'bg-amber-50/60' : ''}`}>
+                <td className="px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleSelect(m.id)}
+                    className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
+                  />
+                </td>
                 <td className="px-3 py-2.5">
                   {m.imageUrl ? (
                     <img src={m.imageUrl} alt={m.name} className="w-10 h-10 object-cover rounded-lg border border-stone-200" />
@@ -232,7 +302,8 @@ export default function MaterialMaster() {
                   </div>
                 </td>
               </tr>
-            ))}
+  );
+})}
           </tbody>
         </table>
       </div>

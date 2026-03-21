@@ -687,6 +687,47 @@ export default function BomManagement() {
     setCollapsedSections(prev => { const s = new Set(prev); s.has(cat) ? s.delete(cat) : s.add(cat); return s; });
   };
 
+  // 체크박스 다중 선택 (BOM 목록용)
+  const [selectedBomIds, setSelectedBomIds] = useState<Set<string>>(new Set());
+  const isAllBomSelected = extBoms.length > 0 && extBoms.every(b => selectedBomIds.has(b.id));
+  const isBomIndeterminate = extBoms.some(b => selectedBomIds.has(b.id)) && !isAllBomSelected;
+
+  const toggleSelectAllBoms = () => {
+    if (isAllBomSelected) {
+      setSelectedBomIds(new Set());
+    } else {
+      setSelectedBomIds(new Set(extBoms.map(b => b.id)));
+    }
+  };
+
+  const toggleSelectBom = (id: string) => {
+    setSelectedBomIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDeleteBom = () => {
+    if (selectedBomIds.size === 0) return;
+    if (confirm(`${selectedBomIds.size}개 BOM을 삭제하시겠습니까?`)) {
+      const newBoms = extBoms.filter(b => !selectedBomIds.has(b.id));
+      // 삭제된 BOM의 styleId에 hasBom: false 업데이트
+      extBoms.filter(b => selectedBomIds.has(b.id)).forEach(b => {
+        store.updateItem(b.styleId, { hasBom: false });
+      });
+      saveExtBoms(newBoms);
+      setExtBoms(newBoms);
+      setSelectedBomIds(new Set());
+      if (editBom && selectedBomIds.has(editBom.id)) {
+        setEditBom(null);
+        setSelectedStyleId('');
+      }
+      toast.success(`${selectedBomIds.size}개 BOM이 삭제되었습니다`);
+    }
+  };
+
   const summary = editBom ? calcSummary(editBom) : null;
   const pnlResult = summary && editBom?.pnl ? calcPnl(summary.totalCostKrw, editBom.pnl) : null;
   const cnyKrw = editBom?.snapshotCnyKrw || settings.cnyKrw;
@@ -792,6 +833,88 @@ export default function BomManagement() {
           )}
         </div>
       </div>
+
+      {/* BOM 목록 (다중 선택 삭제) */}
+      {extBoms.length > 0 && (
+        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-stone-100 bg-stone-50 flex items-center justify-between">
+            <p className="text-sm font-semibold text-stone-700">등록된 BOM 목록 ({extBoms.length}건)</p>
+            {selectedBomIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-stone-500">{selectedBomIds.size}개 선택됨</span>
+                <button
+                  onClick={handleBulkDeleteBom}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  🗑️ 선택 삭제
+                </button>
+                <button
+                  onClick={() => setSelectedBomIds(new Set())}
+                  className="flex items-center gap-1 px-2 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded-lg text-xs font-medium transition-colors"
+                >
+                  ✕ 해제
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50">
+                  <th className="px-4 py-2.5 w-10">
+                    <input
+                      type="checkbox"
+                      checked={isAllBomSelected}
+                      ref={el => { if (el) el.indeterminate = isBomIndeterminate; }}
+                      onChange={toggleSelectAllBoms}
+                      className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
+                    />
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-stone-500">스타일번호</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-stone-500">품명</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-stone-500">시즌</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-stone-500">총원가(KRW)</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-stone-500">자재비(CNY)</th>
+                  <th className="text-center px-4 py-2.5 text-xs font-medium text-stone-500">작업</th>
+                </tr>
+              </thead>
+              <tbody>
+                {extBoms.map(b => {
+                  const isChecked = selectedBomIds.has(b.id);
+                  const sum = calcSummary(b);
+                  return (
+                    <tr key={b.id} className={`border-b border-stone-50 hover:bg-stone-50/50 cursor-pointer ${isChecked ? 'bg-amber-50/60' : ''}`}
+                      onClick={() => setSelectedStyleId(b.styleId)}
+                    >
+                      <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleSelectBom(b.id)}
+                          className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-stone-700">{b.styleNo}</td>
+                      <td className="px-4 py-2.5 text-xs text-stone-600">{b.styleName}</td>
+                      <td className="px-4 py-2.5 text-xs text-stone-500">{b.season}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-xs text-stone-700">{fmtKrw(sum.totalCostKrw)}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-xs text-stone-500">{fmt(sum.materialCny)}</td>
+                      <td className="px-4 py-2.5 text-center">
+                        <button
+                          onClick={e => { e.stopPropagation(); setSelectedStyleId(b.styleId); }}
+                          className="text-xs px-2 py-0.5 rounded border border-[#C9A96E] text-[#C9A96E] hover:bg-amber-50 transition-colors"
+                        >
+                          편집
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {!editBom && (
         <div className="bg-stone-50 border border-dashed border-stone-300 rounded-xl p-12 text-center">
