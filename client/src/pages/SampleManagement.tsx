@@ -950,6 +950,21 @@ export default function SampleManagement() {
                   {s.stage !== '최종승인' && (
                     <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-green-700" onClick={() => handleApprove(s)}>승인</Button>
                   )}
+                  {s.stage === '최종승인' && (() => {
+                    // 모바일 뷰: styleNo 기반 품목 등록 여부 확인
+                    const registeredItem = items.find(i => i.styleNo === s.styleNo && i.itemStatus !== 'TEMP');
+                    return registeredItem ? (
+                      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-amber-700 border border-amber-300"
+                        onClick={() => handleCreateOrder(s)}>
+                        <FileText className="w-3 h-3 mr-1" />발주
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-orange-700 bg-orange-50 border border-orange-300"
+                        onClick={() => handleRegisterItem(s)}>
+                        <PackagePlus className="w-3 h-3 mr-1" />품목
+                      </Button>
+                    );
+                  })()}
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(s.id)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>

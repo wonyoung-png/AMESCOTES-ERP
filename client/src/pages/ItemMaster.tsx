@@ -1,6 +1,6 @@
 // AMESCOTES ERP — 품목 마스터 (Phase 1 개편)
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import { store, genId, formatKRW, type Item, type Season, type Category, type ErpCategory, type ItemStatus, type ProductionOrder } from '@/lib/store';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -60,6 +60,8 @@ const emptyItem: Partial<Item> = {
 
 export default function ItemMaster() {
   const [, navigate] = useLocation();
+  // URL 파라미터 (샘플 관리에서 품목등록 버튼 클릭 시 전달됨)
+  const searchString = useSearch();
   const [items, setItems] = useState(store.getItems());
   const [vendors] = useState(store.getVendors());
   const [search, setSearch] = useState('');
@@ -149,8 +151,33 @@ export default function ItemMaster() {
     setModalOpen(true);
   };
 
-  // 진입 시 prefill 체크
+  // 진입 시 prefill 체크 (localStorage 또는 URL 파라미터)
   useEffect(() => {
+    // 1) URL 파라미터 우선 체크 (샘플관리 → 품목등록 버튼 클릭 시)
+    const urlParams = new URLSearchParams(searchString);
+    const urlStyleNo = urlParams.get('styleNo');
+    if (urlStyleNo) {
+      const pf = {
+        styleNo: urlStyleNo,
+        styleName: urlParams.get('styleName') || '',
+        buyerId: urlParams.get('buyerId') || '',
+        season: urlParams.get('season') || '26SS',
+      };
+      // localStorage에도 저장된 prefill이 있으면 imageUrl 등 병합
+      const storedPrefill = localStorage.getItem('ames_prefill_item');
+      if (storedPrefill) {
+        try {
+          const stored = JSON.parse(storedPrefill);
+          Object.assign(pf, { imageUrl: stored.imageUrl });
+          localStorage.removeItem('ames_prefill_item');
+        } catch { /* 무시 */ }
+      }
+      openAdd(pf);
+      // URL 파라미터 클린업 (히스토리 정리)
+      navigate('/items', { replace: true });
+      return;
+    }
+    // 2) localStorage prefill 체크 (기존 방식 호환)
     const storedPrefill = localStorage.getItem('ames_prefill_item');
     if (storedPrefill) {
       try {
