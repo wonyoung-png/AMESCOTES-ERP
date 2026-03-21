@@ -986,9 +986,15 @@ export default function ItemMaster() {
               )}
             </div>
 
-            <div className="space-y-1.5">
-              <Label>메모</Label>
-              <Input value={editItem.memo || ''} onChange={e => setEditItem({ ...editItem, memo: e.target.value })} placeholder="비고" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>담당 디자이너</Label>
+                <Input value={editItem.designer || ''} onChange={e => setEditItem({ ...editItem, designer: e.target.value })} placeholder="디자이너 이름" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>메모</Label>
+                <Input value={editItem.memo || ''} onChange={e => setEditItem({ ...editItem, memo: e.target.value })} placeholder="비고" />
+              </div>
             </div>
 
             {/* 대표 이미지 업로드 */}
