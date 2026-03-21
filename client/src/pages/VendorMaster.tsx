@@ -807,8 +807,8 @@ export default function VendorMaster() {
 
 
 
-            {/* 해외공장 계좌정보 섹션 (공장 유형일 때만 표시) */}
-            {(editVendor.type === '공장' || editVendor.type === '해외공장') && (
+            {/* 해외공장 계좌정보 섹션 (해외공장 유형일 때만 표시) */}
+            {editVendor.type === '해외공장' && (
               <div className="p-4 bg-sky-50 border border-sky-200 rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-medium text-sky-700">🏦 해외 송금 계좌정보 (해외공장 전용)</p>

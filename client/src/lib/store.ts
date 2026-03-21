@@ -4,7 +4,7 @@
 
 export type Currency = 'KRW' | 'USD' | 'CNY';
 export type Season = '25FW' | '26SS' | '26FW' | '27SS';
-export type Category = '숄더백' | '토트백' | '크로스백' | '클러치' | '백팩' | '기타';
+export type Category = '숄더백' | '토트백' | '크로스백' | '클러치' | '백팩' | '파우치' | '키링' | '지갑' | '기타';
 export type BomCategory = '원자재' | '지퍼' | '장식' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
 export type BomSectionKey = '원자재' | '지퍼' | '장식' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
 export type MaterialCategory = '원자재' | '지퍼' | '장식' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
