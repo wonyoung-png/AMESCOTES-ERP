@@ -50,8 +50,9 @@ export interface Item {
   nameEn?: string;
   season: Season;
   category: Category;
+  customCategory?: string;         // 세부 카테고리 직접입력 (기타 선택 시)
   erpCategory?: ErpCategory;       // HB / SLG
-  materialType?: MaterialType;     // 완제품 / 원재료 / 부재료
+  materialType?: MaterialType;     // 완제품 / 원재료 / 부재료 (항상 완제품으로 자동 설정)
   itemStatus?: ItemStatus;         // TEMP / ACTIVE / INACTIVE
   material: string;
   boxSizeL?: number;

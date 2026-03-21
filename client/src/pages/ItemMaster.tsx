@@ -1,7 +1,7 @@
 // AMESCOTES ERP — 품목 마스터 (Phase 1 개편)
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { store, genId, formatKRW, type Item, type Season, type Category, type ErpCategory, type ItemStatus, type MaterialType } from '@/lib/store';
+import { store, genId, formatKRW, type Item, type Season, type Category, type ErpCategory, type ItemStatus, type ProductionOrder } from '@/lib/store';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,12 +16,12 @@ import { toast } from 'sonner';
 const CATEGORIES: Category[] = ['숄더백', '토트백', '크로스백', '클러치', '백팩', '기타'];
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 const ERP_CATEGORIES: ErpCategory[] = ['HB', 'SLG'];
-const ITEM_STATUSES: ItemStatus[] = ['TEMP', 'ACTIVE', 'INACTIVE'];
-const MATERIAL_TYPES: MaterialType[] = ['완제품', '원재료', '부재료'];
+// 상태 영문→한글 매핑
+const ITEM_STATUS_LABEL: Record<ItemStatus, string> = { 'TEMP': '임시', 'ACTIVE': '활성', 'INACTIVE': '비활성' };
 
 // 카테고리 → 제품유형코드 매핑
 const CATEGORY_CODE_MAP: Record<Category, string> = {
-  '숄더백': 'HB', '토트백': 'HB', '크로스백': 'HB', '클러치': 'SLG', '백팩': 'BP', '기타': 'ETC',
+  '숄더백': 'HB', '토트백': 'HB', '크로스백': 'HB', '클러치': 'SL', '백팩': 'BP', '기타': 'ETC',
 };
 
 const STATUS_COLOR: Record<ItemStatus, string> = {
@@ -35,10 +35,12 @@ const ERP_CAT_COLOR: Record<ErpCategory, string> = {
   'SLG': 'bg-purple-50 text-purple-700 border-purple-200',
 };
 
-function generateStyleNo(brandCode: string, registDate: Date, category: Category, existingItems: Item[], currentItemId?: string): string {
+function generateStyleNo(brandCode: string, registDate: Date, category: Category, existingItems: Item[], currentItemId?: string, erpCategory?: ErpCategory): string {
   const yy = String(registDate.getFullYear()).slice(2);
   const mm = String(registDate.getMonth() + 1).padStart(2, '0');
-  const typeCode = CATEGORY_CODE_MAP[category] || 'HB';
+  // erpCategory가 SLG면 'SL'로 강제 적용
+  let typeCode = CATEGORY_CODE_MAP[category] || 'HB';
+  if (erpCategory === 'SLG') typeCode = 'SL';
   const prefix = `${brandCode.toUpperCase()}${yy}${mm}${typeCode}`;
   const existing = existingItems.filter(it => it.styleNo.startsWith(prefix) && it.id !== currentItemId);
   let maxSeq = 0;
@@ -51,9 +53,9 @@ function generateStyleNo(brandCode: string, registDate: Date, category: Category
 
 const emptyItem: Partial<Item> = {
   styleNo: '', name: '', nameEn: '', season: '26SS', category: '숄더백',
-  erpCategory: 'HB', itemStatus: 'TEMP', materialType: '완제품',
+  erpCategory: 'HB', itemStatus: 'ACTIVE', materialType: '완제품',
   material: '', salePriceKrw: 0, targetSalePrice: 0,
-  colors: [], packagingSizeStr: '', memo: '',
+  colors: [], memo: '',
 };
 
 export default function ItemMaster() {
@@ -76,6 +78,8 @@ export default function ItemMaster() {
   const [filterNoBom, setFilterNoBom] = useState(false);
   const [showSeasonStats, setShowSeasonStats] = useState(false);
   const [seasonStatsTarget, setSeasonStatsTarget] = useState('전체');
+  const [customCategory, setCustomCategory] = useState(''); // 세부 카테고리 직접 입력
+  const [orders] = useState<ProductionOrder[]>(() => store.getOrders()); // 미발주기간 계산용
   const imageFileRef = useRef<HTMLInputElement>(null);
 
   const handleItemImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,10 +119,10 @@ export default function ItemMaster() {
     const vendor = vendors.find(v => v.id === selectedVendorId);
     if (!vendor?.code || !editItem.category) { setPreviewStyleNo(''); return; }
     const date = registDate ? new Date(registDate) : new Date();
-    const generated = generateStyleNo(vendor.code, date, editItem.category as Category, store.getItems(), isEdit ? editItem.id : undefined);
+    const generated = generateStyleNo(vendor.code, date, editItem.category as Category, store.getItems(), isEdit ? editItem.id : undefined, editItem.erpCategory);
     setPreviewStyleNo(generated);
     setEditItem(prev => ({ ...prev, styleNo: generated }));
-  }, [selectedVendorId, registDate, editItem.category, manualStyleNo, isEdit, editItem.id, vendors]);
+  }, [selectedVendorId, registDate, editItem.category, editItem.erpCategory, manualStyleNo, isEdit, editItem.id, vendors]);
 
   const openAdd = (prefill?: { styleNo?: string; buyerId?: string; season?: string; styleName?: string; imageUrl?: string }) => {
     // 샘플에서 넘어온 prefill 확인
@@ -141,6 +145,7 @@ export default function ItemMaster() {
     setSelectedVendorId(pf?.buyerId || '');
     setPreviewStyleNo(pf?.styleNo || '');
     setColorInput('');
+    setCustomCategory('');
     setModalOpen(true);
   };
 
@@ -164,6 +169,7 @@ export default function ItemMaster() {
     setIsEdit(true); setManualStyleNo(true);
     setRegistDate(item.createdAt.split('T')[0]);
     setSelectedVendorId(''); setPreviewStyleNo(item.styleNo); setColorInput('');
+    setCustomCategory(item.customCategory || '');
     setModalOpen(true);
   };
 
@@ -174,14 +180,16 @@ export default function ItemMaster() {
       if (dup) { toast.error(`스타일번호 '${editItem.styleNo}'는 이미 등록되어 있습니다`); return; }
     }
 
-    // 바이어 연결: selectedVendorId가 있으면 적용
+    // 바이어 연결: selectedVendorId(자동생성 거래처)가 있으면 적용
     const buyerId = selectedVendorId || editItem.buyerId;
 
     if (isEdit && editItem.id) {
-      store.updateItem(editItem.id, { ...editItem, buyerId } as Partial<Item>);
+      // 수정 시: materialType 완제품 강제, customCategory 저장
+      store.updateItem(editItem.id, { ...editItem, buyerId, materialType: '완제품', customCategory: customCategory || undefined } as Partial<Item>);
       toast.success('품목이 수정되었습니다');
     } else {
-      store.addItem({ ...editItem, buyerId, id: genId(), hasBom: false, createdAt: new Date().toISOString() } as Item);
+      // 신규 등록: materialType 완제품, itemStatus ACTIVE 강제
+      store.addItem({ ...editItem, buyerId, id: genId(), hasBom: false, createdAt: new Date().toISOString(), materialType: '완제품', itemStatus: 'ACTIVE', customCategory: customCategory || undefined } as Item);
       toast.success('품목이 등록되었습니다');
     }
     setModalOpen(false);
@@ -231,6 +239,15 @@ export default function ItemMaster() {
     return ((item.targetSalePrice - item.baseCostKrw) / item.targetSalePrice * 100);
   };
 
+  // 미발주기간 계산: 마지막 발주일 기준 경과 개월 수
+  const monthsSinceLastOrder = (item: Item): number | null => {
+    const itemOrders = orders.filter(o => o.styleId === item.id);
+    if (itemOrders.length === 0) return null;
+    const latest = itemOrders.reduce((a, b) => a.createdAt > b.createdAt ? a : b);
+    const diffMs = Date.now() - new Date(latest.createdAt).getTime();
+    return Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30));
+  };
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -255,7 +272,7 @@ export default function ItemMaster() {
           return (
             <div key={s} className={`rounded-xl border p-3 text-center ${STATUS_COLOR[s]}`}>
               <p className="text-xl font-bold">{count}</p>
-              <p className="text-xs mt-0.5">{s}</p>
+              <p className="text-xs mt-0.5">{ITEM_STATUS_LABEL[s]}</p>
             </div>
           );
         })}
@@ -276,7 +293,9 @@ export default function ItemMaster() {
             <SelectTrigger className="w-28 h-9"><SelectValue placeholder="상태" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="전체">전체 상태</SelectItem>
-              {ITEM_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              <SelectItem value="TEMP">임시</SelectItem>
+              <SelectItem value="ACTIVE">활성</SelectItem>
+              <SelectItem value="INACTIVE">비활성</SelectItem>
             </SelectContent>
           </Select>
           <Select value={filterSeason} onValueChange={setFilterSeason}>
@@ -322,9 +341,9 @@ export default function ItemMaster() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">구분</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">상태</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">컬러</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">목표납품가</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">납품가</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">판매가</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">포장</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">미발주</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">BOM</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
               </tr>
@@ -367,7 +386,7 @@ export default function ItemMaster() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLOR[item.itemStatus || 'ACTIVE']}`}>
-                        {item.itemStatus || 'ACTIVE'}
+                        {item.itemStatus === 'TEMP' ? '임시' : item.itemStatus === 'INACTIVE' ? '비활성' : '활성'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -397,8 +416,16 @@ export default function ItemMaster() {
                     <td className="px-4 py-3 text-right font-mono text-xs text-stone-600">
                       {formatKRW(item.salePriceKrw)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-stone-500">
-                      {item.packagingSizeStr || '-'}
+                    <td className="px-4 py-3 text-center">
+                      {(() => {
+                        const months = monthsSinceLastOrder(item);
+                        if (months === null) return <span className="text-stone-300 text-xs">-</span>;
+                        return (
+                          <span className={`text-xs font-medium ${months >= 12 ? 'text-red-500' : months >= 6 ? 'text-amber-600' : 'text-stone-500'}`}>
+                            {months}개월
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
@@ -431,7 +458,7 @@ export default function ItemMaster() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={10} className="text-center py-12 text-stone-400">
+                <tr><td colSpan={12} className="text-center py-12 text-stone-400">
                   <Package size={32} className="mx-auto mb-2 opacity-30" />
                   등록된 품목이 없습니다
                 </td></tr>
@@ -573,9 +600,9 @@ export default function ItemMaster() {
             {/* 기본 정보 */}
             <div className="space-y-3">
               <p className="text-xs font-medium text-stone-600">기본 정보</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>ERP 카테고리</Label>
+                  <Label>카테고리</Label>
                   <Select value={editItem.erpCategory || 'HB'} onValueChange={v => setEditItem({ ...editItem, erpCategory: v as ErpCategory })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -586,17 +613,22 @@ export default function ItemMaster() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>세부 카테고리</Label>
-                  <Select value={editItem.category || '숄더백'} onValueChange={v => setEditItem({ ...editItem, category: v as Category })}>
+                  <Select value={editItem.category || '숄더백'} onValueChange={v => {
+                    setEditItem({ ...editItem, category: v as Category });
+                    if (v !== '기타') setCustomCategory('');
+                  }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>소재 구분</Label>
-                  <Select value={editItem.materialType || '완제품'} onValueChange={v => setEditItem({ ...editItem, materialType: v as MaterialType })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{MATERIAL_TYPES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                  </Select>
+                  {/* 기타 선택 시 직접 입력 */}
+                  {editItem.category === '기타' && (
+                    <Input
+                      value={customCategory}
+                      onChange={e => setCustomCategory(e.target.value)}
+                      placeholder="직접 입력 (예: 지갑, 파우치, 카드케이스)"
+                      className="mt-1.5 text-sm"
+                    />
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -609,19 +641,12 @@ export default function ItemMaster() {
                   <Input value={editItem.nameEn || ''} onChange={e => setEditItem({ ...editItem, nameEn: e.target.value })} placeholder="PANIER PETIT BAG" />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>시즌</Label>
                   <Select value={editItem.season || '26SS'} onValueChange={v => setEditItem({ ...editItem, season: v as Season })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>품목 상태</Label>
-                  <Select value={editItem.itemStatus || 'TEMP'} onValueChange={v => setEditItem({ ...editItem, itemStatus: v as ItemStatus })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{ITEM_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
@@ -636,26 +661,14 @@ export default function ItemMaster() {
               <p className="text-xs font-medium text-stone-600">가격 정보</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>목표 납품가 (KRW)</Label>
-                  <Input type="number" value={editItem.targetSalePrice || ''} onChange={e => setEditItem({ ...editItem, targetSalePrice: Number(e.target.value) })} placeholder="목표 납품가" />
+                  <Label>납품가 (KRW)</Label>
+                  <Input type="number" value={editItem.targetSalePrice || ''} onChange={e => setEditItem({ ...editItem, targetSalePrice: Number(e.target.value) })} placeholder="납품가" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>판매가 (KRW)</Label>
                   <Input type="number" value={editItem.salePriceKrw || ''} onChange={e => setEditItem({ ...editItem, salePriceKrw: Number(e.target.value) })} placeholder="218000" />
                 </div>
               </div>
-            </div>
-
-            {/* 바이어 연결 */}
-            <div className="space-y-1.5">
-              <Label>바이어 연결</Label>
-              <Select value={editItem.buyerId || selectedVendorId || ''} onValueChange={v => { const val = v === "none" ? "" : v; setEditItem(prev => ({ ...prev, buyerId: val })); setSelectedVendorId(val); }}>
-                <SelectTrigger><SelectValue placeholder="바이어 선택 (선택사항)" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">연결 없음</SelectItem>
-                  {buyerVendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}{v.code ? ` [${v.code}]` : ''}</SelectItem>)}
-                </SelectContent>
-              </Select>
             </div>
 
             {/* 컬러 목록 */}
@@ -683,16 +696,6 @@ export default function ItemMaster() {
                   ))}
                 </div>
               )}
-            </div>
-
-            {/* 포장사이즈 */}
-            <div className="space-y-1.5">
-              <Label>포장 사이즈</Label>
-              <Input
-                value={editItem.packagingSizeStr || ''}
-                onChange={e => setEditItem({ ...editItem, packagingSizeStr: e.target.value })}
-                placeholder="예: 54×14×61 cm"
-              />
             </div>
 
             <div className="space-y-1.5">

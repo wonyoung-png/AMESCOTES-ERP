@@ -925,6 +925,39 @@ export default function BomManagement() {
                     <td className="px-4 py-3 font-bold text-base" colSpan={2}>총 원 가 액</td>
                     <td className="px-4 py-3 text-right font-bold text-lg tabular-nums text-[#C9A96E]">{fmtKrw(summary.totalCostKrw)}</td>
                   </tr>
+                  {/* 납품가 / 마진금액 / 마진율 — 품목 마스터 자동 연동 */}
+                  {(() => {
+                    const linkedItem = items.find(i => i.id === editBom.styleId);
+                    const deliveryPrice = linkedItem?.targetSalePrice;
+                    if (!deliveryPrice || deliveryPrice <= 0) return null;
+                    const marginAmt = deliveryPrice - summary.totalCostKrw;
+                    const marginPct = (marginAmt / deliveryPrice) * 100;
+                    const marginClass = marginPct < 20 ? 'text-red-600' : marginPct < 30 ? 'text-amber-600' : 'text-green-600';
+                    const marginBg = marginPct < 20 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
+                    return (
+                      <>
+                        <tr className="bg-blue-50 border-t border-blue-200">
+                          <td className="px-4 py-2.5 text-xs font-medium text-blue-600">연동</td>
+                          <td className="px-4 py-2.5 text-sm font-semibold text-blue-800" colSpan={2}>납품가 (품목 마스터 연동)</td>
+                          <td className="px-4 py-2.5 text-right font-mono font-bold text-blue-800">{fmtKrw(deliveryPrice)}</td>
+                        </tr>
+                        <tr>
+                          <td colSpan={4} className="px-4 py-2">
+                            <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border ${marginBg}`}>
+                              <div className="flex items-center gap-4">
+                                <span className="text-xs text-stone-500">마진금액</span>
+                                <span className={`font-mono font-bold text-sm ${marginClass}`}>{fmtKrw(marginAmt)}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-stone-500">마진율</span>
+                                <span className={`font-mono font-bold text-lg ${marginClass}`}>{marginPct.toFixed(1)}%</span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      </>
+                    );
+                  })()}
                   {editBom.pnl?.confirmedSalePrice && editBom.pnl.confirmedSalePrice > 0 && (() => {
                     const salePrice = editBom.pnl.confirmedSalePrice;
                     const marginPct = ((salePrice - summary.totalCostKrw) / salePrice) * 100;
