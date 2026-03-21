@@ -51,9 +51,10 @@ interface ExtBom {
   styleNo: string;
   styleName: string;
   lineName?: string;
-  designer?: string;
-  size?: string;
-  boxSize?: string;
+  designer?: string;        // 품목 마스터에서 자동 매칭
+  erpCategory?: string;     // 품목 마스터에서 자동 매칭 (HB / SLG)
+  size?: string;            // 레거시 필드 (폼에서 제거, 타입만 유지)
+  boxSize?: string;         // 레거시 필드 (폼에서 제거, 타입만 유지)
   version: number;
   season: Season;
   lines: ExtBomLine[];
@@ -143,7 +144,7 @@ const defaultPnl = (): BomPnlAssumptions => ({ discountRate: 0.05, platformFeeRa
 
 function createNewBom(settings: ReturnType<typeof store.getSettings>): ExtBom {
   return {
-    id: genId(), styleId: '', styleNo: '', styleName: '', lineName: '', designer: '',
+    id: genId(), styleId: '', styleNo: '', styleName: '', lineName: '', designer: '', erpCategory: '',
     size: '', boxSize: '', version: 1, season: settings.currentSeason,
     lines: BOM_SECTIONS.flatMap(cat => [newExtLine(cat)]),
     postProcessLines: [newPostLine()],
@@ -495,19 +496,31 @@ export default function BomManagement() {
 
   const markDirty = () => setIsDirty(true);
 
-  // 스타일 선택 시 BOM 로드
+  // 스타일 선택 시 BOM 로드 + 품목 마스터 필드 자동 매칭
   useEffect(() => {
     if (!selectedStyleId) { setEditBom(null); return; }
+    const item = items.find(i => i.id === selectedStyleId);
     const styleBoms = extBoms.filter(b => b.styleId === selectedStyleId);
     if (styleBoms.length > 0) {
-      const loaded = JSON.parse(JSON.stringify(styleBoms.sort((a, b) => b.version - a.version)[0]));
+      const loaded: ExtBom = JSON.parse(JSON.stringify(styleBoms.sort((a, b) => b.version - a.version)[0]));
+      // 품목 마스터 최신값으로 자동 갱신
+      if (item) {
+        loaded.styleNo = item.styleNo;
+        loaded.styleName = item.name;
+        loaded.season = item.season;
+        loaded.designer = (item as Item & { designer?: string }).designer || loaded.designer || '';
+        loaded.erpCategory = item.erpCategory || loaded.erpCategory || '';
+      }
       setEditBom(normalizeBom(loaded));
     } else {
-      const item = items.find(i => i.id === selectedStyleId);
       if (item) {
         const nb = createNewBom(settings);
-        nb.styleId = item.id; nb.styleNo = item.styleNo; nb.styleName = item.name;
+        nb.styleId = item.id;
+        nb.styleNo = item.styleNo;
+        nb.styleName = item.name;
         nb.season = item.season;
+        nb.designer = (item as Item & { designer?: string }).designer || '';
+        nb.erpCategory = item.erpCategory || '';
         setEditBom(nb);
       }
     }
@@ -664,9 +677,14 @@ export default function BomManagement() {
       const item = items.find(i => i.styleNo === styleNo);
       const nb = createNewBom(settings);
       nb.styleId = item?.id || (selectedStyleId || '');
-      nb.styleNo = styleNo || editBom?.styleNo || '';
+      nb.styleNo = item?.styleNo || styleNo || editBom?.styleNo || '';
       nb.styleName = item?.name || editBom?.styleName || '';
-      nb.lineName = lineName; nb.designer = designer; nb.size = size; nb.boxSize = boxSize;
+      nb.lineName = lineName;
+      // 엑셀 업로드 시: 품목 마스터 우선, 없으면 엑셀 파싱값 사용
+      nb.designer = (item as (Item & { designer?: string }) | undefined)?.designer || designer;
+      nb.erpCategory = item?.erpCategory || '';
+      nb.season = item?.season || nb.season;
+      nb.size = size; nb.boxSize = boxSize;
       nb.snapshotCnyKrw = cnyKrw;
       nb.lines = lines.length > 0 ? lines : nb.lines;
       nb.postProcessLines = postLines.length > 0 ? postLines : nb.postProcessLines;
@@ -815,17 +833,73 @@ export default function BomManagement() {
           </div>
           {editBom && (
             <>
-              <div><label className="text-xs text-stone-500 mb-1 block font-medium">라인명</label><Input value={editBom.lineName || ''} onChange={e => updateField('lineName', e.target.value)} className="h-8 text-xs border-stone-200" placeholder="라인명" /></div>
-              <div><label className="text-xs text-stone-500 mb-1 block font-medium">담당 디자이너</label><Input value={editBom.designer || ''} onChange={e => updateField('designer', e.target.value)} className="h-8 text-xs border-stone-200" placeholder="담당자" /></div>
-              <div><label className="text-xs text-stone-500 mb-1 block font-medium">사이즈</label><Input value={editBom.size || ''} onChange={e => updateField('size', e.target.value)} className="h-8 text-xs border-stone-200" placeholder="사이즈" /></div>
-              <div><label className="text-xs text-stone-500 mb-1 block font-medium">포장사이즈</label><Input value={editBom.boxSize || ''} onChange={e => updateField('boxSize', e.target.value)} className="h-8 text-xs border-stone-200" placeholder="54*14*61" /></div>
+              {/* 자동 매칭 필드: 스타일번호 */}
               <div>
-                <label className="text-xs text-stone-500 mb-1 block font-medium">시즌</label>
-                <Select value={editBom.season} onValueChange={v => updateField('season', v as Season)}>
-                  <SelectTrigger className="h-8 text-xs border-stone-200"><SelectValue /></SelectTrigger>
-                  <SelectContent>{SEASONS.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
-                </Select>
+                <label className="text-xs text-stone-500 mb-1 block font-medium">
+                  스타일번호
+                  <span className="ml-1 text-[10px] text-amber-600 font-normal">자동</span>
+                </label>
+                <Input
+                  value={editBom.styleNo}
+                  disabled
+                  className="h-8 text-xs border-stone-200 bg-stone-50 text-stone-500 cursor-not-allowed"
+                  title="품목 마스터에서만 수정 가능합니다"
+                />
               </div>
+              {/* 자동 매칭 필드: 품명 */}
+              <div>
+                <label className="text-xs text-stone-500 mb-1 block font-medium">
+                  품명
+                  <span className="ml-1 text-[10px] text-amber-600 font-normal">자동</span>
+                </label>
+                <Input
+                  value={editBom.styleName}
+                  disabled
+                  className="h-8 text-xs border-stone-200 bg-stone-50 text-stone-500 cursor-not-allowed"
+                  title="품목 마스터에서만 수정 가능합니다"
+                />
+              </div>
+              {/* 자동 매칭 필드: 시즌 */}
+              <div>
+                <label className="text-xs text-stone-500 mb-1 block font-medium">
+                  시즌
+                  <span className="ml-1 text-[10px] text-amber-600 font-normal">자동</span>
+                </label>
+                <Input
+                  value={editBom.season}
+                  disabled
+                  className="h-8 text-xs border-stone-200 bg-stone-50 text-stone-500 cursor-not-allowed"
+                  title="품목 마스터에서만 수정 가능합니다"
+                />
+              </div>
+              {/* 자동 매칭 필드: 카테고리 */}
+              <div>
+                <label className="text-xs text-stone-500 mb-1 block font-medium">
+                  카테고리
+                  <span className="ml-1 text-[10px] text-amber-600 font-normal">자동</span>
+                </label>
+                <Input
+                  value={editBom.erpCategory || ''}
+                  disabled
+                  className="h-8 text-xs border-stone-200 bg-stone-50 text-stone-500 cursor-not-allowed"
+                  title="품목 마스터에서만 수정 가능합니다"
+                />
+              </div>
+              {/* 자동 매칭 필드: 담당 디자이너 */}
+              <div>
+                <label className="text-xs text-stone-500 mb-1 block font-medium">
+                  담당 디자이너
+                  <span className="ml-1 text-[10px] text-amber-600 font-normal">자동</span>
+                </label>
+                <Input
+                  value={editBom.designer || ''}
+                  disabled
+                  className="h-8 text-xs border-stone-200 bg-stone-50 text-stone-500 cursor-not-allowed"
+                  title="품목 마스터에서만 수정 가능합니다"
+                />
+              </div>
+              {/* 수동 입력 필드 */}
+              <div><label className="text-xs text-stone-500 mb-1 block font-medium">라인명</label><Input value={editBom.lineName || ''} onChange={e => updateField('lineName', e.target.value)} className="h-8 text-xs border-stone-200" placeholder="라인명" /></div>
               <div><label className="text-xs text-stone-500 mb-1 block font-medium">적용 환율 (CNY→KRW)</label><Input type="number" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 text-xs border-stone-200 text-right" /></div>
               <div><label className="text-xs text-stone-500 mb-1 block font-medium">생산마진율 (%)</label><Input type="number" value={Math.round((editBom.productionMarginRate || 0.16) * 100)} onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)} className="h-8 text-xs border-stone-200 text-right" /></div>
               {editBom.sourceFileName && <div className="col-span-2 flex items-center gap-2 text-xs text-stone-400 self-end pb-1"><FileText className="w-3.5 h-3.5 text-[#C9A96E]" /><span>{editBom.sourceFileName}</span></div>}
