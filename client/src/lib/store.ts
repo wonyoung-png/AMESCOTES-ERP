@@ -59,9 +59,12 @@ export interface Item {
   boxSizeW?: number;
   boxSizeH?: number;
   packagingSizeStr?: string;       // 포장사이즈 (예: 54×14×61)
-  salePriceKrw: number;
-  targetSalePrice?: number;        // 목표 납품가 (바이어 요청가)
+  // 판매가(salePriceKrw) 제거됨 — 납품가(deliveryPrice) 기반 마진 계산으로 전환
+  deliveryPrice?: number;          // 납품가 (KRW, 바이어에게 납품하는 가격)
+  targetSalePrice?: number;        // 목표 납품가 (바이어 요청가, 하위 호환성 유지)
   baseCostKrw?: number;
+  marginAmount?: number;           // 마진금액 = 납품가 - BOM원가
+  marginRate?: number;             // 마진율 = 마진금액 / 납품가 × 100
   colors?: string[];               // 컬러 목록
   buyerId?: string;                // 바이어 1:1 연결
   imageUrl?: string;
@@ -594,6 +597,41 @@ export const store = {
   addBom: (v: Bom) => { const a = getAll<Bom>(KEYS.boms); a.push(v); setAll(KEYS.boms, a); },
   updateBom: (id: string, u: Partial<Bom>) => { const a = getAll<Bom>(KEYS.boms); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.boms, a); } },
   deleteBom: (id: string) => setAll(KEYS.boms, getAll<Bom>(KEYS.boms).filter(x => x.id !== id)),
+
+  /**
+   * 스타일번호(styleNo) 기반 BOM 총원가 계산 (KRW 환산)
+   * 총원가 = 자재비 합계(단가CNY × 소요량) + 임가공비
+   * BOM이 없으면 0 반환
+   */
+  getBomTotalCost: (styleNo: string): number => {
+    try {
+      const raw = localStorage.getItem('ames_boms');
+      if (!raw) return 0;
+      const boms = JSON.parse(raw) as Array<{
+        styleNo: string;
+        lines?: Array<{ unitPriceCny?: number; unitPrice?: number; netQty: number; lossRate: number; isHqProvided?: boolean }>;
+        postProcessLines?: Array<{ netQty: number; unitPrice: number }>;
+        processingFee?: number;
+        snapshotCnyKrw?: number;
+      }>;
+      const bom = boms.find(b => b.styleNo === styleNo);
+      if (!bom) return 0;
+      const cnyKrw = bom.snapshotCnyKrw ?? 191;
+      // 자재비 합계 (본사제공 제외, LOSS 포함 소요량 × 단가)
+      const materialCny = (bom.lines || []).reduce((s, l) => {
+        if (l.isHqProvided) return s;
+        const price = l.unitPriceCny ?? (l as { unitPrice?: number }).unitPrice ?? 0;
+        const qty = l.netQty * (1 + (l.lossRate ?? 0));
+        return s + price * qty;
+      }, 0);
+      // 후가공비
+      const postProcessCny = (bom.postProcessLines || []).reduce((s, l) => s + l.netQty * l.unitPrice, 0);
+      // 임가공비
+      const processingCny = bom.processingFee ?? 0;
+      // KRW 환산 합계
+      return Math.round((materialCny + postProcessCny + processingCny) * cnyKrw);
+    } catch { return 0; }
+  },
 
   // Orders
   getOrders: () => getAll<ProductionOrder>(KEYS.orders),

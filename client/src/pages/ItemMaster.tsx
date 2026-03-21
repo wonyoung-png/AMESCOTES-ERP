@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, Database, BarChart2 } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link } from 'lucide-react';
 import { toast } from 'sonner';
 
 // HB 전용 세부 카테고리
@@ -57,7 +57,7 @@ function generateStyleNo(
 const emptyItem: Partial<Item> = {
   styleNo: '', name: '', nameEn: '', season: '26SS', category: '숄더백',
   erpCategory: 'HB', materialType: '완제품',
-  material: '', salePriceKrw: 0, targetSalePrice: 0,
+  material: '', deliveryPrice: 0,
   colors: [], memo: '',
 };
 
@@ -82,6 +82,7 @@ export default function ItemMaster() {
   const [filterBuyer, setFilterBuyer] = useState('전체');
   const [filterNoBom, setFilterNoBom] = useState(false);
   const [showSeasonStats, setShowSeasonStats] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [seasonStatsTarget, setSeasonStatsTarget] = useState('전체');
   const [customCategory, setCustomCategory] = useState(''); // 세부 카테고리 직접 입력
   const [orders] = useState<ProductionOrder[]>(() => store.getOrders()); // 미발주기간 계산용
@@ -104,12 +105,28 @@ export default function ItemMaster() {
   // 현재 선택된 erpCategory에 따른 세부 카테고리 옵션
   const subCategories = editItem.erpCategory === 'SLG' ? SLG_CATEGORIES : HB_CATEGORIES;
 
-  // 마진 계산
-  const calcMargin = (salePrice: number, deliveryPrice: number) => {
-    if (!salePrice || !deliveryPrice) return { rate: null, amount: null };
-    const amount = salePrice - deliveryPrice;
-    const rate = (amount / salePrice) * 100;
+  /**
+   * BOM 원가 기반 마진 계산
+   * deliveryPrice = 납품가 (바이어에게 납품하는 금액)
+   * bomCost = BOM에서 자동 조회한 총원가 (자재비 + 임가공비, KRW)
+   * 마진금액 = 납품가 - BOM원가
+   * 마진율 = 마진금액 / 납품가 × 100
+   */
+  const calcMargin = (deliveryPrice: number, bomCost: number) => {
+    if (!deliveryPrice || deliveryPrice <= 0) return { rate: null, amount: null };
+    const amount = deliveryPrice - bomCost;
+    const rate = (amount / deliveryPrice) * 100;
     return { rate, amount };
+  };
+
+  /**
+   * 마진율 색상 클래스 반환
+   * 30% 이상: 초록, 15~30%: 노란색, 15% 미만: 빨간색
+   */
+  const marginColorClass = (rate: number): string => {
+    if (rate >= 30) return 'text-green-600';
+    if (rate >= 15) return 'text-amber-600';
+    return 'text-red-500';
   };
 
   const filtered = useMemo(() => {
@@ -236,10 +253,26 @@ export default function ItemMaster() {
     // 바이어 연결: selectedVendorId(자동생성 거래처)가 있으면 적용
     const buyerId = selectedVendorId || editItem.buyerId;
 
+    // 납품가: deliveryPrice 우선, 없으면 targetSalePrice 사용
+    const deliveryVal = editItem.deliveryPrice || editItem.targetSalePrice || 0;
+
+    // BOM 원가 조회 후 마진 자동 계산
+    const bomCostForSave = editItem.styleNo ? store.getBomTotalCost(editItem.styleNo) : 0;
+    let marginAmountVal: number | undefined;
+    let marginRateVal: number | undefined;
+    if (deliveryVal > 0) {
+      marginAmountVal = deliveryVal - bomCostForSave;
+      marginRateVal = (marginAmountVal / deliveryVal) * 100;
+    }
+
     if (isEdit && editItem.id) {
       store.updateItem(editItem.id, {
         ...editItem,
         buyerId,
+        deliveryPrice: deliveryVal,
+        targetSalePrice: deliveryVal,  // 하위 호환 유지
+        marginAmount: marginAmountVal,
+        marginRate: marginRateVal,
         materialType: '완제품',
         customCategory: customCategory || undefined,
       } as Partial<Item>);
@@ -249,6 +282,10 @@ export default function ItemMaster() {
       store.addItem({
         ...editItem,
         buyerId,
+        deliveryPrice: deliveryVal,
+        targetSalePrice: deliveryVal,  // 하위 호환 유지
+        marginAmount: marginAmountVal,
+        marginRate: marginRateVal,
         id: newId,
         hasBom: false,
         createdAt: new Date().toISOString(),
@@ -286,6 +323,37 @@ export default function ItemMaster() {
 
   const handleDelete = (id: string) => {
     if (confirm('정말 삭제하시겠습니까?')) { store.deleteItem(id); toast.success('삭제되었습니다'); refresh(); }
+  };
+
+  // 체크박스 다중 선택 관련
+  const isAllSelected = filtered.length > 0 && filtered.every(item => selectedIds.has(item.id));
+  const isIndeterminate = filtered.some(item => selectedIds.has(item.id)) && !isAllSelected;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(item => item.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
+      selectedIds.forEach(id => store.deleteItem(id));
+      setSelectedIds(new Set());
+      toast.success(`${selectedIds.size}개 항목이 삭제되었습니다`);
+      refresh();
+    }
   };
 
   const addColor = () => {
@@ -409,12 +477,40 @@ export default function ItemMaster() {
         </CardContent>
       </Card>
 
+      {/* 다중 선택 액션 바 */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-stone-800 text-white rounded-xl">
+          <span className="text-sm font-medium">{selectedIds.size}개 선택됨</span>
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            🗑️ 선택 삭제
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="flex items-center gap-1 px-3 py-1.5 bg-stone-600 hover:bg-stone-500 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            ✕ 선택 해제
+          </button>
+        </div>
+      )}
+
       {/* 테이블 */}
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100 bg-stone-50">
+                <th className="px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
+                  />
+                </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 w-12">이미지</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">스타일번호</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">바이어</th>
@@ -422,7 +518,7 @@ export default function ItemMaster() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">카테고리</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">컬러</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">납품가(KRW)</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">판매가</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">BOM원가</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">마진율</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">미발주기간</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">BOM</th>
@@ -431,10 +527,23 @@ export default function ItemMaster() {
             </thead>
             <tbody>
               {filtered.map(item => {
-                const { rate: marginRate, amount: marginAmount } = calcMargin(item.salePriceKrw, item.targetSalePrice || 0);
+                // 납품가: deliveryPrice 우선, 없으면 targetSalePrice 사용 (하위 호환)
+                const delivery = item.deliveryPrice || item.targetSalePrice || 0;
+                // BOM 총원가 자동 조회
+                const bomCost = item.hasBom ? store.getBomTotalCost(item.styleNo) : 0;
+                const { rate: marginRate, amount: marginAmount } = calcMargin(delivery, bomCost);
                 const months = monthsSinceLastOrder(item);
+                const isChecked = selectedIds.has(item.id);
                 return (
-                  <tr key={item.id} className="border-b border-stone-50 hover:bg-stone-50/50">
+                  <tr key={item.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${isChecked ? 'bg-amber-50/60' : ''}`}>
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleSelect(item.id)}
+                        className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
+                      />
+                    </td>
                     <td className="px-3 py-2.5">
                       {item.imageUrl ? (
                         <img src={item.imageUrl} alt={item.name} className="w-10 h-10 object-cover rounded-lg border border-stone-200" />
@@ -482,19 +591,25 @@ export default function ItemMaster() {
                     </td>
                     {/* 납품가(KRW) */}
                     <td className="px-4 py-3 text-right">
-                      {item.targetSalePrice ? (
-                        <p className="font-mono text-xs text-stone-700">{formatKRW(item.targetSalePrice)}</p>
+                      {delivery > 0 ? (
+                        <p className="font-mono text-xs text-stone-700">{formatKRW(delivery)}</p>
                       ) : <span className="text-stone-300 text-xs">—</span>}
                     </td>
-                    {/* 판매가 */}
-                    <td className="px-4 py-3 text-right font-mono text-xs text-stone-600">
-                      {item.salePriceKrw ? formatKRW(item.salePriceKrw) : <span className="text-stone-300">—</span>}
+                    {/* BOM 원가 */}
+                    <td className="px-4 py-3 text-right font-mono text-xs">
+                      {item.hasBom && bomCost > 0 ? (
+                        <span className="text-amber-700">{formatKRW(bomCost)}</span>
+                      ) : item.hasBom ? (
+                        <span className="text-stone-300">계산중</span>
+                      ) : (
+                        <span className="text-stone-300 text-xs">미등록</span>
+                      )}
                     </td>
                     {/* 마진율 */}
                     <td className="px-4 py-3 text-right">
                       {marginRate !== null ? (
                         <div>
-                          <p className={`text-xs font-medium ${marginRate >= 30 ? 'text-green-600' : marginRate >= 20 ? 'text-amber-600' : 'text-red-500'}`}>
+                          <p className={`text-xs font-medium ${marginColorClass(marginRate)}`}>
                             {marginRate.toFixed(1)}%
                           </p>
                           {marginAmount !== null && (
@@ -542,7 +657,7 @@ export default function ItemMaster() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={12} className="text-center py-12 text-stone-400">
+                <tr><td colSpan={13} className="text-center py-12 text-stone-400">
                   <Package size={32} className="mx-auto mb-2 opacity-30" />
                   등록된 품목이 없습니다
                 </td></tr>
@@ -759,47 +874,85 @@ export default function ItemMaster() {
             {/* 가격 정보 */}
             <div className="space-y-3">
               <p className="text-xs font-medium text-stone-600">가격 정보</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>납품가(KRW)</Label>
-                  <Input
-                    type="number"
-                    value={editItem.targetSalePrice || ''}
-                    onChange={e => setEditItem({ ...editItem, targetSalePrice: Number(e.target.value) })}
-                    placeholder="납품가 입력"
-                  />
-                  <p className="text-[10px] text-stone-400">※ 추후 BOM 완성 시 원가 기반 납품가 자동 연동 예정</p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>판매가(KRW)</Label>
-                  <Input
-                    type="number"
-                    value={editItem.salePriceKrw || ''}
-                    onChange={e => setEditItem({ ...editItem, salePriceKrw: Number(e.target.value) })}
-                    placeholder="218000"
-                  />
-                </div>
-              </div>
-              {/* 마진 자동 계산 표시 */}
+
+              {/* BOM 원가 표시 영역 */}
               {(() => {
-                const { rate, amount } = calcMargin(editItem.salePriceKrw || 0, editItem.targetSalePrice || 0);
-                if (rate === null) return null;
+                const styleNo = editItem.styleNo || '';
+                const hasBom = isEdit ? items.find(i => i.id === editItem.id)?.hasBom : false;
+                const bomCostVal = hasBom && styleNo ? store.getBomTotalCost(styleNo) : 0;
                 return (
-                  <div className="p-3 bg-stone-50 rounded-lg border border-stone-100 flex gap-4">
-                    <div>
-                      <p className="text-xs text-stone-500">마진금액</p>
-                      <p className={`text-sm font-semibold ${(amount || 0) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                        {formatKRW(amount || 0)}
-                      </p>
+                  <div className={`p-3 rounded-lg border flex items-center justify-between ${hasBom && bomCostVal > 0 ? 'bg-amber-50 border-amber-200' : 'bg-stone-50 border-stone-200'}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-stone-600">BOM 원가:</span>
+                      {hasBom && bomCostVal > 0 ? (
+                        <span className="text-sm font-bold text-amber-700">{formatKRW(bomCostVal)}</span>
+                      ) : (
+                        <span className="text-xs text-stone-400">
+                          {hasBom ? '원가 계산중' : 'BOM 미등록'}
+                        </span>
+                      )}
                     </div>
-                    <div>
-                      <p className="text-xs text-stone-500">마진율</p>
-                      <p className={`text-sm font-semibold ${rate >= 30 ? 'text-green-700' : rate >= 20 ? 'text-amber-600' : 'text-red-600'}`}>
-                        {rate.toFixed(1)}%
-                      </p>
-                    </div>
-                    <div className="ml-auto text-xs text-stone-400 self-center">
-                      마진율 = (판매가 - 납품가) / 판매가 × 100
+                    {!hasBom && styleNo && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModalOpen(false);
+                          localStorage.setItem('ames_prefill_bom', styleNo);
+                          navigate('/bom');
+                        }}
+                        className="flex items-center gap-1 text-xs text-[#C9A96E] hover:text-amber-700 font-medium"
+                      >
+                        <Link size={12} />BOM 등록하러 가기
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div className="space-y-1.5">
+                <Label>납품가(KRW)</Label>
+                <Input
+                  type="number"
+                  value={editItem.deliveryPrice || editItem.targetSalePrice || ''}
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setEditItem(prev => ({ ...prev, deliveryPrice: val, targetSalePrice: val }));
+                  }}
+                  placeholder="바이어 납품가 입력 (예: 85000)"
+                />
+                <p className="text-[10px] text-stone-400">※ BOM이 등록된 경우 납품가 입력 시 마진이 자동 계산됩니다</p>
+              </div>
+
+              {/* 마진 자동 계산 표시 (BOM 원가 연동) */}
+              {(() => {
+                const styleNo = editItem.styleNo || '';
+                const hasBom = isEdit ? items.find(i => i.id === editItem.id)?.hasBom : false;
+                const bomCostVal = hasBom && styleNo ? store.getBomTotalCost(styleNo) : 0;
+                const deliveryVal = editItem.deliveryPrice || editItem.targetSalePrice || 0;
+                const { rate, amount } = calcMargin(deliveryVal, bomCostVal);
+                if (rate === null) return null;
+                const bgClass = rate >= 30 ? 'bg-green-50 border-green-200' : rate >= 15 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
+                return (
+                  <div className={`p-3 rounded-lg border ${bgClass}`}>
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <p className="text-xs text-stone-500">마진금액</p>
+                        <p className={`text-sm font-bold ${marginColorClass(rate)}`}>
+                          {formatKRW(amount || 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-stone-500">마진율</p>
+                        <p className={`text-xl font-bold ${marginColorClass(rate)}`}>
+                          {rate.toFixed(1)}%
+                        </p>
+                      </div>
+                      <div className="ml-auto text-right">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${rate >= 30 ? 'bg-green-100 text-green-700' : rate >= 15 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                          {rate >= 30 ? '✅ 양호' : rate >= 15 ? '🟡 주의' : '🔴 위험'}
+                        </span>
+                        <p className="text-[10px] text-stone-400 mt-1">마진율 = (납품가 - BOM원가) / 납품가 × 100</p>
+                      </div>
                     </div>
                   </div>
                 );

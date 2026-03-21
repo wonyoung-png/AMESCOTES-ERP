@@ -48,6 +48,7 @@ export default function VendorMaster() {
   const [showModal, setShowModal] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [editVendor, setEditVendor] = useState<Partial<Vendor>>({ ...EMPTY_VENDOR });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isOcrLoading, setIsOcrLoading] = useState(false);
   const [isBankFileLoading, setIsBankFileLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -122,6 +123,37 @@ export default function VendorMaster() {
     store.deleteVendor(id);
     refresh();
     toast.success('삭제되었습니다');
+  };
+
+  // 체크박스 다중 선택 관련
+  const isAllSelected = filtered.length > 0 && filtered.every(v => selectedIds.has(v.id));
+  const isIndeterminate = filtered.some(v => selectedIds.has(v.id)) && !isAllSelected;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(v => v.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
+      selectedIds.forEach(id => store.deleteVendor(id));
+      setSelectedIds(new Set());
+      refresh();
+      toast.success(`${selectedIds.size}개 항목이 삭제되었습니다`);
+    }
   };
 
   // 헤더 이름을 정규화하는 헬퍼 함수
@@ -500,11 +532,39 @@ export default function VendorMaster() {
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="거래처명 / 코드 검색" className="pl-9 h-9" />
       </div>
 
+      {/* 다중 선택 액션 바 */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-stone-800 text-white rounded-xl">
+          <span className="text-sm font-medium">{selectedIds.size}개 선택됨</span>
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            🗑️ 선택 삭제
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="flex items-center gap-1 px-3 py-1.5 bg-stone-600 hover:bg-stone-500 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            ✕ 선택 해제
+          </button>
+        </div>
+      )}
+
       {/* 테이블 */}
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50">
+              <th className="px-4 py-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 rounded border-stone-300 accent-amber-700 cursor-pointer"
+                />
+              </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">거래처명</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">코드</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">유형</th>
@@ -521,12 +581,22 @@ export default function VendorMaster() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={9} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={10} className="text-center py-12 text-stone-400">
                 <Building2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 거래처가 없습니다</p>
               </td></tr>
-) : filtered.map(v => (
-              <tr key={v.id} className="border-b border-stone-50 hover:bg-stone-50/50">
+) : filtered.map(v => {
+  const isChecked = selectedIds.has(v.id);
+  return (
+              <tr key={v.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${isChecked ? 'bg-amber-50/60' : ''}`}>
+                <td className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleSelect(v.id)}
+                    className="w-4 h-4 rounded border-stone-300 accent-amber-700 cursor-pointer"
+                  />
+                </td>
                 <td className="px-4 py-3">
                   <p className="font-medium text-stone-800">{v.name}</p>
                   {v.nameEn && <p className="text-xs text-stone-400">{v.nameEn}</p>}
@@ -599,7 +669,8 @@ export default function VendorMaster() {
                   </div>
                 </td>
               </tr>
-            ))}
+  );
+})}
           </tbody>
         </table>
       </div>

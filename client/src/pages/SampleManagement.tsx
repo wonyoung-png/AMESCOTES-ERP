@@ -456,6 +456,38 @@ export default function SampleManagement() {
     toast.success('삭제되었습니다');
   };
 
+  // 체크박스 다중 선택 관련
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const isAllSelected = filtered.length > 0 && filtered.every(s => selectedIds.has(s.id));
+  const isIndeterminate = filtered.some(s => selectedIds.has(s.id)) && !isAllSelected;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(s => s.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
+      selectedIds.forEach(id => store.deleteSample(id));
+      setSelectedIds(new Set());
+      refresh();
+      toast.success(`${selectedIds.size}개 항목이 삭제되었습니다`);
+    }
+  };
+
   // 리스트에서 바로 단계 변경
   const handleStageChange = (id: string, stage: SampleStage) => {
     const updates: Partial<Sample> = { stage };
@@ -874,11 +906,39 @@ export default function SampleManagement() {
         </Select>
       </div>
 
+      {/* 다중 선택 액션 바 */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-stone-800 text-white rounded-xl">
+          <span className="text-sm font-medium">{selectedIds.size}개 선택됨</span>
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            🗑️ 선택 삭제
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="flex items-center gap-1 px-3 py-1.5 bg-stone-600 hover:bg-stone-500 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            ✕ 선택 해제
+          </button>
+        </div>
+      )}
+
       {/* 테이블 (데스크탑) */}
       <div className="hidden md:block bg-white rounded-xl border border-stone-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50">
+              <th className="px-4 py-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 rounded border-stone-300 accent-amber-700 cursor-pointer"
+                />
+              </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 w-12">이미지</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">바이어</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">스타일</th>
@@ -894,15 +954,24 @@ export default function SampleManagement() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={10} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={12} className="text-center py-12 text-stone-400">
                 <Camera className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 샘플이 없습니다</p>
               </td></tr>
             ) : filtered.map(s => {
               const checkCount = (s.materialChecklist || []).length;
               const readyCount = (s.materialChecklist || []).filter(c => c.isReady).length;
+              const isChecked = selectedIds.has(s.id);
               return (
-                <tr key={s.id} className="border-b border-stone-50 hover:bg-stone-50/50">
+                <tr key={s.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${isChecked ? 'bg-amber-50/60' : ''}`}>
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleSelect(s.id)}
+                      className="w-4 h-4 rounded border-stone-300 accent-amber-700 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-3 py-2.5">
                     {(s.imageUrls || []).length > 0 ? (
                       <img src={s.imageUrls[0]} alt={s.styleNo} className="w-14 h-14 object-cover rounded-lg border border-stone-200" />
@@ -1043,8 +1112,9 @@ export default function SampleManagement() {
         ) : filtered.map(s => {
           const checkCount = (s.materialChecklist || []).length;
           const readyCount = (s.materialChecklist || []).filter(c => c.isReady).length;
+          const isChecked = selectedIds.has(s.id);
           return (
-            <div key={s.id} className="bg-white rounded-xl border border-stone-200 p-4">
+            <div key={s.id} className={`bg-white rounded-xl border p-4 ${isChecked ? 'border-amber-400 bg-amber-50/50' : 'border-stone-200'}`}>
               <div className="flex gap-3">
                 {/* 썸네일 */}
                 <div className="shrink-0">
@@ -1063,9 +1133,17 @@ export default function SampleManagement() {
                       <p className="font-semibold text-stone-800 text-sm">{s.styleNo}</p>
                       <p className="text-xs text-stone-500 truncate">{s.styleName}</p>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${STAGE_COLOR[s.stage] || 'bg-stone-50 text-stone-600 border-stone-200'}`}>
-                      {s.stage}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleSelect(s.id)}
+                        className="w-4 h-4 rounded border-stone-300 accent-amber-700 cursor-pointer"
+                      />
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${STAGE_COLOR[s.stage] || 'bg-stone-50 text-stone-600 border-stone-200'}`}>
+                        {s.stage}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     {s.buyerId && (

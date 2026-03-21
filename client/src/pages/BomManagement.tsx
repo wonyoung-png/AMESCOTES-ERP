@@ -754,12 +754,21 @@ export default function BomManagement() {
                 {items
                   .filter(item => filterBuyerBom === 'all' || item.buyerId === filterBuyerBom)
                   .filter(item => !styleSearch || item.styleNo.toLowerCase().includes(styleSearch.toLowerCase()) || item.name.toLowerCase().includes(styleSearch.toLowerCase()))
-                  .map(item => (
-                  <SelectItem key={item.id} value={item.id} className="text-xs">
-                    {item.styleNo} — {item.name}
-                    {item.hasBom && <Badge variant="outline" className="ml-2 text-[10px] py-0 h-4 border-green-300 text-green-600">BOM</Badge>}
-                  </SelectItem>
-                ))}
+                  .map(item => {
+                    // 스타일별 총원가 표시
+                    const bomCost = item.hasBom ? store.getBomTotalCost(item.styleNo) : 0;
+                    return (
+                      <SelectItem key={item.id} value={item.id} className="text-xs">
+                        <span className="flex items-center gap-1.5">
+                          {item.styleNo} — {item.name}
+                          {item.hasBom && <Badge variant="outline" className="text-[10px] py-0 h-4 border-green-300 text-green-600">BOM</Badge>}
+                          {item.hasBom && bomCost > 0 && (
+                            <span className="text-[10px] text-amber-600 font-medium">{fmtKrw(bomCost)}</span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
               </SelectContent>
             </Select>
           </div>
@@ -928,12 +937,13 @@ export default function BomManagement() {
                   {/* 납품가 / 마진금액 / 마진율 — 품목 마스터 자동 연동 */}
                   {(() => {
                     const linkedItem = items.find(i => i.id === editBom.styleId);
-                    const deliveryPrice = linkedItem?.targetSalePrice;
+                    // deliveryPrice 우선, 없으면 targetSalePrice 사용 (하위 호환)
+                    const deliveryPrice = linkedItem?.deliveryPrice || linkedItem?.targetSalePrice;
                     if (!deliveryPrice || deliveryPrice <= 0) return null;
                     const marginAmt = deliveryPrice - summary.totalCostKrw;
                     const marginPct = (marginAmt / deliveryPrice) * 100;
-                    const marginClass = marginPct < 20 ? 'text-red-600' : marginPct < 30 ? 'text-amber-600' : 'text-green-600';
-                    const marginBg = marginPct < 20 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
+                    const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 30 ? 'text-amber-600' : 'text-green-600';
+                    const marginBg = marginPct < 15 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
                     return (
                       <>
                         <tr className="bg-blue-50 border-t border-blue-200">
@@ -951,6 +961,9 @@ export default function BomManagement() {
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-stone-500">마진율</span>
                                 <span className={`font-mono font-bold text-lg ${marginClass}`}>{marginPct.toFixed(1)}%</span>
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${marginPct >= 30 ? 'bg-green-100 text-green-700' : marginPct >= 15 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                                  {marginPct >= 30 ? '✅ 양호' : marginPct >= 15 ? '🟡 주의' : '🔴 위험'}
+                                </span>
                               </div>
                             </div>
                           </td>
