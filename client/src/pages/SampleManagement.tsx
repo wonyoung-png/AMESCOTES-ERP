@@ -605,17 +605,7 @@ export default function SampleManagement() {
     toast.info('정확한 스타일번호를 입력 후 품목을 등록해주세요', { duration: 5000 });
   };
 
-  // 발주 생성 (이미 품목 등록된 최종승인 샘플에서)
-  const handleCreateOrder = (s: Sample) => {
-    localStorage.setItem('ames_prefill_order', JSON.stringify({
-      styleId: s.styleId,
-      styleNo: s.styleNo,
-      styleName: s.styleName,
-      season: s.season,
-    }));
-    navigate('/orders');
-    toast.success('생산 발주 페이지로 이동합니다. 스타일이 자동 선택됩니다.');
-  };
+  // 발주 생성은 품목 마스터에서 처리 (샘플 관리에서 제거)
 
   // 월별 담당자별 처리량 통계 (필터 적용)
   const monthlyStats = useMemo(() => {
@@ -1020,23 +1010,15 @@ export default function SampleManagement() {
                           (i.id === s.styleId || (i.name === s.styleName && i.buyerId === s.buyerId))
                         );
                         const needsRegistration = isTempStyleNo || !registeredItem;
-                        return (
-                          <>
-                            {needsRegistration && (
-                              /* TEMP 스타일번호 or 품목 미등록 → 품목등록 버튼 (주황색) */
-                              <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-orange-700 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 border border-orange-300"
-                                onClick={() => handleRegisterItem(s)}>
-                                <PackagePlus className="w-3 h-3 mr-1" />품목등록
-                              </Button>
-                            )}
-                            {!needsRegistration && registeredItem && (
-                              /* 정식 스타일번호로 품목 등록 완료(ACTIVE) → 발주 생성 버튼 */
-                              <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-amber-700 hover:text-amber-900 border border-amber-300"
-                                onClick={() => handleCreateOrder(s)}>
-                                <FileText className="w-3 h-3 mr-1" />발주 생성
-                              </Button>
-                            )}
-                          </>
+                        return needsRegistration ? (
+                          /* TEMP 스타일번호 or 품목 미등록 → 품목등록 버튼 (주황색) */
+                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-orange-700 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 border border-orange-300"
+                            onClick={() => handleRegisterItem(s)}>
+                            <PackagePlus className="w-3 h-3 mr-1" />품목등록
+                          </Button>
+                        ) : (
+                          /* 품목 등록 완료(ACTIVE) → 버튼 없음, 텍스트만 표시 */
+                          <span className="text-xs text-green-600 font-medium px-1">✓ 품목등록완료</span>
                         );
                       })()}
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(s.id)}>
@@ -1139,11 +1121,8 @@ export default function SampleManagement() {
                         <PackagePlus className="w-3 h-3 mr-1" />품목
                       </Button>
                     ) : (
-                      /* 정식 스타일번호로 ACTIVE 품목 등록 완료 → 발주 생성 버튼 */
-                      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-amber-700 border border-amber-300"
-                        onClick={() => handleCreateOrder(s)}>
-                        <FileText className="w-3 h-3 mr-1" />발주
-                      </Button>
+                      /* 품목 등록 완료(ACTIVE) → 텍스트만 표시, 버튼 없음 */
+                      <span className="text-xs text-green-600 font-medium px-1">✓ 완료</span>
                     );
                   })()}
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(s.id)}>
