@@ -74,6 +74,11 @@ export default function ProductionOrders() {
   // 공장단가 통화 선택
   const [factoryCurrency, setFactoryCurrency] = useState<'CNY' | 'USD' | 'KRW'>('CNY');
 
+  // 컬러 드롭다운 상태
+  const [showColorDropdown, setShowColorDropdown] = useState(false);
+  const [customColorInput, setCustomColorInput] = useState('');
+  const [showCustomColorInput, setShowCustomColorInput] = useState(false);
+
   // 입고 처리 팝업 상태
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receiveOrderId, setReceiveOrderId] = useState<string>('');
@@ -123,6 +128,9 @@ export default function ProductionOrders() {
     setManualFactoryPrice(false);
     setManualPriceCny(0);
     setFactoryCurrency('CNY');
+    setShowColorDropdown(false);
+    setShowCustomColorInput(false);
+    setCustomColorInput('');
     setShowModal(true);
 
     if (prefillStyleIdToUse) {
@@ -304,9 +312,28 @@ export default function ProductionOrders() {
       memo: form.memo,
     };
     store.addOrder(order);
+
+    // 새 컬러 → 품목 마스터 자동 추가
+    let newColorCount = 0;
+    if (colorQtys.length > 0 && form.styleId) {
+      const currentItem = store.getItems().find(i => i.id === form.styleId);
+      const existingColors = currentItem?.colors || [];
+      for (const cq of colorQtys) {
+        const trimmed = cq.color.trim();
+        if (trimmed && !existingColors.includes(trimmed)) {
+          store.addItemColor(form.styleId, trimmed);
+          newColorCount++;
+        }
+      }
+    }
+
     refresh();
     setShowModal(false);
-    toast.success('발주가 등록되었습니다');
+    if (newColorCount > 0) {
+      toast.success(`발주가 등록되었습니다 · 새 컬러 ${newColorCount}개가 품목 마스터에 추가됨`);
+    } else {
+      toast.success('발주가 등록되었습니다');
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -919,48 +946,144 @@ export default function ProductionOrders() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs text-stone-500">컬러별 수량 (선택)</Label>
-                  <Button
-                    type="button" variant="outline" size="sm" className="h-7 text-xs"
-                    onClick={() => setColorQtys(prev => [...prev, { color: '', qty: 0 }])}
-                  >
-                    <Plus className="w-3 h-3 mr-1" />컬러 추가
-                  </Button>
-                </div>
-                {colorQtys.length > 0 && (
-                  <div className="space-y-1.5">
-                    {colorQtys.map((cq, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <Input
-                          className="flex-1 h-8 text-sm"
-                          placeholder="컬러명"
-                          value={cq.color}
-                          onChange={e => setColorQtys(prev => prev.map((c, i) => i === idx ? { ...c, color: e.target.value } : c))}
-                        />
-                        <Input
-                          type="number" min={0}
-                          className="w-24 h-8 text-sm text-center"
-                          placeholder="수량"
-                          value={cq.qty || ''}
-                          onChange={e => {
-                            const updated = colorQtys.map((c, i) => i === idx ? { ...c, qty: parseInt(e.target.value) || 0 } : c);
-                            setColorQtys(updated);
-                            const newTotal = updated.reduce((s, c) => s + c.qty, 0);
-                            if (form.styleNo && newTotal > 0) recalcBom(form.styleNo, newTotal);
-                          }}
-                        />
-                        <Button
-                          type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600"
-                          onClick={() => setColorQtys(prev => prev.filter((_, i) => i !== idx))}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ))}
-                    <p className="text-xs text-stone-500 text-right">
-                      합계: <span className="font-mono font-bold">{colorQtys.reduce((s, c) => s + c.qty, 0).toLocaleString()} PCS</span>
-                    </p>
+                  <div className="relative">
+                    <Button
+                      type="button" variant="outline" size="sm" className="h-7 text-xs"
+                      onClick={() => {
+                        setShowColorDropdown(v => !v);
+                        setShowCustomColorInput(false);
+                        setCustomColorInput('');
+                      }}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />컬러 추가
+                    </Button>
+                    {showColorDropdown && (() => {
+                      const selectedItem = items.find(i => i.id === form.styleId);
+                      const registeredColors = selectedItem?.colors || [];
+                      const usedColors = colorQtys.map(c => c.color);
+                      const availableColors = registeredColors.filter(c => !usedColors.includes(c));
+                      return (
+                        <div className="absolute right-0 top-8 z-50 w-48 bg-white border border-stone-200 rounded-lg shadow-lg py-1">
+                          {availableColors.length === 0 && !showCustomColorInput && (
+                            <p className="text-xs text-stone-400 px-3 py-2">등록된 컬러 없음</p>
+                          )}
+                          {availableColors.map(color => (
+                            <button
+                              key={color}
+                              type="button"
+                              className="w-full text-left px-3 py-1.5 text-xs text-stone-700 hover:bg-blue-50 flex items-center gap-2"
+                              onClick={() => {
+                                setColorQtys(prev => [...prev, { color, qty: 0 }]);
+                                setShowColorDropdown(false);
+                              }}
+                            >
+                              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px]">{color}</span>
+                            </button>
+                          ))}
+                          {availableColors.length > 0 && <div className="border-t border-stone-100 my-1" />}
+                          {!showCustomColorInput ? (
+                            <button
+                              type="button"
+                              className="w-full text-left px-3 py-1.5 text-xs text-green-700 hover:bg-green-50 font-medium"
+                              onClick={() => setShowCustomColorInput(true)}
+                            >
+                              ✏️ 직접 입력 (새 컬러)
+                            </button>
+                          ) : (
+                            <div className="px-2 py-1.5 space-y-1">
+                              <Input
+                                autoFocus
+                                className="h-7 text-xs"
+                                placeholder="컬러명 입력"
+                                value={customColorInput}
+                                onChange={e => setCustomColorInput(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter' && customColorInput.trim()) {
+                                    setColorQtys(prev => [...prev, { color: customColorInput.trim(), qty: 0 }]);
+                                    setCustomColorInput('');
+                                    setShowCustomColorInput(false);
+                                    setShowColorDropdown(false);
+                                  }
+                                  if (e.key === 'Escape') {
+                                    setShowCustomColorInput(false);
+                                    setCustomColorInput('');
+                                  }
+                                }}
+                              />
+                              <Button
+                                type="button" size="sm"
+                                className="w-full h-6 text-[10px] bg-green-600 hover:bg-green-700 text-white"
+                                onClick={() => {
+                                  if (customColorInput.trim()) {
+                                    setColorQtys(prev => [...prev, { color: customColorInput.trim(), qty: 0 }]);
+                                    setCustomColorInput('');
+                                    setShowCustomColorInput(false);
+                                    setShowColorDropdown(false);
+                                  }
+                                }}
+                              >추가</Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
-                )}
+                </div>
+                {colorQtys.length > 0 && (() => {
+                  const selectedItem = items.find(i => i.id === form.styleId);
+                  const registeredColors = selectedItem?.colors || [];
+                  return (
+                    <div className="space-y-1.5">
+                      {colorQtys.map((cq, idx) => {
+                        const isNew = !registeredColors.includes(cq.color);
+                        return (
+                          <div key={idx} className="flex items-center gap-2">
+                            <div className="flex-1 flex items-center gap-1.5">
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${isNew ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {cq.color || '?'}
+                              </span>
+                              <Input
+                                className="flex-1 h-8 text-sm"
+                                placeholder="컬러명"
+                                value={cq.color}
+                                onChange={e => setColorQtys(prev => prev.map((c, i) => i === idx ? { ...c, color: e.target.value } : c))}
+                              />
+                              {isNew && cq.color && (
+                                <span className="text-[10px] text-green-600 shrink-0 whitespace-nowrap">(신규 — 자동 추가됨)</span>
+                              )}
+                            </div>
+                            <Input
+                              type="number" min={0}
+                              className="w-24 h-8 text-sm text-center"
+                              placeholder="수량"
+                              value={cq.qty || ''}
+                              onChange={e => {
+                                const updated = colorQtys.map((c, i) => i === idx ? { ...c, qty: parseInt(e.target.value) || 0 } : c);
+                                setColorQtys(updated);
+                                const newTotal = updated.reduce((s, c) => s + c.qty, 0);
+                                if (form.styleNo && newTotal > 0) recalcBom(form.styleNo, newTotal);
+                              }}
+                            />
+                            <Button
+                              type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600"
+                              onClick={() => setColorQtys(prev => prev.filter((_, i) => i !== idx))}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                      {colorQtys.some(cq => !registeredColors.includes(cq.color) && cq.color) && (
+                        <p className="text-[10px] text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1">
+                          💡 초록색 배지 컬러는 품목 마스터에 없는 새 컬러입니다. 발주 저장 시 자동으로 추가됩니다.
+                        </p>
+                      )}
+                      <p className="text-xs text-stone-500 text-right">
+                        합계: <span className="font-mono font-bold">{colorQtys.reduce((s, c) => s + c.qty, 0).toLocaleString()} PCS</span>
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

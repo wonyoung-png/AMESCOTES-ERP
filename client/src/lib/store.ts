@@ -611,6 +611,17 @@ export const store = {
   addItem: (v: Item) => { const a = getAll<Item>(KEYS.items); a.push(v); setAll(KEYS.items, a); },
   updateItem: (id: string, u: Partial<Item>) => { const a = getAll<Item>(KEYS.items); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.items, a); } },
   deleteItem: (id: string) => setAll(KEYS.items, getAll<Item>(KEYS.items).filter(x => x.id !== id)),
+  addItemColor: (itemId: string, color: string) => {
+    const a = getAll<Item>(KEYS.items);
+    const i = a.findIndex(x => x.id === itemId);
+    if (i >= 0) {
+      const existing = a[i].colors || [];
+      if (!existing.includes(color)) {
+        a[i] = { ...a[i], colors: [...existing, color] };
+        setAll(KEYS.items, a);
+      }
+    }
+  },
 
   // BOMs
   getBoms: () => getAll<Bom>(KEYS.boms),
