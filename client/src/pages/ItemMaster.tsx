@@ -84,6 +84,7 @@ export default function ItemMaster() {
   const [filterNoBom, setFilterNoBom] = useState(false);
   const [showSeasonStats, setShowSeasonStats] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [seasonStatsTarget, setSeasonStatsTarget] = useState('전체');
   const [customCategory, setCustomCategory] = useState(''); // 세부 카테고리 직접 입력
   const [orders] = useState<ProductionOrder[]>(() => store.getOrders()); // 미발주기간 계산용
@@ -329,6 +330,7 @@ export default function ItemMaster() {
   };
 
   // 체크박스 다중 선택 관련
+  const displayItems = showSelectedOnly ? filtered.filter(i => selectedIds.has(i.id)) : filtered;
   const isAllSelected = filtered.length > 0 && filtered.every(item => selectedIds.has(item.id));
   const isIndeterminate = filtered.some(item => selectedIds.has(item.id)) && !isAllSelected;
 
@@ -518,7 +520,13 @@ export default function ItemMaster() {
             🗑️ 선택 삭제
           </button>
           <button
-            onClick={() => setSelectedIds(new Set())}
+            onClick={() => setShowSelectedOnly(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${showSelectedOnly ? 'bg-blue-500 hover:bg-blue-600' : 'bg-stone-600 hover:bg-stone-500'} text-white`}
+          >
+            {showSelectedOnly ? '👁 선택만 보기 ON' : '👁 선택만 보기'}
+          </button>
+          <button
+            onClick={() => { setSelectedIds(new Set()); setShowSelectedOnly(false); }}
             className="flex items-center gap-1 px-3 py-1.5 bg-stone-600 hover:bg-stone-500 text-white rounded-lg text-xs font-medium transition-colors"
           >
             ✕ 선택 해제
