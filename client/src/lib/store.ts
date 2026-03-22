@@ -142,7 +142,9 @@ export interface BomLine {
   // 제조금액(CNY) = unitPriceCny * 소요량
   isHqProvided: boolean;    // 본사제공 여부
   isVendorProvided?: boolean; // 업체(공장)제공 여부 — 생산마진 미포함
-  vendorName?: string;      // 구매업체
+  vendorName?: string;      // 본사제공 시 자재업체명
+  vendorId?: string;        // 본사제공 시 자재업체 ID
+  isNewVendor?: boolean;    // 새로 등록된 업체 (기본 정보 미입력)
   memo?: string;            // 비고
 }
 

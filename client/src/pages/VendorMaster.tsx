@@ -614,7 +614,12 @@ export default function VendorMaster() {
                   />
                 </td>
                 <td className="px-4 py-3">
-                  <p className="font-medium text-stone-800">{v.name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium text-stone-800">{v.name}</p>
+                    {v.type === '자재거래처' && !v.contactName && !v.contactEmail && !v.contactPhone && (
+                      <span title="기본 정보 미입력 — 거래처 마스터에서 연락처 정보 입력 필요" className="text-red-500 text-sm leading-none cursor-help">🔴</span>
+                    )}
+                  </div>
                   {v.nameEn && <p className="text-xs text-stone-400">{v.nameEn}</p>}
                   {v.nameCn && <p className="text-xs text-stone-400">{v.nameCn}</p>}
                 </td>
@@ -658,7 +663,14 @@ export default function VendorMaster() {
                 <td className="px-4 py-3 text-stone-500 text-xs">
                   {v.contactEmail && <p>{v.contactEmail}</p>}
                   {v.contactPhone && <p>{v.contactPhone}</p>}
-                  {!v.contactEmail && !v.contactPhone && '-'}
+                  {!v.contactEmail && !v.contactPhone && (
+                    <span className="flex items-center gap-1">
+                      {v.type === '자재거래처' && !v.contactName && (
+                        <span title="기본 정보 미입력 — 전화번호, 이메일, 연락처 없음" className="text-red-500 text-sm cursor-help">🔴</span>
+                      )}
+                      <span>-</span>
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-stone-500 text-xs">
                   {v.billingType ? <p className="text-xs">{v.billingType}</p> : <span className="text-stone-300 text-xs">—</span>}

@@ -8,9 +8,10 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useLocation } from 'wouter';
 import {
   store, genId,
-  type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material,
+  type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material, type Vendor,
 } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,7 +102,10 @@ interface ExtBomLine {
   netQty: number;
   lossRate: number;
   isHqProvided: boolean;
-  vendorName?: string;
+  isVendorProvided?: boolean; // 업체제공 여부
+  vendorName?: string;        // 본사제공 시 자재업체명
+  vendorId?: string;          // 본사제공 시 자재업체 ID
+  isNewVendor?: boolean;      // 새로 등록된 업체 (기본 정보 미입력)
   memo?: string;
 }
 
@@ -704,6 +708,137 @@ function MaterialSearchPopover({ onSelect }: { onSelect: (m: Material) => void }
   );
 }
 
+// ─── 자재업체 자동완성 컴포넌트 (본사제공 시 사용) ────────────────────────────
+function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
+  value: string;
+  vendorId?: string;
+  isNewVendor?: boolean;
+  onChange: (name: string, id?: string, isNew?: boolean) => void;
+}) {
+  const [, setLocation] = useLocation();
+  const [inputVal, setInputVal] = useState(value);
+  const [suggestions, setSuggestions] = useState<Vendor[]>([]);
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const vendors = store.getVendors().filter(v => v.type === '자재거래처');
+
+  // 외부 value 변경 시 inputVal 동기화
+  useEffect(() => { setInputVal(value); }, [value]);
+
+  const handleInput = (text: string) => {
+    setInputVal(text);
+    if (!text.trim()) {
+      setSuggestions([]);
+      setOpen(false);
+      return;
+    }
+    const lower = text.toLowerCase();
+    const matched = vendors.filter(v => v.name.toLowerCase().includes(lower)).slice(0, 8);
+    setSuggestions(matched);
+    setOpen(matched.length > 0);
+  };
+
+  const selectVendor = (v: Vendor) => {
+    setInputVal(v.name);
+    setSuggestions([]);
+    setOpen(false);
+    onChange(v.name, v.id, false);
+  };
+
+  const registerNew = () => {
+    const name = inputVal.trim();
+    if (!name) return;
+    // 이미 존재하는 업체면 그냥 선택
+    const existing = vendors.find(v => v.name === name);
+    if (existing) { selectVendor(existing); return; }
+    // 신규 등록
+    const newVendor: Vendor = {
+      id: genId(),
+      name,
+      type: '자재거래처',
+      country: '한국',
+      currency: 'KRW',
+      contactHistory: [],
+      createdAt: new Date().toISOString(),
+    };
+    store.addVendor(newVendor);
+    toast.success(`"${name}" 거래처 마스터에 등록됨`);
+    setInputVal(name);
+    setSuggestions([]);
+    setOpen(false);
+    onChange(name, newVendor.id, true);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') { e.preventDefault(); registerNew(); }
+    if (e.key === 'Escape') { setOpen(false); }
+  };
+
+  // 외부 클릭 시 닫기
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const goToVendorMaster = () => {
+    if (vendorId) setLocation(`/vendors?edit=${vendorId}`);
+    else setLocation('/vendors');
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-36">
+      <div className="flex items-center gap-0.5">
+        <Input
+          ref={inputRef}
+          value={inputVal}
+          onChange={e => handleInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => { if (suggestions.length > 0) setOpen(true); }}
+          className="h-7 text-xs border-stone-200 bg-amber-50/60 w-full"
+          placeholder="업체명 검색/입력"
+        />
+        {isNewVendor && (
+          <button
+            onClick={goToVendorMaster}
+            title="기본 정보 미입력 — 거래처 마스터에서 추가 정보 입력 필요"
+            className="text-red-500 hover:text-red-700 shrink-0"
+          >
+            <span className="text-sm">❗</span>
+          </button>
+        )}
+      </div>
+      {/* 자동완성 드롭다운 */}
+      {open && (
+        <div className="absolute z-50 top-full left-0 mt-0.5 bg-white border border-stone-200 rounded shadow-lg w-48 max-h-48 overflow-auto">
+          {suggestions.map(v => (
+            <button
+              key={v.id}
+              className="w-full text-left px-3 py-1.5 text-xs hover:bg-amber-50 text-stone-800"
+              onMouseDown={() => selectVendor(v)}
+            >
+              {v.name}
+            </button>
+          ))}
+          {inputVal.trim() && !vendors.find(v => v.name === inputVal.trim()) && (
+            <button
+              className="w-full text-left px-3 py-1.5 text-xs hover:bg-green-50 text-green-700 border-t border-stone-100 flex items-center gap-1"
+              onMouseDown={registerNew}
+            >
+              <span>+</span> <span>"{inputVal.trim()}" 신규 등록</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── BOM 행 컴포넌트 ─────────────────────────────────────────────────────────
 function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재', accentColor = 'amber' }: {
   line: ExtBomLine;
@@ -715,15 +850,23 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
 }) {
   const qty = calcQty(line.netQty, line.lossRate);
   const amt = line.unitPriceCny * qty;
-  const vendors = store.getVendors().filter(v => v.type === '자재거래처');
   const isCustomUnit = line.unit === '직접입력';
   const displayUnit = isCustomUnit ? (line.customUnit || '') : line.unit;
   const subPartOptions = SECTION_SUB_PARTS[sectionKey] || ['기타'];
 
+  // 공급 상태 판단
+  const isHqProvided = line.isHqProvided;
+  const isVendorProvided = !!(line.isVendorProvided);
+  // 본사/업체 동시 체크 불가: 본사제공 우선
+  const supplyLabel = !isHqProvided && !isVendorProvided
+    ? { text: '공장', cls: 'text-stone-400' }
+    : isVendorProvided && !isHqProvided
+    ? { text: '업체', cls: 'text-blue-500' }
+    : { text: '본사', cls: 'text-amber-600 font-semibold' };
+
   const handleMaterialSelect = (m: Material) => {
     onChange(line.id, 'itemName', m.name);
     if (m.spec) onChange(line.id, 'spec', m.spec);
-    // 단위 매핑: 자재 마스터 단위가 UNITS에 있으면 설정
     const unitInList = UNITS.find(u => u !== '직접입력' && u === m.unit);
     if (unitInList) {
       onChange(line.id, 'unit', m.unit);
@@ -734,8 +877,41 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
     if (m.unitPriceCny != null) onChange(line.id, 'unitPriceCny', m.unitPriceCny);
     if (m.vendorId) {
       const vendor = store.getVendors().find(v => v.id === m.vendorId);
-      if (vendor) onChange(line.id, 'vendorName', vendor.name);
+      if (vendor) {
+        onChange(line.id, 'vendorName', vendor.name);
+        onChange(line.id, 'vendorId', vendor.id);
+      }
     }
+  };
+
+  const handleHqChange = (checked: boolean) => {
+    onChange(line.id, 'isHqProvided', checked);
+    if (checked) {
+      // 본사제공 체크 시 업체제공 해제
+      onChange(line.id, 'isVendorProvided', false);
+    } else {
+      // 본사제공 해제 시 업체 정보 초기화
+      onChange(line.id, 'vendorName', '');
+      onChange(line.id, 'vendorId', '');
+      onChange(line.id, 'isNewVendor', false);
+    }
+  };
+
+  const handleVendorChange = (checked: boolean) => {
+    onChange(line.id, 'isVendorProvided', checked);
+    if (checked) {
+      // 업체제공 체크 시 본사제공 해제 + 업체 정보 초기화
+      onChange(line.id, 'isHqProvided', false);
+      onChange(line.id, 'vendorName', '');
+      onChange(line.id, 'vendorId', '');
+      onChange(line.id, 'isNewVendor', false);
+    }
+  };
+
+  const handleVendorAutoComplete = (name: string, id?: string, isNew?: boolean) => {
+    onChange(line.id, 'vendorName', name);
+    onChange(line.id, 'vendorId', id || '');
+    onChange(line.id, 'isNewVendor', isNew || false);
   };
 
   const ringCls = accentColor === 'blue'
@@ -747,7 +923,6 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
       {/* 자재명 (부위 Select가 inline으로 포함됨) */}
       <td className="px-1 py-1">
         <div className="flex items-center gap-1">
-          {/* 부위 Select - 모든 섹션에 inline 배치 */}
           <Select value={line.subPart || ''} onValueChange={v => onChange(line.id, 'subPart', v as BomSubPart)}>
             <SelectTrigger className="h-7 text-xs border-stone-200 w-20 shrink-0">
               <SelectValue placeholder="-" />
@@ -761,7 +936,7 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
           <Input value={line.itemName} onChange={e => onChange(line.id, 'itemName', e.target.value)} className="h-7 text-xs border-stone-200 bg-white min-w-[80px]" placeholder="자재명" />
         </div>
       </td>
-      {/* 컬러 (원자재 섹션에만 입력 표시, 다른 섹션은 빈 셀로 열 유지) */}
+      {/* 컬러 (원자재 섹션에만 입력 표시) */}
       <td className="px-1 py-1">
         {sectionKey === '원자재' && (
           <Input
@@ -805,34 +980,35 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
       <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">{fmt(amt)}</td>
       {/* KRW */}
       <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmtKrw(amt * cnyKrw)}</td>
-      {/* 본사제공 */}
-      <td className="px-2 py-1 text-center"><input type="checkbox" checked={line.isHqProvided} onChange={e => onChange(line.id, 'isHqProvided', e.target.checked)} className="w-3.5 h-3.5 accent-amber-600" /></td>
-      {/* 업체제공 */}
-      <td className="px-2 py-1 text-center"><input type="checkbox" checked={!!(line as ExtBomLine & { isVendorProvided?: boolean }).isVendorProvided} onChange={e => onChange(line.id, 'isVendorProvided', e.target.checked)} className="w-3.5 h-3.5 accent-blue-500" /></td>
-      {/* 구매업체 */}
+      {/* 공급 상태 + 체크박스 (본사/업체/공장) */}
+      <td className="px-2 py-1">
+        <div className="flex flex-col items-center gap-1">
+          {/* 공급 상태 텍스트 */}
+          <span className={`text-[10px] font-medium ${supplyLabel.cls}`}>{supplyLabel.text}</span>
+          {/* 체크박스 2개 */}
+          <div className="flex items-center gap-1.5">
+            <label className="flex items-center gap-0.5 cursor-pointer" title="본사제공">
+              <input type="checkbox" checked={isHqProvided} onChange={e => handleHqChange(e.target.checked)} className="w-3 h-3 accent-amber-600" />
+              <span className="text-[9px] text-amber-600">본</span>
+            </label>
+            <label className="flex items-center gap-0.5 cursor-pointer" title="업체제공">
+              <input type="checkbox" checked={isVendorProvided} onChange={e => handleVendorChange(e.target.checked)} className="w-3 h-3 accent-blue-500" />
+              <span className="text-[9px] text-blue-500">업</span>
+            </label>
+          </div>
+        </div>
+      </td>
+      {/* 자재업체 (본사제공 시에만 입력 가능) */}
       <td className="px-1 py-1">
-        <Select
-          value={line.vendorName || ''}
-          onValueChange={v => onChange(line.id, 'vendorName', v === '__direct__' ? '' : v)}
-        >
-          <SelectTrigger className="h-7 text-xs border-stone-200 w-24">
-            <SelectValue placeholder="업체" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none" className="text-xs text-stone-400">-</SelectItem>
-            {vendors.map(v => <SelectItem key={v.id} value={v.name} className="text-xs">{v.name}</SelectItem>)}
-            <SelectItem value="__direct__" className="text-xs text-stone-500 italic border-t border-stone-200">직접입력</SelectItem>
-          </SelectContent>
-        </Select>
-        {/* 직접입력 또는 드롭다운에 없는 값 */}
-        {(line.vendorName === '' || (line.vendorName && !vendors.find(v => v.name === line.vendorName))) && (
-          <Input
+        {isHqProvided ? (
+          <VendorAutoComplete
             value={line.vendorName || ''}
-            onChange={e => onChange(line.id, 'vendorName', e.target.value)}
-            className="h-6 text-xs border-stone-300 bg-amber-50 mt-0.5 w-24"
-            placeholder="업체명 입력"
-            autoFocus
+            vendorId={line.vendorId}
+            isNewVendor={line.isNewVendor}
+            onChange={handleVendorAutoComplete}
           />
+        ) : (
+          <span className="text-[10px] text-stone-300 px-2">—</span>
         )}
       </td>
       {/* 삭제 */}
@@ -1860,9 +2036,8 @@ export default function BomManagement() {
                             <th className="px-2 py-2 text-right w-24">소요량</th>
                             <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
                             <th className="px-2 py-2 text-right w-24">KRW</th>
-                            <th className="px-2 py-2 text-center w-14">본사제공</th>
-                            <th className="px-2 py-2 text-center w-14 text-blue-600">업체제공</th>
-                            <th className="px-2 py-2 text-left w-24">구매업체</th>
+                            <th className="px-2 py-2 text-center w-20">공급</th>
+                            <th className="px-2 py-2 text-left w-36">자재업체</th>
                             <th className="px-2 py-2 w-8"></th>
                           </tr>
                         </thead>
@@ -1990,9 +2165,8 @@ export default function BomManagement() {
                                 <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">{fmt(lineAmt)}</td>
                                 {/* KRW */}
                                 <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmtKrw(lineAmt * preRate)}</td>
-                                {/* 본사제공 빈칸 */}
+                                {/* 공급/자재업체 빈칸 */}
                                 <td></td>
-                                {/* 구매업체 빈칸 */}
                                 <td></td>
                                 {/* 삭제 */}
                                 <td className="px-1 py-1"><button onClick={() => deletePostLine(line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-stone-300 hover:text-red-400 p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
@@ -2330,9 +2504,8 @@ export default function BomManagement() {
                             <th className="px-2 py-2 text-right w-24">소요량</th>
                             <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
                             <th className="px-2 py-2 text-right w-24">KRW</th>
-                            <th className="px-2 py-2 text-center w-14">본사제공</th>
-                            <th className="px-2 py-2 text-center w-14 text-blue-600">업체제공</th>
-                            <th className="px-2 py-2 text-left w-24">구매업체</th>
+                            <th className="px-2 py-2 text-center w-20">공급</th>
+                            <th className="px-2 py-2 text-left w-36">자재업체</th>
                             <th className="px-2 py-2 w-8"></th>
                           </tr>
                         </thead>
