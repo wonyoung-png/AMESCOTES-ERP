@@ -570,7 +570,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
   const printRef = useRef<HTMLDivElement>(null);
 
   // 마진율 설정
-  const [internalMargin, setInternalMargin] = useState(30); // %
+  const [internalMargin, setInternalMargin] = useState(Math.round((bom?.productionMarginRate ?? 0.3) * 100)); // %
   const [quoteMargin, setQuoteMargin] = useState(16); // %
   const [marginInfo, setMarginInfo] = useState<{ factoryCost: number; targetPrice: number; quotePrice: number; diff: number } | null>(null);
   const [marginApplied, setMarginApplied] = useState(false);
@@ -3043,7 +3043,7 @@ export default function BomManagement() {
                           { key: '자', label: '물류비', desc: 'PCS 배분 물류비', val: summary.logisticsKrw, editable: true, field: 'logisticsCostKrw' as keyof ExtBom },
                           { key: '재', label: '포장/검사비', desc: '포장 잡비, 검사 인건비', val: summary.packagingKrw, editable: true, field: 'packagingCostKrw' as keyof ExtBom },
                           { key: '패', label: '패킹재', desc: '쇼핑백, 박스, 에어캡 등', val: summary.packingKrw, editable: true, field: 'packingCostKrw' as keyof ExtBom },
-                          { key: '마', label: '생산마진', desc: `${Math.round((editBom.productionMarginRate || 0.16) * 100)}%`, val: summary.productionMarginKrw, editable: false },
+                          ...((editBom.productionMarginRate ?? 0) > 0 ? [{ key: '마', label: '생산마진', desc: `${Math.round((editBom.productionMarginRate || 0) * 100)}%`, val: summary.productionMarginKrw, editable: false }] : []),
                         ].map(row => (
                           <tr key={row.key} className="border-b border-stone-100 hover:bg-stone-50">
                             <td className="px-4 py-2 font-bold text-stone-400">{row.key}</td>
@@ -3536,8 +3536,13 @@ export default function BomManagement() {
                 const ps = calcPostSummary(editBom, settings.usdKrw, activePostColorBom);
                 const postCur = editBom.currency || 'CNY';
                 const linkedItem = items.find(i => i.id === editBom.styleId);
+                // 생산마진 계산 (사전원가와 동일 구조)
+                const postMarginRate = editBom.productionMarginRate ?? 0;
+                const postProductionMarginKrw = ps.totalCostKrw * postMarginRate;
+                const postTotalWithMarginKrw = ps.totalCostKrw + postProductionMarginKrw;
                 const deliveryPrice = editBom.postDeliveryPrice || linkedItem?.deliveryPrice || linkedItem?.targetSalePrice || 0;
-                const marginAmt = deliveryPrice > 0 ? deliveryPrice - ps.totalCostKrw : 0;
+                const finalCost = postMarginRate > 0 ? postTotalWithMarginKrw : ps.totalCostKrw;
+                const marginAmt = deliveryPrice > 0 ? deliveryPrice - finalCost : 0;
                 const marginPct = deliveryPrice > 0 ? (marginAmt / deliveryPrice) * 100 : 0;
                 const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 20 ? 'text-amber-600' : marginPct <= 30 ? 'text-green-600' : 'text-orange-600';
                 const marginBg = marginPct < 15 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
@@ -3589,10 +3594,27 @@ export default function BomManagement() {
                             <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(ps.logisticsKrw)}</span></td>
                           </tr>
                         )}
+                        {/* 소계 행 (생산마진율 > 0인 경우에만 구분선 표시) */}
+                        {postMarginRate > 0 && (
+                          <tr className="bg-stone-100 border-y border-stone-300">
+                            <td className="px-4 py-2 font-bold text-stone-500">소</td>
+                            <td className="px-4 py-2 font-semibold text-stone-700" colSpan={2}>소 계 (생산마진 전)</td>
+                            <td className="px-4 py-2 text-right font-bold tabular-nums text-stone-700">{fmtKrw(ps.totalCostKrw)}</td>
+                          </tr>
+                        )}
+                        {/* 생산마진 행 (율 > 0인 경우에만 표시) */}
+                        {postMarginRate > 0 && (
+                          <tr className="border-b border-stone-100 hover:bg-stone-50">
+                            <td className="px-4 py-2 font-bold text-stone-400">마</td>
+                            <td className="px-4 py-2 font-medium text-stone-700">생산마진</td>
+                            <td className="px-4 py-2 text-stone-400">{Math.round(postMarginRate * 100)}%</td>
+                            <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(postProductionMarginKrw)}</span></td>
+                          </tr>
+                        )}
                         <tr className="bg-stone-800 text-white">
                           <td className="px-4 py-3 font-bold">📦</td>
-                          <td className="px-4 py-3 font-bold text-base" colSpan={2}>제 품 원 가</td>
-                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums text-[#C9A96E]">{fmtKrw(ps.totalCostKrw)}</td>
+                          <td className="px-4 py-3 font-bold text-base" colSpan={2}>{postMarginRate > 0 ? '총 원 가 액' : '제 품 원 가'}</td>
+                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums text-[#C9A96E]">{fmtKrw(finalCost)}</td>
                         </tr>
                         {deliveryPrice > 0 && (
                           <>
