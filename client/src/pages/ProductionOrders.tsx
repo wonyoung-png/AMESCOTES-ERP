@@ -1190,10 +1190,20 @@ export default function ProductionOrders() {
                         )}
                       </div>
                       <div className="space-y-1.5">
-                        <Label>공장단가 (KRW 환산)</Label>
-                        <div className="h-9 px-3 py-2 border border-stone-200 rounded-md text-sm font-mono bg-stone-50 text-stone-600 flex items-center">
+                        <div className="flex items-center gap-1.5">
+                          <Label>공장단가 (KRW 환산)</Label>
+                          {negoApplied && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 border border-green-300 rounded-full font-medium">네고 적용</span>
+                          )}
+                        </div>
+                        <div className={`h-9 px-3 py-2 border rounded-md text-sm font-mono flex items-center ${negoApplied ? 'bg-green-50 border-green-300 text-green-800 font-bold' : 'bg-stone-50 border-stone-200 text-stone-600'}`}>
                           {displayFactoryPriceKrw > 0 ? formatKRW(displayFactoryPriceKrw) : '—'}
                         </div>
+                        {negoApplied && originalFactoryPriceKrw > 0 && (
+                          <p className="text-[10px] text-green-600 font-medium">
+                            원래 단가: {formatKRW(originalFactoryPriceKrw)} → 네고 단가: {formatKRW(displayFactoryPriceKrw)}
+                          </p>
+                        )}
                       </div>
                     </div>
                     {/* 총 발주금액 */}
