@@ -3294,15 +3294,7 @@ export default function BomManagement() {
                       />
                     </div>
                   )}
-                  {/* 사전원가 적용 버튼 */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopyPreToPost}
-                    className="gap-1.5 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
-                  >
-                    <Copy className="w-3.5 h-3.5" /> 사전원가 적용
-                  </Button>
+
                   {/* 공장 원가표 업로드 */}
                   <Button
                     variant="outline"
