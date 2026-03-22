@@ -635,7 +635,14 @@ export default function ItemMaster() {
                       {(item.colors || []).length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {normalizeColors(item.colors || []).slice(0, 3).map(c => (
-                            <span key={c.name} className="text-xs px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded">{c.name}</span>
+                            <button
+                              key={c.name}
+                              onClick={() => navigate(`/bom?styleNo=${encodeURIComponent(item.styleNo)}&color=${encodeURIComponent(c.name)}`)}
+                              className="text-xs px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded hover:bg-amber-100 hover:text-amber-700 hover:border hover:border-amber-300 border border-transparent transition-colors"
+                              title={`${c.name} 컬러 BOM으로 이동`}
+                            >
+                              {c.name}
+                            </button>
                           ))}
                           {(item.colors || []).length > 3 && (
                             <span className="text-xs text-stone-400">+{(item.colors || []).length - 3}</span>
@@ -1054,7 +1061,21 @@ export default function ItemMaster() {
                           </span>
                           <span className="text-xs text-stone-300 ml-auto">{colorDetailOpen === idx ? '▲' : '▼'}</span>
                         </button>
-                        <button type="button" onClick={() => removeColor(idx)} className="text-stone-400 hover:text-red-500 ml-2">
+                        {/* BOM 바로가기 버튼 */}
+                        {editItem.styleNo && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalOpen(false);
+                              navigate(`/bom?styleNo=${encodeURIComponent(editItem.styleNo || '')}&color=${encodeURIComponent(c.name)}`);
+                            }}
+                            className="text-xs px-2 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium ml-1 shrink-0"
+                            title={`${c.name} 컬러 BOM으로 이동`}
+                          >
+                            BOM
+                          </button>
+                        )}
+                        <button type="button" onClick={() => removeColor(idx)} className="text-stone-400 hover:text-red-500 ml-1">
                           <X size={14} />
                         </button>
                       </div>

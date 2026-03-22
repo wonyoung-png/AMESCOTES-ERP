@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import {
   store, genId,
   type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material, type Vendor,
@@ -1168,14 +1168,28 @@ export default function BomManagement() {
   const items = store.getItems();
   const buyers = store.getVendors().filter(v => v.type === '바이어');
 
+  // URL 파라미터 감지 (품목 마스터 컬러 BOM 바로가기)
+  const searchString = useSearch();
+  const [, setLocation] = useLocation();
+
   // 현재 활성 탭: 'pre' | 'post' | 컬러명 (컬러별 BOM 탭)
   const [activeTab, setActiveTab] = useState<string>('pre');
   // 컬러 탭 추가 모달
   const [showAddColorModal, setShowAddColorModal] = useState(false);
   const [newColorName, setNewColorName] = useState('');
+  // URL 파라미터로 자동 활성화할 컬러명 (품목 마스터 연동)
+  const [pendingColorTab, setPendingColorTab] = useState<string | null>(null);
 
   const [extBoms, setExtBoms] = useState<ExtBom[]>(() => getExtBoms());
   const [selectedStyleId, setSelectedStyleId] = useState<string>(() => {
+    // 1) URL 파라미터 우선 처리
+    const urlParams = new URLSearchParams(searchString);
+    const urlStyleNo = urlParams.get('styleNo');
+    if (urlStyleNo) {
+      const item = store.getItems().find(i => i.styleNo === urlStyleNo);
+      if (item) return item.id;
+    }
+    // 2) localStorage prefill 처리
     const prefillStyleNo = localStorage.getItem('ames_prefill_bom');
     if (prefillStyleNo) {
       localStorage.removeItem('ames_prefill_bom');
@@ -1230,6 +1244,32 @@ export default function BomManagement() {
     }
     setIsDirty(false);
   }, [selectedStyleId]);
+
+  // URL 파라미터로 컬러 탭 자동 활성화 (품목 마스터 BOM 바로가기 연동)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(searchString);
+    const urlColor = urlParams.get('color');
+    if (urlColor) {
+      setPendingColorTab(urlColor);
+      // URL 파라미터 제거 (히스토리 클린업)
+      setLocation('/bom', { replace: true });
+    }
+  }, [searchString]);
+
+  // pendingColorTab이 설정되면 editBom 로드 후 탭 활성화
+  useEffect(() => {
+    if (!pendingColorTab || !editBom) return;
+    const colorExists = (editBom.colorBoms || []).some(cb => cb.color === pendingColorTab);
+    if (colorExists) {
+      setActiveTab(pendingColorTab);
+      setPendingColorTab(null);
+    } else {
+      // 컬러 탭이 없으면 새 컬러 탭 추가 제안 모달 열기
+      setNewColorName(pendingColorTab);
+      setShowAddColorModal(true);
+      setPendingColorTab(null);
+    }
+  }, [pendingColorTab, editBom]);
 
   const updateField = useCallback(<K extends keyof ExtBom>(field: K, val: ExtBom[K]) => {
     setEditBom(prev => prev ? { ...prev, [field]: val } : prev);
