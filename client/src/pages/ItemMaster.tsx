@@ -1140,11 +1140,20 @@ export default function ItemMaster() {
 
 // ─── 일괄 발주 모달 컴포넌트 ───────────────────────────────────────────────
 
+interface BulkColorQty {
+  color: string;
+  qty: number;
+  leatherColor?: string;
+  decorColor?: string;
+  threadColor?: string;
+  girimaeColor?: string;
+}
+
 interface BulkOrderItemState {
   item: Item;
   enabled: boolean;
-  // 컬러별 수량: { color: string, qty: number }[]
-  colorQtys: { color: string; qty: number }[];
+  // 컬러별 수량 + 세부 정보
+  colorQtys: BulkColorQty[];
 }
 
 interface PostOrderState {
@@ -1173,7 +1182,14 @@ function MultiBulkOrderModal({
     selectedItems.map(item => ({
       item,
       enabled: true,
-      colorQtys: normalizeColors(item.colors || []).map(c => ({ color: c.name, qty: 0 })),
+      colorQtys: normalizeColors(item.colors || []).map(c => ({
+        color: c.name,
+        qty: 0,
+        leatherColor: c.leatherColor,
+        decorColor: c.decorColor,
+        threadColor: c.threadColor,
+        girimaeColor: c.girimaeColor,
+      })),
     }))
   );
   const [postOrderState, setPostOrderState] = useState<PostOrderState | null>(null);
@@ -1191,6 +1207,16 @@ function MultiBulkOrderModal({
       return {
         ...s,
         colorQtys: s.colorQtys.map(cq => cq.color === colorName ? { ...cq, qty } : cq),
+      };
+    }));
+  };
+
+  const updateColorDetail = (itemId: string, colorName: string, field: keyof Omit<BulkColorQty, 'color' | 'qty'>, value: string) => {
+    setItemStates(prev => prev.map(s => {
+      if (s.item.id !== itemId) return s;
+      return {
+        ...s,
+        colorQtys: s.colorQtys.map(cq => cq.color === colorName ? { ...cq, [field]: value } : cq),
       };
     }));
   };
@@ -1336,6 +1362,38 @@ function MultiBulkOrderModal({
 
         store.addOrder(newOrder);
         createdOrders.push(newOrder);
+
+        // 새 컬러 및 세부 정보를 품목 마스터에 반영
+        const existingColors = normalizeColors(state.item.colors || []);
+        const existingColorNames = existingColors.map(c => c.name);
+        for (const cq of state.colorQtys) {
+          const itemColor: ItemColor = {
+            name: cq.color,
+            leatherColor: cq.leatherColor,
+            decorColor: cq.decorColor,
+            threadColor: cq.threadColor,
+            girimaeColor: cq.girimaeColor,
+          };
+          if (!existingColorNames.includes(cq.color)) {
+            // 새 컬러: 품목 마스터에 추가
+            store.addItemColor(state.item.id, itemColor);
+          } else {
+            // 기존 컬러: 세부 정보가 변경된 경우 업데이트
+            const existingColor = existingColors.find(c => c.name === cq.color);
+            const hasDetailChange = existingColor && (
+              (cq.leatherColor !== undefined && cq.leatherColor !== existingColor.leatherColor) ||
+              (cq.decorColor !== undefined && cq.decorColor !== existingColor.decorColor) ||
+              (cq.threadColor !== undefined && cq.threadColor !== existingColor.threadColor) ||
+              (cq.girimaeColor !== undefined && cq.girimaeColor !== existingColor.girimaeColor)
+            );
+            if (hasDetailChange) {
+              const updatedColors = existingColors.map(c =>
+                c.name === cq.color ? { ...c, ...itemColor } : c
+              );
+              store.updateItem(state.item.id, { colors: updatedColors });
+            }
+          }
+        }
       }
 
       setPostOrderState({
@@ -1461,6 +1519,7 @@ function MultiBulkOrderModal({
                   state={state}
                   onToggle={() => toggleItem(state.item.id)}
                   onSetColorQty={(color, qty) => setColorQty(state.item.id, color, qty)}
+                  onUpdateColorDetail={(color, field, value) => updateColorDetail(state.item.id, color, field, value)}
                   onAddColor={(color) => addColorToItem(state.item.id, color)}
                   onRemoveColor={(color) => removeColorFromItem(state.item.id, color)}
                 />
@@ -1511,18 +1570,39 @@ function BulkOrderItemRow({
   state,
   onToggle,
   onSetColorQty,
+  onUpdateColorDetail,
   onAddColor,
   onRemoveColor,
 }: {
   state: BulkOrderItemState;
   onToggle: () => void;
   onSetColorQty: (color: string, qty: number) => void;
+  onUpdateColorDetail: (color: string, field: keyof Omit<BulkColorQty, 'color' | 'qty'>, value: string) => void;
   onAddColor: (color: string) => void;
   onRemoveColor: (color: string) => void;
 }) {
   const [newColorInput, setNewColorInput] = useState('');
+  const [openDetails, setOpenDetails] = useState<Set<string>>(new Set());
 
   const totalQty = state.colorQtys.reduce((sum, cq) => sum + cq.qty, 0);
+
+  const toggleDetail = (colorName: string) => {
+    setOpenDetails(prev => {
+      const next = new Set(prev);
+      if (next.has(colorName)) next.delete(colorName);
+      else next.add(colorName);
+      return next;
+    });
+  };
+
+  const handleAddColor = () => {
+    const trimmed = newColorInput.trim();
+    if (!trimmed) return;
+    onAddColor(trimmed);
+    setNewColorInput('');
+    // 새로 추가된 컬러의 세부 정보 토글 자동 펼침
+    setOpenDetails(prev => new Set(prev).add(trimmed));
+  };
 
   return (
     <div className={`p-3 transition-colors ${state.enabled ? 'bg-white' : 'bg-stone-50 opacity-60'}`}>
@@ -1555,28 +1635,90 @@ function BulkOrderItemRow({
       {/* 컬러별 수량 */}
       {state.enabled && (
         <div className="pl-7 space-y-2">
-          <div className="grid grid-cols-1 gap-1.5">
-            {state.colorQtys.map(cq => (
-              <div key={cq.color} className="flex items-center gap-2">
-                <span className="text-xs px-2 py-1 bg-stone-100 text-stone-700 rounded font-medium w-24 truncate">{cq.color}</span>
-                <Input
-                  type="number"
-                  min={0}
-                  value={cq.qty || ''}
-                  onChange={e => onSetColorQty(cq.color, Number(e.target.value))}
-                  placeholder="수량"
-                  className="h-7 text-xs w-24"
-                />
-                <span className="text-xs text-stone-400">개</span>
-                <button
-                  type="button"
-                  onClick={() => onRemoveColor(cq.color)}
-                  className="text-stone-300 hover:text-red-400 transition-colors ml-1"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 gap-2">
+            {state.colorQtys.map(cq => {
+              const isOpen = openDetails.has(cq.color);
+              return (
+                <div key={cq.color} className="border border-stone-100 rounded-lg overflow-hidden">
+                  {/* 컬러 메인 행 */}
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-stone-50">
+                    <span className="text-xs px-2 py-1 bg-white text-stone-700 rounded border border-stone-200 font-medium w-24 truncate">{cq.color}</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={cq.qty || ''}
+                      onChange={e => onSetColorQty(cq.color, Number(e.target.value))}
+                      placeholder="수량"
+                      className="h-7 text-xs w-20"
+                    />
+                    <span className="text-xs text-stone-400">개</span>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveColor(cq.color)}
+                      className="text-stone-300 hover:text-red-400 transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                    {/* 세부 정보 토글 버튼 */}
+                    <button
+                      type="button"
+                      onClick={() => toggleDetail(cq.color)}
+                      title="세부 컬러 정보 입력"
+                      className={`ml-auto flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded transition-colors ${
+                        isOpen
+                          ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                          : 'text-stone-400 hover:text-amber-600 hover:bg-amber-50 border border-transparent'
+                      }`}
+                    >
+                      {isOpen ? '▲' : '▼'}
+                    </button>
+                  </div>
+                  {/* 세부 정보 패널 */}
+                  {isOpen && (
+                    <div className="px-2 py-2 bg-white border-t border-stone-100">
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-stone-400 w-16 shrink-0">가죽/원단</span>
+                          <Input
+                            value={cq.leatherColor || ''}
+                            onChange={e => onUpdateColorDetail(cq.color, 'leatherColor', e.target.value)}
+                            placeholder="가죽/원단 컬러"
+                            className="h-6 text-xs flex-1"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-stone-400 w-10 shrink-0">장식</span>
+                          <Input
+                            value={cq.decorColor || ''}
+                            onChange={e => onUpdateColorDetail(cq.color, 'decorColor', e.target.value)}
+                            placeholder="장식 컬러"
+                            className="h-6 text-xs flex-1"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-stone-400 w-16 shrink-0">실</span>
+                          <Input
+                            value={cq.threadColor || ''}
+                            onChange={e => onUpdateColorDetail(cq.color, 'threadColor', e.target.value)}
+                            placeholder="실 컬러"
+                            className="h-6 text-xs flex-1"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-stone-400 w-10 shrink-0">기리매</span>
+                          <Input
+                            value={cq.girimaeColor || ''}
+                            onChange={e => onUpdateColorDetail(cq.color, 'girimaeColor', e.target.value)}
+                            placeholder="기리매 컬러"
+                            className="h-6 text-xs flex-1"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           {/* 컬러 추가 */}
           <div className="flex items-center gap-1.5">
@@ -1585,8 +1727,8 @@ function BulkOrderItemRow({
               onChange={e => setNewColorInput(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
-                  onAddColor(newColorInput);
-                  setNewColorInput('');
+                  e.preventDefault();
+                  handleAddColor();
                 }
               }}
               placeholder="컬러 추가 (Enter)"
@@ -1597,10 +1739,7 @@ function BulkOrderItemRow({
               variant="outline"
               size="sm"
               className="h-7 px-2 text-xs"
-              onClick={() => {
-                onAddColor(newColorInput);
-                setNewColorInput('');
-              }}
+              onClick={handleAddColor}
             >
               +
             </Button>
