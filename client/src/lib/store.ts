@@ -75,13 +75,17 @@ export interface Item {
 
 // ─── BOM / 사전원가 ───
 // 중국원가표 구조: 구분(섹션) > 품목 > 규격 > 단위 > 단가(CNY) > NET소요량 > LOSS율 > 소요량 > 제조금액 > 본사제공
+export type BomSubPart = '바디' | '안감' | '트림1' | '트림2' | '기타';
+
 export interface BomLine {
   id: string;
   category: BomCategory;   // 섹션 구분
+  subPart?: BomSubPart;     // 품목 부위 (원자재 구분 시만 사용)
   itemName: string;         // 품목
   spec?: string;            // 규격
   unit: string;             // 단위
-  unitPriceCny: number;     // 단가 (CNY)
+  customUnit?: string;      // 단위 직접입력 (unit === '직접입력' 시)
+  unitPriceCny: number;     // 단가 (CNY/USD/KRW, 선택 통화 기준)
   netQty: number;           // NET 소요량
   lossRate: number;         // LOSS율 (0.05 = 5%)
   // 계산값 (자동)
