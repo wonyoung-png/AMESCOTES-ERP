@@ -38,7 +38,7 @@ const CATEGORY_COLOR: Record<MaterialCategory, string> = {
 
 const emptyForm: Partial<Material> = {
   name: '', nameEn: '', category: '원자재', spec: '', unit: 'YD',
-  unitPriceCny: undefined, unitPriceKrw: undefined, vendorId: '', memo: '',
+  unitPriceCny: undefined, unitPriceUsd: undefined, unitPriceKrw: undefined, priceCurrency: 'CNY' as 'CNY'|'USD'|'KRW', vendorId: '', memo: '',
 };
 
 export default function MaterialMaster() {
@@ -107,7 +107,9 @@ export default function MaterialMaster() {
         spec: form.spec,
         unit: form.unit!,
         unitPriceCny: form.unitPriceCny,
+        unitPriceUsd: form.unitPriceUsd,
         unitPriceKrw: form.unitPriceKrw,
+        priceCurrency: form.priceCurrency,
         vendorId: form.vendorId,
         imageUrl: form.imageUrl,
         memo: form.memo,
@@ -240,6 +242,7 @@ export default function MaterialMaster() {
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">자재명</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">스펙</th>
               <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (CNY)</th>
+              <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (USD)</th>
               <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (KRW)</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">단위</th>
               <th className="text-center px-3 py-3 text-xs font-medium text-stone-500">작업</th>
@@ -286,6 +289,9 @@ export default function MaterialMaster() {
                 <td className="px-3 py-2.5 text-xs text-stone-500">{m.spec || '—'}</td>
                 <td className="px-3 py-2.5 text-right font-mono text-xs text-stone-700">
                   {m.unitPriceCny != null ? `¥${m.unitPriceCny.toFixed(2)}` : '—'}
+                </td>
+                <td className="text-right px-3 py-2.5 text-sm text-stone-600">
+                  {m.unitPriceUsd != null ? `$${m.unitPriceUsd.toFixed(2)}` : '—'}
                 </td>
                 <td className="px-3 py-2.5 text-right font-mono text-xs text-stone-700">
                   {m.unitPriceKrw != null ? `₩${m.unitPriceKrw.toLocaleString()}` : '—'}

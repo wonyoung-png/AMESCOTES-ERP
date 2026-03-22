@@ -75,7 +75,9 @@ export interface Material {
   spec?: string;          // 스펙 (두께, 사이즈 등)
   unit: string;           // 단위 (SF, YD, EA, M, L, 콘 등)
   unitPriceCny?: number;  // 단가 (CNY)
+  unitPriceUsd?: number;  // 단가 (USD)
   unitPriceKrw?: number;  // 단가 (KRW, 국내 자재)
+  priceCurrency?: 'CNY' | 'USD' | 'KRW'; // 주 표시 통화
   vendorId?: string;      // 주 공급업체
   imageUrl?: string;      // 이미지 (base64 또는 URL)
   memo?: string;

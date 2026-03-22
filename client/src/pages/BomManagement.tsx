@@ -71,6 +71,7 @@ interface ExtBom {
   logisticsCostKrw: number;
   packagingCostKrw: number;
   packingCostKrw: number;
+  customsRate?: number;       // 관세율 (%, 임가공비에 적용)
   productionMarginRate: number;
   snapshotCnyKrw: number;
   pnl: BomPnlAssumptions;
@@ -158,16 +159,20 @@ function calcSummary(bom: ExtBom, settingsUsdKrw?: number) {
   const processingKrw = processingAmt * toKrw;
   const postProcessKrw = postProcessAmt * toKrw;
   const logisticsKrw = bom.logisticsCostKrw || 0;
+  // 관세 = 임가공비(KRW) × 관세율(%)
+  const customsRate = bom.customsRate || 0;
+  const customsKrw = processingKrw * (customsRate / 100);
   const packagingKrw = bom.packagingCostKrw || 0;
   const packingKrw = bom.packingCostKrw || 0;
   const marginRate = bom.productionMarginRate ?? 0.16;
-  const subTotal = materialKrw + processingKrw + postProcessKrw + logisticsKrw + packagingKrw + packingKrw;
+  const subTotal = materialKrw + processingKrw + postProcessKrw + customsKrw + logisticsKrw + packagingKrw + packingKrw;
   const productionMarginKrw = subTotal * marginRate;
   const totalCostKrw = subTotal + productionMarginKrw;
   // 하위 호환성을 위해 Cny 명칭 유지
   return {
     materialCny: materialAmt, processingCny: processingAmt, postProcessCny: postProcessAmt,
     materialKrw, processingKrw, postProcessKrw,
+    customsRate, customsKrw,
     logisticsKrw, packagingKrw, packingKrw,
     productionMarginKrw, totalCostKrw, subTotal, marginRate,
     preCur, toKrw,
@@ -180,13 +185,18 @@ interface PostSummary {
   hqMaterialCny: number;        // 본사제공 자재
   totalMaterialCny: number;     // 자재비 합계
   processingCny: number;        // 임가공비
-  factoryUnitCostCny: number;   // 공장단가 (공장구매자재 + 임가공비)
-  totalCostCny: number;         // 제품원가 (전체)
+  postProcessCny: number;       // 후가공비
+  factoryUnitCostCny: number;   // 공장단가 (공장구매자재 + 임가공비 + 후가공 + 관세)
+  totalCostCny: number;         // 제품원가 (공장단가 + 본사제공 + 물류비)
   rate: number;                 // 적용 환율
   factoryMaterialKrw: number;
   hqMaterialKrw: number;
   totalMaterialKrw: number;
   processingKrw: number;
+  postProcessKrw: number;
+  customsRate: number;          // 관세율 (%)
+  customsKrw: number;           // 관세금액 (KRW)
+  logisticsKrw: number;         // 물류비 (KRW)
   factoryUnitCostKrw: number;
   totalCostKrw: number;
 }
@@ -209,25 +219,37 @@ function calcPostSummary(bom: ExtBom, settingsUsdKrw = 1380): PostSummary {
   const totalMaterialCny = factoryMaterialCny + hqMaterialCny;
   const processingCny = bom.postProcessingFee || 0;
   const postProcessCny2 = (bom.postProcessLines || []).reduce((s, l) => s + l.netQty * l.unitPrice, 0);
-  // 공장단가 = 공장구매자재 + 임가공비 + 후가공비 (본사제공 제외)
-  const factoryUnitCostCny = factoryMaterialCny + processingCny + postProcessCny2;
-  // 제품원가 = 전체 자재 + 임가공비 + 후가공비
-  const totalCostCny = totalMaterialCny + processingCny + postProcessCny2;
+  // 관세 = 임가공비(KRW) × 관세율(%)
+  const customsRate = bom.customsRate || 0;
+  const processingKrw = processingCny * rate;
+  const customsKrw = processingKrw * (customsRate / 100);
+  const logisticsKrw = bom.logisticsCostKrw || 0;
+  // 공장단가 = 공장구매자재 + 임가공비 + 후가공비 + 관세 (본사제공 제외)
+  const factoryUnitCostKrw = factoryMaterialCny * rate + processingKrw + postProcessCny2 * rate + customsKrw;
+  const factoryUnitCostCny = factoryUnitCostKrw / (rate || 1);
+  // 제품원가 = 공장단가 + 본사제공 + 물류비
+  const totalCostKrw = factoryUnitCostKrw + hqMaterialCny * rate + logisticsKrw;
+  const totalCostCny = totalCostKrw / (rate || 1);
 
   return {
     factoryMaterialCny,
     hqMaterialCny,
     totalMaterialCny,
     processingCny,
+    postProcessCny: postProcessCny2,
     factoryUnitCostCny,
     totalCostCny,
     rate,
     factoryMaterialKrw: factoryMaterialCny * rate,
     hqMaterialKrw: hqMaterialCny * rate,
     totalMaterialKrw: totalMaterialCny * rate,
-    processingKrw: processingCny * rate,
-    factoryUnitCostKrw: factoryUnitCostCny * rate,
-    totalCostKrw: totalCostCny * rate,
+    processingKrw,
+    postProcessKrw: postProcessCny2 * rate,
+    customsRate,
+    customsKrw,
+    logisticsKrw,
+    factoryUnitCostKrw,
+    totalCostKrw,
   };
 }
 
@@ -290,6 +312,7 @@ function normalizeBom(b: ExtBom): ExtBom {
     logisticsCostKrw: b.logisticsCostKrw ?? 0,
     packagingCostKrw: b.packagingCostKrw ?? 0,
     packingCostKrw: b.packingCostKrw ?? 0,
+    customsRate: b.customsRate ?? 0,
     productionMarginRate: b.productionMarginRate ?? 0.16,
     snapshotCnyKrw: b.snapshotCnyKrw ?? 191,
     colorBoms: Array.isArray(b.colorBoms) ? b.colorBoms.map(cb => ({
@@ -337,70 +360,121 @@ interface QuoteRow {
   taxAmt: number;
   memo?: string;
   // 마진 조정 메타
-  isRawMaterial?: boolean; // 원자재 여부 (마진 배분 제외)
-  originalUnitPrice?: number; // 마진 조정 전 원본 단가
+  isRawMaterial?: boolean;      // 원자재(가죽/원단) 여부 — 마진 배분 시 단가 고정
+  isVendorProvided?: boolean;   // 업체제공 여부 — 금액 0, 마진 계산 제외
+  originalUnitPrice?: number;   // 마진 조정 전 원본 단가
 }
 
 // 10원 단위 올림
 const ceil10 = (n: number) => Math.ceil(n / 10) * 10;
 
 function buildQuoteRows(bom: ExtBom, tab: 'pre' | 'post' = 'pre'): QuoteRow[] {
-  const cnyKrw = bom.snapshotCnyKrw || 191;
+  // 환율 결정
+  const preCur = bom.preCurrency || 'CNY';
+  const cnyKrw = (tab === 'post' ? bom.exchangeRateCny : bom.preExchangeRateCny) || bom.snapshotCnyKrw || 191;
+  const usdKrw = (tab === 'post' ? bom.exchangeRateUsd : bom.preExchangeRateUsd) || 1380;
+  const toKrw = tab === 'post'
+    ? ((bom.currency === 'KRW') ? 1 : (bom.currency === 'USD') ? usdKrw : cnyKrw)
+    : (preCur === 'KRW' ? 1 : preCur === 'USD' ? usdKrw : cnyKrw);
+
   const rows: QuoteRow[] = [];
   const srcLines = tab === 'post' ? (bom.postMaterials || []) : bom.lines;
 
-  const matAmt = srcLines.filter(l => l.category === '원자재' && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
-  if (matAmt > 0) {
-    const sup = ceil10(matAmt);
-    rows.push({ id: genId(), category: '원자재', itemName: '원자재', qty: 1, unitPrice: sup, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: true, originalUnitPrice: sup });
+  // 카테고리 순서대로 각 품목 개별 행 추가
+  const ITEM_CATS: BomCategory[] = ['원자재', '장식', '지퍼', '보강재', '봉사·접착제', '포장재', '철형'];
+
+  for (const cat of ITEM_CATS) {
+    const catLines = srcLines.filter(l => l.category === cat && l.itemName.trim());
+    for (const line of catLines) {
+      const grossQty = calcQty(line.netQty, line.lossRate);
+      if (line.isVendorProvided) {
+        // 업체제공: 소요량만, 단가=0, 금액=0
+        rows.push({
+          id: genId(),
+          category: cat,
+          itemName: line.itemName,
+          qty: parseFloat(grossQty.toFixed(4)),
+          unitPrice: 0,
+          supplyAmt: 0,
+          taxAmt: 0,
+          memo: '업체제공',
+          isRawMaterial: cat === '원자재',
+          isVendorProvided: true,
+          originalUnitPrice: 0,
+        });
+      } else {
+        const amtKrw = calcLineAmt(line.unitPriceCny, line.netQty, line.lossRate) * toKrw;
+        if (amtKrw <= 0 && !['원자재', '지퍼', '장식'].includes(cat)) continue; // 금액 없으면 부자재 등은 생략
+        const sup = ceil10(amtKrw);
+        const unitKrw = grossQty > 0 ? ceil10((line.unitPriceCny * toKrw)) : sup;
+        rows.push({
+          id: genId(),
+          category: cat,
+          itemName: line.itemName + (line.subPart ? ` (${line.subPart})` : ''),
+          qty: parseFloat(grossQty.toFixed(4)),
+          unitPrice: unitKrw,
+          supplyAmt: sup,
+          taxAmt: ceil10(sup * 0.1),
+          memo: line.isHqProvided ? '본사제공' : '',
+          isRawMaterial: cat === '원자재',
+          isVendorProvided: false,
+          originalUnitPrice: unitKrw,
+        });
+      }
+    }
   }
 
-  const subAmt = srcLines.filter(l => ['지퍼', '장식', '보강재', '봉사·접착제'].includes(l.category) && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
-  if (subAmt > 0) {
-    const sup = ceil10(subAmt);
-    rows.push({ id: genId(), category: '부자재', itemName: '부자재', qty: 1, unitPrice: sup, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: false, originalUnitPrice: sup });
-  }
-
-  const packAmt = srcLines.filter(l => l.category === '포장재' && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
-  if (packAmt > 0) {
-    const sup = ceil10(packAmt);
-    rows.push({ id: genId(), category: '포장재', itemName: '포장재', qty: 1, unitPrice: sup, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: false, originalUnitPrice: sup });
-  }
-
+  // 후가공비 (금액 > 0 만)
+  const processingFee = tab === 'post' ? (bom.postProcessingFee || 0) : bom.processingFee;
   (bom.postProcessLines || []).filter(l => l.name && l.unitPrice > 0).forEach(l => {
-    const raw = l.netQty * l.unitPrice * cnyKrw;
+    const raw = l.netQty * l.unitPrice * toKrw;
     const sup = ceil10(raw);
-    const up = ceil10(l.unitPrice * cnyKrw);
-    rows.push({ id: genId(), category: '후가공', itemName: l.name, qty: l.netQty, unitPrice: up, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: false, originalUnitPrice: up });
+    const up = ceil10(l.unitPrice * toKrw);
+    rows.push({ id: genId(), category: '후가공', itemName: l.name, qty: l.netQty, unitPrice: up, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: false, isVendorProvided: false, originalUnitPrice: up });
   });
 
-  if (bom.processingFee > 0) {
-    const sup = ceil10(bom.processingFee * cnyKrw);
-    rows.push({ id: genId(), category: '가공비', itemName: '임가공', qty: 1, unitPrice: sup, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: false, originalUnitPrice: sup });
+  // 임가공비
+  if (processingFee > 0) {
+    const sup = ceil10(processingFee * toKrw);
+    rows.push({ id: genId(), category: '가공비', itemName: '임가공', qty: 1, unitPrice: sup, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: false, isVendorProvided: false, originalUnitPrice: sup });
+  }
+
+  // 관세 (관세율 > 0 일 때만)
+  const customsRate = bom.customsRate || 0;
+  if (customsRate > 0 && processingFee > 0) {
+    const processingKrw = processingFee * toKrw;
+    const customsAmt = ceil10(processingKrw * (customsRate / 100));
+    rows.push({ id: genId(), category: '관세', itemName: `관세 (${customsRate}%)`, qty: 1, unitPrice: customsAmt, supplyAmt: customsAmt, taxAmt: ceil10(customsAmt * 0.1), isRawMaterial: false, isVendorProvided: false, originalUnitPrice: customsAmt });
+  }
+
+  // 물류비 (금액 > 0 일 때만)
+  const logisticsKrw = bom.logisticsCostKrw || 0;
+  if (logisticsKrw > 0) {
+    rows.push({ id: genId(), category: '물류비', itemName: '물류비', qty: 1, unitPrice: logisticsKrw, supplyAmt: logisticsKrw, taxAmt: ceil10(logisticsKrw * 0.1), isRawMaterial: false, isVendorProvided: false, originalUnitPrice: logisticsKrw });
   }
 
   return rows;
 }
 
 /** 마진 배분 로직:
- * 공장단가(KRW) = rows 합계 공급가액
+ * 공장단가(KRW) = 업체제공 제외 rows 합계 공급가액
  * 목표 납품가 = 공장단가 / (1 - internalMargin)
  * 견적 납품가 = 공장단가 / (1 - quoteMargin)
- * 차이 = 목표 - 견적  → 부자재(isRawMaterial=false) 행에 금액 비례 배분
+ * 차이 = 목표 - 견적  → 비원자재(isRawMaterial=false, isVendorProvided=false) 행에 금액 비례 배분
  */
 function applyMarginAdjustment(rows: QuoteRow[], internalMargin: number, quoteMargin: number): { adjustedRows: QuoteRow[]; factoryCost: number; targetPrice: number; quotePrice: number; diff: number } {
-  const factoryCost = rows.reduce((s, r) => s + r.supplyAmt, 0);
+  // 업체제공 제외한 합계가 기준
+  const factoryCost = rows.reduce((s, r) => r.isVendorProvided ? s : s + r.supplyAmt, 0);
   const targetPrice = ceil10(factoryCost / (1 - internalMargin));
   const quotePrice = ceil10(factoryCost / (1 - quoteMargin));
-  const diff = targetPrice - quotePrice; // 부자재에 올려야 할 금액
+  const diff = targetPrice - quotePrice; // 조정해야 할 금액
 
   if (diff <= 0) {
-    // 차이 없으면 그대로
     return { adjustedRows: rows, factoryCost, targetPrice, quotePrice, diff: 0 };
   }
 
-  // 부자재 행들의 총 금액
-  const adjustableRows = rows.filter(r => !r.isRawMaterial);
+  // 조정 대상: 원자재 아니고 업체제공 아닌 행
+  const adjustableRows = rows.filter(r => !r.isRawMaterial && !r.isVendorProvided);
   const adjustableTotal = adjustableRows.reduce((s, r) => s + r.supplyAmt, 0);
 
   if (adjustableTotal === 0) {
@@ -409,7 +483,7 @@ function applyMarginAdjustment(rows: QuoteRow[], internalMargin: number, quoteMa
 
   // 비례 배분
   const adjustedRows = rows.map(r => {
-    if (r.isRawMaterial) return r;
+    if (r.isRawMaterial || r.isVendorProvided) return r;
     const ratio = r.supplyAmt / adjustableTotal;
     const addAmt = ceil10(diff * ratio);
     const newSupply = ceil10(r.supplyAmt + addAmt);
@@ -602,30 +676,46 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre' }: { bom: ExtBom; onClose:
               </thead>
               <tbody>
                 {rows.map((row, idx) => {
-                  const isAdjusted = marginApplied && !row.isRawMaterial && row.originalUnitPrice !== undefined && row.unitPrice !== row.originalUnitPrice;
+                  const isAdjusted = marginApplied && !row.isRawMaterial && !row.isVendorProvided && row.originalUnitPrice !== undefined && row.unitPrice !== row.originalUnitPrice;
+                  const vendorRow = row.isVendorProvided;
+                  const rowBg = vendorRow
+                    ? 'bg-blue-50'
+                    : idx % 2 === 0 ? 'bg-white' : 'bg-stone-50';
                   return (
-                    <tr key={row.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-stone-50'}>
+                    <tr key={row.id} className={rowBg}>
                       <td className="px-2 py-1.5 text-center text-stone-400">{idx + 1}</td>
                       <td className="px-1 py-1">
                         <div className="flex items-center gap-1">
-                          <Input value={row.category} onChange={e => updateRow(row.id, 'category', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" />
+                          <Input value={row.category} onChange={e => updateRow(row.id, 'category', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-blue-700 font-medium' : ''}`} />
                           {isAdjusted && <span title="마진 조정됨" className="text-[9px] text-amber-500 font-bold flex-shrink-0">↑</span>}
                         </div>
                       </td>
-                      <td className="px-1 py-1"><Input value={row.itemName} onChange={e => updateRow(row.id, 'itemName', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" /></td>
-                      <td className="px-1 py-1"><Input type="number" value={row.qty} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right" /></td>
+                      <td className="px-1 py-1"><Input value={row.itemName} onChange={e => updateRow(row.id, 'itemName', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-blue-700' : ''}`} /></td>
+                      <td className="px-1 py-1"><Input type="number" value={row.qty} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${vendorRow ? 'text-blue-700 font-semibold' : ''}`} /></td>
                       <td className="px-1 py-1">
                         <div className="text-right">
-                          <Input type="number" value={row.unitPrice} onChange={e => updateRow(row.id, 'unitPrice', Number(e.target.value))} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right" />
-                          {isAdjusted && row.originalUnitPrice !== undefined && (
-                            <div className="text-[9px] text-stone-400 line-through text-right pr-0.5">{row.originalUnitPrice.toLocaleString()}</div>
+                          {vendorRow ? (
+                            <span className="text-xs text-blue-400 px-1">—</span>
+                          ) : (
+                            <>
+                              <Input type="number" value={row.unitPrice} onChange={e => updateRow(row.id, 'unitPrice', Number(e.target.value))} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right" />
+                              {isAdjusted && row.originalUnitPrice !== undefined && (
+                                <div className="text-[9px] text-stone-400 line-through text-right pr-0.5">{row.originalUnitPrice.toLocaleString()}</div>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>
-                      <td className="px-1 py-1"><Input type="number" value={row.supplyAmt} onChange={e => updateRow(row.id, 'supplyAmt', Number(e.target.value))} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right" /></td>
-                      <td className="px-2 py-1.5 text-right text-stone-600">{fmtKrw(row.taxAmt)}</td>
-                      <td className="px-2 py-1.5 text-right font-medium">{fmtKrw(ceil10(row.supplyAmt + row.taxAmt))}</td>
-                      <td className="px-1 py-1"><Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" placeholder="비고" /></td>
+                      <td className="px-1 py-1">
+                        {vendorRow ? (
+                          <span className="text-xs text-blue-400 px-1 block text-right">—</span>
+                        ) : (
+                          <Input type="number" value={row.supplyAmt} onChange={e => updateRow(row.id, 'supplyAmt', Number(e.target.value))} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right" />
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-right text-stone-600">{vendorRow ? '—' : fmtKrw(row.taxAmt)}</td>
+                      <td className="px-2 py-1.5 text-right font-medium">{vendorRow ? '—' : fmtKrw(ceil10(row.supplyAmt + row.taxAmt))}</td>
+                      <td className="px-1 py-1"><Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-blue-600 font-medium' : ''}`} placeholder="비고" /></td>
                       <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(r => r.id !== row.id))} className="text-stone-300 hover:text-red-400"><X className="w-3 h-3" /></button></td>
                     </tr>
                   );
@@ -660,7 +750,17 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre' }: { bom: ExtBom; onClose:
                 <thead><tr><th style={{width:'28px'}}>No</th><th style={{width:'65px'}}>구분</th><th>품목</th><th style={{width:'55px'}}>소요량</th><th style={{width:'85px'}}>단가</th><th style={{width:'85px'}}>공급가액</th><th style={{width:'75px'}}>세액</th><th style={{width:'85px'}}>합계금액</th><th style={{width:'75px'}}>비고</th></tr></thead>
                 <tbody>
                   {rows.map((row, idx) => (
-                    <tr key={row.id}><td>{idx + 1}</td><td className="tl2">{row.category}</td><td className="tl2">{row.itemName}</td><td className="tr2">{row.qty}</td><td className="tr2">{row.unitPrice.toLocaleString()}</td><td className="tr2">{row.supplyAmt.toLocaleString()}</td><td className="tr2">{row.taxAmt.toLocaleString()}</td><td className="tr2">{ceil10(row.supplyAmt + row.taxAmt).toLocaleString()}</td><td>{row.memo}</td></tr>
+                    <tr key={row.id} style={row.isVendorProvided ? {background:'#EFF6FF'} : {}}>
+                      <td>{idx + 1}</td>
+                      <td className="tl2" style={row.isVendorProvided ? {color:'#1D4ED8'} : {}}>{row.category}</td>
+                      <td className="tl2" style={row.isVendorProvided ? {color:'#1D4ED8'} : {}}>{row.itemName}</td>
+                      <td className="tr2">{row.qty}</td>
+                      <td className="tr2">{row.isVendorProvided ? '—' : row.unitPrice.toLocaleString()}</td>
+                      <td className="tr2">{row.isVendorProvided ? '—' : row.supplyAmt.toLocaleString()}</td>
+                      <td className="tr2">{row.isVendorProvided ? '—' : row.taxAmt.toLocaleString()}</td>
+                      <td className="tr2">{row.isVendorProvided ? '—' : ceil10(row.supplyAmt + row.taxAmt).toLocaleString()}</td>
+                      <td style={row.isVendorProvided ? {color:'#2563EB',fontWeight:'600'} : {}}>{row.memo}</td>
+                    </tr>
                   ))}
                   <tr className="tot"><td colSpan={5} className="tr2">TOTAL</td><td className="tr2">{totalSupply.toLocaleString()}</td><td className="tr2">{totalTax.toLocaleString()}</td><td className="tr2">{grandTotal.toLocaleString()}</td><td></td></tr>
                 </tbody>
@@ -1092,6 +1192,14 @@ function PostCostSummary({
           </span>
         </div>
 
+        {/* 관세 */}
+        {ps.customsRate > 0 && (
+          <div className="flex justify-between items-center px-4 py-2 bg-stone-50 rounded-lg border border-stone-200 text-xs">
+            <span className="text-stone-600 font-medium">관세 ({ps.customsRate}%)</span>
+            <span className="text-stone-800 font-medium">{fmtKrw(ps.customsKrw)}</span>
+          </div>
+        )}
+
         {/* 구분선 */}
         <div className="border-t border-stone-200 my-1" />
 
@@ -1100,7 +1208,7 @@ function PostCostSummary({
           <div className="flex justify-between items-center">
             <div>
               <span className="text-sm font-bold text-stone-800">🏭 공장단가</span>
-              <div className="text-[10px] text-stone-500 mt-0.5">공장 결제금액 (공장구매자재 + 임가공)</div>
+              <div className="text-[10px] text-stone-500 mt-0.5">공장구매자재 + 임가공 + 관세 (본사제공 제외)</div>
             </div>
             <div className="text-right">
               <div className="text-base font-bold text-amber-700">{fmtCny(ps.factoryUnitCostCny)}</div>
@@ -1109,12 +1217,20 @@ function PostCostSummary({
           </div>
         </div>
 
+        {/* 물류비 */}
+        {ps.logisticsKrw > 0 && (
+          <div className="flex justify-between items-center px-4 py-2 bg-stone-50 rounded-lg border border-stone-200 text-xs">
+            <span className="text-stone-600 font-medium">물류비</span>
+            <span className="text-stone-800 font-medium">{fmtKrw(ps.logisticsKrw)}</span>
+          </div>
+        )}
+
         {/* 제품원가 */}
         <div className="bg-stone-800 rounded-xl px-4 py-3">
           <div className="flex justify-between items-center">
             <div>
               <span className="text-sm font-bold text-white">📦 제품원가</span>
-              <div className="text-[10px] text-stone-400 mt-0.5">전체 원가 (본사제공 포함)</div>
+              <div className="text-[10px] text-stone-400 mt-0.5">공장단가 + 본사제공 + 물류비</div>
             </div>
             <div className="text-right">
               <div className="text-base font-bold text-[#C9A96E]">{fmtCny(ps.totalCostCny)}</div>
@@ -2441,6 +2557,39 @@ export default function BomManagement() {
                             <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">{fmtKrw(editBom.processingFee * preRate)}</td>
                             <td colSpan={3}></td>
                           </tr>
+                          {/* 관세율 */}
+                          <tr className="bg-amber-50/20 border-b border-stone-100">
+                            <td className="px-1 py-1" colSpan={3}>
+                              <span className="text-xs text-stone-500 px-2">관세율 (%)</span>
+                              <span className="text-[10px] text-stone-400 ml-1">임가공비 × 관세율</span>
+                            </td>
+                            <td className="px-1 py-1">
+                              <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="%" />
+                            </td>
+                            <td colSpan={3}></td>
+                            <td className="px-2 py-1 text-right text-xs font-semibold tabular-nums text-stone-500">
+                              {(editBom.customsRate || 0) > 0 ? `${editBom.customsRate}%` : '—'}
+                            </td>
+                            <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">
+                              {(editBom.customsRate || 0) > 0 ? fmtKrw(editBom.processingFee * preRate * ((editBom.customsRate || 0) / 100)) : '—'}
+                            </td>
+                            <td colSpan={3}></td>
+                          </tr>
+                          {/* 물류비 */}
+                          <tr className="bg-amber-50/20 border-b border-stone-100">
+                            <td className="px-1 py-1" colSpan={3}>
+                              <span className="text-xs text-stone-500 px-2">물류비 (KRW)</span>
+                              <span className="text-[10px] text-stone-400 ml-1">PCS 배분 물류비</span>
+                            </td>
+                            <td className="px-1 py-1">
+                              <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="₩" />
+                            </td>
+                            <td colSpan={4}></td>
+                            <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">
+                              {(editBom.logisticsCostKrw || 0) > 0 ? fmtKrw(editBom.logisticsCostKrw || 0) : '—'}
+                            </td>
+                            <td colSpan={3}></td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>
@@ -2460,6 +2609,7 @@ export default function BomManagement() {
                       {[
                         { key: '원', label: '원부자재 합산', desc: `원자재 + 부자재 + 보강재 + 포장재 (${summary.preCur})`, val: summary.materialKrw + summary.postProcessKrw, editable: false },
                         { key: '부', label: '임가공비', desc: `NET (${summary.preCur})`, val: summary.processingKrw, editable: false },
+                        ...(summary.customsRate > 0 ? [{ key: '관', label: `관세 (${summary.customsRate}%)`, desc: '임가공비 × 관세율', val: summary.customsKrw, editable: false }] : []),
                         { key: '자', label: '물류비', desc: 'PCS 배분 물류비', val: summary.logisticsKrw, editable: true, field: 'logisticsCostKrw' as keyof ExtBom },
                         { key: '재', label: '포장/검사비', desc: '포장 잡비, 검사 인건비', val: summary.packagingKrw, editable: true, field: 'packagingCostKrw' as keyof ExtBom },
                         { key: '패', label: '패킹재', desc: '쇼핑백, 박스, 에어캡 등', val: summary.packingKrw, editable: true, field: 'packingCostKrw' as keyof ExtBom },
@@ -2987,6 +3137,39 @@ export default function BomManagement() {
                             </td>
                             <td colSpan={3}></td>
                           </tr>
+                          {/* 관세율 */}
+                          <tr className="bg-amber-50/20 border-b border-stone-100">
+                            <td className="px-1 py-1" colSpan={3}>
+                              <span className="text-xs text-stone-500 px-2">관세율 (%)</span>
+                              <span className="text-[10px] text-stone-400 ml-1">임가공비 × 관세율</span>
+                            </td>
+                            <td className="px-1 py-1">
+                              <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="%" />
+                            </td>
+                            <td colSpan={3}></td>
+                            <td className="px-2 py-1 text-right text-xs font-semibold tabular-nums text-stone-500">
+                              {(editBom.customsRate || 0) > 0 ? `${editBom.customsRate}%` : '—'}
+                            </td>
+                            <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">
+                              {(editBom.customsRate || 0) > 0 ? fmtKrw((editBom.postProcessingFee || 0) * postRate * ((editBom.customsRate || 0) / 100)) : '—'}
+                            </td>
+                            <td colSpan={3}></td>
+                          </tr>
+                          {/* 물류비 */}
+                          <tr className="bg-amber-50/20 border-b border-stone-100">
+                            <td className="px-1 py-1" colSpan={3}>
+                              <span className="text-xs text-stone-500 px-2">물류비 (KRW)</span>
+                              <span className="text-[10px] text-stone-400 ml-1">PCS 배분 물류비</span>
+                            </td>
+                            <td className="px-1 py-1">
+                              <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="₩" />
+                            </td>
+                            <td colSpan={4}></td>
+                            <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">
+                              {(editBom.logisticsCostKrw || 0) > 0 ? fmtKrw(editBom.logisticsCostKrw || 0) : '—'}
+                            </td>
+                            <td colSpan={3}></td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>
@@ -3030,12 +3213,28 @@ export default function BomManagement() {
                           <td className="px-4 py-2 text-stone-400">NET ({postCur})</td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.processingKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.processingKrw)}</span></td>
                         </tr>
+                        {ps.customsRate > 0 && (
+                          <tr className="border-b border-stone-100 hover:bg-stone-50">
+                            <td className="px-4 py-2 font-bold text-stone-400">관</td>
+                            <td className="px-4 py-2 font-medium text-stone-700">관세 ({ps.customsRate}%)</td>
+                            <td className="px-4 py-2 text-stone-400">임가공비 × 관세율</td>
+                            <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.customsKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.customsKrw)}</span></td>
+                          </tr>
+                        )}
                         <tr className="bg-amber-50 border-y border-amber-200">
                           <td className="px-4 py-3 font-bold text-amber-600">🏭</td>
                           <td className="px-4 py-3 font-bold text-stone-800">공장단가</td>
-                          <td className="px-4 py-3 text-stone-500 text-[11px]">공장구매자재 + 임가공 (본사제공 제외)</td>
+                          <td className="px-4 py-3 text-stone-500 text-[11px]">공장구매자재 + 임가공 + 후가공 + 관세 (본사제공 제외)</td>
                           <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">{fmtKrw(ps.factoryUnitCostKrw)}</td>
                         </tr>
+                        {ps.logisticsKrw > 0 && (
+                          <tr className="border-b border-stone-100 hover:bg-stone-50">
+                            <td className="px-4 py-2 font-bold text-stone-400">물</td>
+                            <td className="px-4 py-2 font-medium text-stone-700">물류비</td>
+                            <td className="px-4 py-2 text-stone-400">PCS 배분 물류비</td>
+                            <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(ps.logisticsKrw)}</span></td>
+                          </tr>
+                        )}
                         <tr className="bg-stone-800 text-white">
                           <td className="px-4 py-3 font-bold">📦</td>
                           <td className="px-4 py-3 font-bold text-base" colSpan={2}>제 품 원 가</td>
