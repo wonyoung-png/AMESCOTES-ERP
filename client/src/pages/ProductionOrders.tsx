@@ -1,4 +1,4 @@
-// AMESCOTES ERP — 생산 발주 관리
+// AMESCOTES ERP — 생산 발주 관리 (BOM 연동)
 import { useState, useMemo, useEffect } from 'react';
 import {
   store, genId, calcDDay, dDayLabel, dDayColor, formatNumber, formatKRW,
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Eye, Trash2, Package, ChevronRight, FileText } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Package, ChevronRight, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 const ORDER_STATUSES: OrderStatus[] = ['발주생성', '샘플승인', '생산중', '선적중', '통관중', '입고완료', '지연'];
@@ -33,6 +33,19 @@ function newMilestones(): OrderMilestone[] {
   return MILESTONE_STAGES.map(stage => ({ stage, plannedDate: '', actualDate: '' }));
 }
 
+// BOM 연동 계산 결과 타입
+interface BomCalcResult {
+  bomType: 'post' | 'pre' | 'manual' | null;
+  bomLoaded: boolean;
+  hasBomWarning: boolean;
+  factoryUnitPriceCny: number;
+  factoryUnitPriceKrw: number;
+  totalFactoryAmountKrw: number;
+  hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }>;
+  factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }>;
+  manufacturingCountry?: string;
+}
+
 export default function ProductionOrders() {
   const [orders, setOrders] = useState<ProductionOrder[]>(() => store.getOrders());
   const [items] = useState<Item[]>(() => store.getItems());
@@ -40,6 +53,7 @@ export default function ProductionOrders() {
   const [search, setSearch] = useState('');
   const [filterBuyer, setFilterBuyer] = useState('all');
   const [buyers] = useState(() => store.getVendors().filter(v => v.type === '바이어'));
+  const [factories] = useState(() => store.getVendors().filter(v => v.type === '공장' || v.type === '해외공장'));
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterSeason, setFilterSeason] = useState('all');
   const [showModal, setShowModal] = useState(false);
@@ -48,8 +62,15 @@ export default function ProductionOrders() {
   const [hqItems, setHqItems] = useState<HqSupplyItem[]>([]);
   const [colorQtys, setColorQtys] = useState<ColorQty[]>([]);
 
-  // BOM 원가 참고 표시 (스타일 선택 시 자동 설정)
-  const [selectedItemBomCost, setSelectedItemBomCost] = useState<number | null>(null);
+  // BOM 연동 상태
+  const [bomCalc, setBomCalc] = useState<BomCalcResult>({
+    bomType: null, bomLoaded: false, hasBomWarning: false,
+    factoryUnitPriceCny: 0, factoryUnitPriceKrw: 0, totalFactoryAmountKrw: 0,
+    hqProvided: [], factoryProvided: [],
+  });
+  // 공장단가 수동 입력 모드
+  const [manualFactoryPrice, setManualFactoryPrice] = useState(false);
+  const [manualPriceCny, setManualPriceCny] = useState<number>(0);
 
   // 입고 처리 팝업 상태
   const [showReceiveModal, setShowReceiveModal] = useState(false);
@@ -65,7 +86,6 @@ export default function ProductionOrders() {
     if (filterStatus !== 'all') list = list.filter(o => o.status === filterStatus);
     if (filterSeason !== 'all') list = list.filter(o => o.season === filterSeason);
     if (filterBuyer !== 'all') {
-      // 스타일의 buyerId를 통해 필터링
       const buyerStyleIds = items.filter(i => i.buyerId === filterBuyer).map(i => i.id);
       list = list.filter(o => buyerStyleIds.includes(o.styleId));
     }
@@ -78,7 +98,6 @@ export default function ProductionOrders() {
   }, [orders, filterStatus, filterSeason, filterBuyer, items, search]);
 
   const openNew = (prefillStyleId?: string) => {
-    // 샘플 관리에서 prefill 데이터 확인
     const prefillRaw = localStorage.getItem('ames_prefill_order');
     let prefillStyleIdToUse = prefillStyleId;
     if (prefillRaw && !prefillStyleId) {
@@ -89,52 +108,97 @@ export default function ProductionOrders() {
       } catch { /* ignore */ }
     }
 
-    setForm({
-      season: '26SS',
-      status: '발주생성',
-      qty: 0,
-      milestones: newMilestones(),
-      hqSupplyItems: [],
-      attachments: [],
-    });
+    setForm({ season: '26SS', status: '발주생성', qty: 0, milestones: newMilestones(), hqSupplyItems: [], attachments: [] });
     setHqItems([]);
     setColorQtys([]);
-    setSelectedItemBomCost(null);
+    setBomCalc({ bomType: null, bomLoaded: false, hasBomWarning: false, factoryUnitPriceCny: 0, factoryUnitPriceKrw: 0, totalFactoryAmountKrw: 0, hqProvided: [], factoryProvided: [] });
+    setManualFactoryPrice(false);
+    setManualPriceCny(0);
     setShowModal(true);
 
-    // prefill이 있으면 스타일 자동 선택
     if (prefillStyleIdToUse) {
       setTimeout(() => handleStyleSelect(prefillStyleIdToUse!), 0);
     }
   };
 
-  // 샘플 관리에서 prefill 데이터가 있으면 자동으로 모달 열기
   useEffect(() => {
     const prefillRaw = localStorage.getItem('ames_prefill_order');
-    if (prefillRaw) {
-      openNew();
-    }
+    if (prefillRaw) { openNew(); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // BOM 기반 계산 (스타일+수량 변경 시 호출)
+  const recalcBom = (styleNo: string, qty: number) => {
+    if (!styleNo || qty <= 0) return;
+    const settings = store.getSettings();
+    const cnyKrw = settings.cnyKrw || 191;
+    const result = store.calcMaterialRequirements(styleNo, qty);
+
+    if (result.bomType === null) {
+      // BOM 없음
+      setBomCalc(prev => ({
+        ...prev, bomLoaded: false, hasBomWarning: true,
+        factoryUnitPriceCny: 0, factoryUnitPriceKrw: 0, totalFactoryAmountKrw: 0,
+        hqProvided: [], factoryProvided: [],
+      }));
+      return;
+    }
+
+    const factoryUnitPriceCny = result.factoryUnitPriceCny;
+    const factoryUnitPriceKrw = Math.round(factoryUnitPriceCny * cnyKrw);
+    const totalFactoryAmountKrw = factoryUnitPriceKrw * qty;
+
+    setBomCalc({
+      bomType: result.bomType,
+      bomLoaded: true,
+      hasBomWarning: false,
+      factoryUnitPriceCny,
+      factoryUnitPriceKrw,
+      totalFactoryAmountKrw,
+      hqProvided: result.hqProvided,
+      factoryProvided: result.factoryProvided,
+      manufacturingCountry: result.manufacturingCountry,
+    });
+
+    // 공장단가 폼에 자동 설정
+    setForm(f => ({
+      ...f,
+      factoryUnitPriceCny,
+      factoryUnitPriceKrw,
+      bomType: result.bomType as 'post' | 'pre',
+    }));
+  };
 
   const handleStyleSelect = (styleId: string) => {
     const item = items.find(i => i.id === styleId);
     if (!item) return;
     const revision = store.getNextRevision(item.styleNo);
     const orderNo = `${item.styleNo}-R${revision}`;
-    const bom = boms.find(b => b.styleId === styleId);
-    const hqFromBom: HqSupplyItem[] = bom
-      ? bom.lines.filter(l => l.isHqProvided).map(l => ({
-          bomLineId: l.id,
-          itemName: l.itemName,
-          spec: l.spec,
-          unit: l.unit,
-          requiredQty: 0,
-          currency: 'CNY',
-          purchaseStatus: '미구매' as const,
-        }))
+    const bomList = boms.filter(b => b.styleId === styleId);
+    const bom = bomList.sort((a, b) => b.version - a.version)[0];
+
+    // HQ 제공 자재 추출 (BOM에서)
+    const { bom: bomForOrder } = store.getBomForOrder(item.styleNo);
+    const usedLines = bomForOrder
+      ? ((bomForOrder.postMaterials && bomForOrder.postMaterials.length > 0)
+          ? bomForOrder.postMaterials
+          : bomForOrder.lines)
       : [];
+    const hqFromBom: HqSupplyItem[] = (usedLines || [])
+      .filter(l => l.isHqProvided)
+      .map(l => ({
+        bomLineId: l.id,
+        itemName: l.itemName,
+        spec: l.spec,
+        unit: l.unit,
+        requiredQty: 0,
+        currency: 'CNY' as const,
+        purchaseStatus: '미구매' as const,
+        vendorId: undefined,
+        memo: l.vendorName ? `구매처: ${l.vendorName}` : undefined,
+      }));
     setHqItems(hqFromBom);
+
     setForm(f => ({
       ...f,
       styleId: item.id,
@@ -144,16 +208,51 @@ export default function ProductionOrders() {
       revision,
       bomId: bom?.id,
     }));
-    setSelectedItemBomCost(item.baseCostKrw ?? null);
+
+    // 수량이 이미 있으면 BOM 재계산
+    const currentQty = form.qty || 0;
+    if (currentQty > 0) {
+      recalcBom(item.styleNo, currentQty);
+    } else {
+      // 수량 없어도 BOM 존재 여부 확인
+      const { bom: b } = store.getBomForOrder(item.styleNo);
+      setBomCalc(prev => ({
+        ...prev,
+        bomLoaded: !!b,
+        hasBomWarning: !b,
+        bomType: b ? (b.postMaterials && b.postMaterials.length > 0 ? 'post' : 'pre') : null,
+      }));
+    }
+  };
+
+  const handleQtyChange = (newQty: number) => {
+    setForm(f => ({ ...f, qty: newQty }));
+    if (form.styleNo && newQty > 0) {
+      recalcBom(form.styleNo, newQty);
+      // HQ items 수량도 재계산
+      if (bomCalc.hqProvided.length > 0) {
+        const result = store.calcMaterialRequirements(form.styleNo!, newQty);
+        setHqItems(prev => prev.map(item => {
+          const found = result.hqProvided.find(h => h.bomLineId === item.bomLineId);
+          return found ? { ...item, requiredQty: found.reqQty } : item;
+        }));
+      }
+    }
   };
 
   const handleSave = () => {
     if (!form.styleId) { toast.error('스타일을 선택해주세요'); return; }
-    if (!form.vendorName) { toast.error('발주처를 입력해주세요'); return; }
-    // colorQtys 합계 자동계산
+    if (!form.vendorId) { toast.error('발주처(공장)를 선택해주세요'); return; }
+
     const totalQty = colorQtys.length > 0
       ? colorQtys.reduce((s, c) => s + c.qty, 0)
       : (form.qty || 0);
+
+    // 공장단가: 수동입력 모드면 manualPriceCny, 아니면 BOM 계산값
+    const finalFactoryUnitPriceCny = manualFactoryPrice ? manualPriceCny : bomCalc.factoryUnitPriceCny;
+    const settings = store.getSettings();
+    const cnyKrw = settings.cnyKrw || 191;
+    const finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * cnyKrw);
 
     const order: ProductionOrder = {
       id: genId(),
@@ -173,6 +272,9 @@ export default function ProductionOrders() {
       bomId: form.bomId,
       hqSupplyItems: hqItems,
       attachments: [],
+      factoryUnitPriceCny: finalFactoryUnitPriceCny,
+      factoryUnitPriceKrw: finalFactoryUnitPriceKrw,
+      bomType: manualFactoryPrice ? 'manual' : (bomCalc.bomType ?? undefined),
       deliveryDate: form.deliveryDate,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -193,7 +295,6 @@ export default function ProductionOrders() {
 
   const handleStatusChange = (id: string, status: OrderStatus) => {
     if (status === '입고완료') {
-      // 입고 처리 팝업 열기
       const order = orders.find(o => o.id === id);
       setReceiveOrderId(id);
       setReceiveForm({
@@ -223,7 +324,6 @@ export default function ProductionOrders() {
     toast.success('입고 처리 완료');
   };
 
-  // 거래명세표 자동 생성 (입고완료 발주에서)
   const handleCreateTradeStatement = (order: ProductionOrder) => {
     const item = items.find(i => i.id === order.styleId);
     if (!item) { toast.error('품목 정보를 찾을 수 없습니다'); return; }
@@ -235,13 +335,12 @@ export default function ProductionOrders() {
     const vendorCode = buyer.vendorCode || buyer.code || 'XXX';
     const statementNo = store.getNextStatementNo(vendorCode);
 
-    // 컬러별 lines 구성
     const colorQtyList = order.colorQtys && order.colorQtys.length > 0 ? order.colorQtys : [{ color: '기본', qty: order.qty }];
     const lines: TradeStatementLine[] = colorQtyList.map(cq => ({
       id: genId(),
       description: `[${order.styleNo}] ${order.styleName}${cq.color !== '기본' ? ` (${cq.color})` : ''}`,
       qty: cq.qty,
-      unitPrice: item.salePriceKrw || 0,
+      unitPrice: item.deliveryPrice || item.targetSalePrice || 0,
       taxType: '과세' as const,
       taxRate: 0.1,
     }));
@@ -270,11 +369,9 @@ export default function ProductionOrders() {
     const nextIdx = milestones.findIndex(m => !m.actualDate);
     if (nextIdx < 0) { toast.error('완료 처리할 마일스톤이 없습니다'); return; }
     const updated = milestones.map((m, i) => i === nextIdx ? { ...m, actualDate: today } : m);
-    // E. 마지막 마일스톤(입고완료) 완료 시 자동으로 status → "입고완료"
-    const isAllDone = updated.every(m => !!m.actualDate);
     const isLastStage = milestones[nextIdx].stage === '입고완료';
     const updatePayload: Partial<ProductionOrder> = { milestones: updated, updatedAt: new Date().toISOString() };
-    if (isAllDone || isLastStage) {
+    if (isLastStage || updated.every(m => !!m.actualDate)) {
       updatePayload.status = '입고완료';
     }
     store.updateOrder(orderId, updatePayload);
@@ -306,26 +403,49 @@ export default function ProductionOrders() {
     }).length,
   }), [orders]);
 
-  // 공장별 발주 현황
   const factoryStats = useMemo(() => {
-    const map = new Map<string, { name: string; total: number; inProgress: number; totalQty: number }>();
+    const map = new Map<string, { name: string; total: number; inProgress: number; totalQty: number; totalAmountKrw: number }>();
     orders.forEach(o => {
       const key = o.vendorName || '미지정';
-      const cur = map.get(key) || { name: key, total: 0, inProgress: 0, totalQty: 0 };
+      const cur = map.get(key) || { name: key, total: 0, inProgress: 0, totalQty: 0, totalAmountKrw: 0 };
       cur.total++;
       cur.totalQty += o.qty;
+      cur.totalAmountKrw += (o.factoryUnitPriceKrw || 0) * o.qty;
       if (!['입고완료'].includes(o.status)) cur.inProgress++;
       map.set(key, cur);
     });
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [orders]);
 
+  // 공장 목록: BOM 제조국이 중국이면 해외공장 우선
+  const sortedFactories = useMemo(() => {
+    if (bomCalc.manufacturingCountry === '중국') {
+      return [
+        ...factories.filter(f => f.type === '해외공장'),
+        ...factories.filter(f => f.type === '공장'),
+      ];
+    }
+    return factories;
+  }, [factories, bomCalc.manufacturingCountry]);
+
+  // 현재 발주 수량 (컬러별 합계 또는 직접 입력)
+  const currentQty = colorQtys.length > 0
+    ? colorQtys.reduce((s, c) => s + c.qty, 0)
+    : (form.qty || 0);
+
+  // 공장단가 (수동/BOM)
+  const displayFactoryPriceCny = manualFactoryPrice ? manualPriceCny : bomCalc.factoryUnitPriceCny;
+  const settings = store.getSettings();
+  const cnyKrw = settings.cnyKrw || 191;
+  const displayFactoryPriceKrw = Math.round(displayFactoryPriceCny * cnyKrw);
+  const displayTotalAmountKrw = displayFactoryPriceKrw * currentQty;
+
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-stone-800">생산 발주</h1>
-          <p className="text-xs md:text-sm text-stone-500 mt-0.5 hidden sm:block">발주 생성 시 BOM 자동 로드 · 본사제공 자재 체크</p>
+          <p className="text-xs md:text-sm text-stone-500 mt-0.5 hidden sm:block">BOM 자동 연동 · 공장/자재 발주 분리 · 소요량 자동 계산</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -340,6 +460,7 @@ export default function ProductionOrders() {
         </div>
       </div>
 
+      {/* 통계 카드 */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
         {[
           { label: '전체 발주', value: stats.total, color: 'text-stone-800' },
@@ -368,6 +489,7 @@ export default function ProductionOrders() {
                   <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">전체 발주</th>
                   <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">진행중</th>
                   <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">총 수량</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">총 발주금액</th>
                 </tr>
               </thead>
               <tbody>
@@ -379,6 +501,9 @@ export default function ProductionOrders() {
                       <span className={f.inProgress > 0 ? 'text-amber-700 font-medium' : 'text-stone-400'}>{f.inProgress}건</span>
                     </td>
                     <td className="px-3 py-2 text-right font-mono text-stone-700">{f.totalQty.toLocaleString()} PCS</td>
+                    <td className="px-3 py-2 text-right font-mono text-stone-700">
+                      {f.totalAmountKrw > 0 ? formatKRW(f.totalAmountKrw) : '-'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -387,7 +512,8 @@ export default function ProductionOrders() {
         </div>
       )}
 
-      <div className="flex gap-3">
+      {/* 검색/필터 */}
+      <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="발주번호 / 스타일 검색" className="pl-9 h-9" />
@@ -424,7 +550,8 @@ export default function ProductionOrders() {
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">스타일</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">시즌</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">수량</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">발주처</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">공장 / 공장단가</th>
+              <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">총 발주금액</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">납기일</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">상태</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">진행률</th>
@@ -434,7 +561,7 @@ export default function ProductionOrders() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={11} className="text-center py-12 text-stone-400">
                 <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 발주가 없습니다</p>
               </td></tr>
@@ -444,6 +571,8 @@ export default function ProductionOrders() {
               const completedMilestones = o.milestones.filter(m => !!m.actualDate).length;
               const totalMilestones = o.milestones.length;
               const progressPct = totalMilestones > 0 ? Math.round(completedMilestones / totalMilestones * 100) : 0;
+              const totalAmtKrw = (o.factoryUnitPriceKrw || 0) * o.qty;
+              const hasBom = !!o.bomId || o.bomType === 'post' || o.bomType === 'pre';
               return (
                 <tr key={o.id} className="border-b border-stone-50 hover:bg-stone-50/50">
                   <td className="px-4 py-3">
@@ -455,6 +584,11 @@ export default function ProductionOrders() {
                   <td className="px-4 py-3">
                     <p className="font-medium text-stone-700">{o.styleNo}</p>
                     <p className="text-xs text-stone-400">{o.styleName}</p>
+                    {!hasBom && o.bomType !== 'manual' && (
+                      <span className="text-[10px] text-amber-600 flex items-center gap-0.5 mt-0.5">
+                        <AlertTriangle className="w-2.5 h-2.5" />BOM 미등록
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3"><Badge variant="outline" className="text-xs">{o.season}</Badge></td>
                   <td className="px-4 py-3 text-right">
@@ -472,7 +606,22 @@ export default function ProductionOrders() {
                       <p className="text-[10px] text-green-600 mt-0.5">입고 {formatNumber(o.receivedQty)}{o.defectQty ? ` / 불량 ${o.defectQty}` : ''}</p>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-stone-600">{o.vendorName}</td>
+                  <td className="px-4 py-3">
+                    <p className="text-stone-700 font-medium">{o.vendorName}</p>
+                    {o.factoryUnitPriceKrw && o.factoryUnitPriceKrw > 0 ? (
+                      <p className="text-xs text-stone-500 font-mono">{formatKRW(o.factoryUnitPriceKrw)}/PCS
+                        {o.bomType === 'manual' && <span className="text-amber-600 ml-1">(수동)</span>}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-600">공장단가 수동 입력 필요</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {totalAmtKrw > 0
+                      ? <span className="font-mono text-stone-800 font-medium">{formatKRW(totalAmtKrw)}</span>
+                      : <span className="text-stone-300">-</span>
+                    }
+                  </td>
                   <td className="px-4 py-3 text-xs">
                     {o.deliveryDate ? (
                       <span className={`font-mono ${calcDDay(o.deliveryDate) < 0 ? 'text-red-600 font-bold' : calcDDay(o.deliveryDate) <= 14 ? 'text-amber-600' : 'text-stone-600'}`}>
@@ -563,6 +712,7 @@ export default function ProductionOrders() {
           const completedMilestones = o.milestones.filter(m => !!m.actualDate).length;
           const totalMilestones = o.milestones.length;
           const progressPct = totalMilestones > 0 ? Math.round(completedMilestones / totalMilestones * 100) : 0;
+          const totalAmtKrw = (o.factoryUnitPriceKrw || 0) * o.qty;
           return (
             <div key={o.id} className="bg-white rounded-xl border border-stone-200 p-4">
               <div className="flex items-start justify-between gap-2">
@@ -576,17 +726,21 @@ export default function ProductionOrders() {
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLOR[o.status]}`}>{o.status}</span>
               </div>
-              {/* 공장 + 수량 + 납기 */}
               <div className="flex items-center gap-4 mt-3 text-xs text-stone-600">
                 <span>🏭 {o.vendorName || '-'}</span>
                 <span>📦 {formatNumber(o.qty)} PCS</span>
+                {o.factoryUnitPriceKrw && o.factoryUnitPriceKrw > 0 && (
+                  <span className="font-mono">단가 {formatKRW(o.factoryUnitPriceKrw)}</span>
+                )}
                 {o.deliveryDate && (
                   <span className={`font-mono font-semibold ${calcDDay(o.deliveryDate) < 0 ? 'text-red-600' : calcDDay(o.deliveryDate) <= 14 ? 'text-amber-600' : 'text-stone-600'}`}>
                     {o.deliveryDate}
                   </span>
                 )}
               </div>
-              {/* 진행률 바 */}
+              {totalAmtKrw > 0 && (
+                <p className="text-xs text-stone-700 font-mono mt-1">총 발주금액: <span className="font-bold">{formatKRW(totalAmtKrw)}</span></p>
+              )}
               <div className="mt-3 space-y-1">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-stone-500">마일스톤 {completedMilestones}/{totalMilestones}</span>
@@ -605,7 +759,6 @@ export default function ProductionOrders() {
                   />
                 </div>
               </div>
-              {/* 액션 */}
               <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-stone-100">
                 {o.milestones.some(m => !m.actualDate) && (
                   <Button variant="outline" size="sm" className="h-8 px-2 text-xs text-green-700 border-green-300" onClick={() => handleCompleteMilestone(o.id, o.milestones)}>
@@ -624,64 +777,84 @@ export default function ProductionOrders() {
         })}
       </div>
 
-      {/* 발주 등록 모달 */}
+      {/* ─── 발주 등록 모달 (BOM 연동) ─── */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-lg sm:max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>발주 등록</DialogTitle></DialogHeader>
+        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>발주 등록 — BOM 연동</DialogTitle></DialogHeader>
           <div className="space-y-5 py-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5 col-span-1 sm:col-span-2">
-                <Label>스타일 *</Label>
-                <Select value={form.styleId || ''} onValueChange={handleStyleSelect}>
-                  <SelectTrigger><SelectValue placeholder="스타일 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {items.map(i => <SelectItem key={i.id} value={i.id}>{i.styleNo} — {i.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+
+            {/* Step 1: 스타일 선택 */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-amber-700 text-white text-xs flex items-center justify-center font-bold">1</span>
+                <Label className="text-sm font-semibold">스타일 선택</Label>
               </div>
+              <Select value={form.styleId || ''} onValueChange={handleStyleSelect}>
+                <SelectTrigger><SelectValue placeholder="품목 마스터에서 선택" /></SelectTrigger>
+                <SelectContent>
+                  {items.map(i => <SelectItem key={i.id} value={i.id}>{i.styleNo} — {i.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
               {form.orderNo && (
-                <div className="col-span-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                  <p className="text-xs text-amber-700">발주번호: <span className="font-mono font-bold">{form.orderNo}</span>
-                    {(form.revision || 1) > 1 && <span className="ml-2 text-blue-600">(리오더 #{form.revision})</span>}
-                  </p>
-                  {selectedItemBomCost !== null && selectedItemBomCost > 0 && (
-                    <p className="text-xs text-stone-600 mt-1">
-                      📊 BOM 원가: <span className="font-bold text-stone-800">{formatKRW(selectedItemBomCost)}</span>
-                      <span className="text-stone-400 ml-1">(참고용)</span>
+                <div className={`p-3 rounded-lg border ${bomCalc.hasBomWarning ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-stone-700">
+                      발주번호: <span className="font-mono font-bold">{form.orderNo}</span>
+                      {(form.revision || 1) > 1 && <span className="ml-2 text-blue-600">(리오더 #{form.revision})</span>}
+                    </p>
+                    {bomCalc.bomLoaded && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${bomCalc.bomType === 'post' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {bomCalc.bomType === 'post' ? '✅ 사후원가 BOM' : '📋 사전원가 BOM'}
+                      </span>
+                    )}
+                    {bomCalc.hasBomWarning && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />BOM 미등록
+                      </span>
+                    )}
+                  </div>
+                  {bomCalc.hasBomWarning && (
+                    <p className="text-xs text-amber-700 mt-1">⚠️ BOM 미등록 — 공장단가 수동 입력 필요</p>
+                  )}
+                  {bomCalc.manufacturingCountry && (
+                    <p className="text-xs text-stone-500 mt-1">🌍 제조국: {bomCalc.manufacturingCountry}
+                      {bomCalc.manufacturingCountry === '중국' && <span className="text-blue-600 ml-1">(해외공장 목록 우선 표시)</span>}
                     </p>
                   )}
                 </div>
               )}
-              <div className="space-y-1.5">
-                <Label>시즌</Label>
-                <Select value={form.season || '26SS'} onValueChange={v => setForm(f => ({ ...f, season: v as Season }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
+            </div>
+
+            {/* Step 2: 발주 수량 + 시즌 */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-amber-700 text-white text-xs flex items-center justify-center font-bold">2</span>
+                <Label className="text-sm font-semibold">발주 수량 입력</Label>
               </div>
-              <div className="space-y-1.5">
-                <Label>바이어 납기일 <span className="text-stone-400 text-xs">(납품 목표일)</span></Label>
-                <Input
-                  type="date"
-                  value={form.deliveryDate || ''}
-                  onChange={e => setForm(f => ({ ...f, deliveryDate: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>수량 (PCS) — 컬러별 입력 시 자동 합산</Label>
-                <Input
-                  type="number"
-                  value={colorQtys.length > 0 ? colorQtys.reduce((s, c) => s + c.qty, 0) : (form.qty || '')}
-                  onChange={e => { if (colorQtys.length === 0) setForm(f => ({ ...f, qty: parseInt(e.target.value) || 0 })); }}
-                  placeholder="0"
-                  readOnly={colorQtys.length > 0}
-                  className={colorQtys.length > 0 ? 'bg-stone-50 text-stone-500' : ''}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>수량 (PCS)</Label>
+                  <Input
+                    type="number"
+                    value={colorQtys.length > 0 ? colorQtys.reduce((s, c) => s + c.qty, 0) : (form.qty || '')}
+                    onChange={e => { if (colorQtys.length === 0) handleQtyChange(parseInt(e.target.value) || 0); }}
+                    placeholder="0"
+                    readOnly={colorQtys.length > 0}
+                    className={colorQtys.length > 0 ? 'bg-stone-50 text-stone-500' : ''}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>시즌</Label>
+                  <Select value={form.season || '26SS'} onValueChange={v => setForm(f => ({ ...f, season: v as Season }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
               </div>
               {/* 컬러별 수량 */}
-              <div className="col-span-2 space-y-2">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>컬러별 수량</Label>
+                  <Label className="text-xs text-stone-500">컬러별 수량 (선택)</Label>
                   <Button
                     type="button" variant="outline" size="sm" className="h-7 text-xs"
                     onClick={() => setColorQtys(prev => [...prev, { color: '', qty: 0 }])}
@@ -689,25 +862,27 @@ export default function ProductionOrders() {
                     <Plus className="w-3 h-3 mr-1" />컬러 추가
                   </Button>
                 </div>
-                {colorQtys.length === 0 ? (
-                  <p className="text-xs text-stone-400">컬러 추가 버튼으로 컬러별 수량을 입력하세요</p>
-                ) : (
+                {colorQtys.length > 0 && (
                   <div className="space-y-1.5">
                     {colorQtys.map((cq, idx) => (
                       <div key={idx} className="flex items-center gap-2">
                         <Input
                           className="flex-1 h-8 text-sm"
-                          placeholder="컬러명 (예: 블랙)"
+                          placeholder="컬러명"
                           value={cq.color}
                           onChange={e => setColorQtys(prev => prev.map((c, i) => i === idx ? { ...c, color: e.target.value } : c))}
                         />
                         <Input
-                          type="number"
-                          min={0}
+                          type="number" min={0}
                           className="w-24 h-8 text-sm text-center"
                           placeholder="수량"
                           value={cq.qty || ''}
-                          onChange={e => setColorQtys(prev => prev.map((c, i) => i === idx ? { ...c, qty: parseInt(e.target.value) || 0 } : c))}
+                          onChange={e => {
+                            const updated = colorQtys.map((c, i) => i === idx ? { ...c, qty: parseInt(e.target.value) || 0 } : c);
+                            setColorQtys(updated);
+                            const newTotal = updated.reduce((s, c) => s + c.qty, 0);
+                            if (form.styleNo && newTotal > 0) recalcBom(form.styleNo, newTotal);
+                          }}
                         />
                         <Button
                           type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600"
@@ -723,106 +898,273 @@ export default function ProductionOrders() {
                   </div>
                 )}
               </div>
-              <div className="space-y-1.5 col-span-2">
-                <Label>발주처 *</Label>
+            </div>
+
+            {/* BOM 자동 계산 결과 패널 */}
+            {form.styleId && currentQty > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-amber-700 text-white text-xs flex items-center justify-center font-bold">3</span>
+                  <Label className="text-sm font-semibold">자동 계산 결과</Label>
+                </div>
+
+                {/* ── 공장 발주 섹션 ── */}
+                <div className="rounded-lg border border-stone-200 overflow-hidden">
+                  <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-2">
+                    <Factory className="w-4 h-4 text-amber-700" />
+                    <span className="text-sm font-semibold text-amber-800">공장 발주</span>
+                    <span className="text-xs text-amber-600">(임가공비 + 본사미제공 자재)</span>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {/* 공장 선택 */}
+                    <div className="space-y-1.5">
+                      <Label>발주처 (공장) *</Label>
+                      <Select value={form.vendorId || ''} onValueChange={v => {
+                        const vendor = store.getVendors().find(x => x.id === v);
+                        if (vendor?.leadTimeDays && vendor.leadTimeDays > 0 && !form.deliveryDate) {
+                          const suggestedDate = new Date();
+                          suggestedDate.setDate(suggestedDate.getDate() + vendor.leadTimeDays);
+                          const dateStr = suggestedDate.toISOString().split('T')[0];
+                          setForm(f => ({ ...f, vendorId: v, vendorName: vendor?.name || '', deliveryDate: dateStr }));
+                          toast.info(`📅 예상 납기일 자동 설정: ${dateStr} (리드타임 ${vendor.leadTimeDays}일)`);
+                          return;
+                        }
+                        setForm(f => ({ ...f, vendorId: v, vendorName: vendor?.name || '' }));
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="공장 선택" /></SelectTrigger>
+                        <SelectContent>
+                          {bomCalc.manufacturingCountry === '중국' && (
+                            <>
+                              <div className="px-2 py-1 text-[10px] text-stone-400 font-medium">해외공장 (중국 제조국)</div>
+                              {sortedFactories.filter(f => f.type === '해외공장').map(v => (
+                                <SelectItem key={v.id} value={v.id}>
+                                  🌏 {v.name}{v.leadTimeDays ? <span className="text-stone-400 ml-1">({v.leadTimeDays}일)</span> : null}
+                                </SelectItem>
+                              ))}
+                              <div className="px-2 py-1 text-[10px] text-stone-400 font-medium">국내 공장</div>
+                            </>
+                          )}
+                          {sortedFactories
+                            .filter(f => bomCalc.manufacturingCountry === '중국' ? f.type === '공장' : true)
+                            .map(v => (
+                            <SelectItem key={v.id} value={v.id}>
+                              {v.name}{v.leadTimeDays ? <span className="text-stone-400 ml-1">({v.leadTimeDays}일)</span> : null}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* 공장단가 */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label>공장단가 (CNY/PCS)</Label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setManualFactoryPrice(!manualFactoryPrice);
+                              if (!manualFactoryPrice) setManualPriceCny(bomCalc.factoryUnitPriceCny);
+                            }}
+                            className="text-[10px] text-blue-600 underline"
+                          >
+                            {manualFactoryPrice ? 'BOM 자동' : '수동 입력'}
+                          </button>
+                        </div>
+                        {manualFactoryPrice ? (
+                          <Input
+                            type="number"
+                            value={manualPriceCny || ''}
+                            onChange={e => setManualPriceCny(parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                            step="0.01"
+                          />
+                        ) : (
+                          <div className={`h-9 px-3 py-2 border rounded-md text-sm font-mono flex items-center ${bomCalc.bomLoaded ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                            {bomCalc.bomLoaded ? `¥${bomCalc.factoryUnitPriceCny.toFixed(2)}` : '—'}
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>공장단가 (KRW 환산)</Label>
+                        <div className="h-9 px-3 py-2 border border-stone-200 rounded-md text-sm font-mono bg-stone-50 text-stone-600 flex items-center">
+                          {displayFactoryPriceKrw > 0 ? formatKRW(displayFactoryPriceKrw) : '—'}
+                        </div>
+                      </div>
+                    </div>
+                    {/* 총 발주금액 */}
+                    {displayTotalAmountKrw > 0 && (
+                      <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-amber-800">총 공장 발주금액</span>
+                          <span className="text-lg font-bold text-amber-900 font-mono">{formatKRW(displayTotalAmountKrw)}</span>
+                        </div>
+                        <p className="text-xs text-amber-600 mt-0.5">{formatKRW(displayFactoryPriceKrw)} × {currentQty.toLocaleString()} PCS</p>
+                      </div>
+                    )}
+                    {bomCalc.hasBomWarning && (
+                      <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-semibold text-amber-800">BOM 미등록 — 공장단가 수동 입력 필요</p>
+                          <p className="text-xs text-amber-600 mt-0.5">위 "수동 입력" 버튼으로 공장단가를 직접 입력해주세요.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 자재 발주 섹션 (본사제공) ── */}
+                {(bomCalc.hqProvided.length > 0 || hqItems.length > 0) && (
+                  <div className="rounded-lg border border-stone-200 overflow-hidden">
+                    <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center gap-2">
+                      <ShoppingCart className="w-4 h-4 text-blue-700" />
+                      <span className="text-sm font-semibold text-blue-800">자재 발주 (본사제공)</span>
+                      <span className="text-xs text-blue-600">(각 자재거래처에 별도 발주)</span>
+                    </div>
+                    <div className="p-0">
+                      <table className="w-full text-xs">
+                        <thead className="bg-stone-50 border-b border-stone-100">
+                          <tr>
+                            <th className="text-left px-3 py-2 font-medium text-stone-500">자재명</th>
+                            <th className="text-right px-3 py-2 font-medium text-stone-500">소요량</th>
+                            <th className="text-center px-3 py-2 font-medium text-stone-500">단위</th>
+                            <th className="text-left px-3 py-2 font-medium text-stone-500">구매업체</th>
+                            <th className="text-left px-3 py-2 font-medium text-stone-500">구매상태</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {hqItems.map((item, idx) => {
+                            const calcItem = bomCalc.hqProvided.find(h => h.bomLineId === item.bomLineId);
+                            return (
+                              <tr key={item.bomLineId} className="border-t border-stone-100 hover:bg-stone-50">
+                                <td className="px-3 py-2 font-medium text-stone-700">
+                                  {item.itemName}
+                                  {item.spec && <span className="text-stone-400 ml-1">({item.spec})</span>}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  {calcItem ? (
+                                    <span className="font-mono font-semibold text-blue-700">
+                                      {calcItem.reqQty % 1 === 0 ? calcItem.reqQty.toLocaleString() : calcItem.reqQty.toFixed(2)}
+                                    </span>
+                                  ) : (
+                                    <Input
+                                      type="number" value={item.requiredQty || ''}
+                                      onChange={e => {
+                                        const updated = [...hqItems];
+                                        updated[idx] = { ...updated[idx], requiredQty: parseFloat(e.target.value) || 0 };
+                                        setHqItems(updated);
+                                      }}
+                                      className="h-6 text-xs w-20 ml-auto"
+                                    />
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-center text-stone-500">{item.unit}</td>
+                                <td className="px-3 py-2 text-stone-600">
+                                  {calcItem?.vendorName || item.memo?.replace('구매처: ', '') || <span className="text-stone-300">미지정</span>}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <Select value={item.purchaseStatus} onValueChange={v => {
+                                    const updated = [...hqItems];
+                                    updated[idx] = { ...updated[idx], purchaseStatus: v as HqSupplyItem['purchaseStatus'] };
+                                    setHqItems(updated);
+                                  }}>
+                                    <SelectTrigger className="h-6 text-xs w-24"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="미구매">미구매</SelectItem>
+                                      <SelectItem value="구매완료">구매완료</SelectItem>
+                                      <SelectItem value="발송완료">발송완료</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 본사미제공(공장발주) 자재 목록 */}
+                {bomCalc.factoryProvided.length > 0 && (
+                  <div className="rounded-lg border border-stone-100 bg-stone-50 p-3">
+                    <p className="text-xs font-medium text-stone-600 mb-2 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-stone-400" />
+                      공장 구매 자재 ({bomCalc.factoryProvided.length}종) — 공장이 직접 구매
+                    </p>
+                    <div className="space-y-1">
+                      {bomCalc.factoryProvided.map(m => (
+                        <div key={m.bomLineId} className="flex items-center justify-between text-xs text-stone-500">
+                          <span>{m.itemName}{m.spec ? ` (${m.spec})` : ''}</span>
+                          <span className="font-mono">
+                            {m.reqQty % 1 === 0 ? m.reqQty.toLocaleString() : m.reqQty.toFixed(2)} {m.unit}
+                            {m.vendorName && <span className="ml-2 text-stone-400">({m.vendorName})</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* BOM 없거나 수량 미입력 시 공장 선택만 표시 */}
+            {form.styleId && currentQty === 0 && (
+              <div className="space-y-1.5">
+                <Label>발주처 (공장) *</Label>
                 <Select value={form.vendorId || ''} onValueChange={v => {
                   const vendor = store.getVendors().find(x => x.id === v);
-                  // 자동 납기일 계산 (leadTimeDays 기반)
-                  if (vendor?.leadTimeDays && vendor.leadTimeDays > 0) {
-                    const suggestedDate = new Date();
-                    suggestedDate.setDate(suggestedDate.getDate() + vendor.leadTimeDays);
-                    const dateStr = suggestedDate.toISOString().split('T')[0];
-                    if (!form.deliveryDate) {
-                      setForm(f => ({ ...f, vendorId: v, vendorName: vendor?.name || '', deliveryDate: dateStr }));
-                      toast.info(`📅 예상 납기일 자동 설정: ${dateStr} (리드타임 ${vendor.leadTimeDays}일 기준)`);
-                      return;
-                    }
-                  }
                   setForm(f => ({ ...f, vendorId: v, vendorName: vendor?.name || '' }));
                 }}>
-                  <SelectTrigger><SelectValue placeholder="발주처 선택" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="공장 선택" /></SelectTrigger>
                   <SelectContent>
-                    {store.getVendors().filter(v => v.type === '공장' || v.type === '해외공장').map(v => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.name}
-                        {v.leadTimeDays ? <span className="text-stone-400 ml-1">({v.leadTimeDays}일)</span> : null}
-                      </SelectItem>
+                    {sortedFactories.map(v => (
+                      <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {hqItems.length > 0 && (
-              <div>
-                <Label className="text-sm font-semibold text-stone-700 mb-2 block">본사제공 자재 (BOM 자동 추출)</Label>
-                <div className="border border-stone-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-stone-50">
-                      <tr>
-                        <th className="text-left px-3 py-2 font-medium text-stone-500">품목명</th>
-                        <th className="text-right px-3 py-2 font-medium text-stone-500">필요수량</th>
-                        <th className="text-left px-3 py-2 font-medium text-stone-500">구매상태</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {hqItems.map((item, idx) => (
-                        <tr key={item.bomLineId} className="border-t border-stone-100">
-                          <td className="px-3 py-2 font-medium text-stone-700">{item.itemName} {item.spec && `(${item.spec})`}</td>
-                          <td className="px-3 py-2">
-                            <Input type="number" value={item.requiredQty || ''} onChange={e => {
-                              const updated = [...hqItems];
-                              updated[idx] = { ...updated[idx], requiredQty: parseInt(e.target.value) || 0 };
-                              setHqItems(updated);
-                            }} className="h-6 text-xs w-20 ml-auto" />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Select value={item.purchaseStatus} onValueChange={v => {
-                              const updated = [...hqItems];
-                              updated[idx] = { ...updated[idx], purchaseStatus: v as HqSupplyItem['purchaseStatus'] };
-                              setHqItems(updated);
-                            }}>
-                              <SelectTrigger className="h-6 text-xs w-24"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="미구매">미구매</SelectItem>
-                                <SelectItem value="구매완료">구매완료</SelectItem>
-                                <SelectItem value="발송완료">발송완료</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             )}
 
-            <div>
-              <Label className="text-sm font-semibold text-stone-700 mb-2 block">마일스톤 일정</Label>
-              <div className="space-y-2">
-                {(form.milestones || []).map((m, idx) => (
-                  <div key={m.stage} className="flex items-center gap-3">
-                    <ChevronRight className="w-3.5 h-3.5 text-stone-300 shrink-0" />
-                    <span className="text-xs text-stone-600 w-20 shrink-0">{m.stage}</span>
-                    <div className="flex-1 grid grid-cols-2 gap-2">
-                      <div>
-                        <p className="text-[10px] text-stone-400 mb-0.5">예정일</p>
-                        <Input type="date" value={m.plannedDate || ''} onChange={e => updateMilestone(idx, 'plannedDate', e.target.value)} className="h-7 text-xs" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-stone-400 mb-0.5">실제완료일</p>
-                        <Input type="date" value={m.actualDate || ''} onChange={e => updateMilestone(idx, 'actualDate', e.target.value)} className="h-7 text-xs" />
+            {/* Step 4: 납기일 + 메모 */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-amber-700 text-white text-xs flex items-center justify-center font-bold">4</span>
+                <Label className="text-sm font-semibold">납기 & 마일스톤</Label>
+              </div>
+              <div className="space-y-1.5">
+                <Label>바이어 납기일</Label>
+                <Input
+                  type="date"
+                  value={form.deliveryDate || ''}
+                  onChange={e => setForm(f => ({ ...f, deliveryDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold text-stone-700 mb-2 block">마일스톤 일정</Label>
+                <div className="space-y-2">
+                  {(form.milestones || []).map((m, idx) => (
+                    <div key={m.stage} className="flex items-center gap-3">
+                      <ChevronRight className="w-3.5 h-3.5 text-stone-300 shrink-0" />
+                      <span className="text-xs text-stone-600 w-20 shrink-0">{m.stage}</span>
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-[10px] text-stone-400 mb-0.5">예정일</p>
+                          <Input type="date" value={m.plannedDate || ''} onChange={e => updateMilestone(idx, 'plannedDate', e.target.value)} className="h-7 text-xs" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-stone-400 mb-0.5">실제완료일</p>
+                          <Input type="date" value={m.actualDate || ''} onChange={e => updateMilestone(idx, 'actualDate', e.target.value)} className="h-7 text-xs" />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>메모</Label>
-              <Input value={form.memo || ''} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="비고" />
+              <div className="space-y-1.5">
+                <Label>메모</Label>
+                <Input value={form.memo || ''} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="비고" />
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -867,6 +1209,7 @@ export default function ProductionOrders() {
         </DialogContent>
       </Dialog>
 
+      {/* 발주 상세 모달 */}
       {showDetail && (
         <Dialog open={!!showDetail} onOpenChange={() => setShowDetail(null)}>
           <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-lg sm:max-h-[85vh] overflow-y-auto">
@@ -882,8 +1225,39 @@ export default function ProductionOrders() {
                 <div><p className="text-xs text-stone-400">시즌</p><p className="font-medium">{showDetail.season}</p></div>
                 <div><p className="text-xs text-stone-400">수량</p><p className="font-mono font-medium">{formatNumber(showDetail.qty)} PCS</p></div>
                 <div><p className="text-xs text-stone-400">발주처</p><p className="font-medium">{showDetail.vendorName}</p></div>
+                <div>
+                  <p className="text-xs text-stone-400">공장단가</p>
+                  <p className="font-mono font-medium">
+                    {showDetail.factoryUnitPriceKrw ? formatKRW(showDetail.factoryUnitPriceKrw) : '-'}
+                    {showDetail.bomType === 'manual' && <span className="text-xs text-amber-600 ml-1">(수동)</span>}
+                    {showDetail.bomType === 'post' && <span className="text-xs text-green-600 ml-1">(사후원가)</span>}
+                    {showDetail.bomType === 'pre' && <span className="text-xs text-blue-600 ml-1">(사전원가)</span>}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-stone-400">총 발주금액</p>
+                  <p className="font-mono font-bold text-amber-700">
+                    {showDetail.factoryUnitPriceKrw
+                      ? formatKRW(showDetail.factoryUnitPriceKrw * showDetail.qty)
+                      : '-'}
+                  </p>
+                </div>
                 <div><p className="text-xs text-stone-400">리오더</p><p className="font-medium">{showDetail.isReorder ? `${showDetail.revision}차` : '신규'}</p></div>
+                {showDetail.deliveryDate && (
+                  <div><p className="text-xs text-stone-400">납기일</p><p className="font-mono">{showDetail.deliveryDate}</p></div>
+                )}
               </div>
+              {/* 컬러별 수량 */}
+              {(showDetail.colorQtys || []).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-stone-500 mb-2">컬러별 수량</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(showDetail.colorQtys || []).map((cq, i) => (
+                      <span key={i} className="px-2 py-1 bg-stone-100 text-stone-700 text-xs rounded">{cq.color}: {cq.qty.toLocaleString()} PCS</span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
                 <p className="text-xs font-semibold text-stone-500 mb-2">마일스톤 진행 현황</p>
                 <div className="space-y-2">
