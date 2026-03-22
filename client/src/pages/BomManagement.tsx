@@ -1933,6 +1933,52 @@ export default function BomManagement() {
     toast.success('사전원가 데이터를 사후원가로 복사했습니다');
   };
 
+  // 사전원가 컬러 → 사후원가 컬러 복사
+  const copyPreToPost = (color: string) => {
+    if (!editBom) return;
+    const preColorBom = (editBom.colorBoms || []).find(c => c.color === color);
+    if (!preColorBom) { toast.error('사전원가에 해당 컬러가 없습니다'); return; }
+    const postHas = (editBom.postColorBoms || []).some(c => c.color === color);
+    const msg = postHas
+      ? `기존 [${color}] 사후원가 데이터를 사전원가로 덮어쓰시겠습니까?`
+      : `사전원가 [${color}] 데이터를 사후원가에 복사하시겠습니까?`;
+    if (!confirm(msg)) return;
+    setEditBom(prev => {
+      if (!prev) return prev;
+      const post = [...(prev.postColorBoms || [])];
+      const idx = post.findIndex(c => c.color === color);
+      const newColorBom = { ...preColorBom, lines: preColorBom.lines.map(l => ({ ...l, id: genId() })) };
+      if (idx >= 0) post[idx] = newColorBom;
+      else post.push(newColorBom);
+      return { ...prev, postColorBoms: post };
+    });
+    toast.success(`사전원가 [${color}] → 사후원가 복사 완료`);
+    markDirty();
+  };
+
+  // 사후원가 컬러 → 사전원가 컬러 복사
+  const copyPostToPre = (color: string) => {
+    if (!editBom) return;
+    const postColorBomSrc = (editBom.postColorBoms || []).find(c => c.color === color);
+    if (!postColorBomSrc) { toast.error('사후원가에 해당 컬러가 없습니다'); return; }
+    const preHas = (editBom.colorBoms || []).some(c => c.color === color);
+    const msg = preHas
+      ? `기존 [${color}] 사전원가 데이터를 사후원가로 덮어쓰시겠습니까?`
+      : `사후원가 [${color}] 데이터를 사전원가에 복사하시겠습니까?`;
+    if (!confirm(msg)) return;
+    setEditBom(prev => {
+      if (!prev) return prev;
+      const pre = [...(prev.colorBoms || [])];
+      const idx = pre.findIndex(c => c.color === color);
+      const newColorBom = { ...postColorBomSrc, lines: postColorBomSrc.lines.map(l => ({ ...l, id: genId() })) };
+      if (idx >= 0) pre[idx] = newColorBom;
+      else pre.push(newColorBom);
+      return { ...prev, colorBoms: pre };
+    });
+    toast.success(`사후원가 [${color}] → 사전원가 복사 완료`);
+    markDirty();
+  };
+
   // 사전원가 엑셀 업로드
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2822,7 +2868,18 @@ export default function BomManagement() {
                 {/* BOM 테이블 (전체 섹션) */}
                 <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
                   <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between bg-emerald-50">
-                    <h2 className="text-sm font-semibold text-emerald-800">BOM 자재 명세 — [{colorBom.color}]</h2>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-sm font-semibold text-emerald-800">BOM 자재 명세 — [{colorBom.color}]</h2>
+                      {/* 사후원가에서 불러오기 버튼 */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyPostToPre(colorBom.color)}
+                        className="h-7 gap-1 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+                      >
+                        <Copy className="w-3 h-3" /> 사후원가 [{colorBom.color}] 불러오기 →
+                      </Button>
+                    </div>
                     <span className="text-xs text-stone-400">
                       입력 통화: {preCur} {preCur !== 'KRW' && `| CNY→KRW ${preCnyKrw} | USD→KRW ${preUsdKrw}`}
                     </span>
@@ -3262,7 +3319,18 @@ export default function BomManagement() {
                 return (
                   <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
                     <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between bg-blue-50">
-                      <h2 className="text-sm font-semibold text-blue-800">사후원가 자재 명세 — [{postColorBom.color}]</h2>
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-sm font-semibold text-blue-800">사후원가 자재 명세 — [{postColorBom.color}]</h2>
+                        {/* 사전원가에서 불러오기 버튼 */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyPreToPost(postColorBom.color)}
+                          className="h-7 gap-1 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                        >
+                          <Copy className="w-3 h-3" /> ← 사전원가 [{postColorBom.color}] 불러오기
+                        </Button>
+                      </div>
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-stone-400">입력 통화: {postCur} {postCur !== 'KRW' && `| CNY→KRW ${postCnyKrw} | USD→KRW ${postUsdKrw}`}</span>
                         {/* 다른 컬러에서 복사 */}
