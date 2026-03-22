@@ -1153,21 +1153,10 @@ export default function BomManagement() {
       const cellL = getNum(row, 11);   // L열 (임가공/공장단가 금액)
       const rowStr = row.map(c => String(c ?? '')).join(' ');
 
-      // 후가공 섹션 시작 감지
-      if (rowStr.includes('부·소모재') || rowStr.includes('부소모재')) {
+      // 후가공 섹션 시작 감지 (A열='후가공' 또는 '원·부·소모재 총계')
+      if (rowStr.includes('부·소모재') || rowStr.includes('부소모재') || cellA.includes('후가공')) {
         inPostProcess = true;
-        console.log('[파싱] 후가공 섹션 진입 (소모재 총계)');
         continue;
-      }
-      // A열이 '후가공'인 행도 후가공 섹션 시작
-      if (cellA.includes('후가공')) {
-        inPostProcess = true;
-        console.log('[파싱] 후가공 헤더 행 스킵, inPostProcess=true');
-        continue; // 헤더 행 스킵
-      }
-      // 현재 상태 로그 (후가공 섹션에서)
-      if (inPostProcess) {
-        console.log('[파싱 후가공]', 'B=', cellB, 'D=', row[3], 'inPostProcess=', inPostProcess);
       }
 
       // 구분(A열)에 값 있으면 섹션 갱신 (후가공 섹션 진입 후에는 스킵)
@@ -1194,14 +1183,13 @@ export default function BomManagement() {
       if (rowStr.includes('공장단가') || rowStr.includes('제품원가')) continue;
 
       // 후가공 섹션 처리
-      // 구조: B=작업명, C=NET, D=단가(실제값), E=금액(수식→0)
+      // B96:B102 = 품목명, C96:C102 = 수량(NET), D96:D102 = 단가
       if (inPostProcess) {
         const workName = cellB;
-        if (!workName || workName === '소계' || workName === '공임비') continue;
-        // D열(index 3)이 단가 — xlsx 라이브러리는 실제값 읽음
-        const netQtyPost = getNum(row, 2); // C열
-        const unitPrice = getNum(row, 3);  // D열 (실제 단가)
-        // 단가가 있는 항목만 추가
+        // 스킵 조건
+        if (!workName || workName === '소계' || workName === '공임비' || workName === 'NET') continue;
+        const netQtyPost = getNum(row, 2); // C열 = 수량
+        const unitPrice = getNum(row, 3);  // D열 = 단가
         if (workName && unitPrice > 0) {
           postProcessLines.push({
             id: Math.random().toString(36).slice(2),
