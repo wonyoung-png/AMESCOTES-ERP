@@ -564,7 +564,7 @@ export default function ItemMaster() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(item => {
+              {displayItems.map(item => {
                 // 납품가: deliveryPrice 우선, 없으면 targetSalePrice 사용 (하위 호환)
                 const delivery = item.deliveryPrice || item.targetSalePrice || 0;
                 // BOM 총원가 자동 조회

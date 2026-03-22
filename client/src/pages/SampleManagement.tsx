@@ -1,5 +1,5 @@
 // AMESCOTES ERP — 샘플 관리 (Phase 1 전면 재작성)
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import {
   store, genId, formatKRW, formatNumber,
@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
@@ -120,6 +121,10 @@ export default function SampleManagement() {
   const [editId, setEditId] = useState<string | null>(null);
   const [createTempMode, setCreateTempMode] = useState(false);
   const [tempStyleName, setTempStyleName] = useState('');
+  // 변경사항 추적
+  const [isDirty, setIsDirty] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const initialFormRef = useRef<Partial<Sample>>({});
 
   // 상세 모달 (차수별 메모 / 자재 체크리스트)
   const [detailSample, setDetailSample] = useState<Sample | null>(null);
@@ -325,23 +330,28 @@ export default function SampleManagement() {
 
   const openNew = () => {
     // 같은 스타일번호로 새 샘플 접수 시 기존 최대 차수 + 1로 자동 설정 (스타일 선택 시 처리)
-    setForm({
-      season: '26SS', stage: '1차',
-      billingStatus: '미청구',  // 항상 미청구로 시작 (청구는 명세표 발행 시 업데이트)
+    const initial = {
+      season: '26SS' as const, stage: '1차' as const,
+      billingStatus: '미청구' as const,  // 항상 미청구로 시작 (청구는 명세표 발행 시 업데이트)
       requestDate: new Date().toISOString().split('T')[0],
-      location: '내부개발실', round: 1,
+      location: '내부개발실' as const, round: 1,
       costCny: 0, imageUrls: [], documents: [], revisionHistory: [], materialChecklist: [], materialRequests: [],
-    });
+    };
+    initialFormRef.current = initial;
+    setForm(initial);
     setEditId(null);
     setCreateTempMode(false);
     setTempStyleName('');
+    setIsDirty(false);
     setShowModal(true);
   };
 
   const openEdit = (s: Sample) => {
+    initialFormRef.current = { ...s };
     setForm({ ...s });
     setEditId(s.id);
     setCreateTempMode(false);
+    setIsDirty(false);
     setShowModal(true);
   };
 
@@ -446,8 +456,32 @@ export default function SampleManagement() {
       toast.success('샘플이 등록되었습니다');
     }
     refresh();
+    setIsDirty(false);
     setShowModal(false);
   };
+
+  // 모달이 열린 직후(초기화 완료 후) dirty 추적 활성화 플래그
+  const dirtyTrackingRef = useRef(false);
+  useEffect(() => {
+    if (showModal) {
+      // 모달 열릴 때는 아직 초기화 중이므로 잠깐 후 추적 시작
+      dirtyTrackingRef.current = false;
+      const timer = setTimeout(() => { dirtyTrackingRef.current = true; }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      dirtyTrackingRef.current = false;
+    }
+  }, [showModal]);
+
+  // 모달 닫기 요청 처리 (변경사항 확인)
+  const handleModalClose = useCallback((requestClose: boolean) => {
+    if (!requestClose) return;
+    if (isDirty) {
+      setShowUnsavedDialog(true);
+    } else {
+      setShowModal(false);
+    }
+  }, [isDirty]);
 
   const handleDelete = (id: string) => {
     if (!confirm('삭제하시겠습니까?')) return;
@@ -1213,8 +1247,16 @@ export default function SampleManagement() {
         })}
       </div>
 
+      {/* ── 변경사항 확인 다이얼로그 ── */}
+      <UnsavedChangesDialog
+        open={showUnsavedDialog}
+        onSaveAndClose={() => { setShowUnsavedDialog(false); handleSave(); }}
+        onDiscardAndClose={() => { setShowUnsavedDialog(false); setIsDirty(false); setShowModal(false); }}
+        onCancel={() => setShowUnsavedDialog(false)}
+      />
+
       {/* ── 등록/수정 모달 ── */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={handleModalClose}>
         <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editId ? '샘플 수정' : '샘플 접수'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
@@ -1635,7 +1677,7 @@ export default function SampleManagement() {
             </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
+            <Button variant="outline" onClick={() => handleModalClose(true)}>취소</Button>
             <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">{editId ? '수정' : '접수'}</Button>
           </DialogFooter>
         </DialogContent>
