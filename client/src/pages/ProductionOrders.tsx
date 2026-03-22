@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import {
   store, genId, calcDDay, dDayLabel, dDayColor, formatNumber, formatKRW,
   type ProductionOrder, type OrderStatus, type Season, type Item, type Bom,
-  type HqSupplyItem, type OrderMilestone, type MilestoneStage, type ColorQty,
+  type HqSupplyItem, type ColorQty,
   type TradeStatement, type TradeStatementLine,
 } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -13,11 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Eye, Trash2, Package, ChevronRight, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 const ORDER_STATUSES: OrderStatus[] = ['발주생성', '샘플승인', '생산중', '선적중', '통관중', '입고완료', '지연'];
-const MILESTONE_STAGES: MilestoneStage[] = ['샘플1차', '샘플승인', '생산시작', '선적', '통관', '입고완료'];
 
 const STATUS_COLOR: Record<OrderStatus, string> = {
   '발주생성': 'bg-stone-50 text-stone-600 border-stone-200',
@@ -28,10 +27,6 @@ const STATUS_COLOR: Record<OrderStatus, string> = {
   '입고완료': 'bg-green-50 text-green-700 border-green-200',
   '지연': 'bg-red-50 text-red-600 border-red-200',
 };
-
-function newMilestones(): OrderMilestone[] {
-  return MILESTONE_STAGES.map(stage => ({ stage, plannedDate: '', actualDate: '' }));
-}
 
 // BOM 연동 계산 결과 타입
 interface BomCalcResult {
@@ -121,7 +116,7 @@ export default function ProductionOrders() {
       } catch { /* ignore */ }
     }
 
-    setForm({ season: '26SS', status: '발주생성', qty: 0, milestones: newMilestones(), hqSupplyItems: [], attachments: [] });
+    setForm({ season: '26SS', status: '발주생성', qty: 0, orderDate: new Date().toISOString().split('T')[0], hqSupplyItems: [], attachments: [] });
     setHqItems([]);
     setColorQtys([]);
     setBomCalc({ bomType: null, bomLoaded: false, hasBomWarning: false, factoryUnitPriceCny: 0, factoryUnitPriceKrw: 0, totalFactoryAmountKrw: 0, hqProvided: [], factoryProvided: [] });
@@ -297,8 +292,8 @@ export default function ProductionOrders() {
       colorQtys: colorQtys.length > 0 ? colorQtys : undefined,
       vendorId: form.vendorId || '',
       vendorName: form.vendorName || '',
+      orderDate: form.orderDate || new Date().toISOString().split('T')[0],
       status: form.status || '발주생성',
-      milestones: form.milestones || newMilestones(),
       bomId: form.bomId,
       hqSupplyItems: hqItems,
       attachments: [],
@@ -449,43 +444,13 @@ export default function ProductionOrders() {
     }
   };
 
-  const handleCompleteMilestone = (orderId: string, milestones: OrderMilestone[]) => {
-    const today = new Date().toISOString().split('T')[0];
-    const nextIdx = milestones.findIndex(m => !m.actualDate);
-    if (nextIdx < 0) { toast.error('완료 처리할 마일스톤이 없습니다'); return; }
-    const updated = milestones.map((m, i) => i === nextIdx ? { ...m, actualDate: today } : m);
-    const isLastStage = milestones[nextIdx].stage === '입고완료';
-    const updatePayload: Partial<ProductionOrder> = { milestones: updated, updatedAt: new Date().toISOString() };
-    if (isLastStage || updated.every(m => !!m.actualDate)) {
-      updatePayload.status = '입고완료';
-    }
-    store.updateOrder(orderId, updatePayload);
-    refresh();
-    if (updatePayload.status === '입고완료') {
-      toast.success(`"${milestones[nextIdx].stage}" 완료 → 발주 상태가 "입고완료"로 자동 변경되었습니다 ✅`);
-    } else {
-      toast.success(`"${milestones[nextIdx].stage}" 마일스톤 완료 처리`);
-    }
-  };
-
-  const updateMilestone = (idx: number, field: keyof OrderMilestone, value: string) => {
-    setForm(f => {
-      const milestones = [...(f.milestones || [])];
-      milestones[idx] = { ...milestones[idx], [field]: value };
-      return { ...f, milestones };
-    });
-  };
-
   const [showFactoryView, setShowFactoryView] = useState(false);
 
   const stats = useMemo(() => ({
     total: orders.length,
     inProgress: orders.filter(o => ['샘플승인', '생산중'].includes(o.status)).length,
     reorders: orders.filter(o => o.isReorder).length,
-    urgent: orders.filter(o => {
-      const next = o.milestones.filter(m => !m.actualDate && m.plannedDate).sort((a, b) => (a.plannedDate || '').localeCompare(b.plannedDate || ''))[0];
-      return next && calcDDay(next.plannedDate) <= 7;
-    }).length,
+    urgent: orders.filter(o => o.deliveryDate && calcDDay(o.deliveryDate) <= 7 && o.status !== '입고완료').length,
   }), [orders]);
 
   const factoryStats = useMemo(() => {
@@ -645,10 +610,9 @@ export default function ProductionOrders() {
               <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">수량</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">공장 / 공장단가</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">총 발주금액</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">발주일</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">납기일</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">상태</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">진행률</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">다음 마일스톤</th>
               <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
             </tr>
           </thead>
@@ -659,11 +623,6 @@ export default function ProductionOrders() {
                 <p className="text-sm">등록된 발주가 없습니다</p>
               </td></tr>
             ) : filtered.map(o => {
-              const nextMilestone = o.milestones.filter(m => !m.actualDate && m.plannedDate).sort((a, b) => (a.plannedDate || '').localeCompare(b.plannedDate || ''))[0];
-              const dday = nextMilestone ? calcDDay(nextMilestone.plannedDate) : null;
-              const completedMilestones = o.milestones.filter(m => !!m.actualDate).length;
-              const totalMilestones = o.milestones.length;
-              const progressPct = totalMilestones > 0 ? Math.round(completedMilestones / totalMilestones * 100) : 0;
               const totalAmtKrw = (o.factoryUnitPriceKrw || 0) * o.qty;
               const hasBom = !!o.bomId || o.bomType === 'post' || o.bomType === 'pre';
               return (
@@ -716,10 +675,18 @@ export default function ProductionOrders() {
                     }
                   </td>
                   <td className="px-4 py-3 text-xs">
+                    {o.orderDate ? (
+                      <span className="font-mono text-stone-600">{o.orderDate}</span>
+                    ) : <span className="text-stone-300">-</span>}
+                  </td>
+                  <td className="px-4 py-3 text-xs">
                     {o.deliveryDate ? (
-                      <span className={`font-mono ${calcDDay(o.deliveryDate) < 0 ? 'text-red-600 font-bold' : calcDDay(o.deliveryDate) <= 14 ? 'text-amber-600' : 'text-stone-600'}`}>
-                        {o.deliveryDate}
-                      </span>
+                      <div>
+                        <span className={`font-mono ${calcDDay(o.deliveryDate) < 0 ? 'text-red-600 font-bold' : calcDDay(o.deliveryDate) <= 14 ? 'text-amber-600' : 'text-stone-600'}`}>
+                          {o.deliveryDate}
+                        </span>
+                        <span className={`ml-1 text-[10px] px-1 py-0.5 rounded font-mono ${dDayColor(calcDDay(o.deliveryDate))}`}>{dDayLabel(calcDDay(o.deliveryDate))}</span>
+                      </div>
                     ) : <span className="text-stone-300">-</span>}
                   </td>
                   <td className="px-4 py-3">
@@ -732,35 +699,8 @@ export default function ProductionOrders() {
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="space-y-1 min-w-[80px]">
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className="text-stone-500">{completedMilestones}/{totalMilestones}</span>
-                        <span className={progressPct === 100 ? 'text-green-600 font-bold' : 'text-amber-600'}>{progressPct}%</span>
-                      </div>
-                      <div className="w-full bg-stone-100 rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full transition-all ${progressPct === 100 ? 'bg-green-500' : progressPct > 50 ? 'bg-amber-500' : 'bg-blue-400'}`}
-                          style={{ width: `${progressPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {nextMilestone && dday !== null ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-stone-500">{nextMilestone.stage}</span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${dDayColor(dday)}`}>{dDayLabel(dday)}</span>
-                      </div>
-                    ) : <span className="text-xs text-stone-300">-</span>}
-                  </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1 flex-wrap">
-                      {o.milestones.some(m => !m.actualDate) && (
-                        <Button variant="outline" size="sm" className="h-7 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50" onClick={() => handleCompleteMilestone(o.id, o.milestones)}>
-                          ✅ 완료
-                        </Button>
-                      )}
                       {o.tradeStatementId ? (
                         <Badge variant="outline" className="text-[10px] h-6 px-2 text-amber-700 border-amber-300 bg-amber-50 cursor-pointer" title={`연결된 전표: ${store.getTradeStatements().find(t => t.id === o.tradeStatementId)?.statementNo || ''}`}>
                           <FileText className="w-3 h-3 mr-1" />명세표 발행됨
@@ -798,11 +738,6 @@ export default function ProductionOrders() {
             <p className="text-sm">등록된 발주가 없습니다</p>
           </div>
         ) : filtered.map(o => {
-          const nextMilestone = o.milestones.filter(m => !m.actualDate && m.plannedDate).sort((a, b) => (a.plannedDate || '').localeCompare(b.plannedDate || ''))[0];
-          const dday = nextMilestone ? calcDDay(nextMilestone.plannedDate) : null;
-          const completedMilestones = o.milestones.filter(m => !!m.actualDate).length;
-          const totalMilestones = o.milestones.length;
-          const progressPct = totalMilestones > 0 ? Math.round(completedMilestones / totalMilestones * 100) : 0;
           const totalAmtKrw = (o.factoryUnitPriceKrw || 0) * o.qty;
           return (
             <div key={o.id} className="bg-white rounded-xl border border-stone-200 p-4">
@@ -832,30 +767,7 @@ export default function ProductionOrders() {
               {totalAmtKrw > 0 && (
                 <p className="text-xs text-stone-700 font-mono mt-1">총 발주금액: <span className="font-bold">{formatKRW(totalAmtKrw)}</span></p>
               )}
-              <div className="mt-3 space-y-1">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-stone-500">마일스톤 {completedMilestones}/{totalMilestones}</span>
-                  {nextMilestone && dday !== null && (
-                    <span className="flex items-center gap-1">
-                      <span className="text-stone-500">{nextMilestone.stage}</span>
-                      <span className={`px-1.5 py-0.5 rounded font-mono ${dDayColor(dday)}`}>{dDayLabel(dday)}</span>
-                    </span>
-                  )}
-                  <span className={progressPct === 100 ? 'text-green-600 font-bold' : 'text-amber-600'}>{progressPct}%</span>
-                </div>
-                <div className="w-full bg-stone-100 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all ${progressPct === 100 ? 'bg-green-500' : progressPct > 50 ? 'bg-amber-500' : 'bg-blue-400'}`}
-                    style={{ width: `${progressPct}%` }}
-                  />
-                </div>
-              </div>
               <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-stone-100">
-                {o.milestones.some(m => !m.actualDate) && (
-                  <Button variant="outline" size="sm" className="h-8 px-2 text-xs text-green-700 border-green-300" onClick={() => handleCompleteMilestone(o.id, o.milestones)}>
-                    ✅ 완료
-                  </Button>
-                )}
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setShowDetail(o)}>
                   <Eye className="w-4 h-4" />
                 </Button>
@@ -1331,39 +1243,28 @@ export default function ProductionOrders() {
               </div>
             )}
 
-            {/* Step 4: 납기일 + 메모 */}
+            {/* Step 4: 발주일 / 납기일 / 메모 */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-amber-700 text-white text-xs flex items-center justify-center font-bold">4</span>
-                <Label className="text-sm font-semibold">납기 & 마일스톤</Label>
+                <Label className="text-sm font-semibold">발주일 & 납기일</Label>
               </div>
-              <div className="space-y-1.5">
-                <Label>바이어 납기일</Label>
-                <Input
-                  type="date"
-                  value={form.deliveryDate || ''}
-                  onChange={e => setForm(f => ({ ...f, deliveryDate: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-semibold text-stone-700 mb-2 block">마일스톤 일정</Label>
-                <div className="space-y-2">
-                  {(form.milestones || []).map((m, idx) => (
-                    <div key={m.stage} className="flex items-center gap-3">
-                      <ChevronRight className="w-3.5 h-3.5 text-stone-300 shrink-0" />
-                      <span className="text-xs text-stone-600 w-20 shrink-0">{m.stage}</span>
-                      <div className="flex-1 grid grid-cols-2 gap-2">
-                        <div>
-                          <p className="text-[10px] text-stone-400 mb-0.5">예정일</p>
-                          <Input type="date" value={m.plannedDate || ''} onChange={e => updateMilestone(idx, 'plannedDate', e.target.value)} className="h-7 text-xs" />
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-stone-400 mb-0.5">실제완료일</p>
-                          <Input type="date" value={m.actualDate || ''} onChange={e => updateMilestone(idx, 'actualDate', e.target.value)} className="h-7 text-xs" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>발주일</Label>
+                  <Input
+                    type="date"
+                    value={form.orderDate || new Date().toISOString().split('T')[0]}
+                    onChange={e => setForm(f => ({ ...f, orderDate: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>납기일 (바이어)</Label>
+                  <Input
+                    type="date"
+                    value={form.deliveryDate || ''}
+                    onChange={e => setForm(f => ({ ...f, deliveryDate: e.target.value }))}
+                  />
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -1448,8 +1349,16 @@ export default function ProductionOrders() {
                   </p>
                 </div>
                 <div><p className="text-xs text-stone-400">리오더</p><p className="font-medium">{showDetail.isReorder ? `${showDetail.revision}차` : '신규'}</p></div>
+                {showDetail.orderDate && (
+                  <div><p className="text-xs text-stone-400">발주일</p><p className="font-mono">{showDetail.orderDate}</p></div>
+                )}
                 {showDetail.deliveryDate && (
-                  <div><p className="text-xs text-stone-400">납기일</p><p className="font-mono">{showDetail.deliveryDate}</p></div>
+                  <div>
+                    <p className="text-xs text-stone-400">납기일</p>
+                    <p className="font-mono">{showDetail.deliveryDate}
+                      <span className={`ml-1 text-[10px] px-1 py-0.5 rounded font-mono ${dDayColor(calcDDay(showDetail.deliveryDate))}`}>{dDayLabel(calcDDay(showDetail.deliveryDate))}</span>
+                    </p>
+                  </div>
                 )}
               </div>
               {/* 컬러별 수량 */}
@@ -1463,27 +1372,6 @@ export default function ProductionOrders() {
                   </div>
                 </div>
               )}
-              <div>
-                <p className="text-xs font-semibold text-stone-500 mb-2">마일스톤 진행 현황</p>
-                <div className="space-y-2">
-                  {showDetail.milestones.map(m => {
-                    const dday = m.plannedDate ? calcDDay(m.plannedDate) : null;
-                    const done = !!m.actualDate;
-                    return (
-                      <div key={m.stage} className={`flex items-center gap-3 p-2 rounded-lg ${done ? 'bg-green-50' : 'bg-stone-50'}`}>
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${done ? 'bg-green-500 border-green-500' : 'border-stone-300'}`}>
-                          {done && <span className="text-white text-[8px]">✓</span>}
-                        </div>
-                        <span className={`text-xs flex-1 ${done ? 'text-green-700 line-through' : 'text-stone-700'}`}>{m.stage}</span>
-                        {m.plannedDate && <span className="text-xs text-stone-400">{m.plannedDate}</span>}
-                        {dday !== null && !done && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${dDayColor(dday)}`}>{dDayLabel(dday)}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
               {showDetail.hqSupplyItems.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-stone-500 mb-2">본사제공 자재</p>

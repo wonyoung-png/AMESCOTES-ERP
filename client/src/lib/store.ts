@@ -24,7 +24,7 @@ export type SettlementStatus = '정상' | '주의' | '위험' | '완납';
 export type SettlementChannel = 'W Concept' | '29CM' | '자사몰' | '해외T/T' | 'B2B직납' | '기타';
 export type ExpenseType = '법인카드' | '계좌이체' | '현금';
 export type ExpenseCategory = '자재구매' | '물류비' | '샘플비' | '임가공비' | '기타제조원가' | '판관비' | '기타';
-export type MilestoneStage = '샘플1차' | '샘플승인' | '생산시작' | '선적' | '통관' | '입고완료';
+
 
 // ─── 자재 마스터 ───
 export interface Material {
@@ -156,13 +156,6 @@ export interface Bom {
 }
 
 // ─── 생산 발주 ───
-export interface OrderMilestone {
-  stage: MilestoneStage;
-  plannedDate?: string;
-  actualDate?: string;
-  note?: string;
-}
-
 export interface HqSupplyItem {
   bomLineId: string;
   itemName: string;
@@ -201,8 +194,9 @@ export interface ProductionOrder {
   colorQtys?: ColorQty[];         // 컬러별 수량 (합계 = qty)
   vendorId: string;
   vendorName: string;
+  orderDate?: string;           // 발주일 (등록일)
   status: OrderStatus;
-  milestones: OrderMilestone[];
+  milestones?: any[];           // 하위 호환성 유지 (deprecated)
   bomId?: string;
   hqSupplyItems: HqSupplyItem[];
   attachments: OrderAttachment[];
