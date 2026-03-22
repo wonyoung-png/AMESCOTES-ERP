@@ -2192,13 +2192,13 @@ export default function BomManagement() {
                               </React.Fragment>
                             );
                           })}
-                          {/* 후가공 섹션 - 사전원가와 동일 */}
+                          {/* 후가공 섹션 - 사전원가와 동일 (collapsedSections 공유) */}
                           <React.Fragment key="후가공-post">
                             <tr className="bg-stone-100 border-y border-stone-200">
                               <td colSpan={12} className="px-3 py-1.5">
                                 <div className="flex items-center justify-between">
-                                  <button onClick={() => togglePostSection('후가공')} className="flex items-center gap-2 font-semibold text-xs text-stone-700 hover:opacity-80">
-                                    {collapsedPostSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                  <button onClick={() => toggleSection('후가공')} className="flex items-center gap-2 font-semibold text-xs text-stone-700 hover:opacity-80">
+                                    {collapsedSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                     후가공
                                     {editBom.postProcessLines.filter(l => l.name).length > 0 && (
                                       <span className="text-[10px] font-normal text-stone-500">({editBom.postProcessLines.filter(l => l.name).length})</span>
@@ -2210,7 +2210,7 @@ export default function BomManagement() {
                                 </div>
                               </td>
                             </tr>
-                            {!collapsedPostSections.has('후가공') && editBom.postProcessLines.map(line => (
+                            {!collapsedSections.has('후가공') && editBom.postProcessLines.map(line => (
                               <tr key={line.id} className="border-b border-stone-100 hover:bg-stone-50">
                                 <td className="px-2 py-1" colSpan={2}>
                                   <Input value={line.name} onChange={e => updatePostLine(line.id, 'name', e.target.value)} placeholder="후가공 작업명" className="h-7 text-xs border-stone-200 w-full" />
