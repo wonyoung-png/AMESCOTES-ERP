@@ -212,6 +212,7 @@ export interface ProductionOrder {
   // BOM 연동 발주 필드
   factoryUnitPriceCny?: number;   // 공장단가 (CNY) — BOM 임가공비에서 자동 설정
   factoryUnitPriceKrw?: number;   // 공장단가 (KRW 환산) — 표시용
+  factoryCurrency?: 'CNY' | 'USD' | 'KRW'; // 공장단가 통화 선택
   bomType?: 'post' | 'pre' | 'manual'; // BOM 연동 유형 (사후원가/사전원가/수동입력)
   // 입고 정보
   receivedQty?: number;           // 실제 입고 수량

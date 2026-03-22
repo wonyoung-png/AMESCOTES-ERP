@@ -71,6 +71,8 @@ export default function ProductionOrders() {
   // 공장단가 수동 입력 모드
   const [manualFactoryPrice, setManualFactoryPrice] = useState(false);
   const [manualPriceCny, setManualPriceCny] = useState<number>(0);
+  // 공장단가 통화 선택
+  const [factoryCurrency, setFactoryCurrency] = useState<'CNY' | 'USD' | 'KRW'>('CNY');
 
   // 입고 처리 팝업 상태
   const [showReceiveModal, setShowReceiveModal] = useState(false);
@@ -120,6 +122,7 @@ export default function ProductionOrders() {
     setBomCalc({ bomType: null, bomLoaded: false, hasBomWarning: false, factoryUnitPriceCny: 0, factoryUnitPriceKrw: 0, totalFactoryAmountKrw: 0, hqProvided: [], factoryProvided: [] });
     setManualFactoryPrice(false);
     setManualPriceCny(0);
+    setFactoryCurrency('CNY');
     setShowModal(true);
 
     if (prefillStyleIdToUse) {
@@ -205,6 +208,11 @@ export default function ProductionOrders() {
       }));
     setHqItems(hqFromBom);
 
+    // BOM currency → factoryCurrency 기본값 설정
+    if (bomForOrder?.currency) {
+      setFactoryCurrency(bomForOrder.currency);
+    }
+
     setForm(f => ({
       ...f,
       styleId: item.id,
@@ -258,7 +266,15 @@ export default function ProductionOrders() {
     const finalFactoryUnitPriceCny = manualFactoryPrice ? manualPriceCny : bomCalc.factoryUnitPriceCny;
     const settings = store.getSettings();
     const cnyKrw = settings.cnyKrw || 191;
-    const finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * cnyKrw);
+    const usdKrw = settings.usdKrw || 1380;
+    let finalFactoryUnitPriceKrw: number;
+    if (factoryCurrency === 'KRW') {
+      finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny);
+    } else if (factoryCurrency === 'USD') {
+      finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * usdKrw);
+    } else {
+      finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * cnyKrw);
+    }
 
     const order: ProductionOrder = {
       id: genId(),
@@ -280,6 +296,7 @@ export default function ProductionOrders() {
       attachments: [],
       factoryUnitPriceCny: finalFactoryUnitPriceCny,
       factoryUnitPriceKrw: finalFactoryUnitPriceKrw,
+      factoryCurrency,
       bomType: manualFactoryPrice ? 'manual' : (bomCalc.bomType ?? undefined),
       deliveryDate: form.deliveryDate,
       createdAt: new Date().toISOString(),
@@ -478,7 +495,15 @@ export default function ProductionOrders() {
   const displayFactoryPriceCny = manualFactoryPrice ? manualPriceCny : bomCalc.factoryUnitPriceCny;
   const settings = store.getSettings();
   const cnyKrw = settings.cnyKrw || 191;
-  const displayFactoryPriceKrw = Math.round(displayFactoryPriceCny * cnyKrw);
+  const usdKrw = settings.usdKrw || 1380;
+  let displayFactoryPriceKrw: number;
+  if (factoryCurrency === 'KRW') {
+    displayFactoryPriceKrw = Math.round(displayFactoryPriceCny);
+  } else if (factoryCurrency === 'USD') {
+    displayFactoryPriceKrw = Math.round(displayFactoryPriceCny * usdKrw);
+  } else {
+    displayFactoryPriceKrw = Math.round(displayFactoryPriceCny * cnyKrw);
+  }
   const displayTotalAmountKrw = displayFactoryPriceKrw * currentQty;
 
   return (
@@ -997,7 +1022,19 @@ export default function ProductionOrders() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <Label>공장단가 (CNY/PCS)</Label>
+                          <div className="flex items-center gap-1.5">
+                            <Label>공장단가 ({factoryCurrency}/PCS)</Label>
+                            <Select value={factoryCurrency} onValueChange={(v) => setFactoryCurrency(v as 'CNY' | 'USD' | 'KRW')}>
+                              <SelectTrigger className="h-5 w-16 text-[10px] px-1.5 border-stone-300">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="CNY">CNY</SelectItem>
+                                <SelectItem value="USD">USD</SelectItem>
+                                <SelectItem value="KRW">KRW</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                           <button
                             type="button"
                             onClick={() => {
@@ -1019,7 +1056,13 @@ export default function ProductionOrders() {
                           />
                         ) : (
                           <div className={`h-9 px-3 py-2 border rounded-md text-sm font-mono flex items-center ${bomCalc.bomLoaded ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
-                            {bomCalc.bomLoaded ? `¥${bomCalc.factoryUnitPriceCny.toFixed(2)}` : '—'}
+                            {bomCalc.bomLoaded
+                              ? factoryCurrency === 'CNY'
+                                ? `¥${bomCalc.factoryUnitPriceCny.toFixed(2)}`
+                                : factoryCurrency === 'USD'
+                                ? `$${bomCalc.factoryUnitPriceCny.toFixed(2)}`
+                                : `₩${Math.round(bomCalc.factoryUnitPriceCny).toLocaleString()}`
+                              : '—'}
                           </div>
                         )}
                       </div>
