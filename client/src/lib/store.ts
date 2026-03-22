@@ -43,6 +43,14 @@ export interface Material {
 }
 
 // ─── 품목 마스터 ───
+export interface ItemColor {
+  name: string;           // 컬러명 (예: 블랙, 브라운)
+  leatherColor?: string;  // 가죽/원단 컬러
+  decorColor?: string;    // 장식 컬러
+  threadColor?: string;   // 실 컬러
+  girimaeColor?: string;  // 기리매 컬러
+}
+
 export interface Item {
   id: string;
   styleNo: string;
@@ -65,7 +73,7 @@ export interface Item {
   baseCostKrw?: number;
   marginAmount?: number;           // 마진금액 = 납품가 - BOM원가
   marginRate?: number;             // 마진율 = 마진금액 / 납품가 × 100
-  colors?: string[];               // 컬러 목록
+  colors?: ItemColor[];            // 컬러 목록
   buyerId?: string;                // 바이어 1:1 연결
   imageUrl?: string;
   hasBom: boolean;
@@ -599,6 +607,13 @@ function setOne<T>(key: string, data: T): void {
 }
 
 // ─────────────────────────────────────────────
+// 컬러 정규화 헬퍼 (string[] 하위호환)
+// ─────────────────────────────────────────────
+export function normalizeColors(colors: (ItemColor | string)[]): ItemColor[] {
+  return colors.map(c => typeof c === 'string' ? { name: c } : c);
+}
+
+// ─────────────────────────────────────────────
 // Store
 // ─────────────────────────────────────────────
 export const store = {
@@ -614,13 +629,14 @@ export const store = {
   addItem: (v: Item) => { const a = getAll<Item>(KEYS.items); a.push(v); setAll(KEYS.items, a); },
   updateItem: (id: string, u: Partial<Item>) => { const a = getAll<Item>(KEYS.items); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.items, a); } },
   deleteItem: (id: string) => setAll(KEYS.items, getAll<Item>(KEYS.items).filter(x => x.id !== id)),
-  addItemColor: (itemId: string, color: string) => {
+  addItemColor: (itemId: string, color: ItemColor | string) => {
     const a = getAll<Item>(KEYS.items);
     const i = a.findIndex(x => x.id === itemId);
     if (i >= 0) {
-      const existing = a[i].colors || [];
-      if (!existing.includes(color)) {
-        a[i] = { ...a[i], colors: [...existing, color] };
+      const newColor: ItemColor = typeof color === 'string' ? { name: color } : color;
+      const existing = normalizeColors(a[i].colors || []);
+      if (!existing.find(c => c.name === newColor.name)) {
+        a[i] = { ...a[i], colors: [...existing, newColor] };
         setAll(KEYS.items, a);
       }
     }

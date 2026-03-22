@@ -1,7 +1,7 @@
 // AMESCOTES ERP — 품목 마스터 (대규모 개편)
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { store, genId, formatKRW, type Item, type Season, type Category, type ErpCategory, type ProductionOrder } from '@/lib/store';
+import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type ProductionOrder } from '@/lib/store';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -79,6 +79,7 @@ export default function ItemMaster() {
   const [selectedVendorId, setSelectedVendorId] = useState('');
   const [previewStyleNo, setPreviewStyleNo] = useState('');
   const [colorInput, setColorInput] = useState('');
+  const [colorDetailOpen, setColorDetailOpen] = useState<number | null>(null); // 열린 컬러 세부정보 인덱스
   const [filterBuyer, setFilterBuyer] = useState('전체');
   const [filterNoBom, setFilterNoBom] = useState(false);
   const [showSeasonStats, setShowSeasonStats] = useState(false);
@@ -235,11 +236,12 @@ export default function ItemMaster() {
   }, []);
 
   const openEdit = (item: Item) => {
-    setEditItem({ ...item });
+    setEditItem({ ...item, colors: normalizeColors(item.colors || []) });
     setIsEdit(true); setManualStyleNo(true);
     setRegistDate(item.createdAt.split('T')[0]);
     setSelectedVendorId(''); setPreviewStyleNo(item.styleNo); setColorInput('');
     setCustomCategory(item.customCategory || '');
+    setColorDetailOpen(null);
     setModalOpen(true);
   };
 
@@ -269,6 +271,7 @@ export default function ItemMaster() {
       store.updateItem(editItem.id, {
         ...editItem,
         buyerId,
+        colors: normalizeColors(editItem.colors || []),
         deliveryPrice: deliveryVal,
         targetSalePrice: deliveryVal,  // 하위 호환 유지
         marginAmount: marginAmountVal,
@@ -359,13 +362,26 @@ export default function ItemMaster() {
   const addColor = () => {
     const c = colorInput.trim();
     if (!c) return;
-    if ((editItem.colors || []).includes(c)) { toast.error('이미 추가된 컬러입니다'); return; }
-    setEditItem(prev => ({ ...prev, colors: [...(prev.colors || []), c] }));
+    const existing = normalizeColors(editItem.colors || []);
+    if (existing.find(x => x.name === c)) { toast.error('이미 추가된 컬러입니다'); return; }
+    setEditItem(prev => ({ ...prev, colors: [...normalizeColors(prev.colors || []), { name: c }] }));
     setColorInput('');
   };
 
-  const removeColor = (color: string) => {
-    setEditItem(prev => ({ ...prev, colors: (prev.colors || []).filter(c => c !== color) }));
+  const removeColor = (idx: number) => {
+    setEditItem(prev => {
+      const normalized = normalizeColors(prev.colors || []);
+      return { ...prev, colors: normalized.filter((_, i) => i !== idx) };
+    });
+    setColorDetailOpen(null);
+  };
+
+  const updateColorDetail = (idx: number, field: keyof Omit<ItemColor, 'name'>, value: string) => {
+    setEditItem(prev => {
+      const normalized = normalizeColors(prev.colors || []);
+      normalized[idx] = { ...normalized[idx], [field]: value };
+      return { ...prev, colors: normalized };
+    });
   };
 
   // 시즌별 스타일 현황
@@ -580,8 +596,8 @@ export default function ItemMaster() {
                     <td className="px-4 py-3">
                       {(item.colors || []).length > 0 ? (
                         <div className="flex flex-wrap gap-1">
-                          {(item.colors || []).slice(0, 3).map(c => (
-                            <span key={c} className="text-xs px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded">{c}</span>
+                          {normalizeColors(item.colors || []).slice(0, 3).map(c => (
+                            <span key={c.name} className="text-xs px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded">{c.name}</span>
                           ))}
                           {(item.colors || []).length > 3 && (
                             <span className="text-xs text-stone-400">+{(item.colors || []).length - 3}</span>
@@ -972,15 +988,72 @@ export default function ItemMaster() {
                 />
                 <Button type="button" variant="outline" size="sm" onClick={addColor} className="h-9 px-3">추가</Button>
               </div>
-              {(editItem.colors || []).length > 0 && (
-                <div className="flex flex-wrap gap-1.5 p-2 bg-stone-50 rounded-lg border border-stone-100">
-                  {(editItem.colors || []).map(c => (
-                    <span key={c} className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-white border border-stone-200 rounded-full text-stone-700">
-                      {c}
-                      <button type="button" onClick={() => removeColor(c)} className="text-stone-400 hover:text-red-500">
-                        <X size={11} />
-                      </button>
-                    </span>
+              {normalizeColors(editItem.colors || []).length > 0 && (
+                <div className="space-y-2 p-2 bg-stone-50 rounded-lg border border-stone-100">
+                  {normalizeColors(editItem.colors || []).map((c, idx) => (
+                    <div key={idx} className="bg-white border border-stone-200 rounded-lg overflow-hidden">
+                      {/* 컬러 헤더 */}
+                      <div className="flex items-center justify-between px-3 py-2">
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 text-sm font-medium text-stone-700 hover:text-stone-900 flex-1 text-left"
+                          onClick={() => setColorDetailOpen(colorDetailOpen === idx ? null : idx)}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-stone-400 inline-block" />
+                          {c.name}
+                          <span className="text-xs text-stone-400 font-normal">
+                            {[c.leatherColor, c.decorColor, c.threadColor, c.girimaeColor].filter(Boolean).length > 0
+                              ? `(${[c.leatherColor, c.decorColor, c.threadColor, c.girimaeColor].filter(Boolean).join(' / ')})`
+                              : '— 세부정보 없음'}
+                          </span>
+                          <span className="text-xs text-stone-300 ml-auto">{colorDetailOpen === idx ? '▲' : '▼'}</span>
+                        </button>
+                        <button type="button" onClick={() => removeColor(idx)} className="text-stone-400 hover:text-red-500 ml-2">
+                          <X size={14} />
+                        </button>
+                      </div>
+                      {/* 세부 정보 */}
+                      {colorDetailOpen === idx && (
+                        <div className="px-3 pb-3 grid grid-cols-2 gap-2 border-t border-stone-100 pt-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-stone-500">가죽/원단 컬러</Label>
+                            <Input
+                              value={c.leatherColor || ''}
+                              onChange={e => updateColorDetail(idx, 'leatherColor', e.target.value)}
+                              placeholder="블랙"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-stone-500">장식 컬러</Label>
+                            <Input
+                              value={c.decorColor || ''}
+                              onChange={e => updateColorDetail(idx, 'decorColor', e.target.value)}
+                              placeholder="골드"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-stone-500">실 컬러</Label>
+                            <Input
+                              value={c.threadColor || ''}
+                              onChange={e => updateColorDetail(idx, 'threadColor', e.target.value)}
+                              placeholder="블랙"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-stone-500">기리매 컬러</Label>
+                            <Input
+                              value={c.girimaeColor || ''}
+                              onChange={e => updateColorDetail(idx, 'girimaeColor', e.target.value)}
+                              placeholder="블랙"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}

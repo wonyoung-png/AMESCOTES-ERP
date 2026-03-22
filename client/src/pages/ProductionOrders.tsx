@@ -1,7 +1,7 @@
 // AMESCOTES ERP — 생산 발주 관리 (BOM 연동)
 import { useState, useMemo, useEffect } from 'react';
 import {
-  store, genId, calcDDay, dDayLabel, dDayColor, formatNumber, formatKRW,
+  store, genId, calcDDay, dDayLabel, dDayColor, formatNumber, formatKRW, normalizeColors,
   type ProductionOrder, type OrderStatus, type Season, type Item, type Bom,
   type HqSupplyItem, type ColorQty,
   type TradeStatement, type TradeStatementLine,
@@ -78,6 +78,9 @@ export default function ProductionOrders() {
   const [negoRequestedPrice, setNegoRequestedPrice] = useState<number>(0);
   const [negoCurrency, setNegoCurrency] = useState<'CNY' | 'USD' | 'KRW'>('CNY');
   const [negoMemo, setNegoMemo] = useState('');
+  // 네고 단가 발주 적용 상태
+  const [negoApplied, setNegoApplied] = useState(false);
+  const [originalFactoryPriceKrw, setOriginalFactoryPriceKrw] = useState<number>(0);
 
   // 입고 처리 팝업 상태
   const [showReceiveModal, setShowReceiveModal] = useState(false);
@@ -91,6 +94,12 @@ export default function ProductionOrders() {
   const [billingTarget, setBillingTarget] = useState<ProductionOrder | null>(null);
   const [billingMode, setBillingMode] = useState<'new' | 'link'>('new');
   const [linkStatementId, setLinkStatementId] = useState('');
+
+  // 작업지시서 모달 상태
+  const [workOrderModal, setWorkOrderModal] = useState(false);
+  const [workOrderTarget, setWorkOrderTarget] = useState<ProductionOrder | null>(null);
+  const [workOrderNote, setWorkOrderNote] = useState('');
+  const [workOrderWithBom, setWorkOrderWithBom] = useState(false);
 
   const refresh = () => setOrders(store.getOrders());
 
@@ -134,6 +143,8 @@ export default function ProductionOrders() {
     setNegoRequestedPrice(0);
     setNegoCurrency('CNY');
     setNegoMemo('');
+    setNegoApplied(false);
+    setOriginalFactoryPriceKrw(0);
     setShowModal(true);
 
     if (prefillStyleIdToUse) {
@@ -274,18 +285,65 @@ export default function ProductionOrders() {
       ? colorQtys.reduce((s, c) => s + c.qty, 0)
       : (form.qty || 0);
 
-    // 공장단가: 수동입력 모드면 manualPriceCny, 아니면 BOM 계산값
-    const finalFactoryUnitPriceCny = manualFactoryPrice ? manualPriceCny : bomCalc.factoryUnitPriceCny;
+    // 공장단가: 네고 적용 시 form에 저장된 값 사용, 수동입력 모드면 manualPriceCny, 아니면 BOM 계산값
     const settings = store.getSettings();
     const cnyKrw = settings.cnyKrw || 191;
     const usdKrw = settings.usdKrw || 1380;
+    let finalFactoryUnitPriceCny: number;
     let finalFactoryUnitPriceKrw: number;
-    if (factoryCurrency === 'KRW') {
-      finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny);
-    } else if (factoryCurrency === 'USD') {
-      finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * usdKrw);
+
+    if (negoApplied && form.factoryUnitPriceKrw) {
+      // 네고 단가 적용: form에 저장된 KRW 값 사용
+      finalFactoryUnitPriceKrw = form.factoryUnitPriceKrw;
+      // CNY 역산
+      if (factoryCurrency === 'KRW') {
+        finalFactoryUnitPriceCny = form.factoryUnitPriceKrw;
+      } else if (factoryCurrency === 'USD') {
+        finalFactoryUnitPriceCny = usdKrw > 0 ? form.factoryUnitPriceKrw / usdKrw : 0;
+      } else {
+        finalFactoryUnitPriceCny = cnyKrw > 0 ? form.factoryUnitPriceKrw / cnyKrw : 0;
+      }
     } else {
-      finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * cnyKrw);
+      finalFactoryUnitPriceCny = manualFactoryPrice ? manualPriceCny : bomCalc.factoryUnitPriceCny;
+      if (factoryCurrency === 'KRW') {
+        finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny);
+      } else if (factoryCurrency === 'USD') {
+        finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * usdKrw);
+      } else {
+        finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * cnyKrw);
+      }
+    }
+
+    // 네고 적용 후 저장 시 negoHistory에 자동 이력 추가
+    let finalNegoHistory = (form as any).negoHistory || [];
+    if (negoApplied && negoRequestedPrice > 0) {
+      const negoReqKrwForHistory = (() => {
+        if (negoCurrency === 'KRW') return negoRequestedPrice;
+        if (negoCurrency === 'USD') return Math.round(negoRequestedPrice * usdKrw);
+        return Math.round(negoRequestedPrice * cnyKrw);
+      })();
+      const savedPerPcsForHistory = originalFactoryPriceKrw > 0 ? originalFactoryPriceKrw - negoReqKrwForHistory : 0;
+      const savedTotalForHistory = savedPerPcsForHistory * totalQty;
+      const savedRateForHistory = originalFactoryPriceKrw > 0 && savedPerPcsForHistory > 0
+        ? Math.round((savedPerPcsForHistory / originalFactoryPriceKrw) * 1000) / 10
+        : 0;
+      // 이미 동일한 이력이 없으면 추가
+      const isDuplicate = finalNegoHistory.some(
+        (n: any) => n.requestedPrice === negoRequestedPrice && n.currency === negoCurrency
+      );
+      if (!isDuplicate) {
+        finalNegoHistory = [
+          ...finalNegoHistory,
+          {
+            requestedPrice: negoRequestedPrice,
+            currency: negoCurrency,
+            savedAmount: savedTotalForHistory,
+            savedRate: savedRateForHistory,
+            memo: negoMemo || '발주 적용 시 자동 저장',
+            date: new Date().toISOString().split('T')[0],
+          },
+        ];
+      }
     }
 
     const order: ProductionOrder = {
@@ -309,9 +367,9 @@ export default function ProductionOrders() {
       factoryUnitPriceCny: finalFactoryUnitPriceCny,
       factoryUnitPriceKrw: finalFactoryUnitPriceKrw,
       factoryCurrency,
-      bomType: manualFactoryPrice ? 'manual' : (bomCalc.bomType ?? undefined),
+      bomType: negoApplied ? 'manual' : (manualFactoryPrice ? 'manual' : (bomCalc.bomType ?? undefined)),
       deliveryDate: form.deliveryDate,
-      negoHistory: (form as any).negoHistory || [],
+      negoHistory: finalNegoHistory,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       memo: form.memo,
@@ -452,6 +510,17 @@ export default function ProductionOrders() {
       setBillingModal(false);
       toast.success(`${stmt.statementNo}에 발주 항목이 추가됐습니다`);
     }
+  };
+
+  const openWorkOrderModal = (order: ProductionOrder, withBom = false) => {
+    setWorkOrderTarget(order);
+    setWorkOrderNote('');
+    setWorkOrderWithBom(withBom);
+    setWorkOrderModal(true);
+  };
+
+  const handlePrintWorkOrder = () => {
+    window.print();
   };
 
   const [showFactoryView, setShowFactoryView] = useState(false);
@@ -725,6 +794,15 @@ export default function ProductionOrders() {
                           <FileText className="w-3 h-3 mr-1" />명세표 발행
                         </Button>
                       )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-stone-600 border-stone-300 hover:bg-stone-50"
+                        onClick={() => openWorkOrderModal(o)}
+                        title="작업지시서 출력"
+                      >
+                        <Package className="w-3 h-3 mr-1" />작업지시서
+                      </Button>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowDetail(o)}>
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
@@ -1183,6 +1261,28 @@ export default function ProductionOrders() {
                     : 0;
                   const isBelowPrevLowest = prevLowestKrw !== null && negoReqKrw > 0 && negoReqKrw < prevLowestKrw;
 
+                  const handleApplyNegoToOrder = () => {
+                    if (!negoRequestedPrice || negoRequestedPrice <= 0) {
+                      toast.error('네고 후 최종단가를 먼저 입력해주세요');
+                      return;
+                    }
+                    // 원래 공장단가 기록
+                    if (!negoApplied) {
+                      setOriginalFactoryPriceKrw(currentPriceKrw);
+                    }
+                    // factoryUnitPrice를 네고 단가의 KRW 환산값으로 업데이트
+                    setForm(f => ({
+                      ...f,
+                      factoryUnitPriceKrw: negoReqKrw,
+                      factoryUnitPriceCny: negoCurrency === 'CNY' ? negoRequestedPrice : (negoCurrency === 'USD' ? negoRequestedPrice * usdKrw / cnyKrw : negoReqKrw / cnyKrw),
+                    }));
+                    setFactoryCurrency(negoCurrency);
+                    setManualFactoryPrice(true);
+                    setManualPriceCny(negoRequestedPrice);
+                    setNegoApplied(true);
+                    toast.success(`✅ 네고 단가가 공장단가에 적용됐습니다 — ${formatKRW(negoReqKrw)}/PCS`);
+                  };
+
                   const handleSaveNego = () => {
                     if (!form.styleId) { toast.error('스타일을 먼저 선택해주세요'); return; }
                     if (!negoRequestedPrice || negoRequestedPrice <= 0) { toast.error('네고 후 최종단가를 입력해주세요'); return; }
@@ -1320,6 +1420,27 @@ export default function ProductionOrders() {
                           />
                         </div>
 
+                        {/* "이 단가로 발주 적용" 버튼 */}
+                        {negoApplied && negoReqKrw > 0 ? (
+                          <button
+                            type="button"
+                            className="w-full h-9 rounded-md border border-green-400 bg-green-50 text-green-700 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-default"
+                            disabled
+                          >
+                            ✅ 적용됨 ({formatKRW(negoReqKrw)})
+                          </button>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className={`w-full h-9 text-xs font-semibold ${negoRequestedPrice > 0 ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-stone-100 text-stone-400 cursor-not-allowed'}`}
+                            disabled={!negoRequestedPrice || negoRequestedPrice <= 0}
+                            onClick={handleApplyNegoToOrder}
+                          >
+                            이 단가로 발주 적용
+                          </Button>
+                        )}
+
                         {/* 저장 버튼 */}
                         <Button
                           type="button"
@@ -1328,7 +1449,7 @@ export default function ProductionOrders() {
                           className="w-full h-9 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs font-medium"
                           onClick={handleSaveNego}
                         >
-                          네고 내역 저장
+                          네고 내역만 저장 (발주 적용 제외)
                         </Button>
 
                         {/* 이미 저장된 네고 이력 표시 */}
@@ -1632,6 +1753,13 @@ export default function ProductionOrders() {
               )}
             </div>
             <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => { setShowDetail(null); openWorkOrderModal(showDetail!); }}
+                className="text-stone-700"
+              >
+                <Package className="w-3.5 h-3.5 mr-1.5" />작업지시서 출력
+              </Button>
               <Button variant="outline" onClick={() => setShowDetail(null)}>닫기</Button>
             </DialogFooter>
           </DialogContent>
@@ -1728,6 +1856,230 @@ export default function ProductionOrders() {
                 onClick={handleConfirmBilling}
               >
                 {billingMode === 'new' ? '명세표 신규 생성' : '전표 연결 완료'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── 작업지시서 모달 ── */}
+      {workOrderTarget && (
+        <Dialog open={workOrderModal} onOpenChange={setWorkOrderModal}>
+          <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-lg sm:max-h-[95vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="w-4 h-4" />
+                작업지시서 — {workOrderTarget.orderNo}
+              </DialogTitle>
+            </DialogHeader>
+
+            {/* 인쇄 스타일 */}
+            <style>{`
+              @media print {
+                body > * { display: none !important; }
+                #work-order-print-area { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
+                #work-order-print-area * { display: revert; }
+              }
+            `}</style>
+
+            {/* 작업지시서 본문 */}
+            <div id="work-order-print-area">
+              {(() => {
+                const order = workOrderTarget;
+                const item = items.find(i => i.id === order.styleId);
+                const { bom } = store.getBomForOrder(order.styleNo);
+                const bomLines = bom
+                  ? ((bom.postMaterials && bom.postMaterials.length > 0) ? bom.postMaterials : bom.lines)
+                  : [];
+
+                // 메인자재: 원자재 첫 번째 항목
+                const mainMaterials = bomLines.filter(l => l.category === '원자재');
+                const mainMat = mainMaterials[0];
+
+                // 안감: 원자재 중 subPart=안감
+                const liningMat = mainMaterials.find(l => l.subPart === '안감');
+
+                // 지퍼: category=지퍼
+                const zipperMat = bomLines.find(l => l.category === '지퍼');
+
+                // 컬러 정보 (품목 마스터에서)
+                const itemColors = normalizeColors(item?.colors || []);
+
+                // 고유 컬러 정보 집약
+                const leatherColors = [...new Set(itemColors.map(c => c.leatherColor).filter(Boolean))].join(' / ');
+                const decorColors = [...new Set(itemColors.map(c => c.decorColor).filter(Boolean))].join(' / ');
+                const threadColors = [...new Set(itemColors.map(c => c.threadColor).filter(Boolean))].join(' / ');
+                const girimaeColors = [...new Set(itemColors.map(c => c.girimaeColor).filter(Boolean))].join(' / ');
+
+                const colorQtyList = (order.colorQtys || []).length > 0
+                  ? order.colorQtys
+                  : [{ color: '기본', qty: order.qty }];
+
+                return (
+                  <div className="font-mono text-sm border border-stone-800 rounded" style={{ fontFamily: 'monospace' }}>
+                    {/* 제목 */}
+                    <div className="text-center py-4 border-b border-stone-800 bg-stone-50">
+                      <h1 className="text-xl font-bold tracking-[0.3em]">작  업  지  시  서</h1>
+                    </div>
+
+                    {/* 발주일자 / 공장 / 납기일자 */}
+                    <div className="grid grid-cols-3 border-b border-stone-800">
+                      <div className="px-3 py-2 border-r border-stone-800">
+                        <p className="text-xs text-stone-500 mb-0.5">발주일자</p>
+                        <p className="font-semibold">{order.orderDate || '—'}</p>
+                      </div>
+                      <div className="px-3 py-2 border-r border-stone-800">
+                        <p className="text-xs text-stone-500 mb-0.5">공장</p>
+                        <p className="font-semibold">{order.vendorName || '—'}</p>
+                      </div>
+                      <div className="px-3 py-2">
+                        <p className="text-xs text-stone-500 mb-0.5">납기일자</p>
+                        <p className="font-semibold">{order.deliveryDate || '—'}</p>
+                      </div>
+                    </div>
+
+                    {/* 스타일번호 / 품명 */}
+                    <div className="grid grid-cols-2 border-b border-stone-800">
+                      <div className="px-3 py-2 border-r border-stone-800">
+                        <p className="text-xs text-stone-500 mb-0.5">스타일번호</p>
+                        <p className="font-bold text-base">{order.styleNo}</p>
+                      </div>
+                      <div className="px-3 py-2">
+                        <p className="text-xs text-stone-500 mb-0.5">품명</p>
+                        <p className="font-bold text-base">{order.styleName}</p>
+                      </div>
+                    </div>
+
+                    {/* 컬러별 발주수량 */}
+                    <div className="border-b border-stone-800">
+                      <div className="grid grid-cols-2 bg-stone-100 px-3 py-1 border-b border-stone-300">
+                        <span className="text-xs font-semibold text-stone-600">컬러</span>
+                        <span className="text-xs font-semibold text-stone-600">발주수량</span>
+                      </div>
+                      {colorQtyList.map((cq, i) => (
+                        <div key={i} className={`grid grid-cols-2 px-3 py-1.5 ${i < colorQtyList.length - 1 ? 'border-b border-stone-200' : ''}`}>
+                          <span className="font-medium">{cq.color}</span>
+                          <span className="font-mono">{cq.qty.toLocaleString()} PCS</span>
+                        </div>
+                      ))}
+                      <div className="grid grid-cols-2 px-3 py-1.5 bg-stone-50 border-t border-stone-300">
+                        <span className="text-xs font-semibold text-stone-600">합계</span>
+                        <span className="font-mono font-bold">{colorQtyList.reduce((s, c) => s + c.qty, 0).toLocaleString()} PCS</span>
+                      </div>
+                    </div>
+
+                    {/* 메인자재 */}
+                    <div className="border-b border-stone-800">
+                      <div className="px-3 py-1.5 bg-stone-100 border-b border-stone-300">
+                        <span className="text-xs font-bold text-stone-700">[ 메인자재 ]</span>
+                      </div>
+                      {mainMat ? (
+                        <div className="px-3 py-2 space-y-1">
+                          <div className="flex items-start justify-between text-sm">
+                            <span>
+                              <span className="text-stone-500">가죽/원단: </span>
+                              <span className="font-medium">{mainMat.itemName}</span>
+                              {mainMat.spec && <span className="text-stone-400 ml-1">({mainMat.spec})</span>}
+                              <span className="font-mono ml-2 text-stone-600">
+                                {(mainMat.netQty * (1 + mainMat.lossRate)).toFixed(3)}{mainMat.unit}
+                              </span>
+                              {mainMat.subPart && <span className="text-stone-400 ml-1">({mainMat.subPart})</span>}
+                            </span>
+                            <span className="text-xs text-stone-500">
+                              {mainMat.isHqProvided ? '발주처: 본사' : mainMat.isVendorProvided ? '발주처: 공장' : '발주처: 업체'}
+                            </span>
+                          </div>
+                          {liningMat && liningMat.id !== mainMat.id && (
+                            <div className="flex items-start justify-between text-sm">
+                              <span>
+                                <span className="text-stone-500">안감: </span>
+                                <span className="font-medium">{liningMat.itemName}</span>
+                                {liningMat.spec && <span className="text-stone-400 ml-1">({liningMat.spec})</span>}
+                                <span className="font-mono ml-2 text-stone-600">
+                                  {(liningMat.netQty * (1 + liningMat.lossRate)).toFixed(3)}{liningMat.unit}
+                                </span>
+                              </span>
+                              <span className="text-xs text-stone-500">
+                                {liningMat.isHqProvided ? '발주처: 본사' : liningMat.isVendorProvided ? '발주처: 공장' : '발주처: 업체'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="px-3 py-2 text-xs text-stone-400">BOM 자재 정보 없음</div>
+                      )}
+                    </div>
+
+                    {/* 컬러 정보 */}
+                    <div className="border-b border-stone-800">
+                      <div className="px-3 py-1.5 bg-stone-100 border-b border-stone-300">
+                        <span className="text-xs font-bold text-stone-700">[ 컬러 정보 ]</span>
+                      </div>
+                      <div className="px-3 py-2 space-y-1 text-sm">
+                        {leatherColors && (
+                          <div><span className="text-stone-500 w-12 inline-block">가죽:</span> <span className="font-medium">{leatherColors}</span></div>
+                        )}
+                        {decorColors && (
+                          <div><span className="text-stone-500 w-12 inline-block">장식:</span> <span className="font-medium">{decorColors}</span></div>
+                        )}
+                        {threadColors && (
+                          <div><span className="text-stone-500 w-12 inline-block">실:</span> <span className="font-medium">{threadColors}</span></div>
+                        )}
+                        {girimaeColors && (
+                          <div><span className="text-stone-500 w-12 inline-block">기리매:</span> <span className="font-medium">{girimaeColors}</span></div>
+                        )}
+                        {zipperMat && (
+                          <div>
+                            <span className="text-stone-500 w-12 inline-block">지퍼:</span>
+                            <span className="font-medium">{zipperMat.itemName}</span>
+                            {zipperMat.spec && <span className="text-stone-400 ml-1">({zipperMat.spec})</span>}
+                          </div>
+                        )}
+                        {!leatherColors && !decorColors && !threadColors && !girimaeColors && !zipperMat && (
+                          <span className="text-stone-400 text-xs">품목 마스터에 컬러 세부 정보를 입력해 주세요</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 별도 주의사항 */}
+                    <div>
+                      <div className="px-3 py-1.5 bg-stone-100 border-b border-stone-300">
+                        <span className="text-xs font-bold text-stone-700">[ 별도 주의사항 ]</span>
+                      </div>
+                      <div className="px-3 py-3">
+                        <textarea
+                          className="w-full border border-stone-200 rounded p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-stone-400 print:border-none print:p-0"
+                          rows={4}
+                          placeholder="주의사항을 입력하세요..."
+                          value={workOrderNote}
+                          onChange={e => setWorkOrderNote(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <DialogFooter className="gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                onClick={() => setWorkOrderModal(false)}
+              >
+                닫기
+              </Button>
+              <Button
+                variant="outline"
+                className="text-stone-700 border-stone-400"
+                onClick={() => { setWorkOrderWithBom(true); handlePrintWorkOrder(); }}
+              >
+                <FileText className="w-3.5 h-3.5 mr-1.5" />작업지시서 + BOM 출력
+              </Button>
+              <Button
+                className="bg-stone-800 hover:bg-stone-900 text-white"
+                onClick={handlePrintWorkOrder}
+              >
+                <Package className="w-3.5 h-3.5 mr-1.5" />작업지시서 출력
               </Button>
             </DialogFooter>
           </DialogContent>
