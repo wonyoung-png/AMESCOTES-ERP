@@ -552,7 +552,7 @@ function applyMarginAdjustment(rows: QuoteRow[], internalMargin: number, quoteMa
       unitPrice: diff,
       supplyAmt: diff,
       taxAmt: ceil10(diff * 0.1),
-      memo: `내부${Math.round(internalMargin * 100)}%-견적${Math.round(quoteMargin * 100)}%`,
+      memo: '',
       isRawMaterial: false,
       isVendorProvided: false,
       originalUnitPrice: diff,
@@ -808,7 +808,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                       </td>
                       <td className={`px-2 py-1.5 text-right ${marginRow ? 'text-amber-700 font-semibold' : 'text-stone-600'}`}>{vendorRow ? '—' : fmtKrw(row.taxAmt)}</td>
                       <td className={`px-2 py-1.5 text-right font-medium ${marginRow ? 'text-amber-700' : ''}`}>{vendorRow ? '—' : fmtKrw(ceil10(row.supplyAmt + row.taxAmt))}</td>
-                      <td className="px-1 py-1"><Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-blue-600 font-medium' : ''} ${marginRow ? 'text-amber-600' : ''}`} placeholder="비고" /></td>
+                      <td className="px-1 py-1">{marginRow ? null : <Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-blue-600 font-medium' : ''}`} placeholder="비고" />}</td>
                       <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(r => r.id !== row.id))} className="text-stone-300 hover:text-red-400"><X className="w-3 h-3" /></button></td>
                     </tr>
                   );
@@ -861,7 +861,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                       <td className="tr2">{row.isVendorProvided ? '—' : row.supplyAmt.toLocaleString()}</td>
                       <td className="tr2">{row.isVendorProvided ? '—' : row.taxAmt.toLocaleString()}</td>
                       <td className="tr2">{row.isVendorProvided ? '—' : ceil10(row.supplyAmt + row.taxAmt).toLocaleString()}</td>
-                      <td style={row.isVendorProvided ? {color:'#2563EB',fontWeight:'600'} : row.isMarginRow ? {color:'#92400e'} : {}}>{row.memo}</td>
+                      <td style={row.isVendorProvided ? {color:'#2563EB',fontWeight:'600'} : {}}>{row.isMarginRow ? '' : row.memo}</td>
                     </tr>
                   ))}
                   <tr className="tot"><td colSpan={5} className="tr2">TOTAL</td><td className="tr2">{totalSupply.toLocaleString()}</td><td className="tr2">{totalTax.toLocaleString()}</td><td className="tr2">{grandTotal.toLocaleString()}</td><td></td></tr>
