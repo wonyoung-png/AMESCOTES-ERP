@@ -392,10 +392,10 @@ export default function ProductionOrders() {
     let newColorCount = 0;
     if (colorQtys.length > 0 && form.styleId) {
       const currentItem = store.getItems().find(i => i.id === form.styleId);
-      const existingColors = currentItem?.colors || [];
+      const existingColorNames = normalizeColors(currentItem?.colors || []).map(c => c.name);
       for (const cq of colorQtys) {
         const trimmed = cq.color.trim();
-        if (trimmed && !existingColors.includes(trimmed)) {
+        if (trimmed && !existingColorNames.includes(trimmed)) {
           store.addItemColor(form.styleId, trimmed);
           newColorCount++;
         }
@@ -1010,7 +1010,7 @@ export default function ProductionOrders() {
                     </Button>
                     {showColorDropdown && (() => {
                       const selectedItem = items.find(i => i.id === form.styleId);
-                      const registeredColors = selectedItem?.colors || [];
+                      const registeredColors = normalizeColors(selectedItem?.colors || []).map(c => c.name);
                       const usedColors = colorQtys.map(c => c.color);
                       const availableColors = registeredColors.filter(c => !usedColors.includes(c));
                       return (
@@ -1082,7 +1082,7 @@ export default function ProductionOrders() {
                 </div>
                 {colorQtys.length > 0 && (() => {
                   const selectedItem = items.find(i => i.id === form.styleId);
-                  const registeredColors = selectedItem?.colors || [];
+                  const registeredColors = normalizeColors(selectedItem?.colors || []).map(c => c.name);
                   return (
                     <div className="space-y-1.5">
                       {colorQtys.map((cq, idx) => {
