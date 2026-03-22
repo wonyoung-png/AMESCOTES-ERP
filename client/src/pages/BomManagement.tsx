@@ -624,6 +624,8 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
       <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmtKrw(amt * cnyKrw)}</td>
       {/* 본사제공 */}
       <td className="px-2 py-1 text-center"><input type="checkbox" checked={line.isHqProvided} onChange={e => onChange(line.id, 'isHqProvided', e.target.checked)} className="w-3.5 h-3.5 accent-amber-600" /></td>
+      {/* 업체제공 */}
+      <td className="px-2 py-1 text-center"><input type="checkbox" checked={!!(line as ExtBomLine & { isVendorProvided?: boolean }).isVendorProvided} onChange={e => onChange(line.id, 'isVendorProvided', e.target.checked)} className="w-3.5 h-3.5 accent-blue-500" /></td>
       {/* 구매업체 */}
       <td className="px-1 py-1">
         <Select
@@ -1151,10 +1153,15 @@ export default function BomManagement() {
       const cellL = getNum(row, 11);   // L열 (임가공/공장단가 금액)
       const rowStr = row.map(c => String(c ?? '')).join(' ');
 
-      // 후가공 섹션 시작 감지 ('부·소모재 총계' 키워드)
-      if (rowStr.includes('부·소모재') || rowStr.includes('부소모재') || rowStr.includes('총계')) {
+      // 후가공 섹션 시작 감지
+      if (rowStr.includes('부·소모재') || rowStr.includes('부소모재')) {
         inPostProcess = true;
         continue;
+      }
+      // A열이 '후가공비'인 행도 후가공 섹션 시작
+      if (cellA.includes('후가공')) {
+        inPostProcess = true;
+        continue; // 헤더 행 스킵
       }
 
       // 구분(A열)에 값 있으면 섹션 갱신
@@ -1676,6 +1683,7 @@ export default function BomManagement() {
                             <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
                             <th className="px-2 py-2 text-right w-24">KRW</th>
                             <th className="px-2 py-2 text-center w-14">본사제공</th>
+                            <th className="px-2 py-2 text-center w-14 text-blue-600">업체제공</th>
                             <th className="px-2 py-2 text-left w-24">구매업체</th>
                             <th className="px-2 py-2 w-8"></th>
                           </tr>
@@ -2138,6 +2146,7 @@ export default function BomManagement() {
                             <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
                             <th className="px-2 py-2 text-right w-24">KRW</th>
                             <th className="px-2 py-2 text-center w-14">본사제공</th>
+                            <th className="px-2 py-2 text-center w-14 text-blue-600">업체제공</th>
                             <th className="px-2 py-2 text-left w-24">구매업체</th>
                             <th className="px-2 py-2 w-8"></th>
                           </tr>

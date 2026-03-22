@@ -92,6 +92,7 @@ export interface BomLine {
   // 소요량 = netQty * (1 + lossRate)
   // 제조금액(CNY) = unitPriceCny * 소요량
   isHqProvided: boolean;    // 본사제공 여부
+  isVendorProvided?: boolean; // 업체(공장)제공 여부 — 생산마진 미포함
   vendorName?: string;      // 구매업체
   memo?: string;            // 비고
 }
@@ -304,6 +305,7 @@ export interface PostCostLine {
   qty?: number;
   amountCny?: number;
   isHqProvided: boolean;
+  isVendorProvided?: boolean; // 업체제공 여부
   hasQtyError?: boolean;
   hasAmountError?: boolean;
   hasPriceWarning?: boolean;
@@ -639,7 +641,7 @@ export const store = {
       const cnyKrw = bom.snapshotCnyKrw ?? 191;
       // 자재비 합계 (본사제공 제외, LOSS 포함 소요량 × 단가)
       const materialCny = (bom.lines || []).reduce((s, l) => {
-        if (l.isHqProvided) return s;
+        if (l.isHqProvided || l.isVendorProvided) return s; // 본사제공+업체제공 모두 공장단가에서 제외
         const price = l.unitPriceCny ?? (l as { unitPrice?: number }).unitPrice ?? 0;
         const qty = l.netQty * (1 + (l.lossRate ?? 0));
         return s + price * qty;
