@@ -1188,35 +1188,20 @@ export default function BomManagement() {
       if (rowStr.includes('공장단가') || rowStr.includes('제품원가')) continue;
 
       // 후가공 섹션 처리
-      // 구조: B열=작업명, C열=NET, D열=단가, E열=금액 (엑셀 수식이라 0으로 읽힐 수 있음)
-      // 소계 행(B='소계')의 E열에서 후가공 합계 추출
+      // 구조: B=작업명, C=NET, D=단가(실제값), E=금액(수식→0)
       if (inPostProcess) {
         const workName = cellB;
-        // 소계 행: 전체 후가공비 합계를 단일 항목으로 추가
-        if (workName === '소계') {
-          const totalAmount = getNum(row, 4); // E열 소계
-          if (totalAmount > 0 && postProcessLines.length === 0) {
-            postProcessLines.push({
-              id: Math.random().toString(36).slice(2),
-              name: '후가공 합계',
-              netQty: 1,
-              unitPrice: totalAmount,
-              memo: '',
-            });
-          }
-          continue;
-        }
-        if (!workName || workName === '공임비') continue;
-        // 개별 항목: D열=단가, E열=금액, C열=NET (수식값이면 0일 수 있음)
-        const unitPrice = getNum(row, 3);
-        const amount = getNum(row, 4);
-        const netQtyPost = getNum(row, 2);
-        if (workName && (unitPrice > 0 || amount > 0)) {
+        if (!workName || workName === '소계' || workName === '공임비') continue;
+        // D열(index 3)이 단가 — xlsx 라이브러리는 실제값 읽음
+        const netQtyPost = getNum(row, 2); // C열
+        const unitPrice = getNum(row, 3);  // D열 (실제 단가)
+        // 단가가 있는 항목만 추가
+        if (workName && unitPrice > 0) {
           postProcessLines.push({
             id: Math.random().toString(36).slice(2),
             name: workName.trim(),
             netQty: netQtyPost || 1,
-            unitPrice: unitPrice || (netQtyPost > 0 ? amount / netQtyPost : amount),
+            unitPrice: unitPrice,
             memo: '',
           });
         }
