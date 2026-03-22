@@ -1164,12 +1164,11 @@ export default function BomManagement() {
         continue; // 헤더 행 스킵
       }
 
-      // 구분(A열)에 값 있으면 섹션 갱신
-      if (cellA) {
+      // 구분(A열)에 값 있으면 섹션 갱신 (후가공 섹션 진입 후에는 스킵)
+      if (cellA && !inPostProcess) {
         const detected = detectCategory(cellA);
         if (detected) {
           currentCategory = detected;
-          inPostProcess = false;
         }
         // 소계/합계/총계 행은 스킵
         if (cellA.includes('소계') || cellA.includes('합계') || cellA.includes('총계')) continue;
