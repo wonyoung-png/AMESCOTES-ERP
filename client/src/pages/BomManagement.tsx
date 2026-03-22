@@ -2192,6 +2192,46 @@ export default function BomManagement() {
                               </React.Fragment>
                             );
                           })}
+                          {/* 후가공 섹션 - 사전원가와 동일 */}
+                          <React.Fragment key="후가공-post">
+                            <tr className="bg-stone-100 border-y border-stone-200">
+                              <td colSpan={12} className="px-3 py-1.5">
+                                <div className="flex items-center justify-between">
+                                  <button onClick={() => togglePostSection('후가공')} className="flex items-center gap-2 font-semibold text-xs text-stone-700 hover:opacity-80">
+                                    {collapsedPostSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                    후가공
+                                    {editBom.postProcessLines.filter(l => l.name).length > 0 && (
+                                      <span className="text-[10px] font-normal text-stone-500">({editBom.postProcessLines.filter(l => l.name).length})</span>
+                                    )}
+                                  </button>
+                                  <button onClick={() => { setEditBom(prev => prev ? { ...prev, postProcessLines: [...prev.postProcessLines, newPostLine()] } : prev); markDirty(); }} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-amber-700 font-medium">
+                                    <Plus className="w-3 h-3" /> 행 추가
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                            {!collapsedPostSections.has('후가공') && editBom.postProcessLines.map(line => (
+                              <tr key={line.id} className="border-b border-stone-100 hover:bg-stone-50">
+                                <td className="px-2 py-1" colSpan={2}>
+                                  <Input value={line.name} onChange={e => updatePostLine(line.id, 'name', e.target.value)} placeholder="후가공 작업명" className="h-7 text-xs border-stone-200 w-full" />
+                                </td>
+                                <td className="px-1 py-1"></td>
+                                <td className="px-1 py-1">
+                                  <Input type="number" value={line.netQty || ''} onChange={e => updatePostLine(line.id, 'netQty', Number(e.target.value))} placeholder="NET" className="h-7 text-xs border-stone-200 w-16 text-right" />
+                                </td>
+                                <td className="px-1 py-1">
+                                  <Input type="number" value={line.unitPrice || ''} onChange={e => updatePostLine(line.id, 'unitPrice', Number(e.target.value))} placeholder="단가" className="h-7 text-xs border-stone-200 w-20 text-right" />
+                                </td>
+                                <td className="px-1 py-1"></td>
+                                <td className="px-2 py-1 text-right text-xs tabular-nums">{fmt(line.netQty * line.unitPrice)}</td>
+                                <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmtKrw(line.netQty * line.unitPrice * (editBom.exchangeRateCny || editBom.snapshotCnyKrw || 191))}</td>
+                                <td colSpan={3}></td>
+                                <td className="px-1 py-1 text-center">
+                                  <button onClick={() => deletePostLine(line.id)} className="text-stone-300 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                                </td>
+                              </tr>
+                            ))}
+                          </React.Fragment>
                           {/* 임가공비 - 별도 섹션 */}
                           <tr className="bg-amber-50/50 border-y border-stone-200">
                             <td colSpan={12} className="px-3 py-1.5">
