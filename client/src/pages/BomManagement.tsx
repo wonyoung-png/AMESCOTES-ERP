@@ -1191,6 +1191,7 @@ export default function BomManagement() {
       // 실제 구조: B열=작업명, C열=NET, D열=단가, E열=금액
       if (inPostProcess) {
         const workName = cellB;
+        console.log('[후가공 파싱]', workName, '단가=', getNum(row, 3), '금액=', getNum(row, 4));
         if (!workName || workName === '소계' || workName === '공임비') continue;
         // D열=단가(index 3), E열=금액(index 4)
         const unitPrice = getNum(row, 3);
