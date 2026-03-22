@@ -209,6 +209,10 @@ export interface ProductionOrder {
   logisticsCostId?: string;
   tradeStatementId?: string;      // 연결된 거래명세표 ID
   deliveryDate?: string;          // 바이어 납기일 (납품 목표일)
+  // BOM 연동 발주 필드
+  factoryUnitPriceCny?: number;   // 공장단가 (CNY) — BOM 임가공비에서 자동 설정
+  factoryUnitPriceKrw?: number;   // 공장단가 (KRW 환산) — 표시용
+  bomType?: 'post' | 'pre' | 'manual'; // BOM 연동 유형 (사후원가/사전원가/수동입력)
   // 입고 정보
   receivedQty?: number;           // 실제 입고 수량
   defectQty?: number;             // 불량 수량
@@ -655,6 +659,81 @@ export const store = {
   updateOrder: (id: string, u: Partial<ProductionOrder>) => { const a = getAll<ProductionOrder>(KEYS.orders); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.orders, a); } },
   deleteOrder: (id: string) => setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).filter(x => x.id !== id)),
   getNextRevision: (styleNo: string) => { const orders = getAll<ProductionOrder>(KEYS.orders).filter(o => o.styleNo === styleNo); return orders.length > 0 ? Math.max(...orders.map(o => o.revision)) + 1 : 1; },
+
+  // ─── 발주용 BOM 함수 ───
+  /** 스타일별 발주 이력 조회 */
+  getProductionOrdersByStyle: (styleNo: string): ProductionOrder[] => {
+    return getAll<ProductionOrder>(KEYS.orders)
+      .filter(o => o.styleNo === styleNo)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  /** 발주용 BOM 조회: 사후원가(postMaterials) 우선, 없으면 사전원가(lines) 반환 */
+  getBomForOrder: (styleNo: string): { bom: Bom | null; type: 'post' | 'pre' | null } => {
+    const boms = getAll<Bom>(KEYS.boms);
+    // 스타일번호로 매칭되는 최신 BOM (version 내림차순)
+    const bomList = boms
+      .filter(b => b.styleNo === styleNo)
+      .sort((a, b) => b.version - a.version);
+    if (bomList.length === 0) return { bom: null, type: null };
+    // 사후원가 데이터가 있는 BOM 우선
+    const postBom = bomList.find(b => b.postMaterials && b.postMaterials.length > 0);
+    if (postBom) return { bom: postBom, type: 'post' };
+    // 없으면 사전원가
+    const preBom = bomList.find(b => b.lines && b.lines.length > 0);
+    if (preBom) return { bom: preBom, type: 'pre' };
+    return { bom: bomList[0], type: 'pre' };
+  },
+
+  /** 자재 소요량 계산: BOM 소요량 × 발주수량, 본사제공/미제공 분리 */
+  calcMaterialRequirements: (styleNo: string, qty: number): {
+    hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }>;
+    factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }>;
+    processingFee: number;
+    factoryUnitPriceCny: number;
+    bomType: 'post' | 'pre' | null;
+    manufacturingCountry?: string;
+  } => {
+    const { bom, type } = store.getBomForOrder(styleNo);
+    if (!bom) return { hqProvided: [], factoryProvided: [], processingFee: 0, factoryUnitPriceCny: 0, bomType: null };
+
+    // 사용할 자재 라인 결정 (사후원가 우선)
+    const lines: BomLine[] = (type === 'post' && bom.postMaterials && bom.postMaterials.length > 0)
+      ? bom.postMaterials
+      : (bom.lines || []);
+
+    const processingFee = type === 'post'
+      ? (bom.postProcessingFee ?? bom.processingFee ?? 0)
+      : (bom.processingFee ?? 0);
+
+    const hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }> = [];
+    const factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }> = [];
+
+    for (const line of lines) {
+      // 소요량 = NET소요량 * (1 + LOSS율) * 발주수량
+      const perPcsQty = line.netQty * (1 + (line.lossRate ?? 0));
+      const totalQty = Math.round(perPcsQty * qty * 100) / 100;
+      const entry = {
+        bomLineId: line.id,
+        itemName: line.itemName,
+        spec: line.spec,
+        unit: line.unit,
+        reqQty: totalQty,
+        vendorName: line.vendorName,
+      };
+      if (line.isHqProvided) hqProvided.push(entry);
+      else factoryProvided.push(entry);
+    }
+
+    return {
+      hqProvided,
+      factoryProvided,
+      processingFee,
+      factoryUnitPriceCny: processingFee,
+      bomType: type,
+      manufacturingCountry: bom.manufacturingCountry,
+    };
+  },
 
   // Samples
   getSamples: () => getAll<Sample>(KEYS.samples),

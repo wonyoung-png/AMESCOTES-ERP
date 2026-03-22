@@ -565,7 +565,7 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, showSubPart = false, acc
               <SelectValue placeholder="-" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="" className="text-xs text-stone-400">-</SelectItem>
+              <SelectItem value="none" className="text-xs text-stone-400">-</SelectItem>
               {SUB_PARTS.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
             </SelectContent>
           </Select>
@@ -623,7 +623,7 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, showSubPart = false, acc
             <SelectValue placeholder="업체" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="" className="text-xs text-stone-400">-</SelectItem>
+            <SelectItem value="none" className="text-xs text-stone-400">-</SelectItem>
             {vendors.map(v => <SelectItem key={v.id} value={v.name} className="text-xs">{v.name}</SelectItem>)}
             <SelectItem value="__direct__" className="text-xs text-stone-500 italic border-t border-stone-200">직접입력</SelectItem>
           </SelectContent>
