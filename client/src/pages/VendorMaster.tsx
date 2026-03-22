@@ -712,7 +712,7 @@ export default function VendorMaster() {
       />
 
       {/* 등록/수정 모달 */}
-      <Dialog open={showModal} onOpenChange={handleModalClose}>
+      <Dialog open={showModal} onOpenChange={(open) => { if (!open) handleModalClose(true); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{isEdit ? '거래처 수정' : '거래처 등록'}</DialogTitle></DialogHeader>
           <div className="space-y-5 py-2">

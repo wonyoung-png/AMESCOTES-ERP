@@ -1,12 +1,9 @@
-// Supabase ↔ localStorage 양방향 동기화
-// 앱 시작 시 한 번 실행.
-// - Supabase 데이터와 localStorage 데이터를 ID 기준으로 병합
-// - Supabase 우선, 단 localStorage에만 있는 데이터도 보존
-// - localStorage 전용 데이터는 Supabase에 업로드(백필)
+// Supabase → localStorage 동기화
+// 앱 시작 시 한 번 실행. 실패해도 localStorage 데이터 그대로 유지.
 
 import { supabase } from './supabase';
 
-// snake_case → camelCase 변환 (최상위 키만)
+// snake_case → camelCase 변환 (shallow, 최상위 키만)
 function toCamelCase(obj: Record<string, any>): Record<string, any> {
   return Object.fromEntries(
     Object.entries(obj).map(([k, v]) => [
@@ -16,111 +13,131 @@ function toCamelCase(obj: Record<string, any>): Record<string, any> {
   );
 }
 
-// camelCase → snake_case 변환 (최상위 키만)
-function toSnakeCase(obj: Record<string, any>): Record<string, any> {
-  return Object.fromEntries(
-    Object.entries(obj).map(([k, v]) => [
-      k.replace(/[A-Z]/g, c => '_' + c.toLowerCase()),
-      v,
-    ])
-  );
+// BOM 행(ExtBomLine) 배열 정규화 — snake_case/camelCase 혼용 처리
+function normalizeBomLine(l: any): any {
+  if (!l || typeof l !== 'object') return l;
+  return {
+    id: l.id,
+    category: l.category,
+    subPart: l.subPart ?? l.sub_part,
+    itemName: l.itemName ?? l.item_name ?? '',
+    spec: l.spec ?? '',
+    unit: l.unit ?? 'EA',
+    customUnit: l.customUnit ?? l.custom_unit ?? '',
+    unitPriceCny: l.unitPriceCny ?? l.unit_price_cny ?? l.unitPrice ?? l.unit_price ?? 0,
+    netQty: l.netQty ?? l.net_qty ?? 0,
+    lossRate: l.lossRate ?? l.loss_rate ?? 0.05,
+    isHqProvided: l.isHqProvided ?? l.is_hq_provided ?? false,
+    isVendorProvided: l.isVendorProvided ?? l.is_vendor_provided ?? false,
+    vendorName: l.vendorName ?? l.vendor_name ?? '',
+    vendorId: l.vendorId ?? l.vendor_id ?? '',
+    isNewVendor: l.isNewVendor ?? l.is_new_vendor ?? false,
+    memo: l.memo ?? '',
+  };
 }
 
-const TABLE_KEY_MAP: { table: string; key: string }[] = [
+// PostProcessLine 정규화
+function normalizePostLine(l: any): any {
+  if (!l || typeof l !== 'object') return l;
+  return {
+    id: l.id,
+    name: l.name ?? '',
+    netQty: l.netQty ?? l.net_qty ?? 1,
+    unitPrice: l.unitPrice ?? l.unit_price ?? 0,
+    memo: l.memo ?? '',
+    subPart: l.subPart ?? l.sub_part,
+  };
+}
+
+// ColorBom 정규화
+function normalizeColorBom(cb: any): any {
+  if (!cb || typeof cb !== 'object') return cb;
+  return {
+    color: cb.color ?? '',
+    lines: Array.isArray(cb.lines) ? cb.lines.map(normalizeBomLine) : [],
+    postProcessLines: Array.isArray(cb.postProcessLines ?? cb.post_process_lines)
+      ? (cb.postProcessLines ?? cb.post_process_lines).map(normalizePostLine)
+      : [],
+    processingFee: cb.processingFee ?? cb.processing_fee ?? 0,
+  };
+}
+
+// BOM 데이터 특수 변환
+// Supabase boms 테이블: snake_case 컬럼 + JSONB 필드
+// 앱에서 사용하는 ExtBom 구조(camelCase)로 완전 변환
+function convertBomRow(row: Record<string, any>): Record<string, any> {
+  const base = toCamelCase(row);
+
+  // pre_materials(JSONB) → lines (앱 필드명)
+  // Supabase에서 pre_materials로 저장된 경우 lines로 매핑
+  const preMats = base.preMaterials ?? base.lines ?? base.pre_materials;
+  const lines = Array.isArray(preMats) ? preMats.map(normalizeBomLine) : [];
+
+  // post_materials(JSONB) → postMaterials
+  const postMats = base.postMaterials ?? base.post_materials;
+  const postMaterials = Array.isArray(postMats) ? postMats.map(normalizeBomLine) : [];
+
+  // postProcessLines 정규화
+  const postProcLines = base.postProcessLines ?? base.post_process_lines;
+  const postProcessLines = Array.isArray(postProcLines) ? postProcLines.map(normalizePostLine) : [];
+
+  // colorBoms/postColorBoms 정규화
+  const colorBoms = Array.isArray(base.colorBoms) ? base.colorBoms.map(normalizeColorBom)
+    : Array.isArray(base.color_boms) ? base.color_boms.map(normalizeColorBom)
+    : undefined;
+
+  const postColorBoms = Array.isArray(base.postColorBoms) ? base.postColorBoms.map(normalizeColorBom)
+    : Array.isArray(base.post_color_boms) ? base.post_color_boms.map(normalizeColorBom)
+    : undefined;
+
+  // pnl 필드 정규화
+  const pnl = base.pnl ?? {
+    discountRate: 0.05,
+    platformFeeRate: 0.30,
+    sgaRate: 0.10,
+  };
+
+  const result = {
+    ...base,
+    lines,
+    postMaterials,
+    postProcessLines,
+    pnl,
+  } as Record<string, any>;
+
+  if (colorBoms !== undefined) result.colorBoms = colorBoms;
+  if (postColorBoms !== undefined) result.postColorBoms = postColorBoms;
+
+  return result;
+}
+
+const TABLE_KEY_MAP: { table: string; key: string; converter?: (row: Record<string, any>) => Record<string, any> }[] = [
   { table: 'vendors',           key: 'ames_vendors' },
   { table: 'items',             key: 'ames_items' },
   { table: 'samples',           key: 'ames_samples' },
-  { table: 'boms',              key: 'ames_boms' },
+  { table: 'boms',              key: 'ames_boms', converter: convertBomRow },
   { table: 'production_orders', key: 'ames_orders' },
-  { table: 'materials',         key: 'ames_materials' },
 ];
 
-/**
- * ID 기준으로 두 배열을 병합합니다.
- * - Supabase에 있는 것: Supabase 데이터 우선
- * - localStorage에만 있는 것: 보존 (이후 Supabase에 업로드)
- * - Supabase에만 있는 것: 그대로 포함
- */
-function mergeById(
-  supabaseItems: Record<string, any>[],
-  localItems: Record<string, any>[]
-): Record<string, any>[] {
-  const supabaseMap = new Map(supabaseItems.map(item => [item.id, item]));
-  const localMap = new Map(localItems.map(item => [item.id, item]));
-
-  // Supabase 데이터 기반으로 시작
-  const merged = new Map(supabaseMap);
-
-  // localStorage에만 있는 아이템 추가 (Supabase에 없는 것만)
-  for (const [id, item] of localMap) {
-    if (!supabaseMap.has(id)) {
-      merged.set(id, item);
-    }
-  }
-
-  return Array.from(merged.values());
-}
-
 export async function syncFromSupabase(): Promise<void> {
-  for (const { table, key } of TABLE_KEY_MAP) {
+  for (const { table, key, converter } of TABLE_KEY_MAP) {
     try {
-      // 1. Supabase에서 데이터 가져오기
-      const { data: supabaseRaw, error } = await supabase.from(table).select('*');
+      const { data, error } = await supabase.from(table).select('*');
       if (error) {
-        console.warn(`[sync] ${table} Supabase 조회 실패:`, error.message);
-        // 실패해도 localStorage 데이터 그대로 유지
+        console.warn(`[syncFromSupabase] ${table} 조회 실패:`, error.message);
         continue;
       }
-
-      const supabaseData = (supabaseRaw || []).map(row =>
-        toCamelCase(row as Record<string, any>)
-      );
-
-      // 2. localStorage에서 데이터 가져오기
-      let localData: Record<string, any>[] = [];
-      try {
-        const raw = localStorage.getItem(key);
-        localData = raw ? JSON.parse(raw) : [];
-        if (!Array.isArray(localData)) localData = [];
-      } catch {
-        localData = [];
+      if (!data || data.length === 0) {
+        // 원격에 데이터 없으면 localStorage 유지
+        continue;
       }
-
-      // 3. ID 기준 병합 (Supabase 우선, localStorage 전용 보존)
-      const merged = mergeById(supabaseData, localData);
-
-      // 4. 병합된 데이터를 localStorage에 저장
-      localStorage.setItem(key, JSON.stringify(merged));
-      console.log(
-        `[sync] ${table} 병합 완료 ` +
-        `(Supabase: ${supabaseData.length}건, 로컬: ${localData.length}건, 병합: ${merged.length}건)`
+      const converted = data.map(row =>
+        converter ? converter(row as Record<string, any>) : toCamelCase(row as Record<string, any>)
       );
-
-      // 5. localStorage에만 있던 데이터를 Supabase에 업로드 (백필)
-      const supabaseIds = new Set(supabaseData.map(item => item.id));
-      const localOnly = localData.filter(item => item.id && !supabaseIds.has(item.id));
-
-      if (localOnly.length > 0) {
-        console.log(`[sync] ${table} 로컬 전용 ${localOnly.length}건 Supabase에 업로드 중...`);
-        for (const item of localOnly) {
-          try {
-            const { error: upsertErr } = await supabase
-              .from(table)
-              .upsert(toSnakeCase(item));
-            if (upsertErr) {
-              console.warn(
-                `[sync] ${table} 업로드 실패 (id: ${item.id}):`,
-                upsertErr.message
-              );
-            }
-          } catch (uploadErr) {
-            console.warn(`[sync] ${table} 업로드 오류 (id: ${item.id}):`, uploadErr);
-          }
-        }
-        console.log(`[sync] ${table} 로컬 전용 데이터 업로드 완료`);
-      }
+      localStorage.setItem(key, JSON.stringify(converted));
+      console.log(`[syncFromSupabase] ${table} 동기화 완료 (${converted.length}건)`);
     } catch (err) {
-      console.warn(`[sync] ${table} 동기화 중 오류 (localStorage 유지):`, err);
+      console.warn(`[syncFromSupabase] ${table} 동기화 중 오류:`, err);
     }
   }
 }

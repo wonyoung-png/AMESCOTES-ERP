@@ -1412,9 +1412,14 @@ export default function BomManagement() {
 
   // 스타일 선택 시 BOM 로드
   useEffect(() => {
-    if (!selectedStyleId) { setEditBom(null); setActivePreColor(''); setActivePostColor(''); return; }
-    const item = items.find(i => i.id === selectedStyleId);
-    const styleBoms = extBoms.filter(b => b.styleId === selectedStyleId);
+    // _reload 접미사 처리 (강제 재로드용)
+    const styleId = selectedStyleId.endsWith('_reload')
+      ? selectedStyleId.replace('_reload', '')
+      : selectedStyleId;
+
+    if (!styleId) { setEditBom(null); setActivePreColor(''); setActivePostColor(''); return; }
+    const item = items.find(i => i.id === styleId);
+    const styleBoms = extBoms.filter(b => b.styleId === styleId);
     let loadedBom: ExtBom;
     if (styleBoms.length > 0) {
       const loaded: ExtBom = JSON.parse(JSON.stringify(styleBoms.sort((a, b) => b.version - a.version)[0]));
@@ -1437,6 +1442,21 @@ export default function BomManagement() {
       nb.erpCategory = item.erpCategory || '';
       loadedBom = nb;
     }
+
+    // colorBoms 없고 lines에 실제 데이터가 있으면 자동으로 '기본' 컬러 탭 생성
+    // (Supabase에서 동기화된 기존 BOM 데이터 호환)
+    if ((!loadedBom.colorBoms || loadedBom.colorBoms.length === 0) && loadedBom.lines.some(l => l.itemName)) {
+      loadedBom = {
+        ...loadedBom,
+        colorBoms: [{
+          color: '기본',
+          lines: loadedBom.lines.map(l => ({ ...l, id: l.id || genId() })),
+          postProcessLines: (loadedBom.postProcessLines || []).map(l => ({ ...l, id: l.id || genId() })),
+          processingFee: loadedBom.processingFee || 0,
+        }],
+      };
+    }
+
     setEditBom(loadedBom);
     setIsDirty(false);
 
@@ -1445,7 +1465,7 @@ export default function BomManagement() {
     if (colors.length > 0) {
       setActivePreColor(colors[0].color);
     } else {
-      // 기존 lines 데이터가 있으면 마이그레이션 안내 없이 모달만 열기
+      // 빈 BOM이면 컬러 추가 모달 열기
       setActivePreColor('');
       setAddColorForTab('pre');
       setShowAddColorModal(true);
@@ -2352,7 +2372,7 @@ export default function BomManagement() {
           </div>
           <div className="col-span-2">
             <label className="text-xs text-stone-500 mb-1 block font-medium">스타일 선택</label>
-            <Select value={selectedStyleId} onValueChange={setSelectedStyleId}>
+            <Select value={selectedStyleId.replace('_reload', '')} onValueChange={setSelectedStyleId}>
               <SelectTrigger className="h-8 text-xs border-stone-200"><SelectValue placeholder="스타일 선택..." /></SelectTrigger>
               <SelectContent>
                 {items
@@ -2438,7 +2458,16 @@ export default function BomManagement() {
                   const sum = calcSummary(b, settings.usdKrw);
                   const hasPost = (b.postMaterials || []).some(l => l.itemName);
                   return (
-                    <tr key={b.id} className={`border-b border-stone-50 hover:bg-stone-50/50 cursor-pointer ${isChecked ? 'bg-amber-50/60' : ''}`} onClick={() => setSelectedStyleId(b.styleId)}>
+                    <tr key={b.id} className={`border-b border-stone-50 hover:bg-stone-50/50 cursor-pointer ${isChecked ? 'bg-amber-50/60' : ''}`} onClick={() => {
+                      if (selectedStyleId === b.styleId || selectedStyleId === b.styleId + '_reload') {
+                        setEditBom(null);
+                        setActivePreColor('');
+                        setActivePostColor('');
+                        setTimeout(() => setSelectedStyleId(b.styleId), 10);
+                      } else {
+                        setSelectedStyleId(b.styleId);
+                      }
+                    }}>
                       <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
                         <input type="checkbox" checked={isChecked} onChange={() => toggleSelectBom(b.id)} className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer" />
                       </td>
@@ -2451,7 +2480,20 @@ export default function BomManagement() {
                         {hasPost ? <Badge className="text-[10px] py-0 h-4 bg-blue-100 text-blue-700 border-blue-300">등록됨</Badge> : <span className="text-xs text-stone-300">-</span>}
                       </td>
                       <td className="px-4 py-2.5 text-center">
-                        <button onClick={e => { e.stopPropagation(); setSelectedStyleId(b.styleId); }} className="text-xs px-2 py-0.5 rounded border border-[#C9A96E] text-[#C9A96E] hover:bg-amber-50">편집</button>
+                        <button onClick={e => {
+                          e.stopPropagation();
+                          // 이미 선택된 styleId와 동일한 경우 useEffect가 실행되지 않으므로
+                          // editBom을 null로 리셋 후 재선택하여 강제로 편집 화면 열기
+                          if (selectedStyleId === b.styleId) {
+                            setEditBom(null);
+                            setActivePreColor('');
+                            setActivePostColor('');
+                            setTimeout(() => setSelectedStyleId(b.styleId + '_reload'), 0);
+                            setTimeout(() => setSelectedStyleId(b.styleId), 10);
+                          } else {
+                            setSelectedStyleId(b.styleId);
+                          }
+                        }} className="text-xs px-2 py-0.5 rounded border border-[#C9A96E] text-[#C9A96E] hover:bg-amber-50">편집</button>
                       </td>
                     </tr>
                   );

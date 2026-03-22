@@ -1254,7 +1254,7 @@ export default function SampleManagement() {
       />
 
       {/* ── 등록/수정 모달 ── */}
-      <Dialog open={showModal} onOpenChange={handleModalClose}>
+      <Dialog open={showModal} onOpenChange={(open) => { if (!open) handleModalClose(true); }}>
         <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editId ? '샘플 수정' : '샘플 접수'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">

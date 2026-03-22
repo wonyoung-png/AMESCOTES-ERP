@@ -52,6 +52,8 @@ export default function ProductionOrders() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterSeason, setFilterSeason] = useState('all');
   const [showModal, setShowModal] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editOrderId, setEditOrderId] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState<ProductionOrder | null>(null);
   const [form, setForm] = useState<Partial<ProductionOrder>>({});
   const [hqItems, setHqItems] = useState<HqSupplyItem[]>([]);
@@ -144,6 +146,8 @@ export default function ProductionOrders() {
       } catch { /* ignore */ }
     }
 
+    setIsEditMode(false);
+    setEditOrderId(null);
     setForm({ season: '26SS', status: '발주생성', qty: 0, orderDate: new Date().toISOString().split('T')[0], hqSupplyItems: [], attachments: [] });
     setHqItems([]);
     setColorQtys([]);
@@ -164,6 +168,27 @@ export default function ProductionOrders() {
     if (prefillStyleIdToUse) {
       setTimeout(() => handleStyleSelect(prefillStyleIdToUse!), 0);
     }
+  };
+
+  const openEdit = (order: ProductionOrder) => {
+    setIsEditMode(true);
+    setEditOrderId(order.id);
+    setForm({ ...order });
+    setHqItems(order.hqSupplyItems || []);
+    setColorQtys(order.colorQtys || []);
+    setBomCalc({ bomType: order.bomType as 'post' | 'pre' | 'manual' | null, bomLoaded: true, hasBomWarning: false, factoryUnitPriceCny: order.factoryUnitPriceCny || 0, factoryUnitPriceKrw: order.factoryUnitPriceKrw || 0, totalFactoryAmountKrw: (order.factoryUnitPriceKrw || 0) * order.qty, hqProvided: [], factoryProvided: [] });
+    setManualFactoryPrice(order.bomType === 'manual');
+    setManualPriceCny(order.factoryUnitPriceCny || 0);
+    setFactoryCurrency((order.factoryCurrency as 'CNY' | 'USD' | 'KRW') || 'CNY');
+    setShowColorDropdown(false);
+    setShowCustomColorInput(false);
+    setCustomColorInput('');
+    setNegoRequestedPrice(0);
+    setNegoCurrency('CNY');
+    setNegoMemo('');
+    setNegoApplied(false);
+    setOriginalFactoryPriceKrw(order.factoryUnitPriceKrw || 0);
+    setShowModal(true);
   };
 
   useEffect(() => {
@@ -358,6 +383,34 @@ export default function ProductionOrders() {
           },
         ];
       }
+    }
+
+    if (isEditMode && editOrderId) {
+      // 편집 모드: 기존 발주 업데이트
+      const updates: Partial<ProductionOrder> = {
+        qty: totalQty,
+        colorQtys: colorQtys.length > 0 ? colorQtys : undefined,
+        vendorId: form.vendorId || '',
+        vendorName: form.vendorName || '',
+        orderDate: form.orderDate || new Date().toISOString().split('T')[0],
+        deliveryDate: form.deliveryDate,
+        status: form.status || '발주생성',
+        hqSupplyItems: hqItems,
+        factoryUnitPriceCny: finalFactoryUnitPriceCny,
+        factoryUnitPriceKrw: finalFactoryUnitPriceKrw,
+        factoryCurrency,
+        bomType: negoApplied ? 'manual' : (manualFactoryPrice ? 'manual' : (bomCalc.bomType ?? undefined)),
+        negoHistory: finalNegoHistory,
+        memo: form.memo,
+        updatedAt: new Date().toISOString(),
+      };
+      store.updateOrder(editOrderId, updates);
+      toast.success('발주가 수정되었습니다');
+      refresh();
+      setShowModal(false);
+      setIsEditMode(false);
+      setEditOrderId(null);
+      return;
     }
 
     const order: ProductionOrder = {

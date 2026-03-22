@@ -795,7 +795,7 @@ export default function ItemMaster() {
       />
 
       {/* 등록/수정 모달 */}
-      <Dialog open={modalOpen} onOpenChange={handleModalClose}>
+      <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) handleModalClose(true); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEdit ? '품목 수정' : '품목 등록'}</DialogTitle>
