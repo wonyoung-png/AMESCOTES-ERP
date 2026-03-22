@@ -2128,7 +2128,7 @@ export default function BomManagement() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="bg-blue-900 text-white text-[11px]">
+                          <tr className="bg-stone-800 text-white text-[11px]">
                             <th className="px-2 py-2 text-left">부위 | 자재명</th>
                             <th className="px-2 py-2 text-left w-20">규격</th>
                             <th className="px-2 py-2 text-center w-20">단위</th>
@@ -2154,24 +2154,24 @@ export default function BomManagement() {
                             const isRawMaterial = cat === '원자재';
                             return (
                               <React.Fragment key={cat}>
-                                <tr className={`border-y ${isRawMaterial ? 'bg-blue-50 border-blue-200' : 'bg-blue-50/30 border-blue-100'}`}>
+                                <tr className={`border-y ${isRawMaterial ? 'bg-amber-50 border-amber-200' : 'bg-stone-100 border-stone-200'}`}>
                                   <td colSpan={colCount} className="px-3 py-1.5">
                                     <div className="flex items-center justify-between">
-                                      <button onClick={() => togglePostSection(cat)} className="flex items-center gap-2 text-blue-700 font-semibold text-xs hover:text-blue-900">
+                                      <button onClick={() => togglePostSection(cat)} className={`flex items-center gap-2 font-semibold text-xs hover:opacity-80 ${isRawMaterial ? 'text-amber-800' : 'text-stone-700'}`}>
                                         {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                         {cat}
-                                        {filledLines.length > 0 && (
-                                          <span className="text-[10px] font-normal text-blue-500">({filledLines.length})</span>
+                                        {!isRawMaterial && filledLines.length > 0 && (
+                                          <span className="text-[10px] font-normal text-stone-500">({filledLines.length})</span>
                                         )}
                                       </button>
                                       <div className="flex items-center gap-3">
                                         {catTotal > 0 && (
                                           <span className="text-xs text-stone-500">
                                             소계: <span className="font-semibold text-stone-700">{fmt(catTotal)} {curSymbol}</span>
-                                            {postCur !== 'KRW' && <> = <span className="font-semibold text-blue-600">{fmtKrw(catTotal * postRate)}</span></>}
+                                            {postCur !== 'KRW' && <> = <span className="font-semibold text-[#C9A96E]">{fmtKrw(catTotal * postRate)}</span></>}
                                           </span>
                                         )}
-                                        <button onClick={() => addPostMaterialLine(cat)} className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-medium">
+                                        <button onClick={() => addPostMaterialLine(cat)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-amber-700 font-medium">
                                           <Plus className="w-3 h-3" /> 행 추가
                                         </button>
                                       </div>
@@ -2186,22 +2186,22 @@ export default function BomManagement() {
                                     onDelete={deletePostMaterialLine}
                                     cnyKrw={postRate}
                                     sectionKey={cat}
-                                    accentColor="blue"
+                                    accentColor="amber"
                                   />
                                 ))}
                               </React.Fragment>
                             );
                           })}
-                          {/* 사후원가 임가공비 - 별도 섹션 */}
-                          <tr className="bg-blue-50/50 border-y border-blue-100">
+                          {/* 임가공비 - 별도 섹션 */}
+                          <tr className="bg-amber-50/50 border-y border-stone-200">
                             <td colSpan={12} className="px-3 py-1.5">
-                              <span className="text-xs font-semibold text-blue-700">임가공비 (사후)</span>
-                              <span className="text-[10px] text-blue-400 ml-2">자재비와 별도 항목</span>
+                              <span className="text-xs font-semibold text-stone-600">임가공비</span>
+                              <span className="text-[10px] text-stone-400 ml-2">자재비와 별도 항목</span>
                             </td>
                           </tr>
-                          <tr className="bg-blue-50/20 border-b border-blue-100">
+                          <tr className="bg-amber-50/30 border-b border-stone-200">
                             <td className="px-1 py-1" colSpan={3}>
-                              <span className="text-xs text-blue-700 px-2">임가공비 (NET)</span>
+                              <span className="text-xs text-stone-600 px-2">임가공비 (NET)</span>
                             </td>
                             <td className="px-1 py-1">
                               <Input
@@ -2215,10 +2215,8 @@ export default function BomManagement() {
                             <td className="px-1 py-1"><span className="text-xs text-stone-400 px-2">1</span></td>
                             <td></td>
                             <td className="px-2 py-1 text-right text-xs text-stone-400">1</td>
-                            <td className="px-2 py-1 text-right text-xs font-semibold tabular-nums text-blue-700">
-                              {fmt(editBom.postProcessingFee || 0)} {curSymbol}
-                            </td>
-                            <td className="px-2 py-1 text-right text-xs font-semibold text-blue-600 tabular-nums">
+                            <td className="px-2 py-1 text-right text-xs font-semibold tabular-nums">{fmt(editBom.postProcessingFee || 0)} {curSymbol}</td>
+                            <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">
                               {fmtKrw((editBom.postProcessingFee || 0) * postRate)}
                             </td>
                             <td colSpan={3}></td>
@@ -2231,17 +2229,101 @@ export default function BomManagement() {
               })()}
 
               {/* 사후원가 요약 */}
-              <PostCostSummary
-                bom={editBom}
-                items={items}
-                onDeliveryPriceChange={(val) => {
-                  updateField('postDeliveryPrice', val);
-                  // 품목 마스터 자동 연동
-                  if (editBom.styleId) {
-                    store.updateItem(editBom.styleId, { deliveryPrice: val });
-                  }
-                }}
-              />
+              {(() => {
+                const ps = calcPostSummary(editBom, settings.usdKrw);
+                const postCur = editBom.currency || 'CNY';
+                const linkedItem = items.find(i => i.id === editBom.styleId);
+                const deliveryPrice = editBom.postDeliveryPrice || linkedItem?.deliveryPrice || linkedItem?.targetSalePrice || 0;
+                const marginAmt = deliveryPrice > 0 ? deliveryPrice - ps.totalCostKrw : 0;
+                const marginPct = deliveryPrice > 0 ? (marginAmt / deliveryPrice) * 100 : 0;
+                const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 30 ? 'text-amber-600' : 'text-green-600';
+                const marginBg = marginPct < 15 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
+                return (
+                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+                    <div className="px-5 py-3 border-b border-stone-100 bg-stone-800 text-white">
+                      <h2 className="text-sm font-semibold">사후 원가 요약 <span className="text-stone-400 text-xs font-normal ml-2">— 공장 실제 원가 기준</span></h2>
+                    </div>
+                    <table className="w-full text-xs">
+                      <thead><tr className="bg-stone-100 text-stone-600"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-stone-400">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
+                      <tbody>
+                        <tr className="border-b border-stone-100 hover:bg-stone-50">
+                          <td className="px-4 py-2 font-bold text-stone-400">자</td>
+                          <td className="px-4 py-2 font-medium text-stone-700">공장구매 자재</td>
+                          <td className="px-4 py-2 text-stone-400">본사제공 제외 ({postCur})</td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.factoryMaterialKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.factoryMaterialKrw)}</span></td>
+                        </tr>
+                        <tr className="border-b border-stone-100 hover:bg-stone-50">
+                          <td className="px-4 py-2 font-bold text-stone-400">본</td>
+                          <td className="px-4 py-2 font-medium text-stone-700">본사제공 자재</td>
+                          <td className="px-4 py-2 text-stone-400">본사에서 공급</td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.hqMaterialKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.hqMaterialKrw)}</span></td>
+                        </tr>
+                        <tr className="border-b border-stone-100 hover:bg-stone-50">
+                          <td className="px-4 py-2 font-bold text-stone-400">공</td>
+                          <td className="px-4 py-2 font-medium text-stone-700">임가공비</td>
+                          <td className="px-4 py-2 text-stone-400">NET ({postCur})</td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.processingKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.processingKrw)}</span></td>
+                        </tr>
+                        <tr className="bg-amber-50 border-y border-amber-200">
+                          <td className="px-4 py-3 font-bold text-amber-600">🏭</td>
+                          <td className="px-4 py-3 font-bold text-stone-800">공장단가</td>
+                          <td className="px-4 py-3 text-stone-500 text-[11px]">공장구매자재 + 임가공 (본사제공 제외)</td>
+                          <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">{fmtKrw(ps.factoryUnitCostKrw)}</td>
+                        </tr>
+                        <tr className="bg-stone-800 text-white">
+                          <td className="px-4 py-3 font-bold">📦</td>
+                          <td className="px-4 py-3 font-bold text-base" colSpan={2}>제 품 원 가</td>
+                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums text-[#C9A96E]">{fmtKrw(ps.totalCostKrw)}</td>
+                        </tr>
+                        {deliveryPrice > 0 && (
+                          <>
+                            <tr className="bg-blue-50 border-t border-blue-200">
+                              <td className="px-4 py-2.5 text-xs font-medium text-blue-600">연동</td>
+                              <td className="px-4 py-2.5 text-sm font-semibold text-blue-800" colSpan={2}>납품가 (품목 마스터 연동)</td>
+                              <td className="px-4 py-2.5 text-right font-mono font-bold text-blue-800">{fmtKrw(deliveryPrice)}</td>
+                            </tr>
+                            <tr>
+                              <td colSpan={4} className="px-4 py-2">
+                                <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border ${marginBg}`}>
+                                  <div className="flex items-center gap-4">
+                                    <span className="text-xs text-stone-500">마진금액</span>
+                                    <span className={`font-mono font-bold text-sm ${marginClass}`}>{fmtKrw(marginAmt)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-stone-500">마진율</span>
+                                    <span className={`font-mono font-bold text-lg ${marginClass}`}>{marginPct.toFixed(1)}%</span>
+                                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${marginPct >= 30 ? 'bg-green-100 text-green-700' : marginPct >= 15 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                                      {marginPct >= 30 ? '✅ 양호' : marginPct >= 15 ? '🟡 주의' : '🔴 위험'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                    {/* 납품가 입력 */}
+                    <div className="px-4 py-3 border-t border-stone-200 flex items-center gap-3">
+                      <label className="text-xs font-semibold text-stone-700 whitespace-nowrap">납품가 (KRW)</label>
+                      <Input
+                        type="number"
+                        value={deliveryPrice || ''}
+                        onChange={e => {
+                          const val = Number(e.target.value);
+                          updateField('postDeliveryPrice', val);
+                          if (editBom.styleId) store.updateItem(editBom.styleId, { deliveryPrice: val });
+                        }}
+                        className="h-8 text-sm border-stone-300 text-right w-36 font-semibold"
+                        placeholder="납품가 입력"
+                      />
+                      {linkedItem?.deliveryPrice && linkedItem.deliveryPrice !== editBom.postDeliveryPrice && (
+                        <span className="text-[10px] text-stone-400">품목마스터: {fmtKrw(linkedItem.deliveryPrice)}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           )}
 
