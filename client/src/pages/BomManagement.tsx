@@ -1167,27 +1167,36 @@ export default function BomManagement() {
         if (cellA.includes('소계') || cellA.includes('합계') || cellA.includes('총계')) continue;
       }
 
-      // 임가공비 행 감지 (어느 섹션이든)
-      if (rowStr.includes('임가공') && !rowStr.includes('후가공')) {
-        // L열(11) 우선, 없으면 E열(4) 또는 J열(9)
-        const fee = cellL > 0 ? cellL : getNum(row, 4) > 0 ? getNum(row, 4) : getNum(row, 9);
+      // 임가공비 행 감지: G열(6)='임가공' 텍스트, 값은 H열(8)
+      const cellG = row[6] ? String(row[6]).trim() : '';
+      if (cellG.includes('임가공')) {
+        const fee = getNum(row, 8); // H열(8)에 임가공비 금액
         if (fee > 0) parsedProcessingFee = fee;
         continue;
       }
+      // 공장단가/제품원가 행 스킵
+      if (cellG.includes('공장단가') || cellG.includes('제품원가')) continue;
 
       // 공장단가/제품원가 행은 스킵 (ERP 내부 계산으로 대체)
       if (rowStr.includes('공장단가') || rowStr.includes('제품원가')) continue;
 
       // 후가공 섹션 처리
+      // 실제 구조: B열=작업명, C열=NET, D열=단가, E열=금액
       if (inPostProcess) {
         const workName = cellB;
-        if (!workName) continue;
-        // 후가공: B=작업명, D=단가(index 3), E=금액(index 4)
+        if (!workName || workName === '소계' || workName === '공임비') continue;
+        // D열=단가(index 3), E열=금액(index 4)
         const unitPrice = getNum(row, 3);
         const amount = getNum(row, 4);
+        const netQtyPost = getNum(row, 2); // C열=NET
         if (workName && (unitPrice > 0 || amount > 0)) {
-          // 후가공은 PostProcessLine으로 별도 수집 — 여기서는 스킵 (후가공 파싱 배열에 추가)
-          // (후가공은 아래 별도 배열로 리턴)
+          postProcessLines.push({
+            id: Math.random().toString(36).slice(2),
+            name: workName.trim(),
+            netQty: netQtyPost || 1,
+            unitPrice: unitPrice || (netQtyPost > 0 ? amount / netQtyPost : amount),
+            memo: '',
+          });
         }
         continue;
       }
@@ -1240,7 +1249,7 @@ export default function BomManagement() {
       });
     }
 
-    return { materials, parsedProcessingFee, parsedRate };
+    return { materials, parsedProcessingFee, parsedRate, postProcessLines };
   };
 
   const handlePreExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1254,17 +1263,18 @@ export default function BomManagement() {
       const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
 
       const fallback = editBom.preExchangeRateCny ?? editBom.snapshotCnyKrw ?? 191;
-      const { materials: preMaterials, parsedProcessingFee, parsedRate } = parseExcelBomSheet(raw, fallback);
+      const { materials: preMaterials, parsedProcessingFee, parsedRate, postProcessLines: parsedPostLines } = parseExcelBomSheet(raw, fallback);
 
       setEditBom(prev => prev ? {
         ...prev,
         lines: preMaterials.length > 0 ? preMaterials : prev.lines,
         processingFee: parsedProcessingFee || prev.processingFee,
+        postProcessLines: parsedPostLines.length > 0 ? parsedPostLines : prev.postProcessLines,
         snapshotCnyKrw: parsedRate,
         preSourceFileName: file.name,
       } : prev);
       markDirty();
-      toast.success(`원가표 파싱 완료: ${preMaterials.length}개 자재 행, 환율 ${parsedRate}`);
+      toast.success(`원가표 파싱 완료: ${preMaterials.length}개 자재 행, 후가공 ${parsedPostLines.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
     } catch (err) {
       console.error(err);
       toast.error('원가표 파싱 실패. 파일 형식을 확인해주세요.');
@@ -1284,17 +1294,18 @@ export default function BomManagement() {
       const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
 
       const fallback = editBom.exchangeRateCny ?? editBom.snapshotCnyKrw ?? 191;
-      const { materials: postMaterials, parsedProcessingFee, parsedRate } = parseExcelBomSheet(raw, fallback);
+      const { materials: postMaterials, parsedProcessingFee, parsedRate, postProcessLines: parsedPostLines2 } = parseExcelBomSheet(raw, fallback);
 
       setEditBom(prev => prev ? {
         ...prev,
         postMaterials: postMaterials.length > 0 ? postMaterials : prev.postMaterials,
         postProcessingFee: parsedProcessingFee || prev.postProcessingFee,
+        postProcessLines: parsedPostLines2.length > 0 ? parsedPostLines2 : prev.postProcessLines,
         exchangeRateCny: parsedRate,
         postSourceFileName: file.name,
       } : prev);
       markDirty();
-      toast.success(`공장 원가표 파싱 완료: ${postMaterials.length}개 자재 행, 환율 ${parsedRate}`);
+      toast.success(`공장 원가표 파싱 완료: ${postMaterials.length}개 자재 행, 후가공 ${parsedPostLines2.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
     } catch (err) {
       console.error(err);
       toast.error('공장 원가표 파싱 실패. 파일 형식을 확인해주세요.');
