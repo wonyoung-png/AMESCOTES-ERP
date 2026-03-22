@@ -195,10 +195,11 @@ function calcPostSummary(bom: ExtBom, settingsUsdKrw = 1380): PostSummary {
   }, 0);
   const totalMaterialCny = factoryMaterialCny + hqMaterialCny;
   const processingCny = bom.postProcessingFee || 0;
-  // 공장단가 = 공장구매자재 + 임가공비 (본사제공 제외)
-  const factoryUnitCostCny = factoryMaterialCny + processingCny;
-  // 제품원가 = 전체 자재 + 임가공비
-  const totalCostCny = totalMaterialCny + processingCny;
+  const postProcessCny2 = (bom.postProcessLines || []).reduce((s, l) => s + l.netQty * l.unitPrice, 0);
+  // 공장단가 = 공장구매자재 + 임가공비 + 후가공비 (본사제공 제외)
+  const factoryUnitCostCny = factoryMaterialCny + processingCny + postProcessCny2;
+  // 제품원가 = 전체 자재 + 임가공비 + 후가공비
+  const totalCostCny = totalMaterialCny + processingCny + postProcessCny2;
 
   return {
     factoryMaterialCny,
