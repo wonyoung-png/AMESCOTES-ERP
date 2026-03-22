@@ -813,12 +813,13 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
           </SelectContent>
         </Select>
         {/* 직접입력 또는 드롭다운에 없는 값 */}
-        {line.vendorName && !vendors.find(v => v.name === line.vendorName) && (
+        {(line.vendorName === '' || (line.vendorName && !vendors.find(v => v.name === line.vendorName))) && (
           <Input
-            value={line.vendorName}
+            value={line.vendorName || ''}
             onChange={e => onChange(line.id, 'vendorName', e.target.value)}
             className="h-6 text-xs border-stone-300 bg-amber-50 mt-0.5 w-24"
-            placeholder="업체명"
+            placeholder="업체명 입력"
+            autoFocus
           />
         )}
       </td>
