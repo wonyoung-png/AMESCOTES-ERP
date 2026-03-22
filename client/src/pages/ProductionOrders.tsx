@@ -79,6 +79,12 @@ export default function ProductionOrders() {
     receivedQty: 0, defectQty: 0, defectNote: '', receivedDate: new Date().toISOString().split('T')[0],
   });
 
+  // 명세표 발행 모달 상태
+  const [billingModal, setBillingModal] = useState(false);
+  const [billingTarget, setBillingTarget] = useState<ProductionOrder | null>(null);
+  const [billingMode, setBillingMode] = useState<'new' | 'link'>('new');
+  const [linkStatementId, setLinkStatementId] = useState('');
+
   const refresh = () => setOrders(store.getOrders());
 
   const filtered = useMemo(() => {
@@ -324,44 +330,79 @@ export default function ProductionOrders() {
     toast.success('입고 처리 완료');
   };
 
-  const handleCreateTradeStatement = (order: ProductionOrder) => {
+  const openBillingModal = (order: ProductionOrder) => {
+    setBillingTarget(order);
+    setBillingMode('new');
+    setLinkStatementId('');
+    setBillingModal(true);
+  };
+
+  const handleConfirmBilling = () => {
+    if (!billingTarget) return;
+    const order = billingTarget;
     const item = items.find(i => i.id === order.styleId);
     if (!item) { toast.error('품목 정보를 찾을 수 없습니다'); return; }
-    if (order.tradeStatementId) { toast.error('이미 거래명세표가 생성된 발주입니다'); return; }
 
     const buyer = buyers.find(b => b.id === item.buyerId);
     if (!buyer) { toast.error('바이어 정보가 없습니다. 품목의 바이어를 먼저 설정해주세요'); return; }
 
-    const vendorCode = buyer.vendorCode || buyer.code || 'XXX';
-    const statementNo = store.getNextStatementNo(vendorCode);
-
+    const today = new Date().toISOString().split('T')[0];
     const colorQtyList = order.colorQtys && order.colorQtys.length > 0 ? order.colorQtys : [{ color: '기본', qty: order.qty }];
-    const lines: TradeStatementLine[] = colorQtyList.map(cq => ({
-      id: genId(),
-      description: `[${order.styleNo}] ${order.styleName}${cq.color !== '기본' ? ` (${cq.color})` : ''}`,
-      qty: cq.qty,
-      unitPrice: item.deliveryPrice || item.targetSalePrice || 0,
-      taxType: '과세' as const,
-      taxRate: 0.1,
-    }));
+    const unitPrice = item.deliveryPrice || item.targetSalePrice || order.factoryUnitPriceKrw || 0;
 
-    const newStatement: TradeStatement = {
-      id: genId(),
-      statementNo,
-      vendorId: buyer.id,
-      vendorName: buyer.name,
-      vendorCode,
-      issueDate: new Date().toISOString().split('T')[0],
-      lines,
-      status: '미청구',
-      createdAt: new Date().toISOString(),
-      memo: `발주번호 ${order.orderNo}에서 자동 생성`,
-    };
+    if (billingMode === 'new') {
+      const vendorCode = buyer.vendorCode || buyer.code || 'XXX';
+      const statementNo = store.getNextStatementNo(vendorCode);
 
-    store.addTradeStatement(newStatement);
-    store.updateOrder(order.id, { tradeStatementId: newStatement.id, updatedAt: new Date().toISOString() });
-    refresh();
-    toast.success('거래명세표 생성됨 → 거래명세표 탭에서 확인하세요');
+      const lines: TradeStatementLine[] = colorQtyList.map(cq => ({
+        id: genId(),
+        description: `[${order.styleNo}] ${order.styleName}${cq.color !== '기본' ? ` (${cq.color})` : ''}`,
+        qty: cq.qty,
+        unitPrice,
+        taxType: '과세' as const,
+        taxRate: 0.1,
+        memo: `발주번호 ${order.orderNo}`,
+      }));
+
+      const newStatement: TradeStatement = {
+        id: genId(),
+        statementNo,
+        vendorId: buyer.id,
+        vendorName: buyer.name,
+        vendorCode,
+        issueDate: today,
+        lines,
+        status: '미청구',
+        createdAt: new Date().toISOString(),
+        memo: `발주번호 ${order.orderNo}에서 자동 생성`,
+      };
+
+      store.addTradeStatement(newStatement);
+      store.updateOrder(order.id, { tradeStatementId: newStatement.id, updatedAt: new Date().toISOString() });
+      refresh();
+      setBillingModal(false);
+      toast.success(`거래명세표 ${statementNo} 생성 완료 → 거래명세표 탭에서 확인하세요`);
+    } else {
+      if (!linkStatementId) { toast.error('연결할 전표를 선택해주세요'); return; }
+      const stmt = store.getTradeStatements().find(t => t.id === linkStatementId);
+      if (!stmt) { toast.error('선택한 전표를 찾을 수 없습니다'); return; }
+
+      const newLines: TradeStatementLine[] = colorQtyList.map(cq => ({
+        id: genId(),
+        description: `[${order.styleNo}] ${order.styleName}${cq.color !== '기본' ? ` (${cq.color})` : ''}`,
+        qty: cq.qty,
+        unitPrice,
+        taxType: '과세' as const,
+        taxRate: 0.1,
+        memo: `발주번호 ${order.orderNo}`,
+      }));
+
+      store.updateTradeStatement(linkStatementId, { lines: [...(stmt.lines || []), ...newLines] });
+      store.updateOrder(order.id, { tradeStatementId: linkStatementId, updatedAt: new Date().toISOString() });
+      refresh();
+      setBillingModal(false);
+      toast.success(`${stmt.statementNo}에 발주 항목이 추가됐습니다`);
+    }
   };
 
   const handleCompleteMilestone = (orderId: string, milestones: OrderMilestone[]) => {
@@ -668,21 +709,19 @@ export default function ProductionOrders() {
                           ✅ 완료
                         </Button>
                       )}
-                      {o.status === '입고완료' && (
-                        o.tradeStatementId ? (
-                          <Badge variant="outline" className="text-[10px] h-6 px-2 text-amber-700 border-amber-300 bg-amber-50">
-                            명세표 발행됨
-                          </Badge>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs text-amber-700 border-amber-300 hover:bg-amber-50"
-                            onClick={() => handleCreateTradeStatement(o)}
-                          >
-                            <FileText className="w-3 h-3 mr-1" />명세표 생성
-                          </Button>
-                        )
+                      {o.tradeStatementId ? (
+                        <Badge variant="outline" className="text-[10px] h-6 px-2 text-amber-700 border-amber-300 bg-amber-50 cursor-pointer" title={`연결된 전표: ${store.getTradeStatements().find(t => t.id === o.tradeStatementId)?.statementNo || ''}`}>
+                          <FileText className="w-3 h-3 mr-1" />명세표 발행됨
+                        </Badge>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-amber-700 border-amber-300 hover:bg-amber-50"
+                          onClick={() => openBillingModal(o)}
+                        >
+                          <FileText className="w-3 h-3 mr-1" />명세표 발행
+                        </Button>
                       )}
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowDetail(o)}>
                         <Eye className="w-3.5 h-3.5" />

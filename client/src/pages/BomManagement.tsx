@@ -32,6 +32,9 @@ interface PostProcessLine {
   netQty: number;
   unitPrice: number;
   memo?: string;
+  subPart?: string;
+  spec?: string;
+  unit?: string;
 }
 
 interface BomPnlAssumptions {
@@ -105,6 +108,17 @@ interface ExtBomLine {
 const BOM_SECTIONS: BomCategory[] = ['원자재', '지퍼', '장식', '보강재', '봉사·접착제', '포장재', '철형'];
 const UNITS = ['SF', 'YD', 'M', 'EA', 'L', '콘', 'KG', 'SET', '장', '개', 'PC', 'CM', '직접입력'];
 const SUB_PARTS: BomSubPart[] = ['바디', '안감', '트림1', '트림2', '기타'];
+// 섹션별 부위 옵션
+const SECTION_SUB_PARTS: Record<string, string[]> = {
+  '원자재': ['바디', '안감', '트림1', '트림2', '기타'],
+  '지퍼': ['메인지퍼', '내부지퍼', '장식지퍼', '기타'],
+  '장식': ['자석', '고리', 'D링', '버클', '리벳', '기타'],
+  '보강재': ['바디', '안감', '트림', '기타'],
+  '봉사·접착제': ['바디', '안감', '콤비', '기타'],
+  '포장재': ['박스', '내포장', '라벨', '기타'],
+  '후가공': ['칼라불박', '자수', '인쇄', '옴브레', '기타'],
+  '철형': ['기타'],
+};
 // const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS']; // 미사용
 
 // ─── 계산 헬퍼 ──────────────────────────────────────────────────────────────
@@ -519,12 +533,12 @@ function MaterialSearchPopover({ onSelect }: { onSelect: (m: Material) => void }
 }
 
 // ─── BOM 행 컴포넌트 ─────────────────────────────────────────────────────────
-function BomLineRow({ line, onChange, onDelete, cnyKrw, showSubPart = false, accentColor = 'amber' }: {
+function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재', accentColor = 'amber' }: {
   line: ExtBomLine;
   onChange: (id: string, field: keyof ExtBomLine, val: unknown) => void;
   onDelete: (id: string) => void;
   cnyKrw: number;
-  showSubPart?: boolean;
+  sectionKey?: string;
   accentColor?: 'amber' | 'blue';
 }) {
   const qty = calcQty(line.netQty, line.lossRate);
@@ -532,6 +546,7 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, showSubPart = false, acc
   const vendors = store.getVendors().filter(v => v.type === '자재거래처');
   const isCustomUnit = line.unit === '직접입력';
   const displayUnit = isCustomUnit ? (line.customUnit || '') : line.unit;
+  const subPartOptions = SECTION_SUB_PARTS[sectionKey] || ['기타'];
 
   const handleMaterialSelect = (m: Material) => {
     onChange(line.id, 'itemName', m.name);
@@ -557,23 +572,19 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, showSubPart = false, acc
 
   return (
     <tr className={`group transition-colors border-b border-stone-100 ${ringCls}`}>
-      {/* 부위 (원자재만) */}
-      {showSubPart && (
-        <td className="px-1 py-1">
+      {/* 자재명 (부위 Select가 inline으로 포함됨) */}
+      <td className="px-1 py-1">
+        <div className="flex items-center gap-1">
+          {/* 부위 Select - 모든 섹션에 inline 배치 */}
           <Select value={line.subPart || ''} onValueChange={v => onChange(line.id, 'subPart', v as BomSubPart)}>
-            <SelectTrigger className="h-7 text-xs border-stone-200 w-16">
+            <SelectTrigger className="h-7 text-xs border-stone-200 w-20 shrink-0">
               <SelectValue placeholder="-" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none" className="text-xs text-stone-400">-</SelectItem>
-              {SUB_PARTS.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
+              {subPartOptions.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
             </SelectContent>
           </Select>
-        </td>
-      )}
-      {/* 자재명 */}
-      <td className="px-1 py-1">
-        <div className="flex items-center gap-1">
           <MaterialSearchPopover onSelect={handleMaterialSelect} />
           <Input value={line.itemName} onChange={e => onChange(line.id, 'itemName', e.target.value)} className="h-7 text-xs border-stone-200 bg-white min-w-[80px]" placeholder="자재명" />
         </div>
@@ -1696,16 +1707,15 @@ export default function BomManagement() {
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="bg-stone-800 text-white text-[11px]">
-                            <th className="px-2 py-2 text-center w-16">부위</th>
-                            <th className="px-2 py-2 text-left">자재명</th>
+                            <th className="px-2 py-2 text-left">부위 | 자재명</th>
                             <th className="px-2 py-2 text-left w-20">규격</th>
                             <th className="px-2 py-2 text-center w-20">단위</th>
                             <th className="px-2 py-2 text-right w-20">단가({curSymbol})</th>
-                            <th className="px-2 py-2 text-right w-20">NET소요량</th>
+                            <th className="px-2 py-2 text-right w-20">NET</th>
                             <th className="px-2 py-2 text-right w-16">LOSS(%)</th>
                             <th className="px-2 py-2 text-right w-24">소요량</th>
                             <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
-                            <th className="px-2 py-2 text-right w-24">금액(KRW)</th>
+                            <th className="px-2 py-2 text-right w-24">KRW</th>
                             <th className="px-2 py-2 text-center w-14">본사제공</th>
                             <th className="px-2 py-2 text-left w-24">구매업체</th>
                             <th className="px-2 py-2 w-8"></th>
@@ -1719,7 +1729,7 @@ export default function BomManagement() {
                             const catTotal = catLines.reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate), 0);
                             // 원자재: 기본 펼침, 나머지: 기본 접힘
                             const collapsed = collapsedSections.has(cat);
-                            const colCount = 13; // 부위 포함 총 컬럼 수
+                            const colCount = 12; // 총 컬럼 수
                             return (
                               <React.Fragment key={cat}>
                                 <tr className={`border-y ${isRawMaterial ? 'bg-amber-50 border-amber-200' : 'bg-stone-100 border-stone-200'}`}>
@@ -1753,16 +1763,16 @@ export default function BomManagement() {
                                     onChange={updateLine}
                                     onDelete={deleteLine}
                                     cnyKrw={preRate}
-                                    showSubPart={isRawMaterial}
+                                    sectionKey={cat}
                                     accentColor="amber"
                                   />
                                 ))}
                               </React.Fragment>
                             );
                           })}
-                          {/* 후가공비 섹션 */}
+                          {/* 후가공비 섹션 - 동일 컬럼 구조 */}
                           <tr className="bg-stone-100 border-y border-stone-200">
-                            <td colSpan={13} className="px-3 py-1.5">
+                            <td colSpan={12} className="px-3 py-1.5">
                               <div className="flex items-center justify-between">
                                 <button onClick={() => toggleSection('후가공')} className="flex items-center gap-2 text-stone-700 font-semibold text-xs hover:text-stone-900">
                                   {collapsedSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -1777,25 +1787,86 @@ export default function BomManagement() {
                               </div>
                             </td>
                           </tr>
-                          {!collapsedSections.has('후가공') && editBom.postProcessLines.map(line => (
-                            <tr key={line.id} className="group hover:bg-amber-50/30 transition-colors border-b border-stone-100">
-                              <td className="px-1 py-1"></td>{/* 부위 빈칸 */}
-                              <td className="px-1 py-1" colSpan={2}><Input value={line.name} onChange={e => updatePostLine(line.id, 'name', e.target.value)} className="h-7 text-xs border-stone-200 bg-white" placeholder="후가공 품목명" /></td>
-                              <td className="px-2 py-1 text-center text-xs text-stone-400">NET</td>
-                              <td className="px-1 py-1"><Input type="number" value={line.unitPrice || ''} onChange={e => updatePostLine(line.id, 'unitPrice', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder={`단가(${curSymbol})`} /></td>
-                              <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => updatePostLine(line.id, 'netQty', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="수량" /></td>
-                              <td colSpan={2}></td>
-                              <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">{fmt(line.netQty * line.unitPrice)}</td>
-                              <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmtKrw(line.netQty * line.unitPrice * preRate)}</td>
-                              <td colSpan={2}></td>
-                              <td className="px-1 py-1"><button onClick={() => deletePostLine(line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-stone-300 hover:text-red-400 p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
-                            </tr>
-                          ))}
-                          {/* 임가공비 */}
+                          {!collapsedSections.has('후가공') && editBom.postProcessLines.map(line => {
+                            const lineAmt = line.netQty * line.unitPrice;
+                            const isDimmed = lineAmt === 0;
+                            return (
+                              <tr key={line.id} className={`group hover:bg-amber-50/30 transition-colors border-b border-stone-100 ${isDimmed ? 'opacity-40' : ''}`}>
+                                {/* 부위 | 자재명 통합 셀 */}
+                                <td className="px-1 py-1">
+                                  <div className="flex items-center gap-1">
+                                    <Select
+                                      value={(line as PostProcessLine & { subPart?: string }).subPart || ''}
+                                      onValueChange={v => updatePostLine(line.id, 'subPart' as keyof PostProcessLine, v)}
+                                    >
+                                      <SelectTrigger className="h-7 text-xs border-stone-200 w-20 shrink-0">
+                                        <SelectValue placeholder="-" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none" className="text-xs text-stone-400">-</SelectItem>
+                                        {SECTION_SUB_PARTS['후가공'].map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                    <Input value={line.name} onChange={e => updatePostLine(line.id, 'name', e.target.value)} className="h-7 text-xs border-stone-200 bg-white min-w-[80px]" placeholder="후가공 품목명" />
+                                  </div>
+                                </td>
+                                {/* 규격 */}
+                                <td className="px-1 py-1">
+                                  <Input
+                                    value={(line as PostProcessLine & { spec?: string }).spec || ''}
+                                    onChange={e => updatePostLine(line.id, 'spec' as keyof PostProcessLine, e.target.value)}
+                                    className="h-7 text-xs border-stone-200 bg-white min-w-[60px]"
+                                    placeholder="규격"
+                                  />
+                                </td>
+                                {/* 단위 */}
+                                <td className="px-1 py-1">
+                                  <Select
+                                    value={(line as PostProcessLine & { unit?: string }).unit || 'EA'}
+                                    onValueChange={v => updatePostLine(line.id, 'unit' as keyof PostProcessLine, v)}
+                                  >
+                                    <SelectTrigger className="h-7 text-xs border-stone-200 w-20"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      {UNITS.filter(u => u !== '직접입력').map(u => <SelectItem key={u} value={u} className="text-xs">{u}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                </td>
+                                {/* 단가 */}
+                                <td className="px-1 py-1"><Input type="number" value={line.unitPrice || ''} onChange={e => updatePostLine(line.id, 'unitPrice', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder={`단가(${curSymbol})`} /></td>
+                                {/* NET */}
+                                <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => updatePostLine(line.id, 'netQty', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="수량" /></td>
+                                {/* LOSS (후가공은 빈칸) */}
+                                <td className="px-2 py-1 text-center text-xs text-stone-300">-</td>
+                                {/* 소요량 (= NET) */}
+                                <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmt(line.netQty)}</td>
+                                {/* 제조금액 */}
+                                <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">{fmt(lineAmt)}</td>
+                                {/* KRW */}
+                                <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmtKrw(lineAmt * preRate)}</td>
+                                {/* 본사제공 빈칸 */}
+                                <td></td>
+                                {/* 구매업체 빈칸 */}
+                                <td></td>
+                                {/* 삭제 */}
+                                <td className="px-1 py-1"><button onClick={() => deletePostLine(line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-stone-300 hover:text-red-400 p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                              </tr>
+                            );
+                          })}
+                          {/* 임가공비 - 별도 섹션으로 분리 */}
                           <tr className="bg-amber-50/50 border-y border-stone-200">
-                            <td className="px-3 py-2 text-xs font-semibold text-stone-700" colSpan={4}>임가공비</td>
+                            <td colSpan={12} className="px-3 py-1.5">
+                              <span className="text-xs font-semibold text-stone-600">임가공비</span>
+                              <span className="text-[10px] text-stone-400 ml-2">자재비와 별도 항목</span>
+                            </td>
+                          </tr>
+                          <tr className="bg-amber-50/30 border-b border-stone-200">
+                            <td className="px-1 py-1" colSpan={3}>
+                              <span className="text-xs text-stone-600 px-2">임가공비 (NET)</span>
+                            </td>
                             <td className="px-1 py-1"><Input type="number" value={editBom.processingFee || ''} onChange={e => updateField('processingFee', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder={curSymbol} /></td>
-                            <td colSpan={3}></td>
+                            <td className="px-1 py-1"><span className="text-xs text-stone-400 px-2">1</span></td>
+                            <td></td>
+                            <td className="px-2 py-1 text-right text-xs text-stone-400">1</td>
                             <td className="px-2 py-1 text-right text-xs font-semibold tabular-nums">{fmt(editBom.processingFee)} {curSymbol}</td>
                             <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">{fmtKrw(editBom.processingFee * preRate)}</td>
                             <td colSpan={3}></td>
@@ -2098,16 +2169,15 @@ export default function BomManagement() {
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="bg-blue-900 text-white text-[11px]">
-                            <th className="px-2 py-2 text-center w-16">부위</th>
-                            <th className="px-2 py-2 text-left">자재명</th>
+                            <th className="px-2 py-2 text-left">부위 | 자재명</th>
                             <th className="px-2 py-2 text-left w-20">규격</th>
                             <th className="px-2 py-2 text-center w-20">단위</th>
                             <th className="px-2 py-2 text-right w-20">단가({curSymbol})</th>
-                            <th className="px-2 py-2 text-right w-20">NET소요량</th>
+                            <th className="px-2 py-2 text-right w-20">NET</th>
                             <th className="px-2 py-2 text-right w-16">LOSS(%)</th>
                             <th className="px-2 py-2 text-right w-24">소요량</th>
                             <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
-                            <th className="px-2 py-2 text-right w-24">금액(KRW)</th>
+                            <th className="px-2 py-2 text-right w-24">KRW</th>
                             <th className="px-2 py-2 text-center w-14">본사제공</th>
                             <th className="px-2 py-2 text-left w-24">구매업체</th>
                             <th className="px-2 py-2 w-8"></th>
@@ -2115,12 +2185,12 @@ export default function BomManagement() {
                         </thead>
                         <tbody>
                           {BOM_SECTIONS.map(cat => {
-                            const isRawMaterial = cat === '원자재';
                             const catLines = (editBom.postMaterials || []).filter(l => l.category === cat);
                             const filledLines = catLines.filter(l => l.itemName);
                             const catTotal = catLines.reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate), 0);
                             const collapsed = collapsedPostSections.has(cat);
-                            const colCount = 13;
+                            const colCount = 12;
+                            const isRawMaterial = cat === '원자재';
                             return (
                               <React.Fragment key={cat}>
                                 <tr className={`border-y ${isRawMaterial ? 'bg-blue-50 border-blue-200' : 'bg-blue-50/30 border-blue-100'}`}>
@@ -2154,16 +2224,24 @@ export default function BomManagement() {
                                     onChange={updatePostMaterialLine}
                                     onDelete={deletePostMaterialLine}
                                     cnyKrw={postRate}
-                                    showSubPart={isRawMaterial}
+                                    sectionKey={cat}
                                     accentColor="blue"
                                   />
                                 ))}
                               </React.Fragment>
                             );
                           })}
-                          {/* 사후원가 임가공비 */}
+                          {/* 사후원가 임가공비 - 별도 섹션 */}
                           <tr className="bg-blue-50/50 border-y border-blue-100">
-                            <td className="px-3 py-2 text-xs font-semibold text-blue-700" colSpan={4}>임가공비 (사후)</td>
+                            <td colSpan={12} className="px-3 py-1.5">
+                              <span className="text-xs font-semibold text-blue-700">임가공비 (사후)</span>
+                              <span className="text-[10px] text-blue-400 ml-2">자재비와 별도 항목</span>
+                            </td>
+                          </tr>
+                          <tr className="bg-blue-50/20 border-b border-blue-100">
+                            <td className="px-1 py-1" colSpan={3}>
+                              <span className="text-xs text-blue-700 px-2">임가공비 (NET)</span>
+                            </td>
                             <td className="px-1 py-1">
                               <Input
                                 type="number"
@@ -2173,7 +2251,9 @@ export default function BomManagement() {
                                 placeholder={curSymbol}
                               />
                             </td>
-                            <td colSpan={3}></td>
+                            <td className="px-1 py-1"><span className="text-xs text-stone-400 px-2">1</span></td>
+                            <td></td>
+                            <td className="px-2 py-1 text-right text-xs text-stone-400">1</td>
                             <td className="px-2 py-1 text-right text-xs font-semibold tabular-nums text-blue-700">
                               {fmt(editBom.postProcessingFee || 0)} {curSymbol}
                             </td>
