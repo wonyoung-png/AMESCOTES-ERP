@@ -315,14 +315,15 @@ interface QuoteRow {
   memo?: string;
 }
 
-function buildQuoteRows(bom: ExtBom): QuoteRow[] {
+function buildQuoteRows(bom: ExtBom, tab: 'pre' | 'post' = 'pre'): QuoteRow[] {
   const cnyKrw = bom.snapshotCnyKrw || 191;
   const rows: QuoteRow[] = [];
-  const matAmt = bom.lines.filter(l => l.category === '원자재' && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
+  const srcLines = tab === 'post' ? (bom.postMaterials || []) : bom.lines;
+  const matAmt = srcLines.filter(l => l.category === '원자재' && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
   if (matAmt > 0) rows.push({ id: genId(), category: '원자재', itemName: '원자재', qty: 1, unitPrice: Math.round(matAmt), supplyAmt: Math.round(matAmt), taxAmt: Math.round(matAmt * 0.1) });
-  const subAmt = bom.lines.filter(l => ['지퍼', '장식', '보강재', '봉사·접착제'].includes(l.category) && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
+  const subAmt = srcLines.filter(l => ['지퍼', '장식', '보강재', '봉사·접착제'].includes(l.category) && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
   if (subAmt > 0) rows.push({ id: genId(), category: '부자재', itemName: '부자재', qty: 1, unitPrice: Math.round(subAmt), supplyAmt: Math.round(subAmt), taxAmt: Math.round(subAmt * 0.1) });
-  const packAmt = bom.lines.filter(l => l.category === '포장재' && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
+  const packAmt = srcLines.filter(l => l.category === '포장재' && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
   if (packAmt > 0) rows.push({ id: genId(), category: '포장재', itemName: '포장재', qty: 1, unitPrice: Math.round(packAmt), supplyAmt: Math.round(packAmt), taxAmt: Math.round(packAmt * 0.1) });
   (bom.postProcessLines || []).filter(l => l.name && l.unitPrice > 0).forEach(l => {
     const amt = Math.round(l.netQty * l.unitPrice * cnyKrw);
@@ -335,8 +336,8 @@ function buildQuoteRows(bom: ExtBom): QuoteRow[] {
   return rows;
 }
 
-function VendorQuoteModal({ bom, onClose }: { bom: ExtBom; onClose: () => void }) {
-  const [rows, setRows] = useState<QuoteRow[]>(() => buildQuoteRows(bom));
+function VendorQuoteModal({ bom, onClose, tab = 'pre' }: { bom: ExtBom; onClose: () => void; tab?: 'pre' | 'post' }) {
+  const [rows, setRows] = useState<QuoteRow[]>(() => buildQuoteRows(bom, tab));
   const [recipient, setRecipient] = useState('');
   const [dateStr, setDateStr] = useState(new Date().toISOString().split('T')[0]);
   const printRef = useRef<HTMLDivElement>(null);
@@ -2108,6 +2109,10 @@ export default function BomManagement() {
                       <FileText className="w-3 h-3 text-blue-400" /> {editBom.postSourceFileName}
                     </span>
                   )}
+                  {/* 업체용 견적서 발행 */}
+                  <Button variant="outline" size="sm" onClick={() => setShowQuote(true)} className="gap-1.5 text-xs border-[#C9A96E] text-[#C9A96E] hover:bg-amber-50">
+                    <FileText className="w-3.5 h-3.5" /> 업체용 견적서
+                  </Button>
                 </div>
               </div>
 
@@ -2402,7 +2407,7 @@ export default function BomManagement() {
           )}
 
           {/* 업체용 견적서 모달 */}
-          {showQuote && editBom && <VendorQuoteModal bom={editBom} onClose={() => setShowQuote(false)} />}
+          {showQuote && editBom && <VendorQuoteModal bom={editBom} onClose={() => setShowQuote(false)} tab={activeTab} />}
         </>
       )}
 
