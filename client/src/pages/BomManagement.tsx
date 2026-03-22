@@ -1252,7 +1252,7 @@ function PostCostSummary({
   const deliveryPrice = bom.postDeliveryPrice || linkedItem?.deliveryPrice || linkedItem?.targetSalePrice || 0;
   const marginAmt = deliveryPrice > 0 ? deliveryPrice - ps.totalCostKrw : 0;
   const marginPct = deliveryPrice > 0 ? (marginAmt / deliveryPrice) * 100 : 0;
-  const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 30 ? 'text-yellow-600' : 'text-green-600';
+  const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 20 ? 'text-amber-600' : marginPct <= 30 ? 'text-green-600' : 'text-orange-600';
   const marginBgClass = marginPct < 15 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200';
   const marginLabel = marginPct < 15 ? '🔴 위험' : marginPct < 30 ? '🟡 주의' : '✅ 양호';
 
@@ -3069,7 +3069,7 @@ export default function BomManagement() {
                           if (!deliveryPrice || deliveryPrice <= 0) return null;
                           const marginAmt = deliveryPrice - summary.totalCostKrw;
                           const marginPct = (marginAmt / deliveryPrice) * 100;
-                          const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 30 ? 'text-amber-600' : 'text-green-600';
+                          const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 20 ? 'text-amber-600' : marginPct <= 30 ? 'text-green-600' : 'text-orange-600';
                           const marginBg = marginPct < 15 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
                           return (
                             <>
@@ -3088,8 +3088,8 @@ export default function BomManagement() {
                                     <div className="flex items-center gap-2">
                                       <span className="text-xs text-stone-500">마진율</span>
                                       <span className={`font-mono font-bold text-lg ${marginClass}`}>{marginPct.toFixed(1)}%</span>
-                                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${marginPct >= 30 ? 'bg-green-100 text-green-700' : marginPct >= 15 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                                        {marginPct >= 30 ? '✅ 양호' : marginPct >= 15 ? '🟡 주의' : '🔴 위험'}
+                                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${marginPct > 30 ? 'bg-orange-100 text-orange-700' : marginPct >= 20 ? 'bg-green-100 text-green-700' : marginPct >= 15 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                                        {marginPct > 30 ? '🟠 초과주의' : marginPct >= 20 ? '🟢 좋음' : marginPct >= 15 ? '🟡 적정' : '🔴 미달'}
                                       </span>
                                     </div>
                                   </div>
@@ -3539,7 +3539,7 @@ export default function BomManagement() {
                 const deliveryPrice = editBom.postDeliveryPrice || linkedItem?.deliveryPrice || linkedItem?.targetSalePrice || 0;
                 const marginAmt = deliveryPrice > 0 ? deliveryPrice - ps.totalCostKrw : 0;
                 const marginPct = deliveryPrice > 0 ? (marginAmt / deliveryPrice) * 100 : 0;
-                const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 30 ? 'text-amber-600' : 'text-green-600';
+                const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 20 ? 'text-amber-600' : marginPct <= 30 ? 'text-green-600' : 'text-orange-600';
                 const marginBg = marginPct < 15 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
                 return (
                   <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
@@ -3611,8 +3611,8 @@ export default function BomManagement() {
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs text-stone-500">마진율</span>
                                     <span className={`font-mono font-bold text-lg ${marginClass}`}>{marginPct.toFixed(1)}%</span>
-                                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${marginPct >= 30 ? 'bg-green-100 text-green-700' : marginPct >= 15 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                                      {marginPct >= 30 ? '✅ 양호' : marginPct >= 15 ? '🟡 주의' : '🔴 위험'}
+                                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${marginPct > 30 ? 'bg-orange-100 text-orange-700' : marginPct >= 20 ? 'bg-green-100 text-green-700' : marginPct >= 15 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                                      {marginPct > 30 ? '🟠 초과주의' : marginPct >= 20 ? '🟢 좋음' : marginPct >= 15 ? '🟡 적정' : '🔴 미달'}
                                     </span>
                                   </div>
                                 </div>
