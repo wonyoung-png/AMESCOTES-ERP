@@ -532,7 +532,9 @@ export interface CartItem {
   materialName: string    // 자재명
   spec?: string           // 규격
   unit: string            // 단위
-  qty: number             // 수량 (여러 발주에서 합산)
+  qty: number             // 소요수량 (여러 발주에서 합산)
+  stockQty?: number       // 보유 재고 수량 (수동 입력, 기본 0)
+  // 발주필요수량 = qty - (stockQty ?? 0) (계산값, 저장 불필요)
   vendorName?: string     // 구매업체
   isHqProvided: boolean   // 본사제공 여부
   orders: { styleNo: string; styleName: string; qty: number }[] // 담긴 발주 목록
@@ -962,6 +964,15 @@ export const store = {
     const idx = cart.findIndex(c => c.materialName === materialName && c.unit === unit);
     if (idx >= 0) {
       cart[idx].qty = qty;
+      setAll(KEYS.materialCart, cart);
+    }
+  },
+
+  updateCartItemStock: (materialName: string, unit: string, stockQty: number) => {
+    const cart = getAll<CartItem>(KEYS.materialCart);
+    const idx = cart.findIndex(c => c.materialName === materialName && c.unit === unit);
+    if (idx >= 0) {
+      cart[idx].stockQty = stockQty;
       setAll(KEYS.materialCart, cart);
     }
   },

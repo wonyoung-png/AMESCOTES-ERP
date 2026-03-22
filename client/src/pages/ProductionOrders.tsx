@@ -2392,6 +2392,8 @@ export default function ProductionOrders() {
                       <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">자재명</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">규격</th>
                       <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">단위</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">소요수량</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">보유재고</th>
                       <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">발주수량</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">담긴 발주</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">구매처</th>
@@ -2399,22 +2401,51 @@ export default function ProductionOrders() {
                     </tr>
                   </thead>
                   <tbody>
-                    {cartItems.map((item, idx) => (
+                    {cartItems.map((item, idx) => {
+                      const stockQty = item.stockQty ?? 0;
+                      const orderQty = Math.max(0, item.qty - stockQty);
+                      const isSufficient = orderQty === 0;
+                      return (
                       <tr key={idx} className="border-b border-stone-100 hover:bg-stone-50">
                         <td className="px-3 py-2 font-medium text-stone-800">{item.materialName}</td>
                         <td className="px-3 py-2 text-stone-500 text-xs">{item.spec || '-'}</td>
                         <td className="px-3 py-2 text-center text-stone-600">{item.unit}</td>
+                        <td className="px-3 py-2 text-right font-mono text-stone-600 text-sm">
+                          {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
+                        </td>
                         <td className="px-3 py-2 text-right">
                           <input
                             type="number"
                             step="0.001"
-                            value={item.qty}
+                            min="0"
+                            value={stockQty === 0 ? '' : stockQty}
+                            placeholder="0"
                             onChange={e => {
-                              const newQty = parseFloat(e.target.value) || 0;
-                              store.updateCartItemQty(item.materialName, item.unit, newQty);
+                              const val = parseFloat(e.target.value) || 0;
+                              store.updateCartItemStock(item.materialName, item.unit, val);
                               refreshCart();
                             }}
-                            className="w-24 h-7 text-right font-mono text-sm border border-stone-200 rounded px-2 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                            className="w-20 h-7 text-right font-mono text-sm border border-stone-200 rounded px-2 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            value={orderQty}
+                            onChange={e => {
+                              const newQty = parseFloat(e.target.value) || 0;
+                              // 발주수량 수동 조정 시 stockQty를 역산하여 저장
+                              const newStock = Math.max(0, item.qty - newQty);
+                              store.updateCartItemStock(item.materialName, item.unit, newStock);
+                              refreshCart();
+                            }}
+                            className={`w-24 h-7 text-right font-mono text-sm border rounded px-2 focus:outline-none focus:ring-1 ${
+                              isSufficient
+                                ? 'border-green-300 text-green-700 bg-green-50 focus:ring-green-300'
+                                : 'border-amber-300 text-amber-700 bg-amber-50 focus:ring-amber-300'
+                            }`}
                           />
                         </td>
                         <td className="px-3 py-2 text-xs text-stone-500">
@@ -2439,11 +2470,12 @@ export default function ProductionOrders() {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-              <p className="text-xs text-stone-400">💡 발주수량은 재고 보유분 차감 등을 위해 수동 조정 가능합니다</p>
+              <p className="text-xs text-stone-400">💡 보유재고 입력 시 발주수량이 자동으로 차감됩니다. 발주수량도 직접 조정 가능합니다.</p>
             </div>
           )}
           <DialogFooter className="gap-2 flex-wrap">
@@ -2487,14 +2519,20 @@ export default function ProductionOrders() {
           <div className="space-y-6 py-2">
             {/* 거래처별 분류 */}
             {(() => {
-              // cartItems를 vendorName 기준으로 그룹핑
-              const grouped = new Map<string, CartItem[]>();
+              // cartItems를 vendorName 기준으로 그룹핑 (발주수량 0 항목 제외)
+              const grouped = new Map<string, Array<CartItem & { orderQty: number }>>();
               for (const item of cartItems) {
+                const stockQty = item.stockQty ?? 0;
+                const orderQty = Math.max(0, item.qty - stockQty);
+                if (orderQty === 0) continue; // 발주수량 0 항목 제외
                 const vendor = item.vendorName || '미지정';
                 if (!grouped.has(vendor)) grouped.set(vendor, []);
-                grouped.get(vendor)!.push(item);
+                grouped.get(vendor)!.push({ ...item, orderQty });
               }
               const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+              if (grouped.size === 0) {
+                return <p className="text-center text-stone-400 py-8">발주가 필요한 자재가 없습니다 (보유재고로 충당 가능)</p>;
+              }
               return Array.from(grouped.entries()).map(([vendor, items]) => (
                 <div key={vendor} className="border border-stone-200 rounded-lg overflow-hidden">
                   {/* 업체 헤더 */}
@@ -2520,6 +2558,8 @@ export default function ProductionOrders() {
                         <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">자재명</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">규격</th>
                         <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">단위</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">소요수량</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">보유재고</th>
                         <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">발주수량</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">비고 (담긴 발주)</th>
                       </tr>
@@ -2531,8 +2571,14 @@ export default function ProductionOrders() {
                           <td className="px-3 py-2 font-medium text-stone-800">{item.materialName}</td>
                           <td className="px-3 py-2 text-stone-500 text-xs">{item.spec || '-'}</td>
                           <td className="px-3 py-2 text-center text-stone-600">{item.unit}</td>
-                          <td className="px-3 py-2 text-right font-mono font-semibold text-stone-800">
+                          <td className="px-3 py-2 text-right font-mono text-stone-500 text-xs">
                             {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-stone-500 text-xs">
+                            {(item.stockQty ?? 0) % 1 === 0 ? (item.stockQty ?? 0).toLocaleString() : (item.stockQty ?? 0).toFixed(3)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-amber-700">
+                            {item.orderQty % 1 === 0 ? item.orderQty.toLocaleString() : item.orderQty.toFixed(3)}
                           </td>
                           <td className="px-3 py-2 text-xs text-stone-400">
                             {item.orders.map((o, j) => (
@@ -2547,7 +2593,7 @@ export default function ProductionOrders() {
                     </tbody>
                     <tfoot>
                       <tr className="bg-stone-50 border-t border-stone-200">
-                        <td colSpan={4} className="px-3 py-2 text-xs font-medium text-stone-600 text-right">합계 {items.length}종</td>
+                        <td colSpan={6} className="px-3 py-2 text-xs font-medium text-stone-600 text-right">합계 {items.length}종</td>
                         <td className="px-3 py-2 text-right text-xs font-bold text-stone-700">{items.length}종 발주</td>
                         <td className="px-3 py-2"></td>
                       </tr>
