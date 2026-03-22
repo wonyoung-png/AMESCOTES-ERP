@@ -1,5 +1,5 @@
 // AMESCOTES ERP — 품목 마스터 (대규모 개편)
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type ProductionOrder, type ColorQty } from '@/lib/store';
 import { resizeImage } from '@/lib/utils';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link, ShoppingCart, Printer } from 'lucide-react';
 import { toast } from 'sonner';
@@ -74,6 +75,9 @@ export default function ItemMaster() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<Partial<Item>>({ ...emptyItem });
   const [isEdit, setIsEdit] = useState(false);
+  // 변경사항 추적
+  const [isDirty, setIsDirty] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [manualStyleNo, setManualStyleNo] = useState(false);
   const [registDate, setRegistDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedVendorId, setSelectedVendorId] = useState('');
@@ -181,6 +185,7 @@ export default function ItemMaster() {
     setPreviewStyleNo(pf?.styleNo || '');
     setColorInput('');
     setCustomCategory('');
+    setIsDirty(false);
     setModalOpen(true);
   };
 
@@ -243,8 +248,18 @@ export default function ItemMaster() {
     setSelectedVendorId(''); setPreviewStyleNo(item.styleNo); setColorInput('');
     setCustomCategory(item.customCategory || '');
     setColorDetailOpen(null);
+    setIsDirty(false);
     setModalOpen(true);
   };
+
+  const handleModalClose = useCallback((requestClose: boolean) => {
+    if (!requestClose) return;
+    if (isDirty) {
+      setShowUnsavedDialog(true);
+    } else {
+      setModalOpen(false);
+    }
+  }, [isDirty]);
 
   const handleSave = () => {
     if (!editItem.styleNo || !editItem.name) { toast.error('스타일번호와 품명을 입력하세요'); return; }
@@ -321,6 +336,7 @@ export default function ItemMaster() {
         toast.success('품목이 등록되었습니다');
       }
     }
+    setIsDirty(false);
     setModalOpen(false);
     refresh();
   };
@@ -763,8 +779,16 @@ export default function ItemMaster() {
         </DialogContent>
       </Dialog>
 
+      {/* 변경사항 확인 다이얼로그 */}
+      <UnsavedChangesDialog
+        open={showUnsavedDialog}
+        onSaveAndClose={() => { setShowUnsavedDialog(false); handleSave(); }}
+        onDiscardAndClose={() => { setShowUnsavedDialog(false); setIsDirty(false); setModalOpen(false); }}
+        onCancel={() => setShowUnsavedDialog(false)}
+      />
+
       {/* 등록/수정 모달 */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+      <Dialog open={modalOpen} onOpenChange={handleModalClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEdit ? '품목 수정' : '품목 등록'}</DialogTitle>

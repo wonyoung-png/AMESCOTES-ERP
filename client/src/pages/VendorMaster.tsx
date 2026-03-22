@@ -1,5 +1,5 @@
 // AMESCOTES ERP — 거래처 마스터 (Phase 1 개편)
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { store, genId, type Vendor, type VendorType, type Currency, type BillingType } from '@/lib/store';
 import { parseBizLicense } from '@/lib/bizLicense';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Search, Pencil, Trash2, Building2, Clock, Loader2, Paperclip, Upload } from 'lucide-react';
@@ -53,6 +54,9 @@ export default function VendorMaster() {
   const [isBankFileLoading, setIsBankFileLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bankFileInputRef = useRef<HTMLInputElement>(null);
+  // 변경사항 추적
+  const [isDirty, setIsDirty] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
 
   const refresh = () => setVendors(store.getVendors());
 
@@ -75,8 +79,17 @@ export default function VendorMaster() {
     return list;
   }, [vendors, search, filterType, filterMaterialType]);
 
-  const openAdd = () => { setEditVendor({ ...EMPTY_VENDOR }); setIsEdit(false); setShowModal(true); };
-  const openEdit = (v: Vendor) => { setEditVendor({ ...v }); setIsEdit(true); setShowModal(true); };
+  const openAdd = () => { setEditVendor({ ...EMPTY_VENDOR }); setIsEdit(false); setIsDirty(false); setShowModal(true); };
+  const openEdit = (v: Vendor) => { setEditVendor({ ...v }); setIsEdit(true); setIsDirty(false); setShowModal(true); };
+
+  const handleModalClose = useCallback((requestClose: boolean) => {
+    if (!requestClose) return;
+    if (isDirty) {
+      setShowUnsavedDialog(true);
+    } else {
+      setShowModal(false);
+    }
+  }, [isDirty]);
 
   const handleSave = () => {
     if (!editVendor.name) { toast.error('거래처명을 입력해주세요'); return; }
@@ -114,6 +127,7 @@ export default function VendorMaster() {
       } as Vendor);
       toast.success('거래처가 등록되었습니다');
     }
+    setIsDirty(false);
     setShowModal(false);
     refresh();
   };
@@ -265,6 +279,7 @@ export default function VendorMaster() {
         contactEmail: info.email || v.contactEmail,
         address: info.address || v.address,
       }));
+      setIsDirty(true);
       toast.success('사업자등록증 정보가 자동 입력되었습니다 ✅');
     } catch (err) {
       const msg = err instanceof Error ? err.message : '알 수 없는 오류';
@@ -448,11 +463,12 @@ export default function VendorMaster() {
     }
   };
 
-  const update = (field: keyof Vendor, value: unknown) => setEditVendor(v => ({ ...v, [field]: value }));
+  const update = (field: keyof Vendor, value: unknown) => { setEditVendor(v => ({ ...v, [field]: value })); setIsDirty(true); };
 
   const updateCode = (field: 'code' | 'vendorCode', val: string, maxLen: number) => {
     const clean = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, maxLen);
     setEditVendor(v => ({ ...v, [field]: clean }));
+    setIsDirty(true);
   };
 
   // 유형별 카운트
@@ -675,8 +691,16 @@ export default function VendorMaster() {
         </table>
       </div>
 
+      {/* 변경사항 확인 다이얼로그 */}
+      <UnsavedChangesDialog
+        open={showUnsavedDialog}
+        onSaveAndClose={() => { setShowUnsavedDialog(false); handleSave(); }}
+        onDiscardAndClose={() => { setShowUnsavedDialog(false); setIsDirty(false); setShowModal(false); }}
+        onCancel={() => setShowUnsavedDialog(false)}
+      />
+
       {/* 등록/수정 모달 */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={handleModalClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{isEdit ? '거래처 수정' : '거래처 등록'}</DialogTitle></DialogHeader>
           <div className="space-y-5 py-2">
@@ -1011,7 +1035,7 @@ export default function VendorMaster() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
+            <Button variant="outline" onClick={() => handleModalClose(true)}>취소</Button>
             <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">저장</Button>
           </DialogFooter>
         </DialogContent>

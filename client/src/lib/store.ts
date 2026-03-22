@@ -130,6 +130,7 @@ export interface BomLine {
   category: BomCategory;   // 섹션 구분
   subPart?: BomSubPart;     // 품목 부위 (원자재 구분 시만 사용)
   itemName: string;         // 품목
+  color?: string;           // 컬러 (원자재에만 사용, 예: '블랙', '브라운', '전체')
   spec?: string;            // 규격
   unit: string;             // 단위
   customUnit?: string;      // 단위 직접입력 (unit === '직접입력' 시)
@@ -772,10 +773,14 @@ export const store = {
     return { bom: bomList[0], type: 'pre' };
   },
 
-  /** 자재 소요량 계산: BOM 소요량 × 발주수량, 본사제공/미제공 분리 */
-  calcMaterialRequirements: (styleNo: string, qty: number): {
-    hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }>;
-    factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }>;
+  /** 자재 소요량 계산: BOM 소요량 × 발주수량, 본사제공/미제공 분리
+   * 원자재 컬러 매칭 지원:
+   * - BOM 원자재 행의 color가 없거나 "전체"면 → 전체 수량에 적용
+   * - BOM 원자재 행의 color가 특정 컬러면 → colorQtys에서 해당 컬러 수량에만 적용
+   */
+  calcMaterialRequirements: (styleNo: string, qty: number, colorQtys?: ColorQty[]): {
+    hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string }>;
+    factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string }>;
     processingFee: number;
     factoryUnitPriceCny: number;
     bomType: 'post' | 'pre' | null;
@@ -793,13 +798,24 @@ export const store = {
       ? (bom.postProcessingFee ?? bom.processingFee ?? 0)
       : (bom.processingFee ?? 0);
 
-    const hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }> = [];
-    const factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }> = [];
+    const hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string }> = [];
+    const factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string }> = [];
 
     for (const line of lines) {
-      // 소요량 = NET소요량 * (1 + LOSS율) * 발주수량
       const perPcsQty = line.netQty * (1 + (line.lossRate ?? 0));
-      const totalQty = Math.round(perPcsQty * qty * 100) / 100;
+
+      // 원자재 컬러 매칭 로직
+      let effectiveQty = qty;
+      if (line.category === '원자재' && line.color && line.color !== '전체' && line.color !== '공통' && colorQtys && colorQtys.length > 0) {
+        // 특정 컬러 지정 → 해당 컬러 수량만 적용
+        const matched = colorQtys.find(cq =>
+          cq.color.trim() === line.color!.trim()
+        );
+        effectiveQty = matched ? matched.qty : 0;
+      }
+      // color가 없거나 "전체"/"공통"이면 전체 수량(qty) 사용
+
+      const totalQty = Math.round(perPcsQty * effectiveQty * 100) / 100;
       const entry = {
         bomLineId: line.id,
         itemName: line.itemName,
@@ -807,6 +823,7 @@ export const store = {
         unit: line.unit,
         reqQty: totalQty,
         vendorName: line.vendorName,
+        color: line.color,
       };
       if (line.isHqProvided) hqProvided.push(entry);
       else factoryProvided.push(entry);

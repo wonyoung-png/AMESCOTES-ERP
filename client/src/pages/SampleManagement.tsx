@@ -338,6 +338,7 @@ export default function SampleManagement() {
       costCny: 0, imageUrls: [], documents: [], revisionHistory: [], materialChecklist: [], materialRequests: [],
     };
     initialFormRef.current = initial;
+    skipNextDirtyRef.current = true;
     setForm(initial);
     setEditId(null);
     setCreateTempMode(false);
@@ -348,6 +349,7 @@ export default function SampleManagement() {
 
   const openEdit = (s: Sample) => {
     initialFormRef.current = { ...s };
+    skipNextDirtyRef.current = true;
     setForm({ ...s });
     setEditId(s.id);
     setCreateTempMode(false);
@@ -460,18 +462,14 @@ export default function SampleManagement() {
     setShowModal(false);
   };
 
-  // 모달이 열린 직후(초기화 완료 후) dirty 추적 활성화 플래그
-  const dirtyTrackingRef = useRef(false);
+  // form 변경 감지로 isDirty 설정 (초기화 시는 무시)
+  const skipNextDirtyRef = useRef(false);
   useEffect(() => {
-    if (showModal) {
-      // 모달 열릴 때는 아직 초기화 중이므로 잠깐 후 추적 시작
-      dirtyTrackingRef.current = false;
-      const timer = setTimeout(() => { dirtyTrackingRef.current = true; }, 100);
-      return () => clearTimeout(timer);
-    } else {
-      dirtyTrackingRef.current = false;
-    }
-  }, [showModal]);
+    if (!showModal) return;
+    if (skipNextDirtyRef.current) { skipNextDirtyRef.current = false; return; }
+    setIsDirty(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
 
   // 모달 닫기 요청 처리 (변경사항 확인)
   const handleModalClose = useCallback((requestClose: boolean) => {

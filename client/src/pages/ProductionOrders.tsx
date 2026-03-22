@@ -177,7 +177,7 @@ export default function ProductionOrders() {
     if (!styleNo || qty <= 0) return;
     const settings = store.getSettings();
     const cnyKrw = settings.cnyKrw || 191;
-    const result = store.calcMaterialRequirements(styleNo, qty);
+    const result = store.calcMaterialRequirements(styleNo, qty, colorQtys.length > 0 ? colorQtys : undefined);
 
     if (result.bomType === null) {
       // BOM 없음
@@ -282,7 +282,7 @@ export default function ProductionOrders() {
       recalcBom(form.styleNo, newQty);
       // HQ items 수량도 재계산
       if (bomCalc.hqProvided.length > 0) {
-        const result = store.calcMaterialRequirements(form.styleNo!, newQty);
+        const result = store.calcMaterialRequirements(form.styleNo!, newQty, colorQtys.length > 0 ? colorQtys : undefined);
         setHqItems(prev => prev.map(item => {
           const found = result.hqProvided.find(h => h.bomLineId === item.bomLineId);
           return found ? { ...item, requiredQty: found.reqQty } : item;
