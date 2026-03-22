@@ -207,6 +207,7 @@ export interface Bom {
   exchangeRateUsd?: number;       // 사후원가 USD 환율
   postDeliveryPrice?: number;     // 사후원가용 납품가 (직접입력)
   postSourceFileName?: string;    // 사후원가 업로드 파일명
+  colorBoms?: ColorBom[];     // 컬러별 BOM (원자재만 별도 관리)
   createdAt: string;
   updatedAt: string;
   memo?: string;
@@ -782,9 +783,9 @@ export const store = {
   },
 
   /** 자재 소요량 계산: BOM 소요량 × 발주수량, 본사제공/미제공 분리
-   * 원자재 컬러 매칭 지원:
-   * - BOM 원자재 행의 color가 없거나 "전체"면 → 전체 수량에 적용
-   * - BOM 원자재 행의 color가 특정 컬러면 → colorQtys에서 해당 컬러 수량에만 적용
+   * 컬러별 BOM 지원:
+   * - colorQtys의 각 컬러에 해당하는 colorBom이 있으면 → 해당 colorBom.lines 사용 (원자재)
+   * - colorBom이 없는 컬러 or 원자재가 아닌 섹션 → 기본 BOM lines 사용
    */
   calcMaterialRequirements: (styleNo: string, qty: number, colorQtys?: ColorQty[]): {
     hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string }>;
@@ -798,7 +799,7 @@ export const store = {
     if (!bom) return { hqProvided: [], factoryProvided: [], processingFee: 0, factoryUnitPriceCny: 0, bomType: null };
 
     // 사용할 자재 라인 결정 (사후원가 우선)
-    const lines: BomLine[] = (type === 'post' && bom.postMaterials && bom.postMaterials.length > 0)
+    const baseLines: BomLine[] = (type === 'post' && bom.postMaterials && bom.postMaterials.length > 0)
       ? bom.postMaterials
       : (bom.lines || []);
 
@@ -809,21 +810,11 @@ export const store = {
     const hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string }> = [];
     const factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string }> = [];
 
-    for (const line of lines) {
+    // 원자재가 아닌 섹션: 기본 BOM에서 전체 수량 적용
+    const nonRawLines = baseLines.filter(l => l.category !== '원자재');
+    for (const line of nonRawLines) {
       const perPcsQty = line.netQty * (1 + (line.lossRate ?? 0));
-
-      // 원자재 컬러 매칭 로직
-      let effectiveQty = qty;
-      if (line.category === '원자재' && line.color && line.color !== '전체' && line.color !== '공통' && colorQtys && colorQtys.length > 0) {
-        // 특정 컬러 지정 → 해당 컬러 수량만 적용
-        const matched = colorQtys.find(cq =>
-          cq.color.trim() === line.color!.trim()
-        );
-        effectiveQty = matched ? matched.qty : 0;
-      }
-      // color가 없거나 "전체"/"공통"이면 전체 수량(qty) 사용
-
-      const totalQty = Math.round(perPcsQty * effectiveQty * 100) / 100;
+      const totalQty = Math.round(perPcsQty * qty * 100) / 100;
       const entry = {
         bomLineId: line.id,
         itemName: line.itemName,
@@ -831,10 +822,53 @@ export const store = {
         unit: line.unit,
         reqQty: totalQty,
         vendorName: line.vendorName,
-        color: line.color,
+        color: undefined,
       };
       if (line.isHqProvided) hqProvided.push(entry);
       else factoryProvided.push(entry);
+    }
+
+    // 원자재 섹션: colorBoms 활용
+    if (colorQtys && colorQtys.length > 0 && bom.colorBoms && bom.colorBoms.length > 0) {
+      // 컬러별로 처리
+      for (const cq of colorQtys) {
+        if (!cq.qty || cq.qty <= 0) continue;
+        const colorBom = bom.colorBoms.find(cb => cb.color.trim() === cq.color.trim());
+        const rawLines = colorBom ? colorBom.lines : baseLines.filter(l => l.category === '원자재');
+        for (const line of rawLines) {
+          const perPcsQty = line.netQty * (1 + (line.lossRate ?? 0));
+          const totalQty = Math.round(perPcsQty * cq.qty * 100) / 100;
+          const entry = {
+            bomLineId: line.id,
+            itemName: line.itemName,
+            spec: line.spec,
+            unit: line.unit,
+            reqQty: totalQty,
+            vendorName: line.vendorName,
+            color: cq.color,
+          };
+          if (line.isHqProvided) hqProvided.push(entry);
+          else factoryProvided.push(entry);
+        }
+      }
+    } else {
+      // colorBoms 없거나 colorQtys 없으면 기본 원자재 전체 수량 적용
+      const rawLines = baseLines.filter(l => l.category === '원자재');
+      for (const line of rawLines) {
+        const perPcsQty = line.netQty * (1 + (line.lossRate ?? 0));
+        const totalQty = Math.round(perPcsQty * qty * 100) / 100;
+        const entry = {
+          bomLineId: line.id,
+          itemName: line.itemName,
+          spec: line.spec,
+          unit: line.unit,
+          reqQty: totalQty,
+          vendorName: line.vendorName,
+          color: undefined,
+        };
+        if (line.isHqProvided) hqProvided.push(entry);
+        else factoryProvided.push(entry);
+      }
     }
 
     return {

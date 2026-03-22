@@ -45,6 +45,12 @@ interface BomPnlAssumptions {
   confirmedSalePrice?: number;
 }
 
+// 컬러별 BOM (원자재만 별도 관리)
+interface ExtColorBom {
+  color: string;
+  lines: ExtBomLine[];
+}
+
 // 확장된 BOM 타입 (localStorage에 저장되는 실제 구조)
 interface ExtBom {
   id: string;
@@ -75,6 +81,8 @@ interface ExtBom {
   preExchangeRateCny?: number;   // 사전원가 CNY 환율 (없으면 snapshotCnyKrw 사용)
   preExchangeRateUsd?: number;   // 사전원가 USD 환율
   preSourceFileName?: string;
+  // 컬러별 BOM (원자재만 별도 관리)
+  colorBoms?: ExtColorBom[];
   // 사후원가
   postMaterials?: ExtBomLine[];
   postProcessingFee?: number;
@@ -94,7 +102,7 @@ interface ExtBomLine {
   category: BomCategory;
   subPart?: BomSubPart;     // 품목 부위 (원자재 구분 시만)
   itemName: string;
-  color?: string;           // 컬러 (원자재에만 사용, 예: '블랙', '브라운', '전체')
+  color?: string;           // @deprecated — 컬러별 BOM 탭 방식으로 전환. 하위 호환성을 위해 optional 유지
   spec?: string;
   unit: string;
   customUnit?: string;      // 직접입력 단위
@@ -284,6 +292,16 @@ function normalizeBom(b: ExtBom): ExtBom {
     packingCostKrw: b.packingCostKrw ?? 0,
     productionMarginRate: b.productionMarginRate ?? 0.16,
     snapshotCnyKrw: b.snapshotCnyKrw ?? 191,
+    colorBoms: Array.isArray(b.colorBoms) ? b.colorBoms.map(cb => ({
+      color: cb.color,
+      lines: Array.isArray(cb.lines) ? cb.lines.map(l => ({
+        ...l,
+        id: l.id || genId(),
+        unitPriceCny: (l as ExtBomLine & { unitPrice?: number }).unitPriceCny ?? (l as ExtBomLine & { unitPrice?: number }).unitPrice ?? 0,
+        lossRate: l.lossRate ?? 0.05,
+        isHqProvided: l.isHqProvided ?? false,
+      })) : [],
+    })) : undefined,
     postMaterials: Array.isArray(b.postMaterials) ? b.postMaterials.map(l => ({
       ...l,
       id: l.id || genId(),
@@ -1150,8 +1168,11 @@ export default function BomManagement() {
   const items = store.getItems();
   const buyers = store.getVendors().filter(v => v.type === '바이어');
 
-  // 현재 활성 탭: 사전원가 or 사후원가
-  const [activeTab, setActiveTab] = useState<'pre' | 'post'>('pre');
+  // 현재 활성 탭: 'pre' | 'post' | 컬러명 (컬러별 BOM 탭)
+  const [activeTab, setActiveTab] = useState<string>('pre');
+  // 컬러 탭 추가 모달
+  const [showAddColorModal, setShowAddColorModal] = useState(false);
+  const [newColorName, setNewColorName] = useState('');
 
   const [extBoms, setExtBoms] = useState<ExtBom[]>(() => getExtBoms());
   const [selectedStyleId, setSelectedStyleId] = useState<string>(() => {
@@ -1273,6 +1294,102 @@ export default function BomManagement() {
   const updatePnl = useCallback(<K extends keyof BomPnlAssumptions>(field: K, val: BomPnlAssumptions[K]) => {
     setEditBom(prev => prev ? { ...prev, pnl: { ...(prev.pnl || defaultPnl()), [field]: val } } : prev);
     markDirty();
+  }, []);
+
+  // ─── 컬러 BOM 핸들러 ────────────────────────────────────────────────────
+  // 컬러 탭 추가
+  const addColorBom = useCallback((color: string) => {
+    setEditBom(prev => {
+      if (!prev) return prev;
+      const existing = (prev.colorBoms || []).find(cb => cb.color === color);
+      if (existing) return prev;
+      // 기본 BOM 원자재 복사
+      const baseRawLines = prev.lines
+        .filter(l => l.category === '원자재' && l.itemName)
+        .map(l => ({ ...l, id: genId() }));
+      return {
+        ...prev,
+        colorBoms: [...(prev.colorBoms || []), { color, lines: baseRawLines }],
+      };
+    });
+    markDirty();
+    setActiveTab(color);
+  }, []);
+
+  // 컬러 탭 삭제
+  const removeColorBom = useCallback((color: string) => {
+    setEditBom(prev => {
+      if (!prev) return prev;
+      return { ...prev, colorBoms: (prev.colorBoms || []).filter(cb => cb.color !== color) };
+    });
+    markDirty();
+    setActiveTab('pre');
+  }, []);
+
+  // 컬러 BOM 원자재 행 업데이트
+  const updateColorBomLine = useCallback((color: string, id: string, field: keyof ExtBomLine, val: unknown) => {
+    setEditBom(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        colorBoms: (prev.colorBoms || []).map(cb =>
+          cb.color === color
+            ? { ...cb, lines: cb.lines.map(l => l.id === id ? { ...l, [field]: val } : l) }
+            : cb
+        ),
+      };
+    });
+    markDirty();
+  }, []);
+
+  // 컬러 BOM 원자재 행 삭제
+  const deleteColorBomLine = useCallback((color: string, id: string) => {
+    setEditBom(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        colorBoms: (prev.colorBoms || []).map(cb =>
+          cb.color === color
+            ? { ...cb, lines: cb.lines.filter(l => l.id !== id) }
+            : cb
+        ),
+      };
+    });
+    markDirty();
+  }, []);
+
+  // 컬러 BOM 원자재 행 추가
+  const addColorBomLine = useCallback((color: string) => {
+    setEditBom(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        colorBoms: (prev.colorBoms || []).map(cb =>
+          cb.color === color
+            ? { ...cb, lines: [...cb.lines, newExtLine('원자재')] }
+            : cb
+        ),
+      };
+    });
+    markDirty();
+  }, []);
+
+  // 기본 BOM 원자재를 특정 컬러 탭으로 복사
+  const copyBaseToColo = useCallback((color: string) => {
+    setEditBom(prev => {
+      if (!prev) return prev;
+      const baseRawLines = prev.lines
+        .filter(l => l.category === '원자재' && l.itemName)
+        .map(l => ({ ...l, id: genId() }));
+      return {
+        ...prev,
+        colorBoms: (prev.colorBoms || []).map(cb =>
+          cb.color === color ? { ...cb, lines: baseRawLines } : cb
+        ),
+      };
+    });
+    markDirty();
+    toast.success(`기본 원자재를 [${color}] 탭에 복사했습니다`);
   }, []);
 
   const handleSave = () => {
@@ -1874,20 +1991,52 @@ export default function BomManagement() {
       {editBom && (
         <>
           {/* 탭 헤더 */}
-          <div className="flex border-b border-stone-200">
+          <div className="flex items-center border-b border-stone-200 overflow-x-auto">
+            {/* 기본 (사전원가) 탭 */}
             <button
               onClick={() => setActiveTab('pre')}
-              className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === 'pre'
                   ? 'border-[#C9A96E] text-[#C9A96E]'
                   : 'border-transparent text-stone-400 hover:text-stone-600'
               }`}
             >
-              사전원가
+              기본
             </button>
+
+            {/* 컬러별 BOM 탭 */}
+            {(editBom.colorBoms || []).map(cb => (
+              <button
+                key={cb.color}
+                onClick={() => setActiveTab(cb.color)}
+                className={`flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === cb.color
+                    ? 'border-emerald-500 text-emerald-700'
+                    : 'border-transparent text-stone-400 hover:text-stone-600'
+                }`}
+              >
+                {cb.color}
+                <span
+                  onClick={e => { e.stopPropagation(); removeColorBom(cb.color); }}
+                  className="w-4 h-4 rounded-full bg-stone-200 hover:bg-red-200 text-stone-500 hover:text-red-600 flex items-center justify-center text-[10px] cursor-pointer"
+                >
+                  ×
+                </span>
+              </button>
+            ))}
+
+            {/* + 컬러 추가 버튼 */}
+            <button
+              onClick={() => setShowAddColorModal(true)}
+              className="px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-stone-400 hover:text-emerald-600 transition-colors whitespace-nowrap"
+            >
+              + 컬러 추가
+            </button>
+
+            {/* 사후원가 탭 */}
             <button
               onClick={() => setActiveTab('post')}
-              className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+              className={`ml-auto flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === 'post'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-stone-400 hover:text-stone-600'
@@ -1900,6 +2049,80 @@ export default function BomManagement() {
               )}
             </button>
           </div>
+
+          {/* 컬러 추가 모달 */}
+          {showAddColorModal && (
+            <Dialog open onOpenChange={() => { setShowAddColorModal(false); setNewColorName(''); }}>
+              <DialogContent className="max-w-sm">
+                <DialogHeader><DialogTitle>컬러 탭 추가</DialogTitle></DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1 block">컬러명</label>
+                    <Input
+                      value={newColorName}
+                      onChange={e => setNewColorName(e.target.value)}
+                      placeholder="예: 블랙, 브라운, 레드..."
+                      className="text-sm"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && newColorName.trim()) {
+                          addColorBom(newColorName.trim());
+                          setShowAddColorModal(false);
+                          setNewColorName('');
+                        }
+                      }}
+                      autoFocus
+                    />
+                    {/* 품목 마스터 컬러 목록에서 빠른 선택 */}
+                    {(() => {
+                      const linkedItem = items.find(i => i.id === editBom.styleId);
+                      const existingColors = (editBom.colorBoms || []).map(cb => cb.color);
+                      const itemColors = (linkedItem?.colors || [])
+                        .map(c => typeof c === 'string' ? c : c.name)
+                        .filter(name => name && !existingColors.includes(name));
+                      if (itemColors.length === 0) return null;
+                      return (
+                        <div className="mt-2">
+                          <p className="text-[10px] text-stone-400 mb-1">품목 마스터 컬러에서 선택:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {itemColors.map(name => (
+                              <button
+                                key={name}
+                                onClick={() => {
+                                  addColorBom(name);
+                                  setShowAddColorModal(false);
+                                  setNewColorName('');
+                                }}
+                                className="px-2 py-0.5 text-xs rounded-full border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                              >
+                                {name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => { setShowAddColorModal(false); setNewColorName(''); }}>취소</Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (newColorName.trim()) {
+                          addColorBom(newColorName.trim());
+                          setShowAddColorModal(false);
+                          setNewColorName('');
+                        }
+                      }}
+                      disabled={!newColorName.trim()}
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white"
+                    >
+                      추가
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
 
           {/* ══════════════════════════════════════════════════════════════════
             사전원가 탭
@@ -2356,6 +2579,119 @@ export default function BomManagement() {
               )}
             </>
           )}
+
+          {/* ══════════════════════════════════════════════════════════════════
+            컬러별 BOM 탭
+          ══════════════════════════════════════════════════════════════════ */}
+          {activeTab !== 'pre' && activeTab !== 'post' && (() => {
+            const colorBom = (editBom.colorBoms || []).find(cb => cb.color === activeTab);
+            if (!colorBom) return null;
+            const preCur = editBom.preCurrency || 'CNY';
+            const preCnyKrw = editBom.preExchangeRateCny ?? editBom.snapshotCnyKrw;
+            const preUsdKrw = editBom.preExchangeRateUsd ?? settings.usdKrw;
+            const preRate = preCur === 'USD' ? preUsdKrw : preCur === 'KRW' ? 1 : preCnyKrw;
+            const curSymbol = preCur === 'CNY' ? '¥' : preCur === 'USD' ? '$' : '₩';
+            return (
+              <div className="space-y-4">
+                {/* 컬러 BOM 안내 배너 */}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-semibold text-emerald-800">[{colorBom.color}] 컬러 BOM</span>
+                    <span className="text-xs text-emerald-600 ml-3">원자재만 별도 관리 — 장식·지퍼·보강재 등은 기본 BOM과 동일</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyBaseToColo(colorBom.color)}
+                    className="gap-1.5 text-xs border-emerald-400 text-emerald-700 hover:bg-emerald-100"
+                  >
+                    <Copy className="w-3.5 h-3.5" /> 기본에서 복사
+                  </Button>
+                </div>
+
+                {/* 원자재 테이블 */}
+                <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+                  <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between bg-emerald-50">
+                    <h2 className="text-sm font-semibold text-emerald-800">원자재 명세 — {colorBom.color}</h2>
+                    <span className="text-xs text-stone-400">통화: {preCur} {preCur !== 'KRW' && `| CNY→KRW ${preCnyKrw}`}</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-emerald-800 text-white text-[11px]">
+                          <th className="px-2 py-2 text-left">부위 | 자재명</th>
+                          <th className="px-2 py-2 text-left w-20">규격</th>
+                          <th className="px-2 py-2 text-center w-20">단위</th>
+                          <th className="px-2 py-2 text-right w-20">단가({curSymbol})</th>
+                          <th className="px-2 py-2 text-right w-20">NET</th>
+                          <th className="px-2 py-2 text-right w-16">LOSS(%)</th>
+                          <th className="px-2 py-2 text-right w-24">소요량</th>
+                          <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
+                          <th className="px-2 py-2 text-right w-24">KRW</th>
+                          <th className="px-2 py-2 text-center w-20">공급</th>
+                          <th className="px-2 py-2 text-left w-36">자재업체</th>
+                          <th className="px-2 py-2 w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* 원자재 행들 */}
+                        <tr className="bg-emerald-50 border-y border-emerald-200">
+                          <td colSpan={12} className="px-3 py-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-semibold text-emerald-800">원자재</span>
+                              <button
+                                onClick={() => addColorBomLine(colorBom.color)}
+                                className="flex items-center gap-1 text-[11px] text-emerald-700 hover:text-emerald-900 font-medium"
+                              >
+                                <Plus className="w-3 h-3" /> 행 추가
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {colorBom.lines.map(line => (
+                          <BomLineRow
+                            key={line.id}
+                            line={line}
+                            onChange={(id, field, val) => updateColorBomLine(colorBom.color, id, field, val)}
+                            onDelete={id => deleteColorBomLine(colorBom.color, id)}
+                            cnyKrw={preRate}
+                            sectionKey="원자재"
+                            accentColor="amber"
+                          />
+                        ))}
+                        {colorBom.lines.length === 0 && (
+                          <tr>
+                            <td colSpan={12} className="px-4 py-6 text-center text-xs text-stone-400">
+                              원자재가 없습니다. "기본에서 복사" 버튼을 눌러 기본 BOM에서 복사하세요.
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* 원자재 소계 */}
+                        {colorBom.lines.length > 0 && (() => {
+                          const total = colorBom.lines.reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate), 0);
+                          return (
+                            <tr className="bg-emerald-800 text-white">
+                              <td colSpan={7} className="px-4 py-2 text-right text-xs font-semibold">원자재 합계</td>
+                              <td className="px-2 py-2 text-right text-xs font-bold">{fmt(total)} {curSymbol}</td>
+                              <td className="px-2 py-2 text-right text-xs font-bold text-emerald-200">{fmtKrw(total * preRate)}</td>
+                              <td colSpan={3}></td>
+                            </tr>
+                          );
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 기타 섹션 안내 */}
+                <div className="bg-stone-50 rounded-xl border border-dashed border-stone-300 px-5 py-4">
+                  <p className="text-xs font-semibold text-stone-600 mb-2">장식 / 지퍼 / 보강재 / 봉사·접착제 / 포장재 / 철형 / 후가공비 / 임가공비</p>
+                  <p className="text-xs text-stone-400">기본 BOM과 동일하게 적용됩니다. 수정이 필요한 경우 기본 탭에서 수정하세요.</p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ══════════════════════════════════════════════════════════════════
             사후원가 탭
