@@ -1373,8 +1373,7 @@ export default function BomManagement() {
   const [copyFromColor, setCopyFromColor] = useState<string>('');
   // URL 파라미터로 자동 활성화할 컬러명 (품목 마스터 연동)
   const [pendingColorTab, setPendingColorTab] = useState<string | null>(null);
-  // 하위 호환성용: activeTab 게터 (사후원가 탭 판별 등에 사용)
-  const activeTab = mainTab === 'post' ? 'post' : activePreColor;
+  // activeTab 변수는 제거됨 — mainTab, activePreColor, activePostColor를 직접 사용
 
   const [extBoms, setExtBoms] = useState<ExtBom[]>(() => getExtBoms());
   const [selectedStyleId, setSelectedStyleId] = useState<string>(() => {
@@ -1413,7 +1412,7 @@ export default function BomManagement() {
 
   // 스타일 선택 시 BOM 로드
   useEffect(() => {
-    if (!selectedStyleId) { setEditBom(null); setActiveTab(''); return; }
+    if (!selectedStyleId) { setEditBom(null); setActivePreColor(''); setActivePostColor(''); return; }
     const item = items.find(i => i.id === selectedStyleId);
     const styleBoms = extBoms.filter(b => b.styleId === selectedStyleId);
     let loadedBom: ExtBom;
@@ -1994,7 +1993,7 @@ export default function BomManagement() {
       setIsDirty(true);
       toast.success(`엑셀 파싱 완료: ${lines.length}개 자재 행 로드됨`);
     } catch (err) {
-      console.error(err);
+      // console.error(err);
       toast.error('엑셀 파싱 실패. 파일 형식을 확인해주세요.');
     }
     if (fileRef.current) fileRef.current.value = '';
@@ -2224,7 +2223,7 @@ export default function BomManagement() {
       markDirty();
       toast.success(`원가표 파싱 완료: ${preMaterials.length}개 자재 행, 후가공 ${parsedPostLines.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
     } catch (err) {
-      console.error(err);
+      // console.error(err);
       toast.error('원가표 파싱 실패. 파일 형식을 확인해주세요.');
     }
     if (preFileRef.current) preFileRef.current.value = '';
@@ -2255,7 +2254,7 @@ export default function BomManagement() {
       markDirty();
       toast.success(`공장 원가표 파싱 완료: ${postMaterials.length}개 자재 행, 후가공 ${parsedPostLines2.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
     } catch (err) {
-      console.error(err);
+      // console.error(err);
       toast.error('공장 원가표 파싱 실패. 파일 형식을 확인해주세요.');
     }
     if (postFileRef.current) postFileRef.current.value = '';
@@ -2577,13 +2576,13 @@ export default function BomManagement() {
                   {addColorForTab === 'pre' && (editBom.colorBoms || []).length > 0 && (
                     <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 text-xs text-emerald-800">
                       <span className="font-semibold">✨ 자동 복사</span>
-                      <p className="mt-1 text-emerald-700">[{editBom.colorBoms![0].color}] 탭의 전체 BOM이 복사됩니다.</p>
+                      <p className="mt-1 text-emerald-700">[{editBom.colorBoms?.[0]?.color}] 탭의 전체 BOM이 복사됩니다.</p>
                     </div>
                   )}
                   {addColorForTab === 'post' && (editBom.postColorBoms || []).length > 0 && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 text-xs text-blue-800">
                       <span className="font-semibold">✨ 자동 복사</span>
-                      <p className="mt-1 text-blue-700">[{editBom.postColorBoms![0].color}] 탭의 전체 BOM이 복사됩니다.</p>
+                      <p className="mt-1 text-blue-700">[{editBom.postColorBoms?.[0]?.color}] 탭의 전체 BOM이 복사됩니다.</p>
                     </div>
                   )}
                   <div>

@@ -727,7 +727,7 @@ export const store = {
       if (!raw) return 0;
       const boms = JSON.parse(raw) as Array<{
         styleNo: string;
-        lines?: Array<{ unitPriceCny?: number; unitPrice?: number; netQty: number; lossRate: number; isHqProvided?: boolean }>;
+        lines?: Array<{ unitPriceCny?: number; unitPrice?: number; netQty: number; lossRate: number; isHqProvided?: boolean; isVendorProvided?: boolean }>;
         postProcessLines?: Array<{ netQty: number; unitPrice: number }>;
         processingFee?: number;
         snapshotCnyKrw?: number;
