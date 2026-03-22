@@ -325,7 +325,7 @@ function buildQuoteRows(bom: ExtBom): QuoteRow[] {
   if (packAmt > 0) rows.push({ id: genId(), category: '포장재', itemName: '포장재', qty: 1, unitPrice: Math.round(packAmt), supplyAmt: Math.round(packAmt), taxAmt: Math.round(packAmt * 0.1) });
   (bom.postProcessLines || []).filter(l => l.name && l.unitPrice > 0).forEach(l => {
     const amt = Math.round(l.netQty * l.unitPrice * cnyKrw);
-    rows.push({ id: genId(), category: '후가공비', itemName: l.name, qty: l.netQty, unitPrice: Math.round(l.unitPrice * cnyKrw), supplyAmt: amt, taxAmt: Math.round(amt * 0.1) });
+    rows.push({ id: genId(), category: '후가공', itemName: l.name, qty: l.netQty, unitPrice: Math.round(l.unitPrice * cnyKrw), supplyAmt: amt, taxAmt: Math.round(amt * 0.1) });
   });
   if (bom.processingFee > 0) {
     const amt = Math.round(bom.processingFee * cnyKrw);
@@ -1158,7 +1158,7 @@ export default function BomManagement() {
         inPostProcess = true;
         continue;
       }
-      // A열이 '후가공비'인 행도 후가공 섹션 시작
+      // A열이 '후가공'인 행도 후가공 섹션 시작
       if (cellA.includes('후가공')) {
         inPostProcess = true;
         continue; // 헤더 행 스킵
@@ -1736,7 +1736,7 @@ export default function BomManagement() {
                               </React.Fragment>
                             );
                           })}
-                          {/* 후가공비 섹션 - 동일 컬럼 구조 */}
+                          {/* 후가공 섹션 - 동일 컬럼 구조 */}
                           <tr className="bg-stone-100 border-y border-stone-200">
                             <td colSpan={12} className="px-3 py-1.5">
                               <div className="flex items-center justify-between">
