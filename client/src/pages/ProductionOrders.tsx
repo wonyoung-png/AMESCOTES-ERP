@@ -1338,6 +1338,102 @@ export default function ProductionOrders() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ── 명세표 발행 모달 ── */}
+      {billingTarget && (
+        <Dialog open={billingModal} onOpenChange={setBillingModal}>
+          <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>명세표 발행 — {billingTarget.orderNo}</DialogTitle>
+              <div className="text-xs text-stone-500 mt-1">
+                거래명세표를 새로 생성하거나 기존 전표에 연결하세요
+              </div>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              {/* 모드 선택 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  onClick={() => setBillingMode('new')}
+                  className={`p-3 rounded-lg border text-sm font-medium transition-colors ${billingMode === 'new' ? 'bg-amber-50 border-amber-400 text-amber-800' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
+                >
+                  📄 거래명세표 신규 생성
+                </button>
+                <button
+                  onClick={() => setBillingMode('link')}
+                  className={`p-3 rounded-lg border text-sm font-medium transition-colors ${billingMode === 'link' ? 'bg-blue-50 border-blue-400 text-blue-800' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
+                >
+                  🔗 기존 전표에 연결
+                </button>
+              </div>
+
+              {billingMode === 'link' && (() => {
+                const thisMonth = new Date().toISOString().slice(0,7);
+                const item = items.find(i => i.id === billingTarget.styleId);
+                const buyer = buyers.find(b => b.id === item?.buyerId);
+                const buyerStatements = store.getTradeStatements()
+                  .filter(t => {
+                    const matchBuyer = !buyer || t.vendorId === buyer.id;
+                    const matchMonth = t.issueDate.startsWith(thisMonth);
+                    return matchBuyer && matchMonth && t.status !== '수금완료';
+                  });
+                return (
+                  <div className="space-y-2">
+                    <p className="text-xs text-stone-500">이번 달 전표 ({thisMonth}) — 바이어: {buyer?.name || '미지정'}</p>
+                    {buyerStatements.length === 0 ? (
+                      <p className="text-xs text-stone-400 py-3 text-center">해당 조건의 전표가 없습니다. 신규 생성을 선택하세요.</p>
+                    ) : (
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {buyerStatements.map(t => (
+                          <button key={t.id}
+                            onClick={() => setLinkStatementId(t.id)}
+                            className={`w-full text-left px-3 py-2 rounded border text-xs transition-colors ${linkStatementId === t.id ? 'bg-blue-50 border-blue-400' : 'border-stone-200 hover:bg-stone-50'}`}
+                          >
+                            <span className="font-mono font-medium">{t.statementNo}</span>
+                            <span className="ml-2 text-stone-500">{t.vendorName}</span>
+                            <span className="ml-2 text-stone-400">{t.issueDate}</span>
+                            <span className="ml-2 text-stone-400">{t.lines?.length || 0}건</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {billingMode === 'new' && (() => {
+                const item = items.find(i => i.id === billingTarget.styleId);
+                const buyer = buyers.find(b => b.id === item?.buyerId);
+                const unitPrice = item?.deliveryPrice || item?.targetSalePrice || billingTarget.factoryUnitPriceKrw || 0;
+                const colorQtyList = billingTarget.colorQtys && billingTarget.colorQtys.length > 0
+                  ? billingTarget.colorQtys
+                  : [{ color: '기본', qty: billingTarget.qty }];
+                const totalAmt = colorQtyList.reduce((sum, cq) => sum + cq.qty * unitPrice, 0);
+                return (
+                  <div className="p-3 bg-amber-50 rounded-lg text-xs text-amber-700 space-y-1">
+                    <p className="font-medium mb-1">생성될 거래명세표</p>
+                    <p>발주번호: {billingTarget.orderNo}</p>
+                    <p>스타일: {billingTarget.styleNo} — {billingTarget.styleName}</p>
+                    <p>바이어: {buyer?.name || '미지정'}</p>
+                    <p>수량: {billingTarget.qty.toLocaleString()} PCS</p>
+                    {unitPrice > 0 && <p>단가: {formatKRW(unitPrice)} / 합계: {formatKRW(totalAmt)}</p>}
+                    {billingTarget.deliveryDate && <p>납기일: {billingTarget.deliveryDate}</p>}
+                  </div>
+                );
+              })()}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBillingModal(false)}>취소</Button>
+              <Button
+                className="bg-amber-700 hover:bg-amber-800 text-white"
+                disabled={billingMode === 'link' && !linkStatementId}
+                onClick={handleConfirmBilling}
+              >
+                {billingMode === 'new' ? '명세표 신규 생성' : '전표 연결 완료'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
