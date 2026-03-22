@@ -1156,12 +1156,18 @@ export default function BomManagement() {
       // 후가공 섹션 시작 감지
       if (rowStr.includes('부·소모재') || rowStr.includes('부소모재')) {
         inPostProcess = true;
+        console.log('[파싱] 후가공 섹션 진입 (소모재 총계)');
         continue;
       }
       // A열이 '후가공'인 행도 후가공 섹션 시작
       if (cellA.includes('후가공')) {
         inPostProcess = true;
+        console.log('[파싱] 후가공 헤더 행 스킵, inPostProcess=true');
         continue; // 헤더 행 스킵
+      }
+      // 현재 상태 로그 (후가공 섹션에서)
+      if (inPostProcess) {
+        console.log('[파싱 후가공]', 'B=', cellB, 'D=', row[3], 'inPostProcess=', inPostProcess);
       }
 
       // 구분(A열)에 값 있으면 섹션 갱신 (후가공 섹션 진입 후에는 스킵)
