@@ -119,6 +119,7 @@ interface ExtBomLine {
   vendorId?: string;          // 본사제공 시 자재업체 ID
   isNewVendor?: boolean;      // 새로 등록된 업체 (기본 정보 미입력)
   memo?: string;
+  imageUrl?: string;          // 자재 이미지 (base64 또는 URL)
 }
 
 // ─── 상수 ───────────────────────────────────────────────────────────────────
@@ -1064,6 +1065,34 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
   );
 }
 
+// ─── 이미지 확대 모달 ─────────────────────────────────────────────────────────
+function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void }) {
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl p-0 overflow-hidden">
+        <div className="relative">
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 z-10 bg-black/50 text-white rounded-full p-1.5 hover:bg-black/70 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <img src={src} alt="자재 이미지" className="w-full max-h-[80vh] object-contain" />
+          <div className="absolute bottom-3 right-3 flex gap-2">
+            <a
+              href={src}
+              download="material-image.jpg"
+              className="bg-white/80 hover:bg-white text-stone-800 text-xs px-3 py-1.5 rounded-lg border border-stone-200 flex items-center gap-1 shadow-sm"
+            >
+              <Download className="w-3.5 h-3.5" /> 다운로드
+            </a>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── BOM 행 컴포넌트 ─────────────────────────────────────────────────────────
 function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재', accentColor = 'amber' }: {
   line: ExtBomLine;
@@ -1078,6 +1107,21 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
   const isCustomUnit = line.unit === '직접입력';
   const displayUnit = isCustomUnit ? (line.customUnit || '') : line.unit;
   const subPartOptions = SECTION_SUB_PARTS[sectionKey] || ['기타'];
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const showImageFeature = sectionKey === '원자재' || sectionKey === '장식';
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      onChange(line.id, 'imageUrl', base64);
+    };
+    reader.readAsDataURL(file);
+    if (imageInputRef.current) imageInputRef.current.value = '';
+  };
 
   // 공급 상태 판단
   const isHqProvided = line.isHqProvided;
@@ -1144,6 +1188,10 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
     : 'hover:bg-amber-50/30';
 
   return (
+    <>
+      {showImagePreview && line.imageUrl && (
+        <ImagePreviewModal src={line.imageUrl} onClose={() => setShowImagePreview(false)} />
+      )}
     <tr className={`group transition-colors border-b border-stone-100 ${ringCls}`}>
       {/* 자재명 (부위 Select가 inline으로 포함됨) */}
       <td className="px-1 py-1">
@@ -1159,6 +1207,35 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
           </Select>
           <MaterialSearchPopover onSelect={handleMaterialSelect} />
           <Input value={line.itemName} onChange={e => onChange(line.id, 'itemName', e.target.value)} className="h-7 text-xs border-stone-200 bg-white min-w-[80px]" placeholder="자재명" />
+          {/* 이미지 기능 (원자재/장식 섹션에만) */}
+          {showImageFeature && (
+            <>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              {line.imageUrl ? (
+                <img
+                  src={line.imageUrl}
+                  alt="자재 이미지"
+                  className="w-6 h-6 object-cover rounded cursor-pointer border border-stone-200 shrink-0"
+                  onClick={() => setShowImagePreview(true)}
+                  title="클릭하여 확대"
+                />
+              ) : (
+                <button
+                  onClick={() => imageInputRef.current?.click()}
+                  className="w-6 h-6 rounded border border-stone-200 text-stone-300 hover:text-stone-500 hover:border-stone-400 flex items-center justify-center shrink-0 transition-colors"
+                  title="이미지 추가"
+                >
+                  📷
+                </button>
+              )}
+            </>
+          )}
         </div>
       </td>
       {/* 규격 */}
@@ -1228,6 +1305,7 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
       {/* 삭제 */}
       <td className="px-1 py-1"><button onClick={() => onDelete(line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-stone-300 hover:text-red-400 p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
     </tr>
+    </>
   );
 }
 

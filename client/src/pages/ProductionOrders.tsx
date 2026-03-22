@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 const ORDER_STATUSES: OrderStatus[] = ['발주생성', '샘플승인', '생산중', '선적중', '통관중', '입고완료', '지연'];
@@ -36,8 +36,8 @@ interface BomCalcResult {
   factoryUnitPriceCny: number;
   factoryUnitPriceKrw: number;
   totalFactoryAmountKrw: number;
-  hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }>;
-  factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string }>;
+  hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; imageUrl?: string }>;
+  factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; imageUrl?: string }>;
   manufacturingCountry?: string;
 }
 
@@ -108,6 +108,7 @@ export default function ProductionOrders() {
   // 발주 완료 후 액션 팝업 상태
   const [postOrderModal, setPostOrderModal] = useState(false);
   const [postOrderInfo, setPostOrderInfo] = useState<{ order: ProductionOrder; bomMaterials: Array<any> } | null>(null);
+  const [materialImagePreview, setMaterialImagePreview] = useState<string | null>(null);
 
   // 자재 장바구니 모달 상태
   const [cartModal, setCartModal] = useState(false);
@@ -1608,6 +1609,31 @@ export default function ProductionOrders() {
                       <span className="text-xs text-blue-600">(각 자재거래처에 별도 발주)</span>
                     </div>
                     <div className="p-0">
+                      {/* 이미지 미리보기 모달 */}
+                      {materialImagePreview && (
+                        <Dialog open onOpenChange={() => setMaterialImagePreview(null)}>
+                          <DialogContent className="max-w-2xl p-0 overflow-hidden">
+                            <div className="relative">
+                              <button
+                                onClick={() => setMaterialImagePreview(null)}
+                                className="absolute top-3 right-3 z-10 bg-black/50 text-white rounded-full p-1.5 hover:bg-black/70 transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              <img src={materialImagePreview} alt="자재 이미지" className="w-full max-h-[80vh] object-contain" />
+                              <div className="absolute bottom-3 right-3">
+                                <a
+                                  href={materialImagePreview}
+                                  download="material-image.jpg"
+                                  className="bg-white/80 hover:bg-white text-stone-800 text-xs px-3 py-1.5 rounded-lg border border-stone-200 flex items-center gap-1 shadow-sm"
+                                >
+                                  <Download className="w-3.5 h-3.5" /> 다운로드
+                                </a>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      )}
                       <table className="w-full text-xs">
                         <thead className="bg-stone-50 border-b border-stone-100">
                           <tr>
@@ -1624,8 +1650,21 @@ export default function ProductionOrders() {
                             return (
                               <tr key={item.bomLineId} className="border-t border-stone-100 hover:bg-stone-50">
                                 <td className="px-3 py-2 font-medium text-stone-700">
-                                  {item.itemName}
-                                  {item.spec && <span className="text-stone-400 ml-1">({item.spec})</span>}
+                                  <div className="flex items-center gap-2">
+                                    {calcItem?.imageUrl ? (
+                                      <img
+                                        src={calcItem.imageUrl}
+                                        alt={item.itemName}
+                                        className="w-6 h-6 object-cover rounded cursor-pointer border border-stone-200 shrink-0"
+                                        onClick={() => setMaterialImagePreview(calcItem.imageUrl!)}
+                                        title="클릭하여 확대"
+                                      />
+                                    ) : null}
+                                    <span>
+                                      {item.itemName}
+                                      {item.spec && <span className="text-stone-400 ml-1">({item.spec})</span>}
+                                    </span>
+                                  </div>
                                 </td>
                                 <td className="px-3 py-2 text-right">
                                   {calcItem ? (
@@ -1681,7 +1720,18 @@ export default function ProductionOrders() {
                     <div className="space-y-1">
                       {bomCalc.factoryProvided.map(m => (
                         <div key={m.bomLineId} className="flex items-center justify-between text-xs text-stone-500">
-                          <span>{m.itemName}{m.spec ? ` (${m.spec})` : ''}</span>
+                          <div className="flex items-center gap-2">
+                            {m.imageUrl ? (
+                              <img
+                                src={m.imageUrl}
+                                alt={m.itemName}
+                                className="w-5 h-5 object-cover rounded cursor-pointer border border-stone-200 shrink-0"
+                                onClick={() => setMaterialImagePreview(m.imageUrl!)}
+                                title="클릭하여 확대"
+                              />
+                            ) : null}
+                            <span>{m.itemName}{m.spec ? ` (${m.spec})` : ''}</span>
+                          </div>
                           <span className="font-mono">
                             {m.reqQty % 1 === 0 ? m.reqQty.toLocaleString() : m.reqQty.toFixed(2)} {m.unit}
                             {m.vendorName && <span className="ml-2 text-stone-400">({m.vendorName})</span>}
