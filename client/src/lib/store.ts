@@ -214,6 +214,15 @@ export interface ProductionOrder {
   defectQty?: number;             // 불량 수량
   defectNote?: string;            // 불량 비고
   receivedDate?: string;          // 입고일
+  // 리오더 네고 이력
+  negoHistory?: {
+    requestedPrice: number;   // 네고 요청단가
+    currency: string;         // 통화 (CNY/USD/KRW)
+    savedAmount: number;      // 총 절감금액 (KRW)
+    savedRate: number;        // 절감률 (%)
+    memo: string;             // 메모
+    date: string;             // 저장일
+  }[];
   createdAt: string;
   updatedAt: string;
   memo?: string;

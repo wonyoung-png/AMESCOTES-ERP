@@ -74,6 +74,10 @@ export default function ProductionOrders() {
   const [customColorInput, setCustomColorInput] = useState('');
   const [showCustomColorInput, setShowCustomColorInput] = useState(false);
 
+  // 리오더 네고 상태
+  const [negoRequestedPrice, setNegoRequestedPrice] = useState<number>(0);
+  const [negoMemo, setNegoMemo] = useState('');
+
   // 입고 처리 팝업 상태
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receiveOrderId, setReceiveOrderId] = useState<string>('');
@@ -126,6 +130,8 @@ export default function ProductionOrders() {
     setShowColorDropdown(false);
     setShowCustomColorInput(false);
     setCustomColorInput('');
+    setNegoRequestedPrice(0);
+    setNegoMemo('');
     setShowModal(true);
 
     if (prefillStyleIdToUse) {
@@ -302,6 +308,7 @@ export default function ProductionOrders() {
       factoryCurrency,
       bomType: manualFactoryPrice ? 'manual' : (bomCalc.bomType ?? undefined),
       deliveryDate: form.deliveryDate,
+      negoHistory: (form as any).negoHistory || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       memo: form.memo,
@@ -1130,6 +1137,161 @@ export default function ProductionOrders() {
                   </div>
                 </div>
 
+                {/* ── 리오더 네고 패널 ── */}
+                {(() => {
+                  // 이전 발주 이력에서 같은 스타일의 최저 공장단가(KRW) 계산
+                  const prevOrders = orders.filter(o => o.styleNo === form.styleNo && o.id !== form.id);
+                  const prevPrices = prevOrders
+                    .map(o => o.factoryUnitPriceKrw)
+                    .filter((p): p is number => !!p && p > 0);
+                  const prevLowestKrw = prevPrices.length > 0 ? Math.min(...prevPrices) : null;
+
+                  // 절감 계산 (네고 요청단가 vs 현재 공장단가, KRW 기준)
+                  const currentPriceKrw = displayFactoryPriceKrw;
+                  const negoReqKrw = (() => {
+                    if (!negoRequestedPrice || negoRequestedPrice <= 0) return 0;
+                    if (factoryCurrency === 'KRW') return negoRequestedPrice;
+                    if (factoryCurrency === 'USD') return Math.round(negoRequestedPrice * usdKrw);
+                    return Math.round(negoRequestedPrice * cnyKrw);
+                  })();
+                  const savedPerPcs = currentPriceKrw > 0 && negoReqKrw > 0 ? currentPriceKrw - negoReqKrw : 0;
+                  const savedTotal = savedPerPcs * currentQty;
+                  const savedRate = currentPriceKrw > 0 && savedPerPcs > 0
+                    ? Math.round((savedPerPcs / currentPriceKrw) * 1000) / 10
+                    : 0;
+                  const isBelowPrevLowest = prevLowestKrw !== null && negoReqKrw > 0 && negoReqKrw < prevLowestKrw;
+
+                  const handleSaveNego = () => {
+                    if (!form.styleId) { toast.error('스타일을 먼저 선택해주세요'); return; }
+                    if (!negoRequestedPrice || negoRequestedPrice <= 0) { toast.error('네고 요청단가를 입력해주세요'); return; }
+                    // 현재 폼에 임시 저장 (발주 등록 시 함께 저장됨)
+                    setForm(f => ({
+                      ...f,
+                      negoHistory: [
+                        ...((f as any).negoHistory || []),
+                        {
+                          requestedPrice: negoRequestedPrice,
+                          currency: factoryCurrency,
+                          savedAmount: savedTotal,
+                          savedRate,
+                          memo: negoMemo,
+                          date: new Date().toISOString().split('T')[0],
+                        },
+                      ],
+                    }));
+                    toast.success(`네고 내역이 저장됐습니다 — 절감 ${formatKRW(savedTotal)} (${savedRate}%)`);
+                    setNegoRequestedPrice(0);
+                    setNegoMemo('');
+                  };
+
+                  return (
+                    <div className="rounded-lg border border-emerald-200 overflow-hidden">
+                      <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2 flex items-center gap-2">
+                        <span className="text-sm">📊</span>
+                        <span className="text-sm font-semibold text-emerald-800">리오더 네고</span>
+                        <span className="text-xs text-emerald-600">단가 협상 내역 기록</span>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        {/* 공장 제시단가 / 이전 최저단가 */}
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div className="p-2.5 bg-stone-50 rounded border border-stone-200">
+                            <p className="text-stone-500 mb-1">공장 제시단가</p>
+                            <p className="font-mono font-semibold text-stone-800">
+                              {currentPriceKrw > 0 ? formatKRW(currentPriceKrw) : '—'}
+                            </p>
+                          </div>
+                          <div className={`p-2.5 rounded border ${prevLowestKrw ? 'bg-blue-50 border-blue-200' : 'bg-stone-50 border-stone-200'}`}>
+                            <p className="text-stone-500 mb-1">이전 최저단가</p>
+                            <p className={`font-mono font-semibold ${prevLowestKrw ? 'text-blue-700' : 'text-stone-400'}`}>
+                              {prevLowestKrw ? formatKRW(prevLowestKrw) : '이력 없음'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 네고 요청단가 입력 */}
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">
+                            네고 요청단가 ({factoryCurrency}/PCS)
+                          </Label>
+                          <Input
+                            type="number"
+                            value={negoRequestedPrice || ''}
+                            onChange={e => setNegoRequestedPrice(parseFloat(e.target.value) || 0)}
+                            placeholder={`0.00 ${factoryCurrency}`}
+                            step="0.01"
+                            className="h-9"
+                          />
+                          {isBelowPrevLowest && (
+                            <p className="text-[10px] text-green-600 font-medium">
+                              🎯 이전 최저단가보다 낮음 — 신규 최저가 달성!
+                            </p>
+                          )}
+                        </div>
+
+                        {/* 절감 계산 결과 */}
+                        {savedTotal !== 0 && (
+                          <div className={`p-3 rounded-lg border ${savedTotal > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <p className="text-stone-500">절감 금액</p>
+                                <p className={`font-mono font-bold text-sm ${savedTotal > 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                  {savedTotal > 0 ? '+' : ''}{formatKRW(savedTotal)}
+                                </p>
+                                <p className="text-stone-400 mt-0.5">
+                                  {formatKRW(savedPerPcs)}/PCS × {currentQty.toLocaleString()} PCS
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-stone-500">절감률</p>
+                                <p className={`font-mono font-bold text-sm ${savedTotal > 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                  {savedTotal > 0 ? '+' : ''}{savedRate}%
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 네고 메모 */}
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">네고 메모</Label>
+                          <Input
+                            value={negoMemo}
+                            onChange={e => setNegoMemo(e.target.value)}
+                            placeholder="예: 수량 증가로 단가 인하 요청"
+                            className="h-9 text-sm"
+                          />
+                        </div>
+
+                        {/* 저장 버튼 */}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full h-9 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs font-medium"
+                          onClick={handleSaveNego}
+                        >
+                          네고 내역 저장
+                        </Button>
+
+                        {/* 이미 저장된 네고 이력 표시 */}
+                        {((form as any).negoHistory || []).length > 0 && (
+                          <div className="space-y-1.5">
+                            <p className="text-xs font-medium text-stone-500">저장된 네고 이력</p>
+                            {((form as any).negoHistory || []).map((n: any, i: number) => (
+                              <div key={i} className="text-[10px] bg-stone-50 border border-stone-200 rounded px-2 py-1.5 flex items-center justify-between">
+                                <span className="text-stone-600">{n.date} — 요청 {n.requestedPrice} {n.currency}</span>
+                                <span className={`font-mono font-medium ${n.savedAmount > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                  {n.savedAmount > 0 ? '+' : ''}{formatKRW(n.savedAmount)} ({n.savedRate}%)
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* ── 자재 발주 섹션 (본사제공) ── */}
                 {(bomCalc.hqProvided.length > 0 || hqItems.length > 0) && (
                   <div className="rounded-lg border border-stone-200 overflow-hidden">
@@ -1380,6 +1542,31 @@ export default function ProductionOrders() {
                       <div key={idx} className={`flex items-center justify-between p-2 rounded text-xs ${item.purchaseStatus === '발송완료' ? 'bg-green-50 text-green-700' : item.purchaseStatus === '구매완료' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
                         <span>{item.itemName} {item.spec && `(${item.spec})`}</span>
                         <span className="font-mono">{item.requiredQty} {item.unit} — {item.purchaseStatus}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* 네고 이력 */}
+              {((showDetail as any).negoHistory || []).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-stone-500 mb-2">📊 리오더 네고 이력</p>
+                  <div className="space-y-1.5">
+                    {((showDetail as any).negoHistory as Array<{
+                      requestedPrice: number; currency: string; savedAmount: number;
+                      savedRate: number; memo: string; date: string;
+                    }>).map((n, i) => (
+                      <div key={i} className={`p-2.5 rounded-lg border text-xs ${n.savedAmount > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-stone-600 font-medium">{n.date}</span>
+                          <span className={`font-mono font-bold ${n.savedAmount > 0 ? 'text-green-700' : 'text-red-600'}`}>
+                            {n.savedAmount > 0 ? '+' : ''}{formatKRW(n.savedAmount)} ({n.savedRate}%)
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between mt-1 text-stone-500">
+                          <span>요청단가: <span className="font-mono font-medium text-stone-700">{n.requestedPrice} {n.currency}</span></span>
+                          {n.memo && <span className="text-stone-400">{n.memo}</span>}
+                        </div>
                       </div>
                     ))}
                   </div>
