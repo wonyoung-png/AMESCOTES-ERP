@@ -2742,6 +2742,16 @@ export default function BomManagement() {
               <Button size="sm" onClick={() => { setAddColorForTab('pre'); setShowAddColorModal(true); }} className="bg-emerald-700 hover:bg-emerald-800 text-white gap-1.5">
                 <Plus className="w-4 h-4" /> 첫 번째 컬러 추가
               </Button>
+              {(editBom.postColorBoms || []).length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={copyAllPostToPre}
+                  className="border-purple-300 text-purple-700 hover:bg-purple-50 gap-1.5 mt-2"
+                >
+                  사후원가 전체 불러오기 → (컬러 {(editBom.postColorBoms || []).length}개)
+                </Button>
+              )}
             </div>
           )}
 
@@ -3197,6 +3207,16 @@ export default function BomManagement() {
               <Button size="sm" onClick={() => { setAddColorForTab('post'); setShowAddColorModal(true); }} className="bg-blue-700 hover:bg-blue-800 text-white gap-1.5">
                 <Plus className="w-4 h-4" /> 첫 번째 컬러 추가
               </Button>
+              {(editBom.colorBoms || []).length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={copyAllPreToPost}
+                  className="border-purple-300 text-purple-700 hover:bg-purple-50 gap-1.5 mt-2"
+                >
+                  <Copy className="w-4 h-4" /> ← 사전원가 전체 불러오기 (컬러 {(editBom.colorBoms || []).length}개)
+                </Button>
+              )}
             </div>
           )}
 
