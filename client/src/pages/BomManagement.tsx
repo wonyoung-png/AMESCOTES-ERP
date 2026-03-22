@@ -65,6 +65,10 @@ interface ExtBom {
   snapshotCnyKrw: number;
   pnl: BomPnlAssumptions;
   sourceFileName?: string;
+  // 사전원가 추가 설정
+  preCurrency?: 'CNY' | 'USD' | 'KRW';
+  preManufacturingCountry?: '중국' | '한국' | '기타';
+  preSourceFileName?: string;
   // 사후원가
   postMaterials?: ExtBomLine[];
   postProcessingFee?: number;
@@ -708,6 +712,7 @@ export default function BomManagement() {
   const [collapsedPostSections, setCollapsedPostSections] = useState<Set<string>>(new Set());
   const [isDirty, setIsDirty] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const preFileRef = useRef<HTMLInputElement>(null);
   const postFileRef = useRef<HTMLInputElement>(null);
 
   const markDirty = () => setIsDirty(true);
@@ -952,6 +957,146 @@ export default function BomManagement() {
     if (fileRef.current) fileRef.current.value = '';
   };
 
+  // 사전원가 원가표 업로드 (preMaterials에 저장)
+  const handlePreExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editBom) return;
+    try {
+      const XLSX = await import('xlsx');
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
+
+      const getString = (row: (string | number | null)[], col: number) => String(row?.[col] || '').trim();
+      const getNum = (row: (string | number | null)[], col: number) => Number(row?.[col]) || 0;
+
+      // 환율 자동 추출
+      let parsedRate = 0;
+      for (let r = 0; r < Math.min(20, raw.length); r++) {
+        const row = raw[r];
+        if (!row) continue;
+        const rowStr = row.map(c => String(c || '')).join(' ');
+        if (rowStr.includes('환율') || rowStr.includes('汇率') || rowStr.includes('Exchange')) {
+          for (let c = 0; c < row.length; c++) {
+            const v = Number(row[c]);
+            if (v > 100 && v < 300) { parsedRate = v; break; }
+          }
+          if (parsedRate === 0) {
+            const nextRow = raw[r + 1];
+            if (nextRow) {
+              for (let c = 0; c < nextRow.length; c++) {
+                const v = Number(nextRow[c]);
+                if (v > 100 && v < 300) { parsedRate = v; break; }
+              }
+            }
+          }
+        }
+      }
+      if (!parsedRate && raw[8]) parsedRate = getNum(raw[8], 7);
+      if (!parsedRate) parsedRate = editBom.exchangeRateCny || editBom.snapshotCnyKrw || 191;
+
+      // 헤더 행 찾기
+      let headerRow = -1;
+      for (let r = 0; r < Math.min(30, raw.length); r++) {
+        const row = raw[r];
+        if (!row) continue;
+        const rowStr = row.map(c => String(c || '')).join(' ');
+        if ((rowStr.includes('구분') || rowStr.includes('품목')) && rowStr.includes('단가')) {
+          headerRow = r;
+          break;
+        }
+      }
+
+      let colMap: { [key: string]: number } = {
+        category: 0, itemName: 1, spec: 2, unit: 3, unitPrice: 4, net: 5, loss: 6, qty: 7, amount: 8, hq: 9,
+      };
+      if (headerRow >= 0) {
+        const hdr = raw[headerRow];
+        if (hdr) {
+          hdr.forEach((cell, idx) => {
+            const s = String(cell || '').trim();
+            if (s.includes('구분')) colMap.category = idx;
+            else if (s.includes('품목')) colMap.itemName = idx;
+            else if (s.includes('규격')) colMap.spec = idx;
+            else if (s.includes('단위')) colMap.unit = idx;
+            else if (s.includes('단가')) colMap.unitPrice = idx;
+            else if (s.toUpperCase() === 'NET') colMap.net = idx;
+            else if (s.toUpperCase().includes('LOSS')) colMap.loss = idx;
+            else if (s.includes('소요량')) colMap.qty = idx;
+            else if (s.includes('제조금액') || s.includes('금액')) colMap.amount = idx;
+            else if (s.includes('본사')) colMap.hq = idx;
+          });
+        }
+      }
+
+      const dataStart = headerRow >= 0 ? headerRow + 1 : 10;
+      const preMaterials: ExtBomLine[] = [];
+      let parsedProcessingFee = 0;
+      let currentCategory: BomCategory = '원자재';
+
+      for (let r = dataStart; r < raw.length; r++) {
+        const row = raw[r];
+        if (!row) continue;
+        const catStr = getString(row, colMap.category);
+        const itemName = getString(row, colMap.itemName);
+
+        if (catStr && !itemName) {
+          if (catStr.includes('원자재')) currentCategory = '원자재';
+          else if (catStr.includes('지퍼')) currentCategory = '지퍼';
+          else if (catStr.includes('장식')) currentCategory = '장식';
+          else if (catStr.includes('보강')) currentCategory = '보강재';
+          else if (catStr.includes('봉사') || catStr.includes('접착')) currentCategory = '봉사·접착제';
+          else if (catStr.includes('포장')) currentCategory = '포장재';
+          else if (catStr.includes('철형')) currentCategory = '철형';
+          continue;
+        }
+
+        if (itemName.includes('임가공') || catStr.includes('임가공')) {
+          const fee = getNum(row, colMap.amount) || getNum(row, colMap.unitPrice);
+          if (fee > 0) parsedProcessingFee = fee;
+          continue;
+        }
+
+        if (!itemName) continue;
+
+        const unitPrice = getNum(row, colMap.unitPrice);
+        const netQty = getNum(row, colMap.net) || getNum(row, colMap.qty);
+        const lossRate = getNum(row, colMap.loss) || 0.05;
+        const hqVal = getString(row, colMap.hq);
+        const isHqProvided = hqVal.length > 0 && hqVal !== '0';
+
+        preMaterials.push({
+          id: genId(),
+          category: currentCategory,
+          itemName,
+          spec: getString(row, colMap.spec),
+          unit: getString(row, colMap.unit) || 'EA',
+          unitPriceCny: unitPrice,
+          netQty,
+          lossRate,
+          isHqProvided,
+          vendorName: '',
+          memo: '',
+        });
+      }
+
+      setEditBom(prev => prev ? {
+        ...prev,
+        lines: preMaterials.length > 0 ? preMaterials : prev.lines,
+        processingFee: parsedProcessingFee || prev.processingFee,
+        snapshotCnyKrw: parsedRate,
+        preSourceFileName: file.name,
+      } : prev);
+      markDirty();
+      toast.success(`원가표 파싱 완료: ${preMaterials.length}개 자재 행, 환율 ${parsedRate}`);
+    } catch (err) {
+      console.error(err);
+      toast.error('원가표 파싱 실패. 파일 형식을 확인해주세요.');
+    }
+    if (preFileRef.current) preFileRef.current.value = '';
+  };
+
   // 사후원가 공장 원가표 업로드
   const handlePostExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1145,6 +1290,7 @@ export default function BomManagement() {
         </div>
         <div className="flex gap-2">
           <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handleExcelUpload} className="hidden" />
+          <input ref={preFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePreExcelUpload} className="hidden" />
           <input ref={postFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePostExcelUpload} className="hidden" />
           {activeTab === 'pre' && (
             <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} className="gap-1.5 text-xs border-stone-300">
@@ -1340,10 +1486,74 @@ export default function BomManagement() {
           ══════════════════════════════════════════════════════════════════ */}
           {activeTab === 'pre' && (
             <>
+              {/* 사전원가 컨트롤 바 */}
+              <div className="bg-white rounded-xl border border-stone-200 p-4 shadow-sm">
+                <div className="flex flex-wrap items-end gap-4">
+                  {/* 제조국 선택 */}
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1 block font-medium">제조국</label>
+                    <div className="flex gap-1">
+                      {(['중국', '한국', '기타'] as const).map(country => (
+                        <button
+                          key={country}
+                          onClick={() => {
+                            updateField('preManufacturingCountry', country);
+                            if (country === '중국') updateField('preCurrency', 'CNY');
+                            else if (country === '한국') updateField('preCurrency', 'KRW');
+                          }}
+                          className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
+                            editBom.preManufacturingCountry === country
+                              ? 'bg-stone-800 text-white border-stone-800'
+                              : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+                          }`}
+                        >
+                          {country}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* 통화 선택 (한국 제외) */}
+                  {editBom.preManufacturingCountry !== '한국' && (
+                    <div>
+                      <label className="text-xs text-stone-500 mb-1 block font-medium">통화</label>
+                      <div className="flex gap-1">
+                        {(['CNY', 'USD'] as const).map(cur => (
+                          <button
+                            key={cur}
+                            onClick={() => updateField('preCurrency', cur)}
+                            className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
+                              editBom.preCurrency === cur
+                                ? 'bg-amber-600 text-white border-amber-600'
+                                : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+                            }`}
+                          >
+                            {cur === 'CNY' ? '¥ CNY' : '$ USD'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* 원가표 업로드 버튼 */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => preFileRef.current?.click()}
+                    className="gap-1.5 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+                  >
+                    <Upload className="w-3.5 h-3.5" /> 원가표 불러오기
+                  </Button>
+                  {editBom.preSourceFileName && (
+                    <span className="text-xs text-stone-400 flex items-center gap-1">
+                      <FileText className="w-3 h-3 text-blue-400" /> {editBom.preSourceFileName}
+                    </span>
+                  )}
+                </div>
+              </div>
+
               {/* BOM 테이블 */}
               <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
                 <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between bg-stone-50">
-                  <h2 className="text-sm font-semibold text-stone-700">원가 계산서 (중국원가표)</h2>
+                  <h2 className="text-sm font-semibold text-stone-700">사전원가 자재 명세</h2>
                   <span className="text-xs text-stone-400">단가 단위: CNY | 적용 환율: {cnyKrw}</span>
                 </div>
                 <div className="overflow-x-auto">
