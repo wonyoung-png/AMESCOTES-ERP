@@ -1135,6 +1135,7 @@ export default function BomManagement() {
     }
 
     const materials: ExtBomLine[] = [];
+    const postProcessLines: PostProcessLine[] = [];
     let parsedProcessingFee = 0;
     let currentCategory: BomCategory = '원자재';
     let inPostProcess = false;
