@@ -1992,6 +1992,39 @@ export default function BomManagement() {
   };
 
   // 사후원가 컬러 → 사전원가 컬러 복사
+  // 전체 불러오기 함수
+  const copyAllPostToPre = () => {
+    const postBoms = editBom?.postColorBoms || [];
+    if (postBoms.length === 0) { toast.error('사후원가에 등록된 컬러가 없습니다'); return; }
+    if (!confirm(`사후원가 전체 ${postBoms.length}개 컬러를 사전원가로 복사하시겠습니까?\n기존 사전원가 데이터가 덮어씌워집니다.`)) return;
+    setEditBom(prev => {
+      if (!prev) return prev;
+      const newColorBoms = postBoms.map(pb => ({
+        ...pb,
+        lines: pb.lines.map((l: any) => ({ ...l, id: genId() })),
+      }));
+      return { ...prev, colorBoms: newColorBoms };
+    });
+    toast.success(`사후원가 전체 ${postBoms.length}개 컬러 → 사전원가 복사 완료`);
+    markDirty();
+  };
+
+  const copyAllPreToPost = () => {
+    const preBoms = editBom?.colorBoms || [];
+    if (preBoms.length === 0) { toast.error('사전원가에 등록된 컬러가 없습니다'); return; }
+    if (!confirm(`사전원가 전체 ${preBoms.length}개 컬러를 사후원가로 복사하시겠습니까?\n기존 사후원가 데이터가 덮어씌워집니다.`)) return;
+    setEditBom(prev => {
+      if (!prev) return prev;
+      const newPostColorBoms = preBoms.map(pb => ({
+        ...pb,
+        lines: pb.lines.map((l: any) => ({ ...l, id: genId() })),
+      }));
+      return { ...prev, postColorBoms: newPostColorBoms };
+    });
+    toast.success(`사전원가 전체 ${preBoms.length}개 컬러 → 사후원가 복사 완료`);
+    markDirty();
+  };
+
   const copyPostToPre = (color: string) => {
     if (!editBom) return;
     const postColorBomSrc = (editBom.postColorBoms || []).find(c => c.color === color);
@@ -2835,6 +2868,14 @@ export default function BomManagement() {
                       >
                         <Copy className="w-3 h-3" /> 사후원가 [{colorBom.color}] 불러오기 →
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyAllPostToPre}
+                        className="h-7 gap-1 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                      >
+                        <Copy className="w-3 h-3" /> 사후원가 전체 불러오기 →
+                      </Button>
                     </div>
                     <span className="text-xs text-stone-400">
                       입력 통화: {preCur} {preCur !== 'KRW' && `| CNY→KRW ${preCnyKrw} | USD→KRW ${preUsdKrw}`}
@@ -3285,6 +3326,14 @@ export default function BomManagement() {
                           className="h-7 gap-1 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
                         >
                           <Copy className="w-3 h-3" /> ← 사전원가 [{postColorBom.color}] 불러오기
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={copyAllPreToPost}
+                          className="h-7 gap-1 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                        >
+                          <Copy className="w-3 h-3" /> ← 사전원가 전체 불러오기
                         </Button>
                       </div>
                       <div className="flex items-center gap-3">
