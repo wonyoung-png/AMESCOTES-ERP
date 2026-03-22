@@ -1070,6 +1070,179 @@ export default function BomManagement() {
   };
 
   // 사전원가 원가표 업로드 (preMaterials에 저장)
+  // ── 엑셀 원가표 공통 파싱 헬퍼 ─────────────────────────────────────────────
+  // 컬럼 구조 (고정):
+  //   A(0):구분  B(1):부위/품목  C(2):자재명  D(3):규격  E(4):단위
+  //   F(5):단가  G(6):NET  H(7):LOSS  I(8):소요량  J(9):제조금액
+  //   K(10):본사제공  M(12):구매업체
+  // 후가공 섹션: B열=작업명, D열=단가, E열=금액
+  // 임가공비: '임가공' 키워드 행의 L열(11)
+  // 환율: row[8](index 8)의 I열(8)
+
+  const SECTION_MAP: Record<string, BomCategory> = {
+    '원': '원자재',
+    '지퍼': '지퍼',
+    '장식': '장식',
+    '보강': '보강재',
+    '봉사': '봉사·접착제',
+    '포장': '포장재',
+    '철형': '철형',
+  };
+
+  const detectCategory = (cellVal: string): BomCategory | null => {
+    for (const [key, cat] of Object.entries(SECTION_MAP)) {
+      if (cellVal.includes(key)) return cat;
+    }
+    return null;
+  };
+
+  const parseExcelBomSheet = (raw: (string | number | null)[][], fallbackRate: number) => {
+    const getString = (row: (string | number | null)[], col: number) => String(row?.[col] ?? '').trim();
+    const getNum = (row: (string | number | null)[], col: number) => {
+      const v = Number(row?.[col]);
+      return isNaN(v) ? 0 : v;
+    };
+
+    // 1. 환율: row index 8(9번째 행)의 I열(index 8)
+    let parsedRate = 0;
+    if (raw[8]) parsedRate = getNum(raw[8], 8);
+    // 못 찾으면 전체 행 스캔
+    if (!parsedRate) {
+      for (let r = 0; r < Math.min(20, raw.length); r++) {
+        const row = raw[r];
+        if (!row) continue;
+        const rowStr = row.map(c => String(c ?? '')).join(' ');
+        if (rowStr.includes('환율') || rowStr.includes('汇率') || rowStr.includes('Exchange')) {
+          for (let c = row.length - 1; c >= 0; c--) {
+            const v = Number(row[c]);
+            if (v > 100 && v < 300) { parsedRate = v; break; }
+          }
+        }
+      }
+    }
+    if (!parsedRate) parsedRate = fallbackRate;
+
+    // 2. 헤더 행 찾기 (구분/품목 + 단가 포함)
+    let dataStart = 10; // 기본 시작 행
+    for (let r = 0; r < Math.min(30, raw.length); r++) {
+      const row = raw[r];
+      if (!row) continue;
+      const rowStr = row.map(c => String(c ?? '')).join(' ');
+      if ((rowStr.includes('구분') || rowStr.includes('품목')) && rowStr.includes('단가')) {
+        dataStart = r + 1;
+        break;
+      }
+    }
+
+    const materials: ExtBomLine[] = [];
+    let parsedProcessingFee = 0;
+    let currentCategory: BomCategory = '원자재';
+    let inPostProcess = false;
+
+    for (let r = dataStart; r < raw.length; r++) {
+      const row = raw[r];
+      if (!row) continue;
+
+      const cellA = getString(row, 0); // 구분
+      const cellB = getString(row, 1); // 부위/품목
+      const cellC = getString(row, 2); // 자재명
+      const cellK = getString(row, 10); // 본사제공
+      const cellL = getNum(row, 11);   // L열 (임가공/공장단가 금액)
+      const rowStr = row.map(c => String(c ?? '')).join(' ');
+
+      // 후가공 섹션 시작 감지 ('부·소모재 총계' 키워드)
+      if (rowStr.includes('부·소모재') || rowStr.includes('부소모재') || rowStr.includes('총계')) {
+        inPostProcess = true;
+        continue;
+      }
+
+      // 구분(A열)에 값 있으면 섹션 갱신
+      if (cellA) {
+        const detected = detectCategory(cellA);
+        if (detected) {
+          currentCategory = detected;
+          inPostProcess = false;
+        }
+        // 소계/합계/총계 행은 스킵
+        if (cellA.includes('소계') || cellA.includes('합계') || cellA.includes('총계')) continue;
+      }
+
+      // 임가공비 행 감지 (어느 섹션이든)
+      if (rowStr.includes('임가공') && !rowStr.includes('후가공')) {
+        // L열(11) 우선, 없으면 E열(4) 또는 J열(9)
+        const fee = cellL > 0 ? cellL : getNum(row, 4) > 0 ? getNum(row, 4) : getNum(row, 9);
+        if (fee > 0) parsedProcessingFee = fee;
+        continue;
+      }
+
+      // 공장단가/제품원가 행은 스킵 (ERP 내부 계산으로 대체)
+      if (rowStr.includes('공장단가') || rowStr.includes('제품원가')) continue;
+
+      // 후가공 섹션 처리
+      if (inPostProcess) {
+        const workName = cellB;
+        if (!workName) continue;
+        // 후가공: B=작업명, D=단가(index 3), E=금액(index 4)
+        const unitPrice = getNum(row, 3);
+        const amount = getNum(row, 4);
+        if (workName && (unitPrice > 0 || amount > 0)) {
+          // 후가공은 PostProcessLine으로 별도 수집 — 여기서는 스킵 (후가공 파싱 배열에 추가)
+          // (후가공은 아래 별도 배열로 리턴)
+        }
+        continue;
+      }
+
+      // 자재명: C열 우선, 없으면 B열
+      const itemName = cellC || cellB;
+      if (!itemName) continue;
+
+      // 소계/합계/총계 행 스킵
+      if (itemName.includes('소계') || itemName.includes('합계') || itemName.includes('총계')) continue;
+
+      const subPart = cellC ? cellB : undefined; // C열이 있으면 B열이 subPart
+      const spec = getString(row, 3);            // D열: 규격
+      const unit = getString(row, 4) || 'EA';    // E열: 단위
+      const unitPriceRaw = getNum(row, 5);       // F열: 단가 (CNY)
+      const netQty = getNum(row, 6);             // G열: NET
+      const lossRate = getNum(row, 7);           // H열: LOSS (0.1 = 10%)
+      const qtyDirect = getNum(row, 8);          // I열: 소요량 (이미 계산된 값)
+      const amountDirect = getNum(row, 9);       // J열: 제조금액
+
+      // NET도 소요량도 없으면 스킵
+      const effectiveNet = netQty || qtyDirect;
+      if (!effectiveNet && !amountDirect) continue;
+
+      // 단가: F열 직접 사용. 없으면 제조금액/소요량 역산
+      let unitPrice = unitPriceRaw;
+      if (!unitPrice && amountDirect > 0 && qtyDirect > 0) {
+        unitPrice = amountDirect / qtyDirect;
+      }
+
+      // 본사제공: K열(10)에 값 있으면 true
+      const isHqProvided = cellK.length > 0 && cellK !== '0';
+
+      // 구매업체: M열(12)
+      const vendorName = getString(row, 12);
+
+      materials.push({
+        id: genId(),
+        category: currentCategory,
+        subPart: subPart as BomSubPart | undefined,
+        itemName,
+        spec,
+        unit,
+        unitPriceCny: unitPrice,
+        netQty: netQty || qtyDirect,
+        lossRate: lossRate || 0,
+        isHqProvided,
+        vendorName,
+        memo: '',
+      });
+    }
+
+    return { materials, parsedProcessingFee, parsedRate };
+  };
+
   const handlePreExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editBom) return;
@@ -1080,118 +1253,8 @@ export default function BomManagement() {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
 
-      const getString = (row: (string | number | null)[], col: number) => String(row?.[col] || '').trim();
-      const getNum = (row: (string | number | null)[], col: number) => Number(row?.[col]) || 0;
-
-      // 환율 자동 추출
-      let parsedRate = 0;
-      for (let r = 0; r < Math.min(20, raw.length); r++) {
-        const row = raw[r];
-        if (!row) continue;
-        const rowStr = row.map(c => String(c || '')).join(' ');
-        if (rowStr.includes('환율') || rowStr.includes('汇率') || rowStr.includes('Exchange')) {
-          for (let c = 0; c < row.length; c++) {
-            const v = Number(row[c]);
-            if (v > 100 && v < 300) { parsedRate = v; break; }
-          }
-          if (parsedRate === 0) {
-            const nextRow = raw[r + 1];
-            if (nextRow) {
-              for (let c = 0; c < nextRow.length; c++) {
-                const v = Number(nextRow[c]);
-                if (v > 100 && v < 300) { parsedRate = v; break; }
-              }
-            }
-          }
-        }
-      }
-      if (!parsedRate && raw[8]) parsedRate = getNum(raw[8], 7);
-      if (!parsedRate) parsedRate = editBom.exchangeRateCny || editBom.snapshotCnyKrw || 191;
-
-      // 헤더 행 찾기
-      let headerRow = -1;
-      for (let r = 0; r < Math.min(30, raw.length); r++) {
-        const row = raw[r];
-        if (!row) continue;
-        const rowStr = row.map(c => String(c || '')).join(' ');
-        if ((rowStr.includes('구분') || rowStr.includes('품목')) && rowStr.includes('단가')) {
-          headerRow = r;
-          break;
-        }
-      }
-
-      let colMap: { [key: string]: number } = {
-        category: 0, itemName: 1, spec: 2, unit: 3, unitPrice: 4, net: 5, loss: 6, qty: 7, amount: 8, hq: 9,
-      };
-      if (headerRow >= 0) {
-        const hdr = raw[headerRow];
-        if (hdr) {
-          hdr.forEach((cell, idx) => {
-            const s = String(cell || '').trim();
-            if (s.includes('구분')) colMap.category = idx;
-            else if (s.includes('품목')) colMap.itemName = idx;
-            else if (s.includes('규격')) colMap.spec = idx;
-            else if (s.includes('단위')) colMap.unit = idx;
-            else if (s.includes('단가')) colMap.unitPrice = idx;
-            else if (s.toUpperCase() === 'NET') colMap.net = idx;
-            else if (s.toUpperCase().includes('LOSS')) colMap.loss = idx;
-            else if (s.includes('소요량')) colMap.qty = idx;
-            else if (s.includes('제조금액') || s.includes('금액')) colMap.amount = idx;
-            else if (s.includes('본사')) colMap.hq = idx;
-          });
-        }
-      }
-
-      const dataStart = headerRow >= 0 ? headerRow + 1 : 10;
-      const preMaterials: ExtBomLine[] = [];
-      let parsedProcessingFee = 0;
-      let currentCategory: BomCategory = '원자재';
-
-      for (let r = dataStart; r < raw.length; r++) {
-        const row = raw[r];
-        if (!row) continue;
-        const catStr = getString(row, colMap.category);
-        const itemName = getString(row, colMap.itemName);
-
-        if (catStr && !itemName) {
-          if (catStr.includes('원자재')) currentCategory = '원자재';
-          else if (catStr.includes('지퍼')) currentCategory = '지퍼';
-          else if (catStr.includes('장식')) currentCategory = '장식';
-          else if (catStr.includes('보강')) currentCategory = '보강재';
-          else if (catStr.includes('봉사') || catStr.includes('접착')) currentCategory = '봉사·접착제';
-          else if (catStr.includes('포장')) currentCategory = '포장재';
-          else if (catStr.includes('철형')) currentCategory = '철형';
-          continue;
-        }
-
-        if (itemName.includes('임가공') || catStr.includes('임가공')) {
-          const fee = getNum(row, colMap.amount) || getNum(row, colMap.unitPrice);
-          if (fee > 0) parsedProcessingFee = fee;
-          continue;
-        }
-
-        if (!itemName) continue;
-
-        const unitPrice = getNum(row, colMap.unitPrice);
-        const netQty = getNum(row, colMap.net) || getNum(row, colMap.qty);
-        const lossRate = getNum(row, colMap.loss) || 0.05;
-        const hqVal = getString(row, colMap.hq);
-        const isHqProvided = hqVal.length > 0 && hqVal !== '0';
-
-        preMaterials.push({
-          id: genId(),
-          category: currentCategory,
-          itemName,
-          spec: getString(row, colMap.spec),
-          unit: getString(row, colMap.unit) || 'EA',
-          unitPriceCny: unitPrice,
-          netQty,
-          lossRate,
-          isHqProvided,
-          vendorName: '',
-          memo: '',
-        });
-      }
+      const fallback = editBom.preExchangeRateCny ?? editBom.snapshotCnyKrw ?? 191;
+      const { materials: preMaterials, parsedProcessingFee, parsedRate } = parseExcelBomSheet(raw, fallback);
 
       setEditBom(prev => prev ? {
         ...prev,
@@ -1220,124 +1283,8 @@ export default function BomManagement() {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
 
-      const getString = (row: (string | number | null)[], col: number) => String(row?.[col] || '').trim();
-      const getNum = (row: (string | number | null)[], col: number) => Number(row?.[col]) || 0;
-
-      // 환율 자동 추출 (다양한 위치 시도)
-      let parsedRate = 0;
-      for (let r = 0; r < Math.min(20, raw.length); r++) {
-        const row = raw[r];
-        if (!row) continue;
-        const rowStr = row.map(c => String(c || '')).join(' ');
-        if (rowStr.includes('환율') || rowStr.includes('汇率') || rowStr.includes('Exchange')) {
-          // 해당 행에서 숫자값 찾기
-          for (let c = 0; c < row.length; c++) {
-            const v = Number(row[c]);
-            if (v > 100 && v < 300) { parsedRate = v; break; } // CNY 환율 범위
-          }
-          if (parsedRate === 0) {
-            // 다음 행도 확인
-            const nextRow = raw[r + 1];
-            if (nextRow) {
-              for (let c = 0; c < nextRow.length; c++) {
-                const v = Number(nextRow[c]);
-                if (v > 100 && v < 300) { parsedRate = v; break; }
-              }
-            }
-          }
-        }
-      }
-      // 없으면 row[8] col[7] (기존 포맷 기준)
-      if (!parsedRate && raw[8]) parsedRate = getNum(raw[8], 7);
-      if (!parsedRate) parsedRate = editBom.exchangeRateCny || editBom.snapshotCnyKrw || 191;
-
-      // 헤더 행 찾기 — '구분', '품목', '규격', '단위' 등이 있는 행
-      let headerRow = -1;
-      for (let r = 0; r < Math.min(30, raw.length); r++) {
-        const row = raw[r];
-        if (!row) continue;
-        const rowStr = row.map(c => String(c || '')).join(' ');
-        if ((rowStr.includes('구분') || rowStr.includes('품목')) && rowStr.includes('단가')) {
-          headerRow = r;
-          break;
-        }
-      }
-
-      // 컬럼 인덱스 감지
-      let colMap: { [key: string]: number } = {
-        category: 0, itemName: 1, spec: 2, unit: 3, unitPrice: 4, net: 5, loss: 6, qty: 7, amount: 8, hq: 9,
-      };
-      if (headerRow >= 0) {
-        const hdr = raw[headerRow];
-        if (hdr) {
-          hdr.forEach((cell, idx) => {
-            const s = String(cell || '').trim();
-            if (s.includes('구분')) colMap.category = idx;
-            else if (s.includes('품목')) colMap.itemName = idx;
-            else if (s.includes('규격')) colMap.spec = idx;
-            else if (s.includes('단위')) colMap.unit = idx;
-            else if (s.includes('단가')) colMap.unitPrice = idx;
-            else if (s.toUpperCase() === 'NET') colMap.net = idx;
-            else if (s.toUpperCase().includes('LOSS')) colMap.loss = idx;
-            else if (s.includes('소요량')) colMap.qty = idx;
-            else if (s.includes('제조금액') || s.includes('금액')) colMap.amount = idx;
-            else if (s.includes('본사')) colMap.hq = idx;
-          });
-        }
-      }
-
-      const dataStart = headerRow >= 0 ? headerRow + 1 : 10;
-      const postMaterials: ExtBomLine[] = [];
-      let parsedProcessingFee = 0;
-      let currentCategory: BomCategory = '원자재';
-
-      for (let r = dataStart; r < raw.length; r++) {
-        const row = raw[r];
-        if (!row) continue;
-        const catStr = getString(row, colMap.category);
-        const itemName = getString(row, colMap.itemName);
-
-        // 카테고리 섹션 헤더 감지
-        if (catStr && !itemName) {
-          if (catStr.includes('원자재')) currentCategory = '원자재';
-          else if (catStr.includes('지퍼')) currentCategory = '지퍼';
-          else if (catStr.includes('장식')) currentCategory = '장식';
-          else if (catStr.includes('보강')) currentCategory = '보강재';
-          else if (catStr.includes('봉사') || catStr.includes('접착')) currentCategory = '봉사·접착제';
-          else if (catStr.includes('포장')) currentCategory = '포장재';
-          else if (catStr.includes('철형')) currentCategory = '철형';
-          continue;
-        }
-
-        // 임가공 행 감지
-        if (itemName.includes('임가공') || catStr.includes('임가공')) {
-          const fee = getNum(row, colMap.amount) || getNum(row, colMap.unitPrice);
-          if (fee > 0) parsedProcessingFee = fee;
-          continue;
-        }
-
-        if (!itemName) continue;
-
-        const unitPrice = getNum(row, colMap.unitPrice);
-        const netQty = getNum(row, colMap.net) || getNum(row, colMap.qty);
-        const lossRate = getNum(row, colMap.loss) || 0.05;
-        const hqVal = getString(row, colMap.hq);
-        const isHqProvided = hqVal.length > 0 && hqVal !== '0';
-
-        postMaterials.push({
-          id: genId(),
-          category: currentCategory,
-          itemName,
-          spec: getString(row, colMap.spec),
-          unit: getString(row, colMap.unit) || 'EA',
-          unitPriceCny: unitPrice,
-          netQty,
-          lossRate,
-          isHqProvided,
-          vendorName: '',
-          memo: '',
-        });
-      }
+      const fallback = editBom.exchangeRateCny ?? editBom.snapshotCnyKrw ?? 191;
+      const { materials: postMaterials, parsedProcessingFee, parsedRate } = parseExcelBomSheet(raw, fallback);
 
       setEditBom(prev => prev ? {
         ...prev,
