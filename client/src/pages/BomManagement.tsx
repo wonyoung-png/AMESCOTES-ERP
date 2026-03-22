@@ -936,17 +936,6 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
           <Input value={line.itemName} onChange={e => onChange(line.id, 'itemName', e.target.value)} className="h-7 text-xs border-stone-200 bg-white min-w-[80px]" placeholder="자재명" />
         </div>
       </td>
-      {/* 컬러 (원자재 섹션에만 입력 표시) */}
-      <td className="px-1 py-1">
-        {sectionKey === '원자재' && (
-          <Input
-            value={line.color || ''}
-            onChange={e => onChange(line.id, 'color', e.target.value)}
-            className="h-7 text-xs border-stone-200 bg-white w-20"
-            placeholder="전체(공통)"
-          />
-        )}
-      </td>
       {/* 규격 */}
       <td className="px-1 py-1"><Input value={line.spec || ''} onChange={e => onChange(line.id, 'spec', e.target.value)} className="h-7 text-xs border-stone-200 bg-white min-w-[60px]" placeholder="규격" /></td>
       {/* 단위 */}
@@ -981,19 +970,19 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
       {/* KRW */}
       <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmtKrw(amt * cnyKrw)}</td>
       {/* 공급 상태 + 체크박스 (본사/업체/공장) */}
-      <td className="px-2 py-1">
-        <div className="flex flex-col items-center gap-1">
+      <td className="px-2 py-1 w-28">
+        <div className="flex flex-col items-center gap-1.5">
           {/* 공급 상태 텍스트 */}
-          <span className={`text-[10px] font-medium ${supplyLabel.cls}`}>{supplyLabel.text}</span>
+          <span className={`text-sm font-semibold ${supplyLabel.cls}`}>{supplyLabel.text}</span>
           {/* 체크박스 2개 */}
-          <div className="flex items-center gap-1.5">
-            <label className="flex items-center gap-0.5 cursor-pointer" title="본사제공">
-              <input type="checkbox" checked={isHqProvided} onChange={e => handleHqChange(e.target.checked)} className="w-3 h-3 accent-amber-600" />
-              <span className="text-[9px] text-amber-600">본</span>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1 cursor-pointer" title="본사제공">
+              <input type="checkbox" checked={isHqProvided} onChange={e => handleHqChange(e.target.checked)} className="w-4 h-4 accent-amber-600" />
+              <span className="text-xs text-amber-600 font-medium">본사</span>
             </label>
-            <label className="flex items-center gap-0.5 cursor-pointer" title="업체제공">
-              <input type="checkbox" checked={isVendorProvided} onChange={e => handleVendorChange(e.target.checked)} className="w-3 h-3 accent-blue-500" />
-              <span className="text-[9px] text-blue-500">업</span>
+            <label className="flex items-center gap-1 cursor-pointer" title="업체제공">
+              <input type="checkbox" checked={isVendorProvided} onChange={e => handleVendorChange(e.target.checked)} className="w-4 h-4 accent-blue-500" />
+              <span className="text-xs text-blue-500 font-medium">업체</span>
             </label>
           </div>
         </div>
@@ -2027,7 +2016,6 @@ export default function BomManagement() {
                         <thead>
                           <tr className="bg-stone-800 text-white text-[11px]">
                             <th className="px-2 py-2 text-left">부위 | 자재명</th>
-                            <th className="px-2 py-2 text-left w-20 text-amber-300">컬러</th>
                             <th className="px-2 py-2 text-left w-20">규격</th>
                             <th className="px-2 py-2 text-center w-20">단위</th>
                             <th className="px-2 py-2 text-right w-20">단가({curSymbol})</th>
@@ -2036,7 +2024,7 @@ export default function BomManagement() {
                             <th className="px-2 py-2 text-right w-24">소요량</th>
                             <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
                             <th className="px-2 py-2 text-right w-24">KRW</th>
-                            <th className="px-2 py-2 text-center w-20">공급</th>
+                            <th className="px-2 py-2 text-center w-28">공급</th>
                             <th className="px-2 py-2 text-left w-36">자재업체</th>
                             <th className="px-2 py-2 w-8"></th>
                           </tr>
@@ -2049,7 +2037,7 @@ export default function BomManagement() {
                             const catTotal = catLines.reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate), 0);
                             // 원자재: 기본 펼침, 나머지: 기본 접힘
                             const collapsed = collapsedSections.has(cat);
-                            const colCount = 13; // 총 컬럼 수
+                            const colCount = 12; // 총 컬럼 수
                             return (
                               <React.Fragment key={cat}>
                                 <tr className={`border-y ${isRawMaterial ? 'bg-amber-50 border-amber-200' : 'bg-stone-100 border-stone-200'}`}>
@@ -2092,7 +2080,7 @@ export default function BomManagement() {
                           })}
                           {/* 후가공 섹션 - 동일 컬럼 구조 */}
                           <tr className="bg-stone-100 border-y border-stone-200">
-                            <td colSpan={13} className="px-3 py-1.5">
+                            <td colSpan={12} className="px-3 py-1.5">
                               <div className="flex items-center justify-between">
                                 <button onClick={() => toggleSection('후가공')} className="flex items-center gap-2 text-stone-700 font-semibold text-xs hover:text-stone-900">
                                   {collapsedSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -2130,8 +2118,6 @@ export default function BomManagement() {
                                     <Input value={line.name} onChange={e => updatePostLine(line.id, 'name', e.target.value)} className="h-7 text-xs border-stone-200 bg-white min-w-[80px]" placeholder="후가공 품목명" />
                                   </div>
                                 </td>
-                                {/* 컬러 (후가공은 빈칸) */}
-                                <td></td>
                                 {/* 규격 */}
                                 <td className="px-1 py-1">
                                   <Input
@@ -2175,13 +2161,13 @@ export default function BomManagement() {
                           })}
                           {/* 임가공비 - 별도 섹션으로 분리 */}
                           <tr className="bg-amber-50/50 border-y border-stone-200">
-                            <td colSpan={13} className="px-3 py-1.5">
+                            <td colSpan={12} className="px-3 py-1.5">
                               <span className="text-xs font-semibold text-stone-600">임가공비</span>
                               <span className="text-[10px] text-stone-400 ml-2">자재비와 별도 항목</span>
                             </td>
                           </tr>
                           <tr className="bg-amber-50/30 border-b border-stone-200">
-                            <td className="px-1 py-1" colSpan={4}>
+                            <td className="px-1 py-1" colSpan={3}>
                               <span className="text-xs text-stone-600 px-2">임가공비 (NET)</span>
                             </td>
                             <td className="px-1 py-1"><Input type="number" value={editBom.processingFee || ''} onChange={e => updateField('processingFee', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder={curSymbol} /></td>
@@ -2495,7 +2481,6 @@ export default function BomManagement() {
                         <thead>
                           <tr className="bg-stone-800 text-white text-[11px]">
                             <th className="px-2 py-2 text-left">부위 | 자재명</th>
-                            <th className="px-2 py-2 text-left w-20 text-amber-300">컬러</th>
                             <th className="px-2 py-2 text-left w-20">규격</th>
                             <th className="px-2 py-2 text-center w-20">단위</th>
                             <th className="px-2 py-2 text-right w-20">단가({curSymbol})</th>
@@ -2504,7 +2489,7 @@ export default function BomManagement() {
                             <th className="px-2 py-2 text-right w-24">소요량</th>
                             <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
                             <th className="px-2 py-2 text-right w-24">KRW</th>
-                            <th className="px-2 py-2 text-center w-20">공급</th>
+                            <th className="px-2 py-2 text-center w-28">공급</th>
                             <th className="px-2 py-2 text-left w-36">자재업체</th>
                             <th className="px-2 py-2 w-8"></th>
                           </tr>
@@ -2560,7 +2545,7 @@ export default function BomManagement() {
                           {/* 후가공 섹션 - 사전원가와 동일 (collapsedSections 공유) */}
                           <React.Fragment key="후가공-post">
                             <tr className="bg-stone-100 border-y border-stone-200">
-                              <td colSpan={13} className="px-3 py-1.5">
+                              <td colSpan={12} className="px-3 py-1.5">
                                 <div className="flex items-center justify-between">
                                   <button onClick={() => toggleSection('후가공')} className="flex items-center gap-2 font-semibold text-xs text-stone-700 hover:opacity-80">
                                     {collapsedSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -2580,8 +2565,6 @@ export default function BomManagement() {
                                 <td className="px-2 py-1" colSpan={2}>
                                   <Input value={line.name} onChange={e => updatePostLine(line.id, 'name', e.target.value)} placeholder="후가공 작업명" className="h-7 text-xs border-stone-200 w-full" />
                                 </td>
-                                {/* 컬러 빈칸 */}
-                                <td className="px-1 py-1"></td>
                                 <td className="px-1 py-1"></td>
                                 <td className="px-1 py-1">
                                   <Input type="number" value={line.netQty || ''} onChange={e => updatePostLine(line.id, 'netQty', Number(e.target.value))} placeholder="NET" className="h-7 text-xs border-stone-200 w-16 text-right" />
@@ -2601,13 +2584,13 @@ export default function BomManagement() {
                           </React.Fragment>
                           {/* 임가공비 - 별도 섹션 */}
                           <tr className="bg-amber-50/50 border-y border-stone-200">
-                            <td colSpan={13} className="px-3 py-1.5">
+                            <td colSpan={12} className="px-3 py-1.5">
                               <span className="text-xs font-semibold text-stone-600">임가공비</span>
                               <span className="text-[10px] text-stone-400 ml-2">자재비와 별도 항목</span>
                             </td>
                           </tr>
                           <tr className="bg-amber-50/30 border-b border-stone-200">
-                            <td className="px-1 py-1" colSpan={4}>
+                            <td className="px-1 py-1" colSpan={3}>
                               <span className="text-xs text-stone-600 px-2">임가공비 (NET)</span>
                             </td>
                             <td className="px-1 py-1">

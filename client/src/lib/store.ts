@@ -125,6 +125,12 @@ export interface Item {
 // 중국원가표 구조: 구분(섹션) > 품목 > 규격 > 단위 > 단가(CNY) > NET소요량 > LOSS율 > 소요량 > 제조금액 > 본사제공
 export type BomSubPart = '바디' | '안감' | '트림1' | '트림2' | '기타';
 
+// ─── 컬러별 BOM ───
+export interface ColorBom {
+  color: string;     // 컬러명 (예: '블랙', '브라운')
+  lines: BomLine[];  // 원자재만 (기본 BOM에서 복사 후 수정 가능)
+}
+
 export interface BomLine {
   id: string;
   category: BomCategory;   // 섹션 구분
