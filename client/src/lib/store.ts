@@ -685,9 +685,9 @@ export function normalizeColors(colors: (ItemColor | string)[]): ItemColor[] {
 export const store = {
   // Materials
   getMaterials: () => getAll<Material>(KEYS.materials),
-  addMaterial: (v: Material) => { const a = getAll<Material>(KEYS.materials); a.push(v); setAll(KEYS.materials, a); },
-  updateMaterial: (id: string, u: Partial<Material>) => { const a = getAll<Material>(KEYS.materials); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.materials, a); } },
-  deleteMaterial: (id: string) => setAll(KEYS.materials, getAll<Material>(KEYS.materials).filter(x => x.id !== id)),
+  addMaterial: (v: Material) => { const a = getAll<Material>(KEYS.materials); a.push(v); setAll(KEYS.materials, a); sbUpsert('materials', v); },
+  updateMaterial: (id: string, u: Partial<Material>) => { const a = getAll<Material>(KEYS.materials); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.materials, a); sbUpdate('materials', id, u); } },
+  deleteMaterial: (id: string) => { setAll(KEYS.materials, getAll<Material>(KEYS.materials).filter(x => x.id !== id)); sbDelete('materials', id); },
 
   // Items
   getItems: () => getAll<Item>(KEYS.items),
