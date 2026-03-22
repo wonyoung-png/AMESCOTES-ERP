@@ -735,9 +735,8 @@ export const store = {
       const bom = boms.find(b => b.styleNo === styleNo);
       if (!bom) return 0;
       const cnyKrw = bom.snapshotCnyKrw ?? 191;
-      // 자재비 합계 (본사제공 제외, LOSS 포함 소요량 × 단가)
+      // 자재비 합계 (전체 자재 포함 - 제품원가 기준, LOSS 포함 소요량 × 단가)
       const materialCny = (bom.lines || []).reduce((s, l) => {
-        if (l.isHqProvided || l.isVendorProvided) return s; // 본사제공+업체제공 모두 공장단가에서 제외
         const price = l.unitPriceCny ?? (l as { unitPrice?: number }).unitPrice ?? 0;
         const qty = l.netQty * (1 + (l.lossRate ?? 0));
         return s + price * qty;
