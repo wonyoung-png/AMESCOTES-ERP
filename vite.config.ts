@@ -180,6 +180,9 @@ export default defineConfig({
       "localhost",
       "127.0.0.1",
       ".trycloudflare.com",
+      ".ngrok-free.app",
+      ".ngrok-free.dev",
+      ".ngrok.io",
     ],
     fs: {
       strict: true,

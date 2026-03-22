@@ -1,6 +1,46 @@
 // AMESCOTES ERP — Data Store v2
 // 핵심 철학: "이미 만드는 파일을 올리면 자동으로 연결된다"
-// localStorage 기반 (1단계: UI 확인용, 2단계에서 Google Sheets 연동 예정)
+// localStorage + Supabase 동시 저장 (쓰기 시 둘 다, 읽기 시 localStorage 우선)
+
+import { supabase } from './supabase';
+
+// camelCase → snake_case 변환 헬퍼 (최상위 키만)
+function toSnakeCase(obj: Record<string, any>): Record<string, any> {
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [
+      k.replace(/[A-Z]/g, c => '_' + c.toLowerCase()),
+      v,
+    ])
+  );
+}
+
+// Supabase 저장 (실패해도 앱에 영향 없음)
+async function sbUpsert(table: string, data: Record<string, any>): Promise<void> {
+  try {
+    const { error } = await supabase.from(table).upsert(toSnakeCase(data));
+    if (error) console.warn(`[store] ${table} upsert 실패:`, error.message);
+  } catch (e) {
+    console.warn(`[store] ${table} upsert 오류:`, e);
+  }
+}
+
+async function sbUpdate(table: string, id: string, patch: Record<string, any>): Promise<void> {
+  try {
+    const { error } = await supabase.from(table).update(toSnakeCase(patch)).eq('id', id);
+    if (error) console.warn(`[store] ${table} update 실패:`, error.message);
+  } catch (e) {
+    console.warn(`[store] ${table} update 오류:`, e);
+  }
+}
+
+async function sbDelete(table: string, id: string): Promise<void> {
+  try {
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) console.warn(`[store] ${table} delete 실패:`, error.message);
+  } catch (e) {
+    console.warn(`[store] ${table} delete 오류:`, e);
+  }
+}
 
 export type Currency = 'KRW' | 'USD' | 'CNY';
 export type Season = '25FW' | '26SS' | '26FW' | '27SS';
@@ -638,9 +678,9 @@ export const store = {
   // Items
   getItems: () => getAll<Item>(KEYS.items),
   setItems: (v: Item[]) => setAll(KEYS.items, v),
-  addItem: (v: Item) => { const a = getAll<Item>(KEYS.items); a.push(v); setAll(KEYS.items, a); },
-  updateItem: (id: string, u: Partial<Item>) => { const a = getAll<Item>(KEYS.items); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.items, a); } },
-  deleteItem: (id: string) => setAll(KEYS.items, getAll<Item>(KEYS.items).filter(x => x.id !== id)),
+  addItem: (v: Item) => { const a = getAll<Item>(KEYS.items); a.push(v); setAll(KEYS.items, a); sbUpsert('items', v); },
+  updateItem: (id: string, u: Partial<Item>) => { const a = getAll<Item>(KEYS.items); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.items, a); sbUpdate('items', id, u); } },
+  deleteItem: (id: string) => { setAll(KEYS.items, getAll<Item>(KEYS.items).filter(x => x.id !== id)); sbDelete('items', id); },
   addItemColor: (itemId: string, color: ItemColor | string) => {
     const a = getAll<Item>(KEYS.items);
     const i = a.findIndex(x => x.id === itemId);
@@ -658,9 +698,9 @@ export const store = {
   getBoms: () => getAll<Bom>(KEYS.boms),
   setBoms: (v: Bom[]) => setAll(KEYS.boms, v),
   getBomByStyle: (styleId: string) => getAll<Bom>(KEYS.boms).filter(b => b.styleId === styleId),
-  addBom: (v: Bom) => { const a = getAll<Bom>(KEYS.boms); a.push(v); setAll(KEYS.boms, a); },
-  updateBom: (id: string, u: Partial<Bom>) => { const a = getAll<Bom>(KEYS.boms); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.boms, a); } },
-  deleteBom: (id: string) => setAll(KEYS.boms, getAll<Bom>(KEYS.boms).filter(x => x.id !== id)),
+  addBom: (v: Bom) => { const a = getAll<Bom>(KEYS.boms); a.push(v); setAll(KEYS.boms, a); sbUpsert('boms', v); },
+  updateBom: (id: string, u: Partial<Bom>) => { const a = getAll<Bom>(KEYS.boms); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.boms, a); sbUpdate('boms', id, u); } },
+  deleteBom: (id: string) => { setAll(KEYS.boms, getAll<Bom>(KEYS.boms).filter(x => x.id !== id)); sbDelete('boms', id); },
 
   /**
    * 스타일번호(styleNo) 기반 BOM 총원가 계산 (KRW 환산)
@@ -700,9 +740,9 @@ export const store = {
   // Orders
   getOrders: () => getAll<ProductionOrder>(KEYS.orders),
   setOrders: (v: ProductionOrder[]) => setAll(KEYS.orders, v),
-  addOrder: (v: ProductionOrder) => { const a = getAll<ProductionOrder>(KEYS.orders); a.push(v); setAll(KEYS.orders, a); },
-  updateOrder: (id: string, u: Partial<ProductionOrder>) => { const a = getAll<ProductionOrder>(KEYS.orders); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.orders, a); } },
-  deleteOrder: (id: string) => setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).filter(x => x.id !== id)),
+  addOrder: (v: ProductionOrder) => { const a = getAll<ProductionOrder>(KEYS.orders); a.push(v); setAll(KEYS.orders, a); sbUpsert('production_orders', v); },
+  updateOrder: (id: string, u: Partial<ProductionOrder>) => { const a = getAll<ProductionOrder>(KEYS.orders); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.orders, a); sbUpdate('production_orders', id, u); } },
+  deleteOrder: (id: string) => { setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).filter(x => x.id !== id)); sbDelete('production_orders', id); },
   getNextRevision: (styleNo: string) => { const orders = getAll<ProductionOrder>(KEYS.orders).filter(o => o.styleNo === styleNo); return orders.length > 0 ? Math.max(...orders.map(o => o.revision)) + 1 : 1; },
 
   // ─── 발주용 BOM 함수 ───
@@ -783,9 +823,9 @@ export const store = {
   // Samples
   getSamples: () => getAll<Sample>(KEYS.samples),
   setSamples: (v: Sample[]) => setAll(KEYS.samples, v),
-  addSample: (v: Sample) => { const a = getAll<Sample>(KEYS.samples); a.push(v); setAll(KEYS.samples, a); },
-  updateSample: (id: string, u: Partial<Sample>) => { const a = getAll<Sample>(KEYS.samples); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.samples, a); } },
-  deleteSample: (id: string) => setAll(KEYS.samples, getAll<Sample>(KEYS.samples).filter(x => x.id !== id)),
+  addSample: (v: Sample) => { const a = getAll<Sample>(KEYS.samples); a.push(v); setAll(KEYS.samples, a); sbUpsert('samples', v); },
+  updateSample: (id: string, u: Partial<Sample>) => { const a = getAll<Sample>(KEYS.samples); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.samples, a); sbUpdate('samples', id, u); } },
+  deleteSample: (id: string) => { setAll(KEYS.samples, getAll<Sample>(KEYS.samples).filter(x => x.id !== id)); sbDelete('samples', id); },
 
   // Post Costs
   getPostCosts: () => getAll<PostCost>(KEYS.postCosts),
@@ -807,9 +847,9 @@ export const store = {
   // Vendors
   getVendors: () => getAll<Vendor>(KEYS.vendors),
   setVendors: (v: Vendor[]) => setAll(KEYS.vendors, v),
-  addVendor: (v: Vendor) => { const a = getAll<Vendor>(KEYS.vendors); a.push(v); setAll(KEYS.vendors, a); },
-  updateVendor: (id: string, u: Partial<Vendor>) => { const a = getAll<Vendor>(KEYS.vendors); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.vendors, a); } },
-  deleteVendor: (id: string) => setAll(KEYS.vendors, getAll<Vendor>(KEYS.vendors).filter(x => x.id !== id)),
+  addVendor: (v: Vendor) => { const a = getAll<Vendor>(KEYS.vendors); a.push(v); setAll(KEYS.vendors, a); sbUpsert('vendors', v); },
+  updateVendor: (id: string, u: Partial<Vendor>) => { const a = getAll<Vendor>(KEYS.vendors); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.vendors, a); sbUpdate('vendors', id, u); } },
+  deleteVendor: (id: string) => { setAll(KEYS.vendors, getAll<Vendor>(KEYS.vendors).filter(x => x.id !== id)); sbDelete('vendors', id); },
 
   // Settlements
   getSettlements: () => getAll<Settlement>(KEYS.settlements),
