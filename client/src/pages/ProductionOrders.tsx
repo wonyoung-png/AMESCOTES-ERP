@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 const ORDER_STATUSES: OrderStatus[] = ['발주생성', '샘플승인', '생산중', '선적중', '통관중', '입고완료', '지연'];
@@ -917,6 +917,9 @@ export default function ProductionOrders() {
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowDetail(o)}>
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-500 hover:text-blue-600" onClick={() => openEdit(o)} title="발주 수정">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(o.id)}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
@@ -970,6 +973,9 @@ export default function ProductionOrders() {
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setShowDetail(o)}>
                   <Eye className="w-4 h-4" />
                 </Button>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-stone-500 hover:text-blue-600" onClick={() => openEdit(o)} title="발주 수정">
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(o.id)}>
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
@@ -982,7 +988,7 @@ export default function ProductionOrders() {
       {/* ─── 발주 등록 모달 (BOM 연동) ─── */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>발주 등록 — BOM 연동</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{isEditMode ? '발주 수정' : '발주 등록 — BOM 연동'}</DialogTitle></DialogHeader>
           <div className="space-y-5 py-2">
 
             {/* Step 1: 스타일 선택 */}
@@ -991,12 +997,13 @@ export default function ProductionOrders() {
                 <span className="w-6 h-6 rounded-full bg-amber-700 text-white text-xs flex items-center justify-center font-bold">1</span>
                 <Label className="text-sm font-semibold">스타일 선택</Label>
               </div>
-              <Select value={form.styleId || ''} onValueChange={handleStyleSelect}>
-                <SelectTrigger><SelectValue placeholder="품목 마스터에서 선택" /></SelectTrigger>
+              <Select value={form.styleId || ''} onValueChange={handleStyleSelect} disabled={isEditMode}>
+                <SelectTrigger className={isEditMode ? 'bg-stone-50 text-stone-500' : ''}><SelectValue placeholder="품목 마스터에서 선택" /></SelectTrigger>
                 <SelectContent>
                   {items.map(i => <SelectItem key={i.id} value={i.id}>{i.styleNo} — {i.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {isEditMode && <p className="text-xs text-stone-400">※ 수정 모드에서는 스타일 변경 불가 (납기일, 수량, 공장단가, 메모 수정 가능)</p>}
               {form.orderNo && (
                 <div className={`p-3 rounded-lg border ${bomCalc.hasBomWarning ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
                   <div className="flex items-center justify-between">
@@ -1737,7 +1744,7 @@ export default function ProductionOrders() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
-            <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">발주 등록</Button>
+            <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">{isEditMode ? '발주 수정' : '발주 등록'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
