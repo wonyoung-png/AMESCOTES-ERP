@@ -508,60 +508,44 @@ function buildQuoteRows(bom: ExtBom, tab: 'pre' | 'post' = 'pre', colorBom?: Ext
   return rows;
 }
 
-/** 마진 배분 로직:
- * 공장단가(KRW) = 업체제공 제외 rows 합계 공급가액
- * 목표 납품가 = 공장단가 / (1 - internalMargin)   ← 내부 마진(실제 목표)
- * 견적 납품가 = 공장단가 / (1 - quoteMargin)       ← 견적 마진(바이어 제시)
- * 마진 행 금액 = 목표 납품가 - 견적 납품가          ← 생산관리비용으로 별도 표시
- * 비원자재 행에는 견적 마진 배분; 차액은 isMarginRow 행으로 추가
+/** 마진 계산 로직:
+ * 소계 = 업체제공·마진행 제외 rows 합계 공급가액
+ * 납품가 = 소계 / (1 - quoteMargin)   ← 10원 단위 올림
+ * 생산관리비용 = 납품가 - 소계          ← isMarginRow 행으로 추가
+ * 다른 항목의 단가는 건드리지 않음
  */
-function applyMarginAdjustment(rows: QuoteRow[], internalMargin: number, quoteMargin: number): { adjustedRows: QuoteRow[]; factoryCost: number; targetPrice: number; quotePrice: number; diff: number } {
-  // 업체제공 제외한 합계가 기준
-  const factoryCost = rows.reduce((s, r) => r.isVendorProvided ? s : s + r.supplyAmt, 0);
-  const targetPrice = ceil10(factoryCost / (1 - internalMargin));
-  const quotePrice = ceil10(factoryCost / (1 - quoteMargin));
-  const diff = targetPrice - quotePrice; // 내부 마진 - 견적 마진 차액 = 생산관리비용
+function applyMarginAdjustment(rows: QuoteRow[], quoteMargin: number): { adjustedRows: QuoteRow[]; subtotal: number; deliveryPrice: number; marginAmt: number } {
+  // 업체제공·마진행 제외 소계
+  const subtotal = rows
+    .filter(r => !r.isVendorProvided && !r.isMarginRow)
+    .reduce((s, r) => s + r.supplyAmt, 0);
 
-  // 조정 대상: 원자재 아니고 업체제공 아닌 행, 기존 마진 행 제외
-  const adjustableRows = rows.filter(r => !r.isRawMaterial && !r.isVendorProvided && !r.isMarginRow);
-  const adjustableTotal = adjustableRows.reduce((s, r) => s + r.supplyAmt, 0);
+  // 납품가 = 소계 / (1 - 견적마진율), 10원 단위 올림
+  const deliveryPrice = Math.ceil(subtotal / (1 - quoteMargin) / 10) * 10;
 
-  // 견적 마진을 비원자재 행에 비례 배분 (quoteMargin 기준)
-  const quoteMarginAmt = quotePrice - factoryCost;
-  let quotaAdjustedRows: QuoteRow[];
-  if (adjustableTotal === 0 || quoteMarginAmt <= 0) {
-    quotaAdjustedRows = rows.filter(r => !r.isMarginRow);
-  } else {
-    quotaAdjustedRows = rows.filter(r => !r.isMarginRow).map(r => {
-      if (r.isRawMaterial || r.isVendorProvided) return r;
-      const ratio = r.supplyAmt / adjustableTotal;
-      const addAmt = ceil10(quoteMarginAmt * ratio);
-      const newSupply = ceil10(r.supplyAmt + addAmt);
-      const newUnitPrice = r.qty > 0 ? ceil10(newSupply / r.qty) : newSupply;
-      const newTax = ceil10(newSupply * 0.1);
-      return { ...r, unitPrice: newUnitPrice, supplyAmt: newSupply, taxAmt: newTax };
-    });
-  }
+  // 생산관리비용 = 납품가 - 소계
+  const marginAmt = deliveryPrice - subtotal;
 
-  // 마진 행(생산관리비용) 추가 — diff > 0 일 때만
-  if (diff > 0) {
-    quotaAdjustedRows.push({
+  // 기존 행은 단가 그대로 유지, 마진 행만 교체
+  const updatedRows = rows.filter(r => !r.isMarginRow);
+  if (marginAmt > 0) {
+    updatedRows.push({
       id: genId(),
       category: '마진',
       itemName: '생산관리비용',
       qty: 1,
-      unitPrice: diff,
-      supplyAmt: diff,
-      taxAmt: ceil10(diff * 0.1),
+      unitPrice: marginAmt,
+      supplyAmt: marginAmt,
+      taxAmt: Math.ceil(marginAmt * 0.1 / 10) * 10,
       memo: '',
       isRawMaterial: false,
       isVendorProvided: false,
-      originalUnitPrice: diff,
+      originalUnitPrice: marginAmt,
       isMarginRow: true,
     });
   }
 
-  return { adjustedRows: quotaAdjustedRows, factoryCost, targetPrice, quotePrice, diff };
+  return { adjustedRows: updatedRows, subtotal, deliveryPrice, marginAmt };
 }
 
 function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom; onClose: () => void; tab?: 'pre' | 'post'; colorBom?: ExtColorBom }) {
@@ -604,12 +588,11 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
 
   // 마진 자동 조정 실행
   const handleApplyMargin = () => {
-    const internalRate = internalMargin / 100;
     const quoteRate = quoteMargin / 100;
     const base = buildQuoteRows(bom, tab, colorBom); // 원본 기준으로 재계산
-    const { adjustedRows, factoryCost, targetPrice, quotePrice, diff } = applyMarginAdjustment(base, internalRate, quoteRate);
+    const { adjustedRows, subtotal, deliveryPrice, marginAmt } = applyMarginAdjustment(base, quoteRate);
     setRows(adjustedRows);
-    setMarginInfo({ factoryCost, targetPrice, quotePrice, diff });
+    setMarginInfo({ factoryCost: subtotal, targetPrice: deliveryPrice, quotePrice: deliveryPrice, diff: marginAmt });
     setMarginApplied(true);
   };
 
@@ -704,28 +687,30 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
               <div className="grid grid-cols-2 gap-3 pt-1 border-t border-amber-200">
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs">
-                    <span className="text-stone-500">실제 공장단가</span>
+                    <span className="text-stone-500">제품원가 소계</span>
                     <span className="font-medium">{fmtKrw(marginInfo.factoryCost)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-stone-500">견적 납품가 <span className="text-stone-400">({quoteMargin}% 기준)</span></span>
-                    <span className="font-medium text-blue-700">{fmtKrw(marginInfo.quotePrice)}</span>
+                    <span className="text-stone-500">납품가 <span className="text-stone-400">({quoteMargin}% 기준)</span></span>
+                    <span className="font-medium text-blue-700">{fmtKrw(marginInfo.targetPrice)}</span>
                   </div>
                 </div>
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs">
-                    <span className="text-stone-500">목표 납품가 <span className="text-stone-400">(내부 {internalMargin}% 기준)</span></span>
-                    <span className="font-medium text-amber-700">{fmtKrw(marginInfo.targetPrice)}</span>
+                    <span className="text-stone-500">생산관리비용</span>
+                    <span className={`font-semibold ${marginInfo.diff > 0 ? 'text-amber-700' : 'text-stone-500'}`}>
+                      {marginInfo.diff > 0 ? `+${fmtKrw(marginInfo.diff)}` : '조정 없음'}
+                    </span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-stone-500">부자재 조정액</span>
-                    <span className={`font-semibold ${marginInfo.diff > 0 ? 'text-green-700' : 'text-stone-500'}`}>
-                      {marginInfo.diff > 0 ? `+${fmtKrw(marginInfo.diff)}` : '조정 없음'}
+                    <span className="text-stone-500">실제 마진율</span>
+                    <span className="font-semibold text-green-700">
+                      {marginInfo.targetPrice > 0 ? `${((marginInfo.diff / marginInfo.targetPrice) * 100).toFixed(1)}%` : '—'}
                     </span>
                   </div>
                 </div>
                 <div className="col-span-2 text-[10px] text-stone-400">
-                  ※ 원자재 단가는 고정. 부자재·포장재·후가공·임가공 금액에 비례 배분됩니다.
+                  ※ 납품가 = 제품원가 / (1 - {quoteMargin}%). 각 항목 단가는 변경되지 않습니다.
                 </div>
               </div>
             )}
@@ -737,7 +722,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
               <span className="tabular-nums">{fmtKrw(baseSupply)}</span>
             </div>
             <div className="flex items-center justify-between text-xs text-amber-700">
-              <span>생산관리비용 {marginRowAmt > 0 ? '(내/견적 마진 차액)' : `(견적 마진 ${quoteMargin}% 참고)`}</span>
+              <span>생산관리비용 {marginRowAmt > 0 ? `(견적 마진 ${quoteMargin}% 적용)` : `(견적 마진 ${quoteMargin}% 참고)`}</span>
               <span className="tabular-nums font-medium">+ {fmtKrw(marginAmt)}</span>
             </div>
             <div className="border-t border-stone-200 pt-1.5 flex items-center justify-between">
@@ -809,7 +794,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                       </td>
                       <td className={`px-2 py-1.5 text-right ${marginRow ? 'text-amber-700 font-semibold' : 'text-stone-600'}`}>{vendorRow ? '—' : fmtKrw(row.taxAmt)}</td>
                       <td className={`px-2 py-1.5 text-right font-medium ${marginRow ? 'text-amber-700' : ''}`}>{vendorRow ? '—' : fmtKrw(ceil10(row.supplyAmt + row.taxAmt))}</td>
-                      <td className="px-1 py-1">{marginRow ? null : <Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-blue-600 font-medium' : ''}`} placeholder="비고" />}</td>
+                      <td className="px-1 py-1">{marginRow ? null : vendorRow ? <span className="text-xs text-blue-600 font-medium px-1">업체제공</span> : <Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" placeholder="비고" />}</td>
                       <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(r => r.id !== row.id))} className="text-stone-300 hover:text-red-400"><X className="w-3 h-3" /></button></td>
                     </tr>
                   );
@@ -862,7 +847,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                       <td className="tr2">{row.isVendorProvided ? '—' : row.supplyAmt.toLocaleString()}</td>
                       <td className="tr2">{row.isVendorProvided ? '—' : row.taxAmt.toLocaleString()}</td>
                       <td className="tr2">{row.isVendorProvided ? '—' : ceil10(row.supplyAmt + row.taxAmt).toLocaleString()}</td>
-                      <td style={row.isVendorProvided ? {color:'#2563EB',fontWeight:'600'} : {}}>{row.isMarginRow ? '' : row.memo}</td>
+                      <td style={row.isVendorProvided ? {color:'#2563EB',fontWeight:'600'} : {}}>{row.isMarginRow ? '' : row.isVendorProvided ? '업체제공' : ''}</td>
                     </tr>
                   ))}
                   <tr className="tot"><td colSpan={5} className="tr2">TOTAL</td><td className="tr2">{totalSupply.toLocaleString()}</td><td className="tr2">{totalTax.toLocaleString()}</td><td className="tr2">{grandTotal.toLocaleString()}</td><td></td></tr>
