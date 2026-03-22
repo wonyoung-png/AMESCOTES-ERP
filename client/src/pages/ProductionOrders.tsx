@@ -2032,8 +2032,17 @@ export default function ProductionOrders() {
                 const item = items.find(i => i.id === order.styleId);
                 const { bom } = store.getBomForOrder(order.styleNo);
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const bomLines: any[] =
-                  bom ? ((bom.postMaterials && bom.postMaterials.length > 0) ? bom.postMaterials : (bom.lines || [])) : [];
+                // 컬러별 BOM에서 첫 번째 컬러 사용, 없으면 기존 방식
+                const getColorBomLines = (b: any) => {
+                  if (!b) return [];
+                  // 사후원가 컬러 BOM 우선
+                  if (b.postColorBoms && b.postColorBoms.length > 0) return b.postColorBoms[0].lines || [];
+                  if (b.postMaterials && b.postMaterials.length > 0) return b.postMaterials;
+                  // 사전원가 컬러 BOM
+                  if (b.colorBoms && b.colorBoms.length > 0) return b.colorBoms[0].lines || [];
+                  return b.lines || [];
+                };
+                const bomLines: any[] = getColorBomLines(bom);
 
                 // 원자재 (바디/안감)
                 const rawMaterials = bomLines.filter((l: any) => l.category === '원자재');
