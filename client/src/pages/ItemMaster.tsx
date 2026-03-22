@@ -1,7 +1,7 @@
 // AMESCOTES ERP — 품목 마스터 (대규모 개편)
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type ProductionOrder } from '@/lib/store';
+import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type ProductionOrder, type ColorQty } from '@/lib/store';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link, ShoppingCart, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 
 // HB 전용 세부 카테고리
@@ -359,6 +359,14 @@ export default function ItemMaster() {
     }
   };
 
+  // 일괄 발주 모달 상태
+  const [bulkOrderModalOpen, setBulkOrderModalOpen] = useState(false);
+
+  const handleBulkOrder = () => {
+    if (selectedIds.size === 0) return;
+    setBulkOrderModalOpen(true);
+  };
+
   const addColor = () => {
     const c = colorInput.trim();
     if (!c) return;
@@ -497,6 +505,12 @@ export default function ItemMaster() {
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-stone-800 text-white rounded-xl">
           <span className="text-sm font-medium">{selectedIds.size}개 선택됨</span>
+          <button
+            onClick={handleBulkOrder}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            📦 선택 발주
+          </button>
           <button
             onClick={handleBulkDelete}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors"
@@ -1106,6 +1120,493 @@ export default function ItemMaster() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 일괄 발주 모달 */}
+      {bulkOrderModalOpen && (
+        <MultiBulkOrderModal
+          open={bulkOrderModalOpen}
+          onClose={() => setBulkOrderModalOpen(false)}
+          selectedItems={items.filter(i => selectedIds.has(i.id))}
+          onComplete={() => {
+            setBulkOrderModalOpen(false);
+            setSelectedIds(new Set());
+            navigate('/orders');
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── 일괄 발주 모달 컴포넌트 ───────────────────────────────────────────────
+
+interface BulkOrderItemState {
+  item: Item;
+  enabled: boolean;
+  // 컬러별 수량: { color: string, qty: number }[]
+  colorQtys: { color: string; qty: number }[];
+}
+
+interface PostOrderState {
+  orders: ProductionOrder[];
+  hqMaterialSummary: Array<{ materialName: string; spec?: string; unit: string; totalQty: number; vendorName?: string; styleNos: string[] }>;
+}
+
+function MultiBulkOrderModal({
+  open,
+  onClose,
+  selectedItems,
+  onComplete,
+}: {
+  open: boolean;
+  onClose: () => void;
+  selectedItems: Item[];
+  onComplete: () => void;
+}) {
+  const vendors = store.getVendors();
+  const factories = vendors.filter(v => v.type === '공장' || v.type === '해외공장');
+
+  const [factoryId, setFactoryId] = useState('');
+  const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
+  const [deliveryDate, setDeliveryDate] = useState('');
+  const [itemStates, setItemStates] = useState<BulkOrderItemState[]>(() =>
+    selectedItems.map(item => ({
+      item,
+      enabled: true,
+      colorQtys: normalizeColors(item.colors || []).map(c => ({ color: c.name, qty: 0 })),
+    }))
+  );
+  const [postOrderState, setPostOrderState] = useState<PostOrderState | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const toggleItem = (itemId: string) => {
+    setItemStates(prev => prev.map(s =>
+      s.item.id === itemId ? { ...s, enabled: !s.enabled } : s
+    ));
+  };
+
+  const setColorQty = (itemId: string, colorName: string, qty: number) => {
+    setItemStates(prev => prev.map(s => {
+      if (s.item.id !== itemId) return s;
+      return {
+        ...s,
+        colorQtys: s.colorQtys.map(cq => cq.color === colorName ? { ...cq, qty } : cq),
+      };
+    }));
+  };
+
+  const addColorToItem = (itemId: string, colorName: string) => {
+    const trimmed = colorName.trim();
+    if (!trimmed) return;
+    setItemStates(prev => prev.map(s => {
+      if (s.item.id !== itemId) return s;
+      if (s.colorQtys.find(cq => cq.color === trimmed)) return s;
+      return { ...s, colorQtys: [...s.colorQtys, { color: trimmed, qty: 0 }] };
+    }));
+  };
+
+  const removeColorFromItem = (itemId: string, colorName: string) => {
+    setItemStates(prev => prev.map(s => {
+      if (s.item.id !== itemId) return s;
+      return { ...s, colorQtys: s.colorQtys.filter(cq => cq.color !== colorName) };
+    }));
+  };
+
+  // 본사제공 자재 합산 미리보기
+  const hqMaterialPreview = useMemo(() => {
+    const summary: Record<string, { materialName: string; spec?: string; unit: string; totalQty: number; vendorName?: string; styleNos: string[] }> = {};
+    for (const state of itemStates) {
+      if (!state.enabled) continue;
+      const totalQty = state.colorQtys.reduce((sum, cq) => sum + cq.qty, 0);
+      if (totalQty <= 0) continue;
+      const { bom } = store.getBomForOrder(state.item.styleNo);
+      if (!bom) continue;
+      const lines = bom.postMaterials?.length ? bom.postMaterials : (bom.lines || []);
+      for (const line of lines) {
+        if (!line.isHqProvided) continue;
+        const perPcs = line.netQty * (1 + (line.lossRate ?? 0));
+        const reqQty = Math.round(perPcs * totalQty * 1000) / 1000;
+        const key = line.itemName + '||' + line.unit;
+        if (summary[key]) {
+          summary[key].totalQty = Math.round((summary[key].totalQty + reqQty) * 1000) / 1000;
+          if (!summary[key].styleNos.includes(state.item.styleNo)) {
+            summary[key].styleNos.push(state.item.styleNo);
+          }
+        } else {
+          summary[key] = {
+            materialName: line.itemName,
+            spec: line.spec,
+            unit: line.unit,
+            totalQty: reqQty,
+            vendorName: line.vendorId ? vendors.find(v => v.id === line.vendorId)?.name : undefined,
+            styleNos: [state.item.styleNo],
+          };
+        }
+      }
+    }
+    return Object.values(summary);
+  }, [itemStates]);
+
+  const handleSubmit = async () => {
+    if (!factoryId) { toast.error('공장을 선택해주세요'); return; }
+    const factory = vendors.find(v => v.id === factoryId);
+    if (!factory) return;
+
+    const enabledStates = itemStates.filter(s => s.enabled);
+    if (enabledStates.length === 0) { toast.error('발주할 품목을 하나 이상 선택해주세요'); return; }
+
+    const hasQty = enabledStates.some(s => s.colorQtys.reduce((sum, cq) => sum + cq.qty, 0) > 0);
+    if (!hasQty) { toast.error('수량을 입력해주세요'); return; }
+
+    setSubmitting(true);
+    try {
+      const createdOrders: ProductionOrder[] = [];
+      const allHqMaterials: Array<{ materialName: string; spec?: string; unit: string; totalQty: number; vendorName?: string; styleNos: string[] }> = [];
+
+      for (const state of enabledStates) {
+        const totalQty = state.colorQtys.reduce((sum, cq) => sum + cq.qty, 0);
+        if (totalQty <= 0) continue;
+
+        const revision = store.getNextRevision(state.item.styleNo);
+        const orderNo = `${state.item.styleNo}-R${revision}`;
+        const colorQtysForOrder: ColorQty[] = state.colorQtys.filter(cq => cq.qty > 0).map(cq => ({ color: cq.color, qty: cq.qty }));
+
+        // BOM 기반 본사제공 자재 계산
+        const { bom } = store.getBomForOrder(state.item.styleNo);
+        const hqSupplyItems: ProductionOrder['hqSupplyItems'] = [];
+        const bomMaterialsForCart: Array<{ itemName: string; spec?: string; unit: string; netQty: number; lossRate: number; vendorName?: string; isHqProvided: boolean }> = [];
+
+        if (bom) {
+          const lines = bom.postMaterials?.length ? bom.postMaterials : (bom.lines || []);
+          for (const line of lines) {
+            if (line.isHqProvided) {
+              const perPcs = line.netQty * (1 + (line.lossRate ?? 0));
+              const reqQty = Math.round(perPcs * totalQty * 1000) / 1000;
+              hqSupplyItems.push({
+                bomLineId: line.id,
+                itemName: line.itemName,
+                spec: line.spec,
+                unit: line.unit,
+                requiredQty: reqQty,
+                purchaseStatus: '미구매',
+              });
+            }
+            bomMaterialsForCart.push({
+              itemName: line.itemName,
+              spec: line.spec,
+              unit: line.unit,
+              netQty: line.netQty,
+              lossRate: line.lossRate ?? 0,
+              vendorName: line.vendorId ? vendors.find(v => v.id === line.vendorId)?.name : undefined,
+              isHqProvided: !!line.isHqProvided,
+            });
+          }
+          // 본사제공 자재 장바구니에 추가
+          if (bomMaterialsForCart.filter(m => m.isHqProvided).length > 0) {
+            store.addToMaterialCart(
+              state.item.styleNo,
+              state.item.name,
+              bomMaterialsForCart.filter(m => m.isHqProvided),
+              totalQty
+            );
+          }
+        }
+
+        const newOrder: ProductionOrder = {
+          id: genId(),
+          orderNo,
+          styleId: state.item.id,
+          styleNo: state.item.styleNo,
+          styleName: state.item.name,
+          season: state.item.season as Season,
+          revision,
+          isReorder: revision > 1,
+          qty: totalQty,
+          colorQtys: colorQtysForOrder,
+          vendorId: factoryId,
+          vendorName: factory.name,
+          orderDate,
+          deliveryDate: deliveryDate || undefined,
+          status: '발주생성',
+          hqSupplyItems,
+          attachments: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        store.addOrder(newOrder);
+        createdOrders.push(newOrder);
+      }
+
+      setPostOrderState({
+        orders: createdOrders,
+        hqMaterialSummary: hqMaterialPreview,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 완료 팝업이 보이는 상태
+  if (postOrderState) {
+    return (
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-700">
+              ✅ 발주 등록 완료
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="p-3 bg-green-50 border border-green-200 rounded-xl">
+              <p className="text-sm font-medium text-green-800 mb-2">
+                {postOrderState.orders.length}건 발주가 등록되었습니다
+              </p>
+              <ul className="space-y-1">
+                {postOrderState.orders.map(o => (
+                  <li key={o.id} className="text-xs text-green-700 flex items-center gap-2">
+                    <span className="font-mono font-semibold">{o.orderNo}</span>
+                    <span className="text-green-600">{o.styleName}</span>
+                    <span className="ml-auto font-medium">{o.qty.toLocaleString()}개</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {postOrderState.hqMaterialSummary.length > 0 && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                <p className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-1.5">
+                  <ShoppingCart size={13} />본사제공 자재 장바구니 담김
+                </p>
+                <ul className="space-y-1">
+                  {postOrderState.hqMaterialSummary.map((m, idx) => (
+                    <li key={idx} className="text-xs text-amber-700 flex items-center gap-2">
+                      <span className="font-medium">{m.materialName}</span>
+                      {m.spec && <span className="text-amber-500">{m.spec}</span>}
+                      <span className="ml-auto font-mono">{m.totalQty.toLocaleString()} {m.unit}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex gap-2 sm:flex-row flex-col">
+            <Button
+              variant="outline"
+              className="flex items-center gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+              onClick={() => {
+                onComplete();
+              }}
+            >
+              <ShoppingCart size={14} />자재 장바구니 확인
+            </Button>
+            <Button
+              className="bg-[#C9A96E] hover:bg-[#B8985D] text-white flex items-center gap-1.5"
+              onClick={onComplete}
+            >
+              <Printer size={14} />발주 목록으로 이동
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Package size={18} className="text-amber-600" />
+            일괄 발주 등록
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-5">
+          {/* 공장 / 날짜 */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label>공장 선택 *</Label>
+              <Select value={factoryId} onValueChange={setFactoryId}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="공장 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {factories.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-stone-400">등록된 공장 없음</div>
+                  ) : (
+                    factories.map(f => (
+                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>발주일</Label>
+              <Input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} className="h-9" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>납기일</Label>
+              <Input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} className="h-9" />
+            </div>
+          </div>
+
+          {/* 품목별 설정 */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold text-stone-700">품목별 컬러 · 수량 설정</Label>
+            <div className="border border-stone-200 rounded-xl overflow-hidden divide-y divide-stone-100">
+              {itemStates.map(state => (
+                <BulkOrderItemRow
+                  key={state.item.id}
+                  state={state}
+                  onToggle={() => toggleItem(state.item.id)}
+                  onSetColorQty={(color, qty) => setColorQty(state.item.id, color, qty)}
+                  onAddColor={(color) => addColorToItem(state.item.id, color)}
+                  onRemoveColor={(color) => removeColorFromItem(state.item.id, color)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* 본사제공 자재 합산 */}
+          {hqMaterialPreview.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-stone-700 flex items-center gap-1.5">
+                <ShoppingCart size={14} className="text-amber-600" />
+                본사제공 자재 통합 발주 (자동 합산)
+              </Label>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
+                {hqMaterialPreview.map((m, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-sm">
+                    <span className="text-amber-700 font-medium">{m.materialName}</span>
+                    {m.spec && <span className="text-amber-500 text-xs">{m.spec}</span>}
+                    <span className="text-xs text-stone-400 ml-1">({m.styleNos.join(' + ')})</span>
+                    <span className="ml-auto font-mono font-semibold text-amber-800">
+                      {m.totalQty.toLocaleString()} {m.unit}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>취소</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="bg-amber-500 hover:bg-amber-600 text-white"
+          >
+            {submitting ? '등록 중...' : '발주 등록'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// 개별 품목 행 컴포넌트
+function BulkOrderItemRow({
+  state,
+  onToggle,
+  onSetColorQty,
+  onAddColor,
+  onRemoveColor,
+}: {
+  state: BulkOrderItemState;
+  onToggle: () => void;
+  onSetColorQty: (color: string, qty: number) => void;
+  onAddColor: (color: string) => void;
+  onRemoveColor: (color: string) => void;
+}) {
+  const [newColorInput, setNewColorInput] = useState('');
+
+  const totalQty = state.colorQtys.reduce((sum, cq) => sum + cq.qty, 0);
+
+  return (
+    <div className={`p-3 transition-colors ${state.enabled ? 'bg-white' : 'bg-stone-50 opacity-60'}`}>
+      {/* 헤더 */}
+      <div className="flex items-center gap-3 mb-2.5">
+        <input
+          type="checkbox"
+          checked={state.enabled}
+          onChange={onToggle}
+          className="w-4 h-4 rounded border-stone-300 accent-amber-500 cursor-pointer"
+        />
+        {state.item.imageUrl ? (
+          <img src={state.item.imageUrl} alt={state.item.name} className="w-8 h-8 object-cover rounded-lg border border-stone-200" />
+        ) : (
+          <div className="w-8 h-8 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center">
+            <Package size={12} className="text-stone-300" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-stone-800 truncate">{state.item.name}</p>
+          <p className="text-xs font-mono text-stone-500">{state.item.styleNo}</p>
+        </div>
+        {totalQty > 0 && (
+          <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+            합계 {totalQty.toLocaleString()}개
+          </span>
+        )}
+      </div>
+
+      {/* 컬러별 수량 */}
+      {state.enabled && (
+        <div className="pl-7 space-y-2">
+          <div className="grid grid-cols-1 gap-1.5">
+            {state.colorQtys.map(cq => (
+              <div key={cq.color} className="flex items-center gap-2">
+                <span className="text-xs px-2 py-1 bg-stone-100 text-stone-700 rounded font-medium w-24 truncate">{cq.color}</span>
+                <Input
+                  type="number"
+                  min={0}
+                  value={cq.qty || ''}
+                  onChange={e => onSetColorQty(cq.color, Number(e.target.value))}
+                  placeholder="수량"
+                  className="h-7 text-xs w-24"
+                />
+                <span className="text-xs text-stone-400">개</span>
+                <button
+                  type="button"
+                  onClick={() => onRemoveColor(cq.color)}
+                  className="text-stone-300 hover:text-red-400 transition-colors ml-1"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+          {/* 컬러 추가 */}
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={newColorInput}
+              onChange={e => setNewColorInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  onAddColor(newColorInput);
+                  setNewColorInput('');
+                }
+              }}
+              placeholder="컬러 추가 (Enter)"
+              className="h-7 text-xs flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => {
+                onAddColor(newColorInput);
+                setNewColorInput('');
+              }}
+            >
+              +
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
