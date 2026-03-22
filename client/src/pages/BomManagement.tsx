@@ -1923,12 +1923,32 @@ export default function BomManagement() {
     // 첫 번째 컬러 BOM 기준으로 원가 업데이트 (없으면 lines 기준)
     const firstColor = (updated.colorBoms || [])[0];
     const summary = calcSummary(updated, settings.usdKrw, firstColor);
-    store.updateItem(editBom.styleId, {
-      baseCostKrw: Math.round(summary.totalCostKrw),
-      hasBom: true,
-    });
+    // BOM 컬러 목록을 품목 마스터 colors에 동기화
+    const bomColors = [...new Set([
+      ...(updated.colorBoms || []).map(c => c.color),
+      ...(updated.postColorBoms || []).map(c => c.color),
+    ])];
+    const currentItem = items.find(i => i.id === editBom.styleId);
+    const currentColorNames = normalizeColors(currentItem?.colors || []).map(c => c.name);
+    const newColors = bomColors.filter(c => !currentColorNames.includes(c));
+    if (newColors.length > 0) {
+      const updatedColors = [
+        ...normalizeColors(currentItem?.colors || []),
+        ...newColors.map(c => ({ name: c })),
+      ];
+      store.updateItem(editBom.styleId, {
+        baseCostKrw: Math.round(summary.totalCostKrw),
+        hasBom: true,
+        colors: updatedColors,
+      });
+    } else {
+      store.updateItem(editBom.styleId, {
+        baseCostKrw: Math.round(summary.totalCostKrw),
+        hasBom: true,
+      });
+    }
     setIsDirty(false);
-    toast.success('BOM이 저장되었습니다');
+    toast.success('BOM이 저장되었습니다' + (newColors.length > 0 ? ` (컬러 ${newColors.length}개 품목에 추가됨)` : ''));
   };
 
   const handleCopyBom = () => {
