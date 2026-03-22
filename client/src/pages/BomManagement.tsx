@@ -1153,8 +1153,8 @@ export default function BomManagement() {
       const cellL = getNum(row, 11);   // L열 (임가공/공장단가 금액)
       const rowStr = row.map(c => String(c ?? '')).join(' ');
 
-      // 후가공 섹션 시작 감지 (A열='후가공' 또는 '원·부·소모재 총계')
-      if (rowStr.includes('부·소모재') || rowStr.includes('부소모재') || cellA.includes('후가공')) {
+      // 후가공 섹션 시작 감지 (아직 진입 안 했을 때만 - 재감지 방지)
+      if (!inPostProcess && (rowStr.includes('부·소모재') || rowStr.includes('부소모재') || cellA.includes('후가공'))) {
         inPostProcess = true;
         continue;
       }
