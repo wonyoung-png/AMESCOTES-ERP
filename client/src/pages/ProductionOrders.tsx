@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import {
   store, genId, calcDDay, dDayLabel, dDayColor, formatNumber, formatKRW, normalizeColors,
   type ProductionOrder, type OrderStatus, type Season, type Item, type Bom,
-  type HqSupplyItem, type ColorQty,
+  type HqSupplyItem, type ColorQty, type CartItem,
   type TradeStatement, type TradeStatementLine,
 } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 const ORDER_STATUSES: OrderStatus[] = ['발주생성', '샘플승인', '생산중', '선적중', '통관중', '입고완료', '지연'];
@@ -101,6 +101,18 @@ export default function ProductionOrders() {
   const [workOrderNote, setWorkOrderNote] = useState('');
   const [workOrderWithBom, setWorkOrderWithBom] = useState(false);
 
+  // 발주 완료 후 액션 팝업 상태
+  const [postOrderModal, setPostOrderModal] = useState(false);
+  const [postOrderInfo, setPostOrderInfo] = useState<{ order: ProductionOrder; bomMaterials: Array<any> } | null>(null);
+
+  // 자재 장바구니 모달 상태
+  const [cartModal, setCartModal] = useState(false);
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => store.getMaterialCart());
+
+  // 거래처별 발주서 모달 상태
+  const [vendorOrderModal, setVendorOrderModal] = useState(false);
+
+  const refreshCart = () => setCartItems(store.getMaterialCart());
   const refresh = () => setOrders(store.getOrders());
 
   const filtered = useMemo(() => {
@@ -392,10 +404,36 @@ export default function ProductionOrders() {
 
     refresh();
     setShowModal(false);
+
+    // 발주 완료 후 액션 팝업: BOM 자재 목록 계산
+    const bomMaterials: Array<any> = [];
+    if (form.styleNo) {
+      const { bom } = store.getBomForOrder(form.styleNo);
+      if (bom) {
+        const usedLines = (bom.postMaterials && bom.postMaterials.length > 0)
+          ? bom.postMaterials
+          : (bom.lines || []);
+        for (const l of usedLines) {
+          if (l.isHqProvided) {
+            bomMaterials.push({
+              itemName: l.itemName,
+              spec: l.spec,
+              unit: l.unit,
+              netQty: l.netQty,
+              lossRate: l.lossRate,
+              vendorName: l.vendorName,
+              isHqProvided: true,
+            });
+          }
+        }
+      }
+    }
+
+    setPostOrderInfo({ order, bomMaterials });
+    setPostOrderModal(true);
+
     if (newColorCount > 0) {
-      toast.success(`발주가 등록되었습니다 · 새 컬러 ${newColorCount}개가 품목 마스터에 추가됨`);
-    } else {
-      toast.success('발주가 등록되었습니다');
+      toast.success(`발주 등록 완료 · 새 컬러 ${newColorCount}개가 품목 마스터에 추가됨`);
     }
   };
 
@@ -590,6 +628,19 @@ export default function ProductionOrders() {
             className={`hidden sm:block px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${showFactoryView ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
           >
             공장별 현황
+          </button>
+          {/* 자재 장바구니 버튼 */}
+          <button
+            onClick={() => { refreshCart(); setCartModal(true); }}
+            className="relative px-3 py-2 rounded-lg border border-blue-300 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors flex items-center gap-1.5"
+          >
+            <ShoppingCart className="w-3.5 h-3.5" />
+            자재 장바구니
+            {cartItems.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+                {cartItems.length}
+              </span>
+            )}
           </button>
           <Button onClick={() => openNew()} className="bg-amber-700 hover:bg-amber-800 text-white gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
             <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />발주 등록
@@ -2095,6 +2146,293 @@ export default function ProductionOrders() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ── 발주 완료 후 액션 팝업 ── */}
+      {postOrderInfo && (
+        <Dialog open={postOrderModal} onOpenChange={setPostOrderModal}>
+          <DialogContent className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-green-700">
+                <CheckCircle2 className="w-5 h-5" />
+                발주 등록 완료!
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-3 space-y-3">
+              {/* 발주 정보 요약 */}
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 flex-wrap text-sm">
+                  <span className="font-mono font-bold text-stone-800">{postOrderInfo.order.styleNo}</span>
+                  <span className="text-stone-600">{postOrderInfo.order.styleName}</span>
+                  <span className="font-mono text-green-700 font-semibold">{postOrderInfo.order.qty.toLocaleString()} PCS</span>
+                </div>
+                <p className="text-xs text-stone-500 mt-1">발주번호: {postOrderInfo.order.orderNo} · 공장: {postOrderInfo.order.vendorName}</p>
+              </div>
+              <p className="text-sm text-stone-600 font-medium">이어서 진행하시겠습니까?</p>
+              <div className="space-y-2">
+                {/* 작업지시서 출력 */}
+                <button
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-stone-200 hover:bg-stone-50 text-left transition-colors"
+                  onClick={() => {
+                    setPostOrderModal(false);
+                    openWorkOrderModal(postOrderInfo.order);
+                  }}
+                >
+                  <span className="text-xl">📄</span>
+                  <div>
+                    <p className="text-sm font-semibold text-stone-800">작업지시서 출력</p>
+                    <p className="text-xs text-stone-500">작업지시서 모달 바로 오픈</p>
+                  </div>
+                </button>
+                {/* 자재 장바구니 담기 */}
+                {postOrderInfo.bomMaterials.length > 0 ? (
+                  <button
+                    className="w-full flex items-center gap-3 p-3 rounded-lg border border-blue-200 hover:bg-blue-50 text-left transition-colors"
+                    onClick={() => {
+                      store.addToMaterialCart(
+                        postOrderInfo.order.styleNo,
+                        postOrderInfo.order.styleName,
+                        postOrderInfo.bomMaterials,
+                        postOrderInfo.order.qty
+                      );
+                      refreshCart();
+                      setPostOrderModal(false);
+                      toast.success(`🛒 본사제공 자재 ${postOrderInfo.bomMaterials.length}종을 장바구니에 담았습니다`);
+                      setCartModal(true);
+                    }}
+                  >
+                    <span className="text-xl">📦</span>
+                    <div>
+                      <p className="text-sm font-semibold text-blue-800">자재 장바구니 담기</p>
+                      <p className="text-xs text-blue-600">본사제공 자재 {postOrderInfo.bomMaterials.length}종을 장바구니에 추가</p>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="w-full flex items-center gap-3 p-3 rounded-lg border border-stone-100 bg-stone-50 text-left opacity-60">
+                    <span className="text-xl">📦</span>
+                    <div>
+                      <p className="text-sm font-semibold text-stone-500">자재 장바구니 담기</p>
+                      <p className="text-xs text-stone-400">본사제공 자재 없음 (BOM 미등록 또는 전량 공장구매)</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPostOrderModal(false)}>닫기</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── 자재 통합 발주 장바구니 모달 ── */}
+      <Dialog open={cartModal} onOpenChange={setCartModal}>
+        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4 text-blue-700" />
+              자재 통합 발주 장바구니
+              {cartItems.length > 0 && (
+                <span className="ml-1 text-sm font-normal text-stone-500">({cartItems.length}종)</span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {cartItems.length === 0 ? (
+            <div className="py-12 text-center text-stone-400">
+              <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-20" />
+              <p className="text-sm">장바구니가 비어 있습니다</p>
+              <p className="text-xs mt-1">발주 등록 완료 후 "자재 장바구니 담기"를 클릭하세요</p>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-stone-200 bg-stone-50">
+                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">자재명</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">규격</th>
+                      <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">단위</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">발주수량</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">담긴 발주</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">구매처</th>
+                      <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">삭제</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cartItems.map((item, idx) => (
+                      <tr key={idx} className="border-b border-stone-100 hover:bg-stone-50">
+                        <td className="px-3 py-2 font-medium text-stone-800">{item.materialName}</td>
+                        <td className="px-3 py-2 text-stone-500 text-xs">{item.spec || '-'}</td>
+                        <td className="px-3 py-2 text-center text-stone-600">{item.unit}</td>
+                        <td className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            step="0.001"
+                            value={item.qty}
+                            onChange={e => {
+                              const newQty = parseFloat(e.target.value) || 0;
+                              store.updateCartItemQty(item.materialName, item.unit, newQty);
+                              refreshCart();
+                            }}
+                            className="w-24 h-7 text-right font-mono text-sm border border-stone-200 rounded px-2 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-xs text-stone-500">
+                          {item.orders.map((o, i) => (
+                            <span key={i}>
+                              {i > 0 && <span className="mx-1 text-stone-300">+</span>}
+                              <span className="text-stone-600 font-medium">{o.styleNo}</span>
+                              <span className="text-stone-400">({o.qty % 1 === 0 ? o.qty.toLocaleString() : o.qty.toFixed(3)})</span>
+                            </span>
+                          ))}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-stone-500">{item.vendorName || <span className="text-stone-300">-</span>}</td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            className="text-stone-300 hover:text-red-500 transition-colors"
+                            onClick={() => {
+                              store.removeCartItem(item.materialName, item.unit);
+                              refreshCart();
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-stone-400">💡 발주수량은 재고 보유분 차감 등을 위해 수동 조정 가능합니다</p>
+            </div>
+          )}
+          <DialogFooter className="gap-2 flex-wrap">
+            {cartItems.length > 0 && (
+              <>
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => {
+                    if (confirm('장바구니를 전체 비우시겠습니까?')) {
+                      store.clearMaterialCart();
+                      refreshCart();
+                    }
+                  }}
+                >
+                  전체 비우기
+                </Button>
+                <Button
+                  className="bg-blue-700 hover:bg-blue-800 text-white"
+                  onClick={() => { setCartModal(false); setVendorOrderModal(true); }}
+                >
+                  <Printer className="w-4 h-4 mr-1.5" />
+                  거래처별 발주서 출력
+                </Button>
+              </>
+            )}
+            <Button variant="outline" onClick={() => setCartModal(false)}>닫기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 거래처별 발주서 출력 모달 ── */}
+      <Dialog open={vendorOrderModal} onOpenChange={setVendorOrderModal}>
+        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="w-4 h-4" />
+              거래처별 발주서
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-2">
+            {/* 거래처별 분류 */}
+            {(() => {
+              // cartItems를 vendorName 기준으로 그룹핑
+              const grouped = new Map<string, CartItem[]>();
+              for (const item of cartItems) {
+                const vendor = item.vendorName || '미지정';
+                if (!grouped.has(vendor)) grouped.set(vendor, []);
+                grouped.get(vendor)!.push(item);
+              }
+              const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+              return Array.from(grouped.entries()).map(([vendor, items]) => (
+                <div key={vendor} className="border border-stone-200 rounded-lg overflow-hidden">
+                  {/* 업체 헤더 */}
+                  <div className="bg-stone-800 text-white px-4 py-3 flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-base">{vendor === '미지정' ? '구매처 미지정' : vendor}</p>
+                      <p className="text-xs text-stone-300 mt-0.5">발주일: {today} · {items.length}종</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs text-stone-800 border-stone-200 bg-white hover:bg-stone-100"
+                      onClick={() => window.print()}
+                    >
+                      <Printer className="w-3 h-3 mr-1" />인쇄
+                    </Button>
+                  </div>
+                  {/* 발주 품목 테이블 */}
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-stone-50 border-b border-stone-200">
+                        <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-8">No.</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">자재명</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">규격</th>
+                        <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">단위</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">발주수량</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">비고 (담긴 발주)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item, i) => (
+                        <tr key={i} className="border-b border-stone-100">
+                          <td className="px-3 py-2 text-center text-stone-400 text-xs">{i + 1}</td>
+                          <td className="px-3 py-2 font-medium text-stone-800">{item.materialName}</td>
+                          <td className="px-3 py-2 text-stone-500 text-xs">{item.spec || '-'}</td>
+                          <td className="px-3 py-2 text-center text-stone-600">{item.unit}</td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-stone-800">
+                            {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-stone-400">
+                            {item.orders.map((o, j) => (
+                              <span key={j}>
+                                {j > 0 && ' + '}
+                                {o.styleNo}({o.qty % 1 === 0 ? o.qty.toLocaleString() : o.qty.toFixed(3)})
+                              </span>
+                            ))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-stone-50 border-t border-stone-200">
+                        <td colSpan={4} className="px-3 py-2 text-xs font-medium text-stone-600 text-right">합계 {items.length}종</td>
+                        <td className="px-3 py-2 text-right text-xs font-bold text-stone-700">{items.length}종 발주</td>
+                        <td className="px-3 py-2"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                  {/* 서명란 */}
+                  <div className="px-4 py-3 border-t border-stone-100 grid grid-cols-3 gap-4 text-xs text-stone-500">
+                    <div>발주담당: ___________</div>
+                    <div>확인: ___________</div>
+                    <div>수령: ___________</div>
+                  </div>
+                </div>
+              ));
+            })()}
+            {cartItems.length === 0 && (
+              <p className="text-center text-stone-400 py-8">장바구니에 담긴 자재가 없습니다</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setVendorOrderModal(false); setCartModal(true); }}>
+              장바구니로 돌아가기
+            </Button>
+            <Button variant="outline" onClick={() => setVendorOrderModal(false)}>닫기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
