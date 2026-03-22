@@ -1019,7 +1019,7 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
           value={inputVal}
           onChange={e => handleInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={() => { if (suggestions.length > 0) setOpen(true); }}
+          onFocus={() => { setOpen(true); if (inputVal.trim() === '') handleInput(''); }}
           className="h-7 text-xs border-stone-200 bg-amber-50/60 w-full"
           placeholder="업체명 검색/입력"
         />
