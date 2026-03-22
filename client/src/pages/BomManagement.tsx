@@ -313,27 +313,89 @@ interface QuoteRow {
   supplyAmt: number;
   taxAmt: number;
   memo?: string;
+  // 마진 조정 메타
+  isRawMaterial?: boolean; // 원자재 여부 (마진 배분 제외)
+  originalUnitPrice?: number; // 마진 조정 전 원본 단가
 }
+
+// 10원 단위 올림
+const ceil10 = (n: number) => Math.ceil(n / 10) * 10;
 
 function buildQuoteRows(bom: ExtBom, tab: 'pre' | 'post' = 'pre'): QuoteRow[] {
   const cnyKrw = bom.snapshotCnyKrw || 191;
   const rows: QuoteRow[] = [];
   const srcLines = tab === 'post' ? (bom.postMaterials || []) : bom.lines;
+
   const matAmt = srcLines.filter(l => l.category === '원자재' && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
-  if (matAmt > 0) rows.push({ id: genId(), category: '원자재', itemName: '원자재', qty: 1, unitPrice: Math.round(matAmt), supplyAmt: Math.round(matAmt), taxAmt: Math.round(matAmt * 0.1) });
-  const subAmt = srcLines.filter(l => ['지퍼', '장식', '보강재', '봉사·접착제'].includes(l.category) && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
-  if (subAmt > 0) rows.push({ id: genId(), category: '부자재', itemName: '부자재', qty: 1, unitPrice: Math.round(subAmt), supplyAmt: Math.round(subAmt), taxAmt: Math.round(subAmt * 0.1) });
-  const packAmt = srcLines.filter(l => l.category === '포장재' && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
-  if (packAmt > 0) rows.push({ id: genId(), category: '포장재', itemName: '포장재', qty: 1, unitPrice: Math.round(packAmt), supplyAmt: Math.round(packAmt), taxAmt: Math.round(packAmt * 0.1) });
-  (bom.postProcessLines || []).filter(l => l.name && l.unitPrice > 0).forEach(l => {
-    const amt = Math.round(l.netQty * l.unitPrice * cnyKrw);
-    rows.push({ id: genId(), category: '후가공', itemName: l.name, qty: l.netQty, unitPrice: Math.round(l.unitPrice * cnyKrw), supplyAmt: amt, taxAmt: Math.round(amt * 0.1) });
-  });
-  if (bom.processingFee > 0) {
-    const amt = Math.round(bom.processingFee * cnyKrw);
-    rows.push({ id: genId(), category: '가공비', itemName: '임가공', qty: 1, unitPrice: amt, supplyAmt: amt, taxAmt: Math.round(amt * 0.1) });
+  if (matAmt > 0) {
+    const sup = ceil10(matAmt);
+    rows.push({ id: genId(), category: '원자재', itemName: '원자재', qty: 1, unitPrice: sup, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: true, originalUnitPrice: sup });
   }
+
+  const subAmt = srcLines.filter(l => ['지퍼', '장식', '보강재', '봉사·접착제'].includes(l.category) && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
+  if (subAmt > 0) {
+    const sup = ceil10(subAmt);
+    rows.push({ id: genId(), category: '부자재', itemName: '부자재', qty: 1, unitPrice: sup, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: false, originalUnitPrice: sup });
+  }
+
+  const packAmt = srcLines.filter(l => l.category === '포장재' && !l.isHqProvided).reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * cnyKrw, 0);
+  if (packAmt > 0) {
+    const sup = ceil10(packAmt);
+    rows.push({ id: genId(), category: '포장재', itemName: '포장재', qty: 1, unitPrice: sup, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: false, originalUnitPrice: sup });
+  }
+
+  (bom.postProcessLines || []).filter(l => l.name && l.unitPrice > 0).forEach(l => {
+    const raw = l.netQty * l.unitPrice * cnyKrw;
+    const sup = ceil10(raw);
+    const up = ceil10(l.unitPrice * cnyKrw);
+    rows.push({ id: genId(), category: '후가공', itemName: l.name, qty: l.netQty, unitPrice: up, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: false, originalUnitPrice: up });
+  });
+
+  if (bom.processingFee > 0) {
+    const sup = ceil10(bom.processingFee * cnyKrw);
+    rows.push({ id: genId(), category: '가공비', itemName: '임가공', qty: 1, unitPrice: sup, supplyAmt: sup, taxAmt: ceil10(sup * 0.1), isRawMaterial: false, originalUnitPrice: sup });
+  }
+
   return rows;
+}
+
+/** 마진 배분 로직:
+ * 공장단가(KRW) = rows 합계 공급가액
+ * 목표 납품가 = 공장단가 / (1 - internalMargin)
+ * 견적 납품가 = 공장단가 / (1 - quoteMargin)
+ * 차이 = 목표 - 견적  → 부자재(isRawMaterial=false) 행에 금액 비례 배분
+ */
+function applyMarginAdjustment(rows: QuoteRow[], internalMargin: number, quoteMargin: number): { adjustedRows: QuoteRow[]; factoryCost: number; targetPrice: number; quotePrice: number; diff: number } {
+  const factoryCost = rows.reduce((s, r) => s + r.supplyAmt, 0);
+  const targetPrice = ceil10(factoryCost / (1 - internalMargin));
+  const quotePrice = ceil10(factoryCost / (1 - quoteMargin));
+  const diff = targetPrice - quotePrice; // 부자재에 올려야 할 금액
+
+  if (diff <= 0) {
+    // 차이 없으면 그대로
+    return { adjustedRows: rows, factoryCost, targetPrice, quotePrice, diff: 0 };
+  }
+
+  // 부자재 행들의 총 금액
+  const adjustableRows = rows.filter(r => !r.isRawMaterial);
+  const adjustableTotal = adjustableRows.reduce((s, r) => s + r.supplyAmt, 0);
+
+  if (adjustableTotal === 0) {
+    return { adjustedRows: rows, factoryCost, targetPrice, quotePrice, diff };
+  }
+
+  // 비례 배분
+  const adjustedRows = rows.map(r => {
+    if (r.isRawMaterial) return r;
+    const ratio = r.supplyAmt / adjustableTotal;
+    const addAmt = ceil10(diff * ratio);
+    const newSupply = ceil10(r.supplyAmt + addAmt);
+    const newUnitPrice = r.qty > 0 ? ceil10(newSupply / r.qty) : newSupply;
+    const newTax = ceil10(newSupply * 0.1);
+    return { ...r, unitPrice: newUnitPrice, supplyAmt: newSupply, taxAmt: newTax };
+  });
+
+  return { adjustedRows, factoryCost, targetPrice, quotePrice, diff };
 }
 
 function VendorQuoteModal({ bom, onClose, tab = 'pre' }: { bom: ExtBom; onClose: () => void; tab?: 'pre' | 'post' }) {
@@ -341,18 +403,46 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre' }: { bom: ExtBom; onClose:
   const [recipient, setRecipient] = useState('');
   const [dateStr, setDateStr] = useState(new Date().toISOString().split('T')[0]);
   const printRef = useRef<HTMLDivElement>(null);
+
+  // 마진율 설정
+  const [internalMargin, setInternalMargin] = useState(30); // %
+  const [quoteMargin, setQuoteMargin] = useState(16); // %
+  const [marginInfo, setMarginInfo] = useState<{ factoryCost: number; targetPrice: number; quotePrice: number; diff: number } | null>(null);
+  const [marginApplied, setMarginApplied] = useState(false);
+
   const totalSupply = rows.reduce((s, r) => s + r.supplyAmt, 0);
   const totalTax = rows.reduce((s, r) => s + r.taxAmt, 0);
-  const grandTotal = totalSupply + totalTax;
+  const grandTotal = ceil10(totalSupply + totalTax);
 
   const updateRow = (id: string, field: keyof QuoteRow, val: string | number) => {
     setRows(prev => prev.map(r => {
       if (r.id !== id) return r;
       const u = { ...r, [field]: val };
-      if (field === 'qty' || field === 'unitPrice') { u.supplyAmt = Math.round(Number(u.qty) * Number(u.unitPrice)); u.taxAmt = Math.round(u.supplyAmt * 0.1); }
-      if (field === 'supplyAmt') u.taxAmt = Math.round(Number(val) * 0.1);
+      if (field === 'qty' || field === 'unitPrice') {
+        u.supplyAmt = ceil10(Number(u.qty) * Number(u.unitPrice));
+        u.taxAmt = ceil10(u.supplyAmt * 0.1);
+      }
+      if (field === 'supplyAmt') u.taxAmt = ceil10(Number(val) * 0.1);
       return u;
     }));
+  };
+
+  // 마진 자동 조정 실행
+  const handleApplyMargin = () => {
+    const internalRate = internalMargin / 100;
+    const quoteRate = quoteMargin / 100;
+    const base = buildQuoteRows(bom, tab); // 원본 기준으로 재계산
+    const { adjustedRows, factoryCost, targetPrice, quotePrice, diff } = applyMarginAdjustment(base, internalRate, quoteRate);
+    setRows(adjustedRows);
+    setMarginInfo({ factoryCost, targetPrice, quotePrice, diff });
+    setMarginApplied(true);
+  };
+
+  // 마진 초기화
+  const handleResetMargin = () => {
+    setRows(buildQuoteRows(bom, tab));
+    setMarginInfo(null);
+    setMarginApplied(false);
   };
 
   const handlePrint = () => {
@@ -402,6 +492,70 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre' }: { bom: ExtBom; onClose:
             <div><label className="text-xs text-stone-500 mb-1 block">수신</label><Input value={recipient} onChange={e => setRecipient(e.target.value)} placeholder="수신처 입력" className="text-sm h-8" /></div>
             <div><label className="text-xs text-stone-500 mb-1 block">날짜</label><Input type="date" value={dateStr} onChange={e => setDateStr(e.target.value)} className="text-sm h-8" /></div>
           </div>
+
+          {/* ── 마진율 조정 패널 ── */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 space-y-3">
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className="text-xs font-semibold text-amber-800">마진율 설정</span>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-stone-500 whitespace-nowrap">내부 마진율</label>
+                <Input
+                  type="number" min={20} max={50} value={internalMargin}
+                  onChange={e => { setInternalMargin(Number(e.target.value)); setMarginApplied(false); }}
+                  className="h-7 text-xs w-20 text-right border-amber-300"
+                />
+                <span className="text-xs text-stone-500">%</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-stone-500 whitespace-nowrap">견적 마진율</label>
+                <Input
+                  type="number" min={15} max={20} value={quoteMargin}
+                  onChange={e => { setQuoteMargin(Number(e.target.value)); setMarginApplied(false); }}
+                  className="h-7 text-xs w-20 text-right border-amber-300"
+                />
+                <span className="text-xs text-stone-500">%</span>
+              </div>
+              <Button size="sm" onClick={handleApplyMargin} className="text-xs h-7 gap-1 bg-amber-600 hover:bg-amber-700 text-white">
+                <Calculator className="w-3 h-3" /> 마진 자동 조정
+              </Button>
+              {marginApplied && (
+                <Button size="sm" variant="outline" onClick={handleResetMargin} className="text-xs h-7 gap-1 border-stone-300 text-stone-500">
+                  <X className="w-3 h-3" /> 초기화
+                </Button>
+              )}
+            </div>
+
+            {marginInfo && (
+              <div className="grid grid-cols-2 gap-3 pt-1 border-t border-amber-200">
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-stone-500">실제 공장단가</span>
+                    <span className="font-medium">{fmtKrw(marginInfo.factoryCost)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-stone-500">견적 납품가 <span className="text-stone-400">({quoteMargin}% 기준)</span></span>
+                    <span className="font-medium text-blue-700">{fmtKrw(marginInfo.quotePrice)}</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-stone-500">목표 납품가 <span className="text-stone-400">(내부 {internalMargin}% 기준)</span></span>
+                    <span className="font-medium text-amber-700">{fmtKrw(marginInfo.targetPrice)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-stone-500">부자재 조정액</span>
+                    <span className={`font-semibold ${marginInfo.diff > 0 ? 'text-green-700' : 'text-stone-500'}`}>
+                      {marginInfo.diff > 0 ? `+${fmtKrw(marginInfo.diff)}` : '조정 없음'}
+                    </span>
+                  </div>
+                </div>
+                <div className="col-span-2 text-[10px] text-stone-400">
+                  ※ 원자재 단가는 고정. 부자재·포장재·후가공·임가공 금액에 비례 배분됩니다.
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 flex items-center gap-4">
             <span className="text-sm font-semibold text-stone-700">합계금액 (공급가액+세액)</span>
             <span className="text-xl font-bold text-[#C9A96E]">{fmtKrw(grandTotal)}</span>
@@ -424,20 +578,35 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre' }: { bom: ExtBom; onClose:
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, idx) => (
-                  <tr key={row.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-stone-50'}>
-                    <td className="px-2 py-1.5 text-center text-stone-400">{idx + 1}</td>
-                    <td className="px-1 py-1"><Input value={row.category} onChange={e => updateRow(row.id, 'category', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" /></td>
-                    <td className="px-1 py-1"><Input value={row.itemName} onChange={e => updateRow(row.id, 'itemName', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" /></td>
-                    <td className="px-1 py-1"><Input type="number" value={row.qty} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right" /></td>
-                    <td className="px-1 py-1"><Input type="number" value={row.unitPrice} onChange={e => updateRow(row.id, 'unitPrice', Number(e.target.value))} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right" /></td>
-                    <td className="px-1 py-1"><Input type="number" value={row.supplyAmt} onChange={e => updateRow(row.id, 'supplyAmt', Number(e.target.value))} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right" /></td>
-                    <td className="px-2 py-1.5 text-right text-stone-600">{fmtKrw(row.taxAmt)}</td>
-                    <td className="px-2 py-1.5 text-right font-medium">{fmtKrw(row.supplyAmt + row.taxAmt)}</td>
-                    <td className="px-1 py-1"><Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" placeholder="비고" /></td>
-                    <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(r => r.id !== row.id))} className="text-stone-300 hover:text-red-400"><X className="w-3 h-3" /></button></td>
-                  </tr>
-                ))}
+                {rows.map((row, idx) => {
+                  const isAdjusted = marginApplied && !row.isRawMaterial && row.originalUnitPrice !== undefined && row.unitPrice !== row.originalUnitPrice;
+                  return (
+                    <tr key={row.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-stone-50'}>
+                      <td className="px-2 py-1.5 text-center text-stone-400">{idx + 1}</td>
+                      <td className="px-1 py-1">
+                        <div className="flex items-center gap-1">
+                          <Input value={row.category} onChange={e => updateRow(row.id, 'category', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" />
+                          {isAdjusted && <span title="마진 조정됨" className="text-[9px] text-amber-500 font-bold flex-shrink-0">↑</span>}
+                        </div>
+                      </td>
+                      <td className="px-1 py-1"><Input value={row.itemName} onChange={e => updateRow(row.id, 'itemName', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" /></td>
+                      <td className="px-1 py-1"><Input type="number" value={row.qty} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right" /></td>
+                      <td className="px-1 py-1">
+                        <div className="text-right">
+                          <Input type="number" value={row.unitPrice} onChange={e => updateRow(row.id, 'unitPrice', Number(e.target.value))} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right" />
+                          {isAdjusted && row.originalUnitPrice !== undefined && (
+                            <div className="text-[9px] text-stone-400 line-through text-right pr-0.5">{row.originalUnitPrice.toLocaleString()}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-1 py-1"><Input type="number" value={row.supplyAmt} onChange={e => updateRow(row.id, 'supplyAmt', Number(e.target.value))} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right" /></td>
+                      <td className="px-2 py-1.5 text-right text-stone-600">{fmtKrw(row.taxAmt)}</td>
+                      <td className="px-2 py-1.5 text-right font-medium">{fmtKrw(ceil10(row.supplyAmt + row.taxAmt))}</td>
+                      <td className="px-1 py-1"><Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" placeholder="비고" /></td>
+                      <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(r => r.id !== row.id))} className="text-stone-300 hover:text-red-400"><X className="w-3 h-3" /></button></td>
+                    </tr>
+                  );
+                })}
                 <tr className="bg-[#f0ede4] font-semibold border-t-2 border-stone-300">
                   <td colSpan={5} className="px-2 py-2 text-right text-sm">TOTAL</td>
                   <td className="px-2 py-2 text-right text-sm">{fmtKrw(totalSupply)}</td>
@@ -468,7 +637,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre' }: { bom: ExtBom; onClose:
                 <thead><tr><th style={{width:'28px'}}>No</th><th style={{width:'65px'}}>구분</th><th>품목</th><th style={{width:'55px'}}>소요량</th><th style={{width:'85px'}}>단가</th><th style={{width:'85px'}}>공급가액</th><th style={{width:'75px'}}>세액</th><th style={{width:'85px'}}>합계금액</th><th style={{width:'75px'}}>비고</th></tr></thead>
                 <tbody>
                   {rows.map((row, idx) => (
-                    <tr key={row.id}><td>{idx + 1}</td><td className="tl2">{row.category}</td><td className="tl2">{row.itemName}</td><td className="tr2">{row.qty}</td><td className="tr2">{row.unitPrice.toLocaleString()}</td><td className="tr2">{row.supplyAmt.toLocaleString()}</td><td className="tr2">{row.taxAmt.toLocaleString()}</td><td className="tr2">{(row.supplyAmt + row.taxAmt).toLocaleString()}</td><td>{row.memo}</td></tr>
+                    <tr key={row.id}><td>{idx + 1}</td><td className="tl2">{row.category}</td><td className="tl2">{row.itemName}</td><td className="tr2">{row.qty}</td><td className="tr2">{row.unitPrice.toLocaleString()}</td><td className="tr2">{row.supplyAmt.toLocaleString()}</td><td className="tr2">{row.taxAmt.toLocaleString()}</td><td className="tr2">{ceil10(row.supplyAmt + row.taxAmt).toLocaleString()}</td><td>{row.memo}</td></tr>
                   ))}
                   <tr className="tot"><td colSpan={5} className="tr2">TOTAL</td><td className="tr2">{totalSupply.toLocaleString()}</td><td className="tr2">{totalTax.toLocaleString()}</td><td className="tr2">{grandTotal.toLocaleString()}</td><td></td></tr>
                 </tbody>
