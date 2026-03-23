@@ -370,50 +370,47 @@ function getExtBoms(): ExtBom[] {
 }
 function saveExtBoms(boms: ExtBom[]) {
   localStorage.setItem('ames_boms', JSON.stringify(boms));
-  // Supabase에도 저장 (colorBoms 포함)
-  boms.forEach(bom => {
-    if (!bom.id) return;
-    try {
-      const snakeBom: Record<string, unknown> = {
-        id: bom.id,
-        style_no: bom.styleNo,
-        style_name: bom.styleName,
-        season: bom.season,
-        erp_category: bom.erpCategory,
-        designer: bom.designer,
-        line_name: bom.lineName,
-        snapshot_cny_krw: bom.snapshotCnyKrw,
-        processing_fee: bom.processingFee,
-        post_processing_fee: bom.postProcessingFee,
-        logistics_cost_krw: bom.logisticsCostKrw,
-        production_margin_rate: bom.productionMarginRate,
-        customs_rate: bom.customsRate,
-        color_boms: bom.colorBoms || [],
-        post_color_boms: bom.postColorBoms || [],
-        post_process_lines: bom.postProcessLines || [],
-        manufacturing_country: bom.manufacturingCountry,
-        currency: bom.preCurrency,
-        pre_exchange_rate_cny: bom.preExchangeRateCny,
-        post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny,
-        updated_at: new Date().toISOString(),
-      };
-      // sbUpsert를 직접 호출 (store import 없이)
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      if (supabaseUrl && supabaseKey) {
-        fetch(`${supabaseUrl}/rest/v1/boms`, {
-          method: 'POST',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates',
-          },
-          body: JSON.stringify(snakeBom),
-        }).catch(() => {}); // 실패 무시
-      }
-    } catch {}
-  });
+}
+
+// BOM을 Supabase에 저장하는 함수
+function syncBomToSupabase(bom: ExtBom) {
+  if (!bom.id) return;
+  try {
+    const snakeBom = {
+      id: bom.id,
+      style_no: bom.styleNo,
+      style_name: bom.styleName,
+      season: bom.season,
+      erp_category: bom.erpCategory,
+      designer: bom.designer,
+      line_name: bom.lineName,
+      snapshot_cny_krw: bom.snapshotCnyKrw,
+      processing_fee: bom.processingFee,
+      post_processing_fee: bom.postProcessingFee,
+      logistics_cost_krw: bom.logisticsCostKrw,
+      production_margin_rate: bom.productionMarginRate,
+      customs_rate: bom.customsRate,
+      color_boms: bom.colorBoms || [],
+      post_color_boms: bom.postColorBoms || [],
+      post_process_lines: bom.postProcessLines || [],
+      manufacturing_country: bom.manufacturingCountry,
+      pre_exchange_rate_cny: bom.preExchangeRateCny,
+      post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny,
+      updated_at: new Date().toISOString(),
+    };
+    // store의 sbUpsert 방식과 동일하게 fetch 사용
+    fetch('https://linzfvhgswrnoukssqyi.supabase.co/rest/v1/boms', {
+      method: 'POST',
+      headers: {
+        'apikey': 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2',
+        'Authorization': 'Bearer sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2',
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify(snakeBom),
+    }).then(r => { if (!r.ok) r.text().then(t => console.warn('BOM Supabase 저장 실패:', t)); })
+      .catch(e => console.warn('BOM Supabase 저장 오류:', e));
+  } catch(e) { console.warn('syncBomToSupabase 오류:', e); }
 }
 
 // ─── 업체용 견적서 모달 ────────────────────────────────────────────────────────
@@ -2159,6 +2156,8 @@ export default function BomManagement() {
       });
     }
     setIsDirty(false);
+    // Supabase에도 저장
+    syncBomToSupabase(updated);
     toast.success('BOM이 저장되었습니다' + (newColors.length > 0 ? ` (컬러 ${newColors.length}개 품목에 추가됨)` : ''));
   };
 
