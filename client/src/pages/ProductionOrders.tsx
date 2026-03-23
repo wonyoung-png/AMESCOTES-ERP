@@ -297,7 +297,7 @@ export default function ProductionOrders() {
         ...prev,
         bomLoaded: !!b,
         hasBomWarning: !b,
-        bomType: b ? (b.postMaterials && b.postMaterials.length > 0 ? 'post' : 'pre') : null,
+        bomType: b ? ((b as any).postColorBoms?.length > 0 || (b.postMaterials && b.postMaterials.length > 0) ? 'post' : 'pre') : null,
       }));
     }
   };
