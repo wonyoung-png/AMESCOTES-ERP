@@ -23,7 +23,7 @@ const TABLE_COLUMNS: Record<string, string[]> = {
   items: ['id', 'style_no', 'name', 'erp_category', 'sub_category', 'buyer_id', 'season',
           'designer', 'material', 'delivery_price', 'margin_amount', 'margin_rate',
           'last_order_date', 'memo', 'image_url',
-          // 마이그레이션 후 활성화: 'has_bom', 'base_cost_krw',
+          'has_bom', 'base_cost_krw', 'colors',
           'created_at', 'updated_at'],
   samples: ['id', 'style_no', 'style_name', 'buyer_id', 'season', 'stage', 'assignee',
             'sales_person', 'request_date', 'expected_date', 'approved_date', 'cost_krw',
@@ -33,9 +33,10 @@ const TABLE_COLUMNS: Record<string, string[]> = {
          'pre_materials', 'pre_processing_fee', 'post_materials', 'post_processing_fee',
          'delivery_price', 'logistics_cost_krw', 'production_margin_rate', 'memo',
          'created_at', 'updated_at'],
-  // production_orders: 현재 기본 스키마 컬럼만 (마이그레이션 후 확장)
-  production_orders: ['id', 'style_no', 'buyer_id', 'vendor_id', 'quantity', 'unit_price',
+  production_orders: ['id', 'style_no', 'style_name', 'buyer_id', 'vendor_id', 'quantity', 'unit_price',
                       'currency', 'order_date', 'expected_date', 'status', 'memo',
+                      'order_no', 'vendor_name', 'factory_unit_price_krw', 'color_qtys',
+                      'delivery_date', 'style_id', 'revision',
                       'created_at', 'updated_at'],
   materials: ['id', 'name', 'spec', 'unit', 'unit_price', 'currency', 'vendor_id',
               'category', 'stock_qty', 'memo', 'created_at', 'updated_at'],
@@ -726,7 +727,26 @@ export const store = {
   getItems: () => getAll<Item>(KEYS.items),
   setItems: (v: Item[]) => setAll(KEYS.items, v),
   addItem: (v: Item) => { const a = getAll<Item>(KEYS.items); a.push(v); setAll(KEYS.items, a); sbUpsert('items', v); },
-  updateItem: (id: string, u: Partial<Item>) => { const a = getAll<Item>(KEYS.items); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.items, a); sbUpdate('items', id, u); } },
+  updateItem: (id: string, u: Partial<Item>) => {
+    const a = getAll<Item>(KEYS.items);
+    const i = a.findIndex(x => x.id === id);
+    if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.items, a); }
+    // Supabase에 snake_case로 명시적 변환 후 저장
+    const snakeU: Record<string, unknown> = {};
+    if (u.hasBom !== undefined) snakeU.has_bom = u.hasBom;
+    if (u.baseCostKrw !== undefined) snakeU.base_cost_krw = u.baseCostKrw;
+    if (u.colors !== undefined) snakeU.colors = u.colors;
+    if (u.deliveryPrice !== undefined) snakeU.delivery_price = u.deliveryPrice;
+    if (u.name !== undefined) snakeU.name = u.name;
+    if (u.memo !== undefined) snakeU.memo = u.memo;
+    if (u.imageUrl !== undefined) snakeU.image_url = u.imageUrl;
+    if (u.season !== undefined) snakeU.season = u.season;
+    if (u.designer !== undefined) snakeU.designer = u.designer;
+    if (u.material !== undefined) snakeU.material = u.material;
+    if (u.erpCategory !== undefined) snakeU.erp_category = u.erpCategory;
+    if (u.buyerId !== undefined) snakeU.buyer_id = u.buyerId;
+    if (Object.keys(snakeU).length > 0) sbUpdate('items', id, snakeU);
+  },
   deleteItem: (id: string) => { setAll(KEYS.items, getAll<Item>(KEYS.items).filter(x => x.id !== id)); sbDelete('items', id); },
   addItemColor: (itemId: string, color: ItemColor | string) => {
     const a = getAll<Item>(KEYS.items);
@@ -813,7 +833,26 @@ export const store = {
       .then(({ error }) => { if (error) console.warn('[store] production_orders upsert 실패:', error.message); })
       .catch(e => console.warn('[store] production_orders upsert 오류:', e));
   },
-  updateOrder: (id: string, u: Partial<ProductionOrder>) => { const a = getAll<ProductionOrder>(KEYS.orders); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.orders, a); sbUpdate('production_orders', id, u); } },
+  updateOrder: (id: string, u: Partial<ProductionOrder>) => {
+    const a = getAll<ProductionOrder>(KEYS.orders);
+    const i = a.findIndex(x => x.id === id);
+    if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.orders, a); }
+    // Supabase에 snake_case로 명시적 변환 후 저장
+    const snakeU: Record<string, unknown> = {};
+    if (u.orderNo !== undefined) snakeU.order_no = u.orderNo;
+    if (u.vendorName !== undefined) snakeU.vendor_name = u.vendorName;
+    if (u.factoryUnitPriceKrw !== undefined) snakeU.factory_unit_price_krw = u.factoryUnitPriceKrw;
+    if (u.colorQtys !== undefined) snakeU.color_qtys = u.colorQtys;
+    if (u.deliveryDate !== undefined) snakeU.delivery_date = u.deliveryDate;
+    if (u.styleId !== undefined) snakeU.style_id = u.styleId;
+    if (u.styleName !== undefined) snakeU.style_name = u.styleName;
+    if (u.status !== undefined) snakeU.status = u.status;
+    if (u.qty !== undefined) snakeU.quantity = u.qty;
+    if (u.memo !== undefined) snakeU.memo = u.memo;
+    if (u.vendorId !== undefined) snakeU.vendor_id = u.vendorId;
+    if (u.buyerId !== undefined) snakeU.buyer_id = u.buyerId;
+    if (Object.keys(snakeU).length > 0) sbUpdate('production_orders', id, snakeU);
+  },
   deleteOrder: (id: string) => { setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).filter(x => x.id !== id)); sbDelete('production_orders', id); },
   getNextRevision: (styleNo: string) => { const orders = getAll<ProductionOrder>(KEYS.orders).filter(o => o.styleNo === styleNo); return orders.length > 0 ? Math.max(...orders.map(o => o.revision)) + 1 : 1; },
 
@@ -934,11 +973,25 @@ export const store = {
       }
     }
 
+    // 공장단가 = 공장구매자재비(per pcs, LOSS 포함) + 임가공비
+    // 공장구매 자재비 합산 (본사제공 제외, per pcs 기준)
+    const factoryMaterialCny = baseLines.reduce((s, l) => {
+      if (l.isHqProvided) return s;
+      const price = (l as any).unitPriceCny ?? (l as any).unitPrice ?? 0;
+      const perPcsQty = l.netQty * (1 + (l.lossRate ?? 0));
+      return s + price * perPcsQty;
+    }, 0);
+    // 후가공비 (per pcs)
+    const postProcessFee = (bom as any).postProcessLines
+      ? ((bom as any).postProcessLines as Array<{ netQty: number; unitPrice: number }>).reduce((s, l) => s + l.netQty * l.unitPrice, 0)
+      : 0;
+    const factoryUnitPriceCny = factoryMaterialCny + processingFee + postProcessFee;
+
     return {
       hqProvided,
       factoryProvided,
       processingFee,
-      factoryUnitPriceCny: processingFee,
+      factoryUnitPriceCny,
       bomType: type,
       manufacturingCountry: bom.manufacturingCountry,
     };
