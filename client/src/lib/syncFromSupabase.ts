@@ -176,7 +176,13 @@ const TABLE_KEY_MAP: { table: string; key: string; converter?: (row: Record<stri
 ];
 
 export async function syncFromSupabase(): Promise<void> {
-  for (const { table, key, converter } of TABLE_KEY_MAP) {
+  // items를 먼저 처리해서 boms 변환 시 styleId 매핑 가능하게
+  const sortedMap = [...TABLE_KEY_MAP].sort((a, b) => {
+    if (a.table === 'items') return -1;
+    if (b.table === 'items') return 1;
+    return 0;
+  });
+  for (const { table, key, converter } of sortedMap) {
     try {
       const { data, error } = await supabase.from(table).select('*');
       if (error) {

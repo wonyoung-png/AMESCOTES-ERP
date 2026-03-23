@@ -2030,6 +2030,15 @@ export default function BomManagement() {
 
   const handleSave = () => {
     if (!editBom) return;
+    // styleId 없으면 styleNo로 item 찾아서 설정
+    if (!editBom.styleId && editBom.styleNo) {
+      const matchedItem = items.find(i => i.styleNo === editBom.styleNo);
+      if (matchedItem) {
+        setEditBom(prev => prev ? { ...prev, styleId: matchedItem.id } : prev);
+        toast.info('스타일 ID를 자동으로 연결했습니다. 다시 저장해주세요.');
+        return;
+      }
+    }
     if (!editBom.styleId) { toast.error('스타일을 선택해주세요'); return; }
     const updated = { ...editBom, updatedAt: new Date().toISOString() };
     const existing = extBoms.find(b => b.id === updated.id);
