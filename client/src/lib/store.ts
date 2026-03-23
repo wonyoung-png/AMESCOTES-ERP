@@ -14,10 +14,45 @@ function toSnakeCase(obj: Record<string, any>): Record<string, any> {
   );
 }
 
+// 테이블별 허용 컬럼 목록 (Supabase 스키마와 동기화)
+// ⚠️ 마이그레이션 후 컬럼이 추가되면 아래 목록에도 추가 필요
+// migration: supabase/MIGRATION_REQUIRED.md 참조
+const TABLE_COLUMNS: Record<string, string[]> = {
+  vendors: ['id', 'code', 'name', 'company_name', 'type', 'material_types', 'custom_type',
+            'contact_name', 'phone', 'email', 'memo', 'bank_info', 'created_at', 'updated_at'],
+  items: ['id', 'style_no', 'name', 'erp_category', 'sub_category', 'buyer_id', 'season',
+          'designer', 'material', 'delivery_price', 'margin_amount', 'margin_rate',
+          'last_order_date', 'memo', 'image_url',
+          // 마이그레이션 후 활성화: 'has_bom', 'base_cost_krw',
+          'created_at', 'updated_at'],
+  samples: ['id', 'style_no', 'style_name', 'buyer_id', 'season', 'stage', 'assignee',
+            'sales_person', 'request_date', 'expected_date', 'approved_date', 'cost_krw',
+            'image_urls', 'material_requests', 'documents', 'memo', 'created_at', 'updated_at'],
+  boms: ['id', 'style_no', 'style_name', 'season', 'erp_category', 'designer', 'line_name',
+         'manufacturing_country', 'currency', 'exchange_rate_cny', 'exchange_rate_usd',
+         'pre_materials', 'pre_processing_fee', 'post_materials', 'post_processing_fee',
+         'delivery_price', 'logistics_cost_krw', 'production_margin_rate', 'memo',
+         'created_at', 'updated_at'],
+  // production_orders: 현재 기본 스키마 컬럼만 (마이그레이션 후 확장)
+  production_orders: ['id', 'style_no', 'buyer_id', 'vendor_id', 'quantity', 'unit_price',
+                      'currency', 'order_date', 'expected_date', 'status', 'memo',
+                      'created_at', 'updated_at'],
+  materials: ['id', 'name', 'spec', 'unit', 'unit_price', 'currency', 'vendor_id',
+              'category', 'stock_qty', 'memo', 'created_at', 'updated_at'],
+};
+
+// 테이블에서 허용된 컬럼만 필터링
+function filterForTable(table: string, row: Record<string, any>): Record<string, any> {
+  const allowed = TABLE_COLUMNS[table];
+  if (!allowed) return row; // 알 수 없는 테이블은 그대로 통과
+  return Object.fromEntries(Object.entries(row).filter(([k]) => allowed.includes(k)));
+}
+
 // Supabase 저장 (실패해도 앱에 영향 없음)
 async function sbUpsert(table: string, data: Record<string, any>): Promise<void> {
   try {
-    const { error } = await supabase.from(table).upsert(toSnakeCase(data));
+    const row = filterForTable(table, toSnakeCase(data));
+    const { error } = await supabase.from(table).upsert(row);
     if (error) console.warn(`[store] ${table} upsert 실패:`, error.message);
   } catch (e) {
     console.warn(`[store] ${table} upsert 오류:`, e);
@@ -26,7 +61,8 @@ async function sbUpsert(table: string, data: Record<string, any>): Promise<void>
 
 async function sbUpdate(table: string, id: string, patch: Record<string, any>): Promise<void> {
   try {
-    const { error } = await supabase.from(table).update(toSnakeCase(patch)).eq('id', id);
+    const row = filterForTable(table, toSnakeCase(patch));
+    const { error } = await supabase.from(table).update(row).eq('id', id);
     if (error) console.warn(`[store] ${table} update 실패:`, error.message);
   } catch (e) {
     console.warn(`[store] ${table} update 오류:`, e);
@@ -763,7 +799,20 @@ export const store = {
   // Orders
   getOrders: () => getAll<ProductionOrder>(KEYS.orders),
   setOrders: (v: ProductionOrder[]) => setAll(KEYS.orders, v),
-  addOrder: (v: ProductionOrder) => { const a = getAll<ProductionOrder>(KEYS.orders); a.push(v); setAll(KEYS.orders, a); sbUpsert('production_orders', v); },
+  addOrder: (v: ProductionOrder) => {
+    const a = getAll<ProductionOrder>(KEYS.orders); a.push(v); setAll(KEYS.orders, a);
+    // production_orders 테이블은 qty→quantity, factoryUnitPriceKrw→unit_price, factoryCurrency→currency 매핑 필요
+    const row = {
+      ...toSnakeCase(v as Record<string, any>),
+      quantity: v.qty,
+      unit_price: v.factoryUnitPriceKrw ?? v.factoryUnitPriceCny ?? 0,
+      currency: v.factoryCurrency ?? 'KRW',
+    };
+    const filtered = filterForTable('production_orders', row);
+    supabase.from('production_orders').upsert(filtered)
+      .then(({ error }) => { if (error) console.warn('[store] production_orders upsert 실패:', error.message); })
+      .catch(e => console.warn('[store] production_orders upsert 오류:', e));
+  },
   updateOrder: (id: string, u: Partial<ProductionOrder>) => { const a = getAll<ProductionOrder>(KEYS.orders); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.orders, a); sbUpdate('production_orders', id, u); } },
   deleteOrder: (id: string) => { setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).filter(x => x.id !== id)); sbDelete('production_orders', id); },
   getNextRevision: (styleNo: string) => { const orders = getAll<ProductionOrder>(KEYS.orders).filter(o => o.styleNo === styleNo); return orders.length > 0 ? Math.max(...orders.map(o => o.revision)) + 1 : 1; },

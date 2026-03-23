@@ -183,3 +183,27 @@ create trigger samples_updated_at before update on samples for each row execute 
 create trigger boms_updated_at before update on boms for each row execute function update_updated_at_column();
 create trigger production_orders_updated_at before update on production_orders for each row execute function update_updated_at_column();
 create trigger materials_updated_at before update on materials for each row execute function update_updated_at_column();
+
+-- ─── 마이그레이션: Missing 컬럼 추가 (2026-03-23) ───
+-- items 테이블: BOM 연동 컬럼
+ALTER TABLE items ADD COLUMN IF NOT EXISTS has_bom boolean DEFAULT false;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS base_cost_krw numeric;
+
+-- production_orders 테이블: 확장 컬럼
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS order_no text;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS style_name text;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS style_id text;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS season text;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS vendor_name text;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS delivery_date date;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS factory_unit_price_cny numeric;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS factory_unit_price_krw numeric;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS factory_currency text;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS bom_id text;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS bom_type text;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS color_qtys jsonb;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS hq_supply_items jsonb;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS received_qty integer;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS defect_qty integer;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS defect_note text;
+ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS received_date date;
