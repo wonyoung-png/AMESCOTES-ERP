@@ -32,7 +32,10 @@ const TABLE_COLUMNS: Record<string, string[]> = {
          'manufacturing_country', 'currency', 'exchange_rate_cny', 'exchange_rate_usd',
          'pre_materials', 'pre_processing_fee', 'post_materials', 'post_processing_fee',
          'delivery_price', 'logistics_cost_krw', 'production_margin_rate', 'memo',
-         'created_at', 'updated_at'],
+         'created_at', 'updated_at',
+         // 마이그레이션으로 추가된 컬럼 (실제 Supabase 테이블에 존재)
+         'color_boms', 'post_color_boms', 'pre_currency', 'post_currency',
+         'pre_exchange_rate_cny', 'post_exchange_rate_cny', 'customs_rate', 'post_process_lines'],
   production_orders: ['id', 'style_no', 'style_name', 'buyer_id', 'vendor_id', 'quantity', 'unit_price',
                       'currency', 'order_date', 'expected_date', 'status', 'memo',
                       'order_no', 'vendor_name', 'factory_unit_price_krw', 'color_qtys',
@@ -817,6 +820,66 @@ export const store = {
   addBom: (v: Bom) => { const a = getAll<Bom>(KEYS.boms); a.push(v); setAll(KEYS.boms, a); sbUpsert('boms', v); },
   updateBom: (id: string, u: Partial<Bom>) => { const a = getAll<Bom>(KEYS.boms); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.boms, a); sbUpdate('boms', id, u); } },
   deleteBom: (id: string) => { setAll(KEYS.boms, getAll<Bom>(KEYS.boms).filter(x => x.id !== id)); sbDelete('boms', id); },
+
+  /**
+   * ExtBom(BomManagement.tsx 형식) → Supabase boms 테이블에 upsert
+   * colorBoms, postColorBoms, postProcessLines 등 JSONB 필드 완전 지원
+   * sbUpsert는 내부에서 toSnakeCase를 또 호출하므로, 직접 supabase client 사용
+   */
+  saveBom: (bom: any): void => {
+    // localStorage 저장 (ames_boms 키)
+    const boms = getAll<any>(KEYS.boms);
+    const idx = boms.findIndex((b: any) => b.id === bom.id);
+    if (idx >= 0) {
+      boms[idx] = bom;
+    } else {
+      boms.push(bom);
+    }
+    setAll(KEYS.boms, boms);
+
+    // Supabase에 snake_case로 직접 변환 후 upsert
+    // 실제 boms 테이블 컬럼에 맞춰 명시적 매핑
+    const snakeBom: Record<string, any> = {
+      id: bom.id,
+      style_no: bom.styleNo,
+      style_name: bom.styleName,
+      season: bom.season,
+      erp_category: bom.erpCategory,
+      designer: bom.designer,
+      line_name: bom.lineName,
+      manufacturing_country: bom.manufacturingCountry,
+      currency: bom.currency ?? bom.preCurrency ?? 'CNY',
+      exchange_rate_cny: bom.exchangeRateCny ?? bom.snapshotCnyKrw,
+      exchange_rate_usd: bom.exchangeRateUsd,
+      pre_materials: bom.lines ?? [],
+      pre_processing_fee: bom.processingFee ?? 0,
+      post_materials: bom.postMaterials ?? [],
+      post_processing_fee: bom.postProcessingFee ?? 0,
+      logistics_cost_krw: bom.logisticsCostKrw ?? 0,
+      production_margin_rate: bom.productionMarginRate ?? 0.16,
+      customs_rate: bom.customsRate ?? 0,
+      color_boms: bom.colorBoms ?? [],
+      post_color_boms: bom.postColorBoms ?? [],
+      post_process_lines: bom.postProcessLines ?? [],
+      pre_currency: bom.preCurrency ?? bom.currency ?? 'CNY',
+      post_currency: bom.currency ?? 'CNY',
+      pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
+      post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny ?? bom.snapshotCnyKrw,
+      memo: bom.memo,
+      updated_at: new Date().toISOString(),
+    };
+
+    // 직접 supabase client로 upsert (toSnakeCase 이중 변환 방지)
+    Promise.resolve(supabase.from('boms').upsert(snakeBom))
+      .then(({ error }) => {
+        if (error) {
+          console.warn('[store.saveBom] Supabase upsert 실패:', error.message, error.details);
+        } else {
+          console.log('[store.saveBom] BOM 저장 완료:', bom.styleNo, bom.id);
+        }
+      })
+      .catch((e: unknown) => console.warn('[store.saveBom] 오류:', e));
+  },
 
   /**
    * 스타일번호(styleNo) 기반 BOM 총원가 계산 (KRW 환산)

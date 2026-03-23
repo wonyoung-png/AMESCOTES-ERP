@@ -376,6 +376,8 @@ function saveExtBoms(boms: ExtBom[]) {
 function syncBomToSupabase(bom: ExtBom) {
   if (!bom.id) return;
   try {
+    // 실제 Supabase boms 테이블 컬럼에 맞게 명시적 매핑
+    // (snapshot_cny_krw 같은 존재하지 않는 컬럼명 제거, 실제 컬럼명 사용)
     const snakeBom = {
       id: bom.id,
       style_no: bom.styleNo,
@@ -384,47 +386,51 @@ function syncBomToSupabase(bom: ExtBom) {
       erp_category: bom.erpCategory,
       designer: bom.designer,
       line_name: bom.lineName,
-      snapshot_cny_krw: bom.snapshotCnyKrw,
-      processing_fee: bom.processingFee,
-      post_processing_fee: bom.postProcessingFee,
-      logistics_cost_krw: bom.logisticsCostKrw,
-      production_margin_rate: bom.productionMarginRate,
-      customs_rate: bom.customsRate,
-      color_boms: bom.colorBoms || [],
-      post_color_boms: bom.postColorBoms || [],
-      post_process_lines: bom.postProcessLines || [],
       manufacturing_country: bom.manufacturingCountry,
-      pre_exchange_rate_cny: bom.preExchangeRateCny,
-      post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny,
+      currency: bom.preCurrency ?? bom.currency ?? 'CNY',
+      exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
+      exchange_rate_usd: bom.preExchangeRateUsd ?? bom.exchangeRateUsd,
+      pre_materials: bom.lines ?? [],
+      pre_processing_fee: bom.processingFee ?? 0,
+      post_materials: bom.postMaterials ?? [],
+      post_processing_fee: bom.postProcessingFee ?? 0,
+      logistics_cost_krw: bom.logisticsCostKrw ?? 0,
+      production_margin_rate: bom.productionMarginRate ?? 0.16,
+      customs_rate: bom.customsRate ?? 0,
+      color_boms: bom.colorBoms ?? [],
+      post_color_boms: bom.postColorBoms ?? [],
+      post_process_lines: bom.postProcessLines ?? [],
+      pre_currency: bom.preCurrency ?? bom.currency ?? 'CNY',
+      post_currency: bom.currency ?? 'CNY',
+      pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
+      post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny ?? bom.snapshotCnyKrw,
+      memo: bom.memo,
       updated_at: new Date().toISOString(),
     };
-    // store의 sbUpsert 방식과 동일하게 fetch 사용
-    // PATCH로 기존 BOM 업데이트 (color_boms 포함)
-    fetch(`https://linzfvhgswrnoukssqyi.supabase.co/rest/v1/boms?id=eq.${bom.id}`, {
-      method: 'PATCH',
-      headers: {
-        'apikey': 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2',
-        'Authorization': 'Bearer sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2',
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
+
+    const SUPABASE_URL = 'https://linzfvhgswrnoukssqyi.supabase.co/rest/v1';
+    const SUPABASE_KEY = 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2';
+    const HEADERS = {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+    };
+
+    // UPSERT (POST + Prefer: resolution=merge-duplicates)로 insert/update 동시 처리
+    // PATCH는 0 rows affected여도 r.ok=true라 신규 BOM 감지 불가 → POST upsert가 더 안전
+    fetch(`${SUPABASE_URL}/boms`, {
+      method: 'POST',
+      headers: { ...HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(snakeBom),
-    }).then(r => {
+    }).then(async r => {
       if (!r.ok) {
-        // PATCH 실패 시 POST로 재시도 (새 BOM)
-        fetch('https://linzfvhgswrnoukssqyi.supabase.co/rest/v1/boms', {
-          method: 'POST',
-          headers: {
-            'apikey': 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2',
-            'Authorization': 'Bearer sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2',
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates',
-          },
-          body: JSON.stringify(snakeBom),
-        }).catch(e => console.warn('BOM POST 실패:', e));
+        const errText = await r.text().catch(() => '');
+        console.warn('[syncBomToSupabase] Supabase upsert 실패:', r.status, errText);
+      } else {
+        console.log('[syncBomToSupabase] BOM 저장 완료:', bom.styleNo, bom.id);
       }
-    }).catch(e => console.warn('BOM Supabase 저장 오류:', e));
-  } catch(e) { console.warn('syncBomToSupabase 오류:', e); }
+    }).catch(e => console.warn('[syncBomToSupabase] 네트워크 오류:', e));
+  } catch(e) { console.warn('[syncBomToSupabase] 오류:', e); }
 }
 
 // ─── 업체용 견적서 모달 ────────────────────────────────────────────────────────
@@ -2142,6 +2148,8 @@ export default function BomManagement() {
     }
     saveExtBoms(newBoms);
     setExtBoms(newBoms);
+    // store.saveBom으로 Supabase에도 직접 저장 (colorBoms, postColorBoms 포함)
+    store.saveBom(updated);
     // 첫 번째 컬러 BOM 기준으로 원가 업데이트 (없으면 lines 기준)
     const firstColor = (updated.colorBoms || [])[0];
     const summary = calcSummary(updated, settings.usdKrw, firstColor);
@@ -2170,8 +2178,7 @@ export default function BomManagement() {
       });
     }
     setIsDirty(false);
-    // Supabase에도 저장
-    syncBomToSupabase(updated);
+    // Supabase 저장은 store.saveBom에서 처리 (위에서 이미 호출)
     toast.success('BOM이 저장되었습니다' + (newColors.length > 0 ? ` (컬러 ${newColors.length}개 품목에 추가됨)` : ''));
   };
 
