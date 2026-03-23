@@ -233,8 +233,8 @@ function calcPostSummary(bom: ExtBom, settingsUsdKrw = 1380, postColorBom?: ExtC
   const processingKrw = processingCny * rate;
   const customsKrw = processingKrw * (customsRate / 100);
   const logisticsKrw = bom.logisticsCostKrw || 0;
-  // 공장단가 = 공장구매자재 + 임가공비 + 후가공비 + 관세 (본사제공 제외)
-  const factoryUnitCostKrw = factoryMaterialCny * rate + processingKrw + postProcessCny2 * rate + customsKrw;
+  // 공장단가 = 공장구매자재 + 임가공비 + 후가공비 (관세는 우리가 내는 것 - 제외)
+  const factoryUnitCostKrw = factoryMaterialCny * rate + processingKrw + postProcessCny2 * rate;
   const factoryUnitCostCny = factoryUnitCostKrw / (rate || 1);
   // 제품원가 = 공장단가 + 본사제공 + 물류비
   const totalCostKrw = factoryUnitCostKrw + hqMaterialCny * rate + logisticsKrw;
@@ -3762,7 +3762,7 @@ export default function BomManagement() {
                         <tr className="bg-amber-50 border-y border-amber-200">
                           <td className="px-4 py-3 font-bold text-amber-600">🏭</td>
                           <td className="px-4 py-3 font-bold text-stone-800">공장단가</td>
-                          <td className="px-4 py-3 text-stone-500 text-[11px]">공장구매자재 + 임가공 + 후가공 + 관세 (본사제공 제외)</td>
+                          <td className="px-4 py-3 text-stone-500 text-[11px]">공장구매자재 + 임가공 + 후가공 (관세 제외, 공장 결제금액)</td>
                           <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">{fmtKrw(ps.factoryUnitCostKrw)}</td>
                         </tr>
                         {ps.logisticsKrw > 0 && (
