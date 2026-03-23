@@ -265,6 +265,13 @@ export default function ProductionOrders() {
   // BOM 기반 계산 (스타일+수량 변경 시 호출)
   const recalcBom = (styleNo: string, qty: number) => {
     if (!styleNo || qty <= 0) return;
+    // 최신 BOM 항상 Supabase에서 동기화 후 계산
+    store.fetchAndCacheBom(styleNo).then(() => {
+      _doRecalcBom(styleNo, qty);
+    });
+  };
+  const _doRecalcBom = (styleNo: string, qty: number) => {
+    if (!styleNo || qty <= 0) return;
     const settings = store.getSettings();
     const cnyKrw = settings.cnyKrw || 191;
     const result = store.calcMaterialRequirements(styleNo, qty, colorQtys.length > 0 ? colorQtys : undefined);

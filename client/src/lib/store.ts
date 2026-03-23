@@ -1003,6 +1003,49 @@ export const store = {
     return { bom: bomList[0], type: 'pre' };
   },
 
+  // Supabase에서 최신 BOM 직접 패치 (localStorage 동기화용)
+  fetchAndCacheBom: async (styleNo: string): Promise<void> => {
+    try {
+      const SURL = 'https://linzfvhgswrnoukssqyi.supabase.co/rest/v1';
+      const SKEY = 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2';
+      const res = await fetch(`${SURL}/boms?style_no=eq.${styleNo}&select=*`, {
+        headers: { 'apikey': SKEY, 'Authorization': `Bearer ${SKEY}` }
+      });
+      if (!res.ok) return;
+      const rows = await res.json();
+      if (!rows || rows.length === 0) return;
+      const boms = getAll<any>(KEYS.boms);
+      for (const row of rows) {
+        const idx = boms.findIndex((b: any) => b.id === row.id || b.styleNo === row.style_no);
+        const converted = {
+          ...(idx >= 0 ? boms[idx] : {}),
+          id: row.id,
+          styleNo: row.style_no,
+          styleName: row.style_name,
+          postColorBoms: row.post_color_boms || [],
+          colorBoms: row.color_boms || [],
+          postMaterials: row.post_materials || [],
+          lines: row.pre_materials || [],
+          processingFee: row.processing_fee || 0,
+          postProcessingFee: row.post_processing_fee || 0,
+          exchangeRateCny: row.exchange_rate_cny || 191,
+          preExchangeRateCny: row.pre_exchange_rate_cny || 191,
+          postExchangeRateCny: row.post_exchange_rate_cny || row.exchange_rate_cny || 191,
+          customsRate: row.customs_rate || 0,
+          productionMarginRate: row.production_margin_rate || 0.16,
+          postProcessLines: row.post_process_lines || [],
+          manufacturingCountry: row.manufacturing_country,
+          version: 1,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        };
+        if (idx >= 0) boms[idx] = converted;
+        else boms.push(converted);
+      }
+      setAll(KEYS.boms, boms);
+    } catch(e) { console.warn('fetchAndCacheBom 오류:', e); }
+  },
+
   /** 자재 소요량 계산: BOM 소요량 × 발주수량, 본사제공/미제공 분리
    * 컬러별 BOM 지원:
    * - colorQtys의 각 컬러에 해당하는 colorBom이 있으면 → 해당 colorBom.lines 사용 (원자재)
