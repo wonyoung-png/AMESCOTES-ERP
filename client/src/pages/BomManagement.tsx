@@ -427,7 +427,7 @@ function buildQuoteRows(bom: ExtBom, tab: 'pre' | 'post' = 'pre', colorBom?: Ext
           id: genId(), category: cat,
           itemName: line.itemName + (line.subPart ? ` (${line.subPart})` : ''),
           qty: parseFloat(grossQty.toFixed(4)), unitPrice: unitKrw, supplyAmt: sup,
-          taxAmt: ceil10(sup * 0.1), memo: line.isHqProvided ? '본사제공' : '',
+          taxAmt: ceil10(sup * 0.1), memo: '',
           isRawMaterial: cat === '원자재', isVendorProvided: false, originalUnitPrice: unitKrw,
         });
       }
@@ -534,28 +534,53 @@ function applyMarginAdjustment(
   // 4. 차액 = 내부납품가 - (소계 + 생산관리비용)
   const gap = internalPrice - subtotal - marginAmt;
 
-  // 5. 차액을 원자재 제외 항목에 금액 비례 배분
-  const adjustableRows = rows.filter(r =>
-    !r.isVendorProvided &&
-    !r.isMarginRow &&
-    !r.isRawMaterial
-  );
-  const adjustableTotal = adjustableRows.reduce((s, r) => s + r.supplyAmt, 0);
+  // 5. 차액 배분 (항목별 규칙):
+  //    - 장식 / 보강재 / 봉사·접착제 / 포장재: 단가 조정 (70%)
+  //    - 원자재: 소요량 조정 (30%)
+  const baseRows = rows.filter(r => !r.isMarginRow);
 
-  const updatedRows = rows.filter(r => !r.isMarginRow).map(r => {
-    if (r.isVendorProvided || r.isMarginRow || r.isRawMaterial || adjustableTotal === 0) {
-      return r;
+  const decorAndOtherRows = baseRows.filter(r =>
+    !r.isVendorProvided &&
+    (r.category === '장식' || ['보강재', '봉사·접착제', '포장재'].includes(r.category))
+  );
+  const rawRows = baseRows.filter(r => r.isRawMaterial && !r.isVendorProvided);
+  const adjustableAmt = decorAndOtherRows.reduce((s, r) => s + r.supplyAmt, 0);
+
+  const mainGap = adjustableAmt > 0 ? Math.round(gap * 0.7) : 0;
+  const rawGap = gap - mainGap;
+  const rawTotal = rawRows.reduce((s, r) => s + r.supplyAmt, 0);
+
+  const updatedRows = baseRows.map(r => {
+    if (r.isVendorProvided || r.isMarginRow) return r;
+
+    if (r.category === '장식' || ['보강재', '봉사·접착제', '포장재'].includes(r.category)) {
+      if (adjustableAmt === 0) return r;
+      const ratio = r.supplyAmt / adjustableAmt;
+      const addAmt = Math.round(mainGap * ratio / 10) * 10;
+      const newSupplyAmt = r.supplyAmt + addAmt;
+      return {
+        ...r,
+        supplyAmt: newSupplyAmt,
+        unitPrice: r.qty > 0 ? Math.ceil(newSupplyAmt / r.qty / 10) * 10 : r.unitPrice,
+        taxAmt: Math.ceil(newSupplyAmt * 0.1 / 10) * 10,
+      };
     }
-    const ratio = r.supplyAmt / adjustableTotal;
-    const addAmt = Math.round(gap * ratio / 10) * 10;
-    const newSupplyAmt = r.supplyAmt + addAmt;
-    const newUnitPrice = r.qty > 0 ? Math.ceil(newSupplyAmt / r.qty / 10) * 10 : r.unitPrice;
-    return {
-      ...r,
-      unitPrice: newUnitPrice,
-      supplyAmt: newSupplyAmt,
-      taxAmt: Math.ceil(newSupplyAmt * 0.1 / 10) * 10,
-    };
+
+    if (r.isRawMaterial) {
+      if (rawTotal === 0) return r;
+      const ratio = r.supplyAmt / rawTotal;
+      const addAmt = Math.round(rawGap * ratio / 10) * 10;
+      const newSupplyAmt = r.supplyAmt + addAmt;
+      const newQty = r.unitPrice > 0 ? +(newSupplyAmt / r.unitPrice).toFixed(2) : r.qty;
+      return {
+        ...r,
+        qty: newQty,
+        supplyAmt: newSupplyAmt,
+        taxAmt: Math.ceil(newSupplyAmt * 0.1 / 10) * 10,
+      };
+    }
+
+    return r;
   });
 
   // 6. 생산관리비용 행 추가
