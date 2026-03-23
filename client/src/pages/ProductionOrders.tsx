@@ -2772,6 +2772,7 @@ export default function ProductionOrders() {
                     <thead>
                       <tr className="bg-stone-50 border-b border-stone-200">
                         <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-8">No.</th>
+                        <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-10">이미지</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">자재명</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">규격</th>
                         <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">단위</th>
@@ -2785,6 +2786,13 @@ export default function ProductionOrders() {
                       {items.map((item, i) => (
                         <tr key={i} className="border-b border-stone-100">
                           <td className="px-3 py-2 text-center text-stone-400 text-xs">{i + 1}</td>
+                          <td className="px-2 py-1 text-center">
+                            {(item as any).imageUrl ? (
+                              <img src={(item as any).imageUrl} alt={item.materialName} className="w-8 h-8 object-cover rounded cursor-pointer border border-stone-200" onClick={() => window.open((item as any).imageUrl, '_blank')} />
+                            ) : (
+                              <span className="text-stone-300 text-base">📷</span>
+                            )}
+                          </td>
                           <td className="px-3 py-2 font-medium text-stone-800">{item.materialName}</td>
                           <td className="px-3 py-2 text-stone-500 text-xs">{item.spec || '-'}</td>
                           <td className="px-3 py-2 text-center text-stone-600">{item.unit}</td>

@@ -639,6 +639,7 @@ export interface CartItem {
   // 발주필요수량 = qty - (stockQty ?? 0) (계산값, 저장 불필요)
   vendorName?: string     // 구매업체
   isHqProvided: boolean   // 본사제공 여부
+  imageUrl?: string       // BOM 자재 이미지
   orders: { styleNo: string; styleName: string; qty: number }[] // 담긴 발주 목록
 }
 
