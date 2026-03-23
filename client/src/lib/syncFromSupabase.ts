@@ -242,8 +242,38 @@ export async function syncFromSupabase(): Promise<void> {
         continue;
       }
 
-      localStorage.setItem(key, JSON.stringify(converted));
-      console.log(`[syncFromSupabase] ${table} 동기화 완료 (${converted.length}건)`);
+      // items 테이블은 스마트 병합 (로컬의 colors/hasBom/baseCostKrw 보존)
+      if (key === 'ames_items') {
+        try {
+          const localRaw = localStorage.getItem(key);
+          const localItems: Array<Record<string, any>> = localRaw ? JSON.parse(localRaw) : [];
+          const localById = new Map<string, Record<string, any>>();
+          localItems.forEach(item => { if (item.id) localById.set(item.id, item); });
+          
+          const merged = converted.map(remote => {
+            const local = localById.get(remote.id);
+            if (!local) return remote;
+            // 로컬에 colors/hasBom/baseCostKrw가 있으면 우선 적용 (BOM 저장 결과 보존)
+            return {
+              ...remote,
+              colors: (local.colors && local.colors.length > 0) ? local.colors : remote.colors,
+              hasBom: local.hasBom !== undefined ? local.hasBom : remote.hasBom,
+              baseCostKrw: local.baseCostKrw || remote.baseCostKrw,
+            };
+          });
+          // 로컬에만 있는 것 추가
+          localItems.forEach(local => {
+            if (!converted.find(r => r.id === local.id)) merged.push(local);
+          });
+          localStorage.setItem(key, JSON.stringify(merged));
+          console.log(`[syncFromSupabase] items 스마트 병합 완료 (${merged.length}건, colors/hasBom 보존)`);
+        } catch (e) {
+          localStorage.setItem(key, JSON.stringify(converted));
+        }
+      } else {
+        localStorage.setItem(key, JSON.stringify(converted));
+        console.log(`[syncFromSupabase] ${table} 동기화 완료 (${converted.length}건)`);
+      }
     } catch (err) {
       console.warn(`[syncFromSupabase] ${table} 동기화 중 오류:`, err);
     }
