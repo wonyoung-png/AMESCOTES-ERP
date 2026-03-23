@@ -1234,7 +1234,7 @@ export const store = {
   addToMaterialCart: (
     styleNo: string,
     styleName: string,
-    bomMaterials: Array<{ itemName: string; spec?: string; unit: string; netQty: number; lossRate: number; vendorName?: string; isHqProvided: boolean }>,
+    bomMaterials: Array<{ itemName: string; spec?: string; unit: string; netQty: number; lossRate: number; vendorName?: string; isHqProvided: boolean; imageUrl?: string }>,
     orderQty: number
   ) => {
     const cart = getAll<CartItem>(KEYS.materialCart);
@@ -1253,6 +1253,7 @@ export const store = {
           cart[idx].orders.push({ styleNo, styleName, qty: totalQty });
         }
         cart[idx].qty = Math.round((cart[idx].qty + totalQty) * 1000) / 1000;
+        if (!cart[idx].imageUrl && mat.imageUrl) cart[idx].imageUrl = mat.imageUrl;
       } else {
         cart.push({
           materialName: mat.itemName,
@@ -1261,6 +1262,7 @@ export const store = {
           qty: totalQty,
           vendorName: mat.vendorName,
           isHqProvided: mat.isHqProvided,
+          imageUrl: mat.imageUrl,
           orders: [{ styleNo, styleName, qty: totalQty }],
         });
       }

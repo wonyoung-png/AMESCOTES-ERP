@@ -550,6 +550,7 @@ export default function ProductionOrders() {
               lossRate: l.lossRate,
               vendorName: l.vendorName,
               isHqProvided: true,
+              imageUrl: l.imageUrl,
             });
           }
         }
@@ -2847,7 +2848,7 @@ export default function ProductionOrders() {
                           <td className="px-3 py-2 text-center text-stone-400 text-xs">{i + 1}</td>
                           <td className="px-2 py-1 text-center">
                             {(item as any).imageUrl ? (
-                              <img src={(item as any).imageUrl} alt={item.materialName} className="w-8 h-8 object-cover rounded cursor-pointer border border-stone-200" onClick={() => window.open((item as any).imageUrl, '_blank')} />
+                              <img src={(item as any).imageUrl} alt={item.materialName} className="w-14 h-14 object-cover rounded cursor-pointer border border-stone-200 hover:scale-110 transition-transform" onClick={() => window.open((item as any).imageUrl, '_blank')} />
                             ) : (
                               <span className="text-stone-300 text-base">📷</span>
                             )}
