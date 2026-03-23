@@ -921,10 +921,15 @@ export const store = {
       .filter(b => b.styleNo === styleNo)
       .sort((a, b) => b.version - a.version);
     if (bomList.length === 0) return { bom: null, type: null };
-    // 사후원가 데이터가 있는 BOM 우선
+    // 사후원가 컬러 BOM 우선 (postColorBoms > postMaterials)
+    const postColorBom = bomList.find(b => (b as any).postColorBoms && (b as any).postColorBoms.length > 0);
+    if (postColorBom) return { bom: postColorBom, type: 'post' };
     const postBom = bomList.find(b => b.postMaterials && b.postMaterials.length > 0);
     if (postBom) return { bom: postBom, type: 'post' };
-    // 없으면 사전원가
+    // 사전원가 컬러 BOM
+    const preColorBom = bomList.find(b => (b as any).colorBoms && (b as any).colorBoms.length > 0);
+    if (preColorBom) return { bom: preColorBom, type: 'pre' };
+    // 기본 사전원가
     const preBom = bomList.find(b => b.lines && b.lines.length > 0);
     if (preBom) return { bom: preBom, type: 'pre' };
     return { bom: bomList[0], type: 'pre' };
