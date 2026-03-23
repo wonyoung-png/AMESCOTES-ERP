@@ -450,7 +450,7 @@ export default function MaterialMaster() {
                 <SelectTrigger><SelectValue placeholder="공급업체 선택" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">선택 없음</SelectItem>
-                  {vendors.map(v => (
+                  {vendors.filter(v => v.id && v.id.trim() !== '').map(v => (
                     <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                   ))}
                 </SelectContent>
