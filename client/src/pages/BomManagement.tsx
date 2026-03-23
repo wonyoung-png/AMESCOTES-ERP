@@ -10,7 +10,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import {
-  store, genId,
+  store, genId, normalizeColors,
   type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material, type Vendor,
 } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -2056,10 +2056,10 @@ export default function BomManagement() {
     const firstColor = (updated.colorBoms || [])[0];
     const summary = calcSummary(updated, settings.usdKrw, firstColor);
     // BOM 컬러 목록을 품목 마스터 colors에 동기화
-    const bomColors = [...new Set([
+    const bomColors = Array.from(new Set([
       ...(updated.colorBoms || []).map(c => c.color),
       ...(updated.postColorBoms || []).map(c => c.color),
-    ])];
+    ]));
     const currentItem = items.find(i => i.id === editBom.styleId);
     const currentColorNames = normalizeColors(currentItem?.colors || []).map(c => c.name);
     const newColors = bomColors.filter(c => !currentColorNames.includes(c));

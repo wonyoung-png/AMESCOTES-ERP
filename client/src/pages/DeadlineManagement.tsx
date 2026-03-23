@@ -8,13 +8,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CalendarClock, List, Calendar, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const MILESTONE_LABELS: Record<MilestoneStage, string> = {
+const MILESTONE_LABELS: Partial<Record<MilestoneStage, string>> = {
   '샘플1차': '샘플1차',
   '샘플승인': '샘플승인',
   '생산시작': '생산시작',
   '선적': '선적',
   '통관': '통관',
   '입고완료': '입고완료',
+  '발주생성': '발주생성',
+  '생산중': '생산중',
+  '선적중': '선적중',
+  '통관중': '통관중',
 };
 
 export default function DeadlineManagement() {
@@ -32,7 +36,7 @@ export default function DeadlineManagement() {
     // 마지막 마일스톤(입고완료) 완료 시 자동으로 status → "입고완료"
     const isLastStage = milestones[nextIdx].stage === '입고완료';
     const isAllDone = updated.every(m => !!m.actualDate);
-    const updatePayload: Partial<import('@/lib/store').ProductionOrder> = { milestones: updated, updatedAt: new Date().toISOString() };
+    const updatePayload: Partial<ProductionOrder> = { milestones: updated, updatedAt: new Date().toISOString() };
     if (isAllDone || isLastStage) {
       updatePayload.status = '입고완료';
     }
@@ -48,10 +52,10 @@ export default function DeadlineManagement() {
   // Active orders: not fully completed (입고완료 status)
   const activeOrders = useMemo(() =>
     orders.filter(o => o.status !== '입고완료').sort((a, b) => {
-      const aNext = a.milestones.find(m => !m.actualDate && m.plannedDate);
-      const bNext = b.milestones.find(m => !m.actualDate && m.plannedDate);
-      const aD = aNext ? calcDDay(aNext.plannedDate) : 999;
-      const bD = bNext ? calcDDay(bNext.plannedDate) : 999;
+      const aNext = (a.milestones || []).find(m => !m.actualDate && m.plannedDate);
+      const bNext = (b.milestones || []).find(m => !m.actualDate && m.plannedDate);
+      const aD = aNext ? calcDDay(aNext.plannedDate!) : 999;
+      const bD = bNext ? calcDDay(bNext.plannedDate!) : 999;
       return aD - bD;
     }),
     [orders]
@@ -71,11 +75,11 @@ export default function DeadlineManagement() {
       const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const events: { orderNo: string; milestone: string; color: string }[] = [];
       orders.forEach(o => {
-        o.milestones.forEach(m => {
+        (o.milestones || []).forEach(m => {
           if (m.plannedDate === dateStr || m.actualDate === dateStr) {
-            const dd = calcDDay(m.plannedDate);
+            const dd = calcDDay(m.plannedDate!);
             const color = dd < 0 ? 'bg-red-500' : dd <= 3 ? 'bg-orange-500' : dd <= 7 ? 'bg-yellow-500' : 'bg-green-500';
-            events.push({ orderNo: o.orderNo, milestone: MILESTONE_LABELS[m.stage], color });
+            events.push({ orderNo: o.orderNo, milestone: MILESTONE_LABELS[m.stage] || m.stage, color });
           }
         });
       });
@@ -104,8 +108,9 @@ export default function DeadlineManagement() {
         <TabsContent value="list" className="space-y-3 mt-4">
           {activeOrders.map(order => {
             const item = items.find(i => i.styleNo === order.styleNo);
-            const nextMilestone = order.milestones.find(m => !m.actualDate && m.plannedDate);
-            const d = nextMilestone ? calcDDay(nextMilestone.plannedDate) : 0;
+            const milestones = order.milestones || [];
+            const nextMilestone = milestones.find(m => !m.actualDate && m.plannedDate);
+            const d = nextMilestone ? calcDDay(nextMilestone.plannedDate!) : 0;
             return (
               <Card key={order.id} className="border-border/60 shadow-sm">
                 <CardContent className="p-4 flex items-center gap-4">
@@ -121,24 +126,26 @@ export default function DeadlineManagement() {
                     <p className="text-sm text-muted-foreground">{item?.name || order.styleName} · {formatNumber(order.qty)}pcs</p>
                     {nextMilestone && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        다음: <span className="font-medium">{MILESTONE_LABELS[nextMilestone.stage]}</span> ({nextMilestone.plannedDate})
+                        다음: <span className="font-medium">{MILESTONE_LABELS[nextMilestone.stage] || nextMilestone.stage}</span> ({nextMilestone.plannedDate})
                       </p>
                     )}
                   </div>
                   {/* Mini milestone progress */}
-                  <div className="hidden md:flex items-center gap-1">
-                    {order.milestones.map((m, i) => (
-                      <div key={i} className={`w-2 h-2 rounded-full ${m.actualDate ? 'bg-green-500' : 'bg-border'}`}
-                        title={`${MILESTONE_LABELS[m.stage]}: ${m.actualDate || m.plannedDate || '미정'}`} />
-                    ))}
-                  </div>
+                  {milestones.length > 0 && (
+                    <div className="hidden md:flex items-center gap-1">
+                      {milestones.map((m, i) => (
+                        <div key={i} className={`w-2 h-2 rounded-full ${m.actualDate ? 'bg-green-500' : 'bg-border'}`}
+                          title={`${MILESTONE_LABELS[m.stage] || m.stage}: ${m.actualDate || m.plannedDate || '미정'}`} />
+                      ))}
+                    </div>
+                  )}
                   {/* 마일스톤 완료 버튼 */}
-                  {order.milestones.some(m => !m.actualDate) && (
+                  {milestones.some(m => !m.actualDate) && (
                     <Button
                       size="sm"
                       variant="outline"
                       className="h-8 px-3 text-xs text-green-700 border-green-300 hover:bg-green-50 shrink-0"
-                      onClick={() => handleCompleteMilestone(order.id, order.milestones)}
+                      onClick={() => handleCompleteMilestone(order.id, milestones)}
                     >
                       ✅ 완료
                     </Button>
@@ -201,7 +208,8 @@ export default function DeadlineManagement() {
             <CardContent className="p-4">
               <div className="space-y-3">
                 {orders.filter(o => o.status !== '입고완료').map(order => {
-                  const allDates = order.milestones
+                  const milestones = order.milestones || [];
+                  const allDates = milestones
                     .flatMap(m => [m.plannedDate, m.actualDate])
                     .filter((d): d is string => !!d)
                     .map(d => new Date(d).getTime());
@@ -220,7 +228,7 @@ export default function DeadlineManagement() {
                         {/* Today marker */}
                         <div className="absolute top-0 bottom-0 w-px bg-red-400 z-10" style={{ left: `${Math.min(todayPos, 100)}%` }} />
                         {/* Milestone dots */}
-                        {order.milestones.map((m, i) => {
+                        {milestones.map((m, i) => {
                           const date = m.actualDate || m.plannedDate;
                           if (!date) return null;
                           const pos = ((new Date(date).getTime() - minDate) / range) * 100;
@@ -228,14 +236,14 @@ export default function DeadlineManagement() {
                             <div key={i}
                               className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white ${m.actualDate ? 'bg-green-500' : 'bg-[#C9A96E]'}`}
                               style={{ left: `${Math.min(pos, 98)}%` }}
-                              title={`${MILESTONE_LABELS[m.stage]}: ${date}`}
+                              title={`${MILESTONE_LABELS[m.stage] || m.stage}: ${date}`}
                             />
                           );
                         })}
                         {/* Progress bar */}
-                        {(() => {
-                          const completed = order.milestones.filter(m => m.actualDate).length;
-                          const total = order.milestones.length;
+                        {milestones.length > 0 && (() => {
+                          const completed = milestones.filter(m => m.actualDate).length;
+                          const total = milestones.length;
                           const pct = (completed / total) * 100;
                           return <div className="absolute top-0 left-0 bottom-0 bg-green-200 rounded-l" style={{ width: `${pct}%` }} />;
                         })()}

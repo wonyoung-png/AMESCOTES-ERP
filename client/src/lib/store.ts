@@ -49,12 +49,34 @@ function filterForTable(table: string, row: Record<string, any>): Record<string,
   return Object.fromEntries(Object.entries(row).filter(([k]) => allowed.includes(k)));
 }
 
+// 마이그레이션 전까지 Supabase에 없는 컬럼 목록 (PGRST204 에러 방지용 제외 컬럼)
+// migration_add_missing_columns.sql 실행 후 이 목록에서 제거하세요
+const PENDING_MIGRATION_COLUMNS: Record<string, string[]> = {
+  items: ['has_bom', 'base_cost_krw', 'colors'],
+  production_orders: ['order_no', 'style_name', 'style_id', 'season', 'vendor_name',
+                      'delivery_date', 'factory_unit_price_cny', 'factory_unit_price_krw',
+                      'factory_currency', 'bom_id', 'bom_type', 'color_qtys',
+                      'hq_supply_items', 'received_qty', 'defect_qty', 'defect_note',
+                      'received_date', 'revision'],
+};
+
 // Supabase 저장 (실패해도 앱에 영향 없음)
+// PGRST204 (컬럼 없음) 에러 시 pending 컬럼 제외 후 재시도
 async function sbUpsert(table: string, data: Record<string, any>): Promise<void> {
   try {
     const row = filterForTable(table, toSnakeCase(data));
     const { error } = await supabase.from(table).upsert(row);
-    if (error) console.warn(`[store] ${table} upsert 실패:`, error.message);
+    if (error) {
+      if (error.code === 'PGRST204' && PENDING_MIGRATION_COLUMNS[table]) {
+        // 마이그레이션 미실행 컬럼 제외 후 재시도
+        const pending = PENDING_MIGRATION_COLUMNS[table];
+        const fallbackRow = Object.fromEntries(Object.entries(row).filter(([k]) => !pending.includes(k)));
+        const { error: err2 } = await supabase.from(table).upsert(fallbackRow);
+        if (err2) console.warn(`[store] ${table} upsert 재시도 실패:`, err2.message);
+      } else {
+        console.warn(`[store] ${table} upsert 실패:`, error.message);
+      }
+    }
   } catch (e) {
     console.warn(`[store] ${table} upsert 오류:`, e);
   }
@@ -63,8 +85,21 @@ async function sbUpsert(table: string, data: Record<string, any>): Promise<void>
 async function sbUpdate(table: string, id: string, patch: Record<string, any>): Promise<void> {
   try {
     const row = filterForTable(table, toSnakeCase(patch));
+    if (Object.keys(row).length === 0) return; // 저장할 컬럼 없음
     const { error } = await supabase.from(table).update(row).eq('id', id);
-    if (error) console.warn(`[store] ${table} update 실패:`, error.message);
+    if (error) {
+      if (error.code === 'PGRST204' && PENDING_MIGRATION_COLUMNS[table]) {
+        // 마이그레이션 미실행 컬럼 제외 후 재시도
+        const pending = PENDING_MIGRATION_COLUMNS[table];
+        const fallbackRow = Object.fromEntries(Object.entries(row).filter(([k]) => !pending.includes(k)));
+        if (Object.keys(fallbackRow).length > 0) {
+          const { error: err2 } = await supabase.from(table).update(fallbackRow).eq('id', id);
+          if (err2) console.warn(`[store] ${table} update 재시도 실패:`, err2.message);
+        }
+      } else {
+        console.warn(`[store] ${table} update 실패:`, error.message);
+      }
+    }
   } catch (e) {
     console.warn(`[store] ${table} update 오류:`, e);
   }
@@ -142,11 +177,13 @@ export interface Item {
   materialType?: MaterialType;     // 완제품 / 원재료 / 부재료 (항상 완제품으로 자동 설정)
   itemStatus?: ItemStatus;         // TEMP / ACTIVE / INACTIVE
   material: string;
+  designer?: string;               // 담당 디자이너
   boxSizeL?: number;
   boxSizeW?: number;
   boxSizeH?: number;
   packagingSizeStr?: string;       // 포장사이즈 (예: 54×14×61)
   // 판매가(salePriceKrw) 제거됨 — 납품가(deliveryPrice) 기반 마진 계산으로 전환
+  salePriceKrw?: number;           // @deprecated — 하위 호환성 유지 (deliveryPrice 사용 권장)
   deliveryPrice?: number;          // 납품가 (KRW, 바이어에게 납품하는 가격)
   targetSalePrice?: number;        // 목표 납품가 (바이어 요청가, 하위 호환성 유지)
   baseCostKrw?: number;
@@ -279,6 +316,17 @@ export interface ColorQty {
   qty: number;
 }
 
+export type MilestoneStage = '발주생성' | '샘플승인' | '생산중' | '선적중' | '통관중' | '입고완료' | '샘플1차' | '생산시작' | '선적' | '통관';
+
+export interface OrderMilestone {
+  stage: MilestoneStage;
+  plannedDate?: string;
+  actualDate?: string;
+  date?: string;
+  note?: string;
+  completed?: boolean;
+}
+
 export interface ProductionOrder {
   id: string;
   orderNo: string;
@@ -292,9 +340,10 @@ export interface ProductionOrder {
   colorQtys?: ColorQty[];         // 컬러별 수량 (합계 = qty)
   vendorId: string;
   vendorName: string;
+  buyerId?: string;               // 바이어 ID (Supabase buyer_id 컬럼 연동)
   orderDate?: string;           // 발주일 (등록일)
   status: OrderStatus;
-  milestones?: any[];           // 하위 호환성 유지 (deprecated)
+  milestones?: OrderMilestone[]; // 납기 마일스톤 목록
   bomId?: string;
   hqSupplyItems: HqSupplyItem[];
   attachments: OrderAttachment[];
@@ -829,9 +878,9 @@ export const store = {
       currency: v.factoryCurrency ?? 'KRW',
     };
     const filtered = filterForTable('production_orders', row);
-    supabase.from('production_orders').upsert(filtered)
+    Promise.resolve(supabase.from('production_orders').upsert(filtered))
       .then(({ error }) => { if (error) console.warn('[store] production_orders upsert 실패:', error.message); })
-      .catch(e => console.warn('[store] production_orders upsert 오류:', e));
+      .catch((e: unknown) => console.warn('[store] production_orders upsert 오류:', e));
   },
   updateOrder: (id: string, u: Partial<ProductionOrder>) => {
     const a = getAll<ProductionOrder>(KEYS.orders);
