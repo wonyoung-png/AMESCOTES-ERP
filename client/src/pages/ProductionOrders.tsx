@@ -815,7 +815,9 @@ export default function ProductionOrders() {
               </td></tr>
             ) : filtered.map(o => {
               const totalAmtKrw = (o.factoryUnitPriceKrw || 0) * o.qty;
-              const hasBom = !!o.bomId || o.bomType === 'post' || o.bomType === 'pre';
+              // BOM 실제 존재 여부 확인 (items.hasBom 또는 BOM 레코드 존재)
+              const itemForOrder = items.find(i => i.styleNo === o.styleNo || i.id === o.styleId);
+              const hasBom = !!o.bomId || o.bomType === 'post' || o.bomType === 'pre' || !!(itemForOrder as any)?.hasBom;
               return (
                 <tr key={o.id} className="border-b border-stone-50 hover:bg-stone-50/50">
                   <td className="px-4 py-3">
@@ -856,7 +858,7 @@ export default function ProductionOrders() {
                         {o.bomType === 'manual' && <span className="text-amber-600 ml-1">(수동)</span>}
                       </p>
                     ) : (
-                      <p className="text-xs text-amber-600">공장단가 수동 입력 필요</p>
+                      <p className="text-xs text-amber-600">{hasBom ? "공장단가 재계산 필요" : "공장단가 수동 입력 필요"}</p>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
