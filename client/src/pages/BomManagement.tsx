@@ -399,17 +399,31 @@ function syncBomToSupabase(bom: ExtBom) {
       updated_at: new Date().toISOString(),
     };
     // store의 sbUpsert 방식과 동일하게 fetch 사용
-    fetch('https://linzfvhgswrnoukssqyi.supabase.co/rest/v1/boms', {
-      method: 'POST',
+    // PATCH로 기존 BOM 업데이트 (color_boms 포함)
+    fetch(`https://linzfvhgswrnoukssqyi.supabase.co/rest/v1/boms?id=eq.${bom.id}`, {
+      method: 'PATCH',
       headers: {
         'apikey': 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2',
         'Authorization': 'Bearer sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2',
         'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates',
+        'Prefer': 'return=minimal',
       },
       body: JSON.stringify(snakeBom),
-    }).then(r => { if (!r.ok) r.text().then(t => console.warn('BOM Supabase 저장 실패:', t)); })
-      .catch(e => console.warn('BOM Supabase 저장 오류:', e));
+    }).then(r => {
+      if (!r.ok) {
+        // PATCH 실패 시 POST로 재시도 (새 BOM)
+        fetch('https://linzfvhgswrnoukssqyi.supabase.co/rest/v1/boms', {
+          method: 'POST',
+          headers: {
+            'apikey': 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2',
+            'Authorization': 'Bearer sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2',
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates',
+          },
+          body: JSON.stringify(snakeBom),
+        }).catch(e => console.warn('BOM POST 실패:', e));
+      }
+    }).catch(e => console.warn('BOM Supabase 저장 오류:', e));
   } catch(e) { console.warn('syncBomToSupabase 오류:', e); }
 }
 
