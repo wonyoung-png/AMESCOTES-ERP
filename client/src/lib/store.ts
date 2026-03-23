@@ -1062,13 +1062,19 @@ export const store = {
       else factoryProvided.push(entry);
     }
 
-    // 원자재 섹션: colorBoms 활용
-    if (colorQtys && colorQtys.length > 0 && bom.colorBoms && bom.colorBoms.length > 0) {
+    // 원자재 섹션: postColorBoms 우선 → colorBoms fallback
+    const postColorBoms = (bom as any).postColorBoms || [];
+    const preColorBoms = bom.colorBoms || [];
+    const hasColorData = (colorQtys && colorQtys.length > 0) && (postColorBoms.length > 0 || preColorBoms.length > 0);
+    if (hasColorData) {
       // 컬러별로 처리
-      for (const cq of colorQtys) {
+      for (const cq of colorQtys!) {
         if (!cq.qty || cq.qty <= 0) continue;
-        const colorBom = bom.colorBoms.find(cb => cb.color.trim() === cq.color.trim());
-        const rawLines = colorBom ? colorBom.lines : baseLines.filter(l => l.category === '원자재');
+        // 사후원가 컬러탭 우선, 없으면 사전원가
+        const postColorBom = postColorBoms.find((cb: any) => cb.color.trim() === cq.color.trim());
+        const preColorBom = preColorBoms.find(cb => cb.color.trim() === cq.color.trim());
+        const colorBomToUse = postColorBom || preColorBom;
+        const rawLines = colorBomToUse ? colorBomToUse.lines : baseLines.filter(l => l.category === '원자재');
         for (const line of rawLines) {
           const perPcsQty = line.netQty * (1 + (line.lossRate ?? 0));
           const totalQty = Math.round(perPcsQty * cq.qty * 100) / 100;
