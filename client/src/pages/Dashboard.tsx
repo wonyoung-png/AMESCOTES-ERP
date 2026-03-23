@@ -590,11 +590,11 @@ export default function Dashboard() {
             date: s.createdAt.split('T')[0],
             color: 'bg-blue-50 border-blue-100',
           })),
-          ...orders.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5).map(o => ({
+          ...orders.filter(o => o.createdAt).slice().sort((a, b) => (b.createdAt||'').localeCompare(a.createdAt||'')).slice(0, 5).map(o => ({
             type: 'order' as const,
             label: `📦 발주 등록: ${o.orderNo}`,
-            sub: `${o.styleName} × ${o.qty.toLocaleString()}PCS → ${o.vendorName}`,
-            date: o.createdAt.split('T')[0],
+            sub: `${o.styleName ?? ''} × ${(o.qty ?? 0).toLocaleString()}PCS → ${o.vendorName ?? ''}`,
+            date: (o.createdAt||'').split('T')[0],
             color: 'bg-amber-50 border-amber-100',
           })),
         ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
