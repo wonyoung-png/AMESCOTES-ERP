@@ -2030,6 +2030,8 @@ export default function BomManagement() {
 
   const handleSave = () => {
     if (!editBom) return;
+    // 저장 버튼 클릭 시 isDirty 강제 설정 (항상 저장 실행)
+    setIsDirty(true);
     // styleId 없으면 styleNo로 item 찾아서 설정
     if (!editBom.styleId && editBom.styleNo) {
       const matchedItem = items.find(i => i.styleNo === editBom.styleNo);
