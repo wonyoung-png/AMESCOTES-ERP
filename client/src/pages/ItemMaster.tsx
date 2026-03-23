@@ -1,7 +1,9 @@
 // AMESCOTES ERP — 품목 마스터 (대규모 개편)
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useSearch } from 'wouter';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type ProductionOrder, type ColorQty } from '@/lib/store';
+import { fetchItems, upsertItem, deleteItem as deleteItemSB, fetchVendors } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,11 +65,13 @@ const emptyItem: Partial<Item> = {
 };
 
 export default function ItemMaster() {
+  const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   // URL 파라미터 (샘플 관리에서 품목등록 버튼 클릭 시 전달됨)
   const searchString = useSearch();
-  const [items, setItems] = useState(store.getItems());
-  const [vendors] = useState(store.getVendors());
+  const { data: items = [] } = useQuery({ queryKey: ['items'], queryFn: fetchItems });
+  const setItems = (_v: Item[]) => {}; // no-op
+  const { data: vendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const [search, setSearch] = useState('');
   const [filterSeason, setFilterSeason] = useState('전체');
   const [filterCategory, setFilterCategory] = useState('전체');
@@ -91,7 +95,7 @@ export default function ItemMaster() {
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [seasonStatsTarget, setSeasonStatsTarget] = useState('전체');
   const [customCategory, setCustomCategory] = useState(''); // 세부 카테고리 직접 입력
-  const [orders] = useState<ProductionOrder[]>(() => store.getOrders()); // 미발주기간 계산용
+  const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: () => import('@/lib/supabaseQueries').then(m => m.fetchOrders()) }); // 미발주기간 계산용
   const imageFileRef = useRef<HTMLInputElement>(null);
 
   const handleItemImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,7 +110,7 @@ export default function ItemMaster() {
     if (imageFileRef.current) imageFileRef.current.value = '';
   };
 
-  const refresh = () => setItems(store.getItems());
+  const refresh = () => { queryClient.invalidateQueries({ queryKey: ['items'] }); queryClient.invalidateQueries({ queryKey: ['boms'] }); };
 
   // 현재 선택된 erpCategory에 따른 세부 카테고리 옵션
   const subCategories = editItem.erpCategory === 'SLG' ? SLG_CATEGORIES : HB_CATEGORIES;
@@ -283,66 +287,70 @@ export default function ItemMaster() {
       marginRateVal = (marginAmountVal / deliveryVal) * 100;
     }
 
-    if (isEdit && editItem.id) {
-      store.updateItem(editItem.id, {
-        ...editItem,
-        buyerId,
-        colors: normalizeColors(editItem.colors || []),
-        deliveryPrice: deliveryVal,
-        targetSalePrice: deliveryVal,  // 하위 호환 유지
-        marginAmount: marginAmountVal,
-        marginRate: marginRateVal,
-        materialType: '완제품',
-        customCategory: customCategory || undefined,
-      } as Partial<Item>);
-      toast.success('품목이 수정되었습니다');
-    } else {
-      const newId = genId();
-      store.addItem({
-        ...editItem,
-        buyerId,
-        deliveryPrice: deliveryVal,
-        targetSalePrice: deliveryVal,  // 하위 호환 유지
-        marginAmount: marginAmountVal,
-        marginRate: marginRateVal,
-        id: newId,
-        hasBom: false,
-        createdAt: new Date().toISOString(),
-        materialType: '완제품',
-        itemStatus: 'ACTIVE',
-        customCategory: customCategory || undefined,
-      } as Item);
+    const itemData = isEdit && editItem.id
+      ? {
+          ...editItem,
+          buyerId,
+          colors: normalizeColors(editItem.colors || []),
+          deliveryPrice: deliveryVal,
+          targetSalePrice: deliveryVal,
+          marginAmount: marginAmountVal,
+          marginRate: marginRateVal,
+          materialType: '완제품' as const,
+          customCategory: customCategory || undefined,
+        } as Item
+      : {
+          ...editItem,
+          buyerId,
+          deliveryPrice: deliveryVal,
+          targetSalePrice: deliveryVal,
+          marginAmount: marginAmountVal,
+          marginRate: marginRateVal,
+          id: genId(),
+          hasBom: false,
+          createdAt: new Date().toISOString(),
+          materialType: '완제품' as const,
+          itemStatus: 'ACTIVE' as const,
+          customCategory: customCategory || undefined,
+        } as Item;
 
-      // 샘플-품목 연결
-      const linkedSampleId = sessionStorage.getItem('ames_link_sampleId');
-      if (linkedSampleId) {
-        try {
-          const samples = store.getSamples();
-          const linkedSample = samples.find(s => s.id === linkedSampleId);
-          if (linkedSample) {
-            store.updateSample(linkedSampleId, {
-              styleId: newId,
-              styleNo: editItem.styleNo || '',
-            });
-            toast.success(`품목 등록 완료 — 샘플 "${linkedSample.styleName}"에 연결되었습니다`);
+    upsertItem(itemData)
+      .then(async () => {
+        if (!isEdit) {
+          // 샘플-품목 연결
+          const linkedSampleId = sessionStorage.getItem('ames_link_sampleId');
+          if (linkedSampleId) {
+            try {
+              const { upsertSample } = await import('@/lib/supabaseQueries');
+              const samples = (await import('@/lib/supabaseQueries').then(m => m.fetchSamples()));
+              const linkedSample = samples.find((s: any) => s.id === linkedSampleId);
+              if (linkedSample) {
+                await upsertSample({ ...linkedSample, styleId: itemData.id, styleNo: itemData.styleNo });
+                toast.success(`품목 등록 완료 — 샘플 "${linkedSample.styleName}"에 연결되었습니다`);
+              } else {
+                toast.success('품목이 등록되었습니다');
+              }
+            } catch { toast.success('품목이 등록되었습니다'); }
+            sessionStorage.removeItem('ames_link_sampleId');
           } else {
             toast.success('품목이 등록되었습니다');
           }
-        } catch {
-          toast.success('품목이 등록되었습니다');
+        } else {
+          toast.success('품목이 수정되었습니다');
         }
-        sessionStorage.removeItem('ames_link_sampleId');
-      } else {
-        toast.success('품목이 등록되었습니다');
-      }
-    }
-    setIsDirty(false);
-    setModalOpen(false);
-    refresh();
+        setIsDirty(false);
+        setModalOpen(false);
+        refresh();
+      })
+      .catch((e: Error) => toast.error(`저장 실패: ${e.message}`));
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('정말 삭제하시겠습니까?')) { store.deleteItem(id); toast.success('삭제되었습니다'); refresh(); }
+    if (confirm('정말 삭제하시겠습니까?')) {
+      deleteItemSB(id)
+        .then(() => { toast.success('삭제되었습니다'); refresh(); })
+        .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
+    }
   };
 
   // 체크박스 다중 선택 관련
@@ -370,10 +378,10 @@ export default function ItemMaster() {
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
     if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
-      selectedIds.forEach(id => store.deleteItem(id));
-      setSelectedIds(new Set());
-      toast.success(`${selectedIds.size}개 항목이 삭제되었습니다`);
-      refresh();
+      const count = selectedIds.size;
+      Promise.all([...selectedIds].map(id => deleteItemSB(id)))
+        .then(() => { setSelectedIds(new Set()); toast.success(`${count}개 항목이 삭제되었습니다`); refresh(); })
+        .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
     }
   };
 
@@ -1295,14 +1303,17 @@ function MultiBulkOrderModal({
     } else {
       updatedColors = [...currentColors, { name: colorName, [field]: value }];
     }
-    store.updateItem(itemId, { colors: updatedColors });
+    upsertItem({ id: itemId, colors: updatedColors } as any).catch(() => {});
+    queryClient.setQueryData(['items'], (old: any[] = []) =>
+      old.map((it: any) => it.id === itemId ? { ...it, colors: updatedColors } : it)
+    );
   };
 
   const addColorToItem = (itemId: string, colorName: string) => {
     const trimmed = colorName.trim();
     if (!trimmed) return;
     // 품목 마스터에서 기존 컬러 정보 로드
-    const masterItem = store.getItems().find(i => i.id === itemId);
+    const masterItem = items.find((i: any) => i.id === itemId);
     const masterColors = normalizeColors(masterItem?.colors || []);
     const existingMasterColor = masterColors.find(c => c.name === trimmed);
     setItemStates(prev => prev.map(s => {
@@ -1466,8 +1477,12 @@ function MultiBulkOrderModal({
             girimaeColor: cq.girimaeColor,
           };
           if (!existingColorNames.includes(cq.color)) {
-            // 새 컬러: 품목 마스터에 추가
-            store.addItemColor(state.item.id, itemColor);
+            // 새 컬러: 품목 마스터에 추가 (낙관적 업데이트)
+            const newColors = [...existingColors, itemColor];
+            upsertItem({ id: state.item.id, colors: newColors } as any).catch(() => {});
+            queryClient.setQueryData(['items'], (old: any[] = []) =>
+              old.map((it: any) => it.id === state.item.id ? { ...it, colors: newColors } : it)
+            );
           } else {
             // 기존 컬러: 세부 정보가 변경된 경우 업데이트
             const existingColor = existingColors.find(c => c.name === cq.color);
@@ -1481,7 +1496,10 @@ function MultiBulkOrderModal({
               const updatedColors = existingColors.map(c =>
                 c.name === cq.color ? { ...c, ...itemColor } : c
               );
-              store.updateItem(state.item.id, { colors: updatedColors });
+              upsertItem({ id: state.item.id, colors: updatedColors } as any).catch(() => {});
+              queryClient.setQueryData(['items'], (old: any[] = []) =>
+                old.map((it: any) => it.id === state.item.id ? { ...it, colors: updatedColors } : it)
+              );
             }
           }
         }

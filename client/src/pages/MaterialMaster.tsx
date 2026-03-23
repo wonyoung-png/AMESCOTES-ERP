@@ -1,6 +1,8 @@
 // AMESCOTES ERP — 자재 마스터
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
+import { fetchMaterials, upsertMaterial, deleteMaterial as deleteMaterialSB, fetchVendors } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,8 +44,11 @@ const emptyForm: Partial<Material> = {
 };
 
 export default function MaterialMaster() {
-  const [materials, setMaterials] = useState<Material[]>(() => store.getMaterials());
-  const [vendors] = useState<Vendor[]>(() => store.getVendors().filter(v => v.type === '자재거래처'));
+  const queryClient = useQueryClient();
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
+  const setMaterials = (_v: Material[]) => {}; // no-op
+  const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
+  const vendors = allVendors.filter((v: Vendor) => v.type === '자재거래처');
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
   const [showModal, setShowModal] = useState(false);
@@ -52,12 +57,11 @@ export default function MaterialMaster() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const refresh = () => setMaterials(store.getMaterials());
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['materials'] });
 
   // 마운트 시 + 발주 확정 이벤트 시 자동 갱신
   useEffect(() => {
-    setMaterials(store.getMaterials()); // 탭 진입 시 최신 데이터
-    const handler = () => setMaterials(store.getMaterials());
+    const handler = () => refresh();
     window.addEventListener('materials-updated', handler);
     window.addEventListener('focus', handler);
     return () => {
@@ -107,38 +111,38 @@ export default function MaterialMaster() {
     if (!form.name?.trim()) { toast.error('자재명을 입력하세요'); return; }
     if (!form.unit) { toast.error('단위를 입력하세요'); return; }
 
-    if (editId) {
-      store.updateMaterial(editId, { ...form } as Partial<Material>);
-      toast.success('자재가 수정되었습니다');
-    } else {
-      const mat: Material = {
-        id: genId(),
-        name: form.name!,
-        nameEn: form.nameEn,
-        category: form.category || '원자재',
-        spec: form.spec,
-        unit: form.unit!,
-        unitPriceCny: form.unitPriceCny,
-        unitPriceUsd: form.unitPriceUsd,
-        unitPriceKrw: form.unitPriceKrw,
-        priceCurrency: form.priceCurrency,
-        vendorId: form.vendorId,
-        imageUrl: form.imageUrl,
-        memo: form.memo,
-        createdAt: new Date().toISOString(),
-      };
-      store.addMaterial(mat);
-      toast.success('자재가 등록되었습니다');
-    }
-    setShowModal(false);
-    refresh();
+    const matData = editId
+      ? { id: editId, ...form }
+      : {
+          id: genId(),
+          name: form.name!,
+          nameEn: form.nameEn,
+          category: form.category || '원자재',
+          spec: form.spec,
+          unit: form.unit!,
+          unitPriceCny: form.unitPriceCny,
+          unitPriceUsd: form.unitPriceUsd,
+          unitPriceKrw: form.unitPriceKrw,
+          priceCurrency: form.priceCurrency,
+          vendorId: form.vendorId,
+          imageUrl: form.imageUrl,
+          memo: form.memo,
+          createdAt: new Date().toISOString(),
+        };
+    upsertMaterial(matData)
+      .then(() => {
+        toast.success(editId ? '자재가 수정되었습니다' : '자재가 등록되었습니다');
+        setShowModal(false);
+        refresh();
+      })
+      .catch((e: Error) => toast.error(`저장 실패: ${e.message}`));
   };
 
   const handleDelete = (id: string) => {
     if (!confirm('삭제하시겠습니까?')) return;
-    store.deleteMaterial(id);
-    refresh();
-    toast.success('삭제되었습니다');
+    deleteMaterialSB(id)
+      .then(() => { refresh(); toast.success('삭제되었습니다'); })
+      .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
   };
 
   // 체크박스 다중 선택 관련
@@ -166,10 +170,10 @@ export default function MaterialMaster() {
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
     if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
-      selectedIds.forEach(id => store.deleteMaterial(id));
-      setSelectedIds(new Set());
-      refresh();
-      toast.success(`${selectedIds.size}개 항목이 삭제되었습니다`);
+      const count = selectedIds.size;
+      Promise.all([...selectedIds].map(id => deleteMaterialSB(id)))
+        .then(() => { setSelectedIds(new Set()); refresh(); toast.success(`${count}개 항목이 삭제되었습니다`); })
+        .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
     }
   };
 

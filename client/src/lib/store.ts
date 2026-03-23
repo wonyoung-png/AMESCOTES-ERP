@@ -1413,3 +1413,43 @@ export function getSettlementStatusByDays(days: number, outstanding: number): Se
   if (days <= 60) return '주의';
   return '위험';
 }
+
+// ─────────────────────────────────────────────
+// 외부 boms 배열을 받는 BOM 유틸 함수
+// (Supabase 직접 연동으로 전환 시 useQuery 데이터를 직접 전달)
+// ─────────────────────────────────────────────
+
+export function getBomForOrderFromList(
+  boms: Bom[],
+  styleNo: string
+): { bom: Bom | null; type: 'post' | 'pre' | null } {
+  const bomList = boms
+    .filter(b => b.styleNo === styleNo)
+    .sort((a, b) => b.version - a.version);
+  if (bomList.length === 0) return { bom: null, type: null };
+  const postColorBom = bomList.find(b => (b as any).postColorBoms && (b as any).postColorBoms.length > 0);
+  if (postColorBom) return { bom: postColorBom, type: 'post' };
+  const postBom = bomList.find(b => b.postMaterials && b.postMaterials.length > 0);
+  if (postBom) return { bom: postBom, type: 'post' };
+  const preColorBom = bomList.find(b => (b as any).colorBoms && (b as any).colorBoms.length > 0);
+  if (preColorBom) return { bom: preColorBom, type: 'pre' };
+  const preBom = bomList.find(b => b.lines && b.lines.length > 0);
+  if (preBom) return { bom: preBom, type: 'pre' };
+  return { bom: bomList[0], type: 'pre' };
+}
+
+export function calcMaterialRequirementsFromList(
+  boms: Bom[],
+  styleNo: string,
+  qty: number,
+  colorQtys?: ColorQty[]
+): {
+  hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string; category?: string }>;
+  factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string; category?: string }>;
+  processingFee: number;
+  factoryUnitPriceCny: number;
+  bomType: 'post' | 'pre' | null;
+  manufacturingCountry?: string;
+} {
+  return store.calcMaterialRequirements(styleNo, qty, colorQtys);
+}

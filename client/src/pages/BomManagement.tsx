@@ -9,10 +9,12 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useLocation, useSearch } from 'wouter';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   store, genId, normalizeColors,
   type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material, type Vendor,
 } from '@/lib/store';
+import { fetchBoms, upsertBom, deleteBom as deleteBomSB, fetchItems, fetchVendors, fetchMaterials } from '@/lib/supabaseQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -986,7 +988,7 @@ function MaterialSearchPopover({ onSelect }: { onSelect: (m: Material) => void }
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
-  const materials = store.getMaterials();
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
 
   const filtered = materials.filter(m => {
     const matchCat = filterCat === 'all' || m.category === filterCat;
@@ -1046,7 +1048,8 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const vendors = store.getVendors().filter(v => v.type === '자재거래처');
+  const { data: allV = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
+  const vendors = allV.filter((v: any) => v.type === '자재거래처');
 
   // 외부 value 변경 시 inputVal 동기화
   useEffect(() => { setInputVal(value); }, [value]);
@@ -1249,7 +1252,7 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
     }
     if (m.unitPriceCny != null) onChange(line.id, 'unitPriceCny', m.unitPriceCny);
     if (m.vendorId) {
-      const vendor = store.getVendors().find(v => v.id === m.vendorId);
+      const vendor = allV.find((v: any) => v.id === m.vendorId);
       if (vendor) {
         onChange(line.id, 'vendorName', vendor.name);
         onChange(line.id, 'vendorId', vendor.id);
@@ -1569,9 +1572,11 @@ function PostCostSummary({
 
 // ─── 메인 컴포넌트 ───────────────────────────────────────────────────────────
 export default function BomManagement() {
+  const queryClient = useQueryClient();
   const settings = store.getSettings();
-  const items = store.getItems();
-  const buyers = store.getVendors().filter(v => v.type === '바이어');
+  const { data: items = [] } = useQuery({ queryKey: ['items'], queryFn: fetchItems });
+  const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
+  const buyers = allVendors.filter((v: any) => v.type === '바이어');
 
   // URL 파라미터 감지 (품목 마스터 컬러 BOM 바로가기)
   const searchString = useSearch();
@@ -1592,21 +1597,36 @@ export default function BomManagement() {
   const [pendingColorTab, setPendingColorTab] = useState<string | null>(null);
   // activeTab 변수는 제거됨 — mainTab, activePreColor, activePostColor를 직접 사용
 
+  const { data: supabaseBoms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
   const [extBoms, setExtBoms] = useState<ExtBom[]>(() => getExtBoms());
+  // supabaseBoms가 로드되면 extBoms를 병합
+  useEffect(() => {
+    if (supabaseBoms.length > 0) {
+      setExtBoms(prev => {
+        const mergedMap = new Map<string, ExtBom>(prev.map(b => [b.id, b]));
+        for (const sb of supabaseBoms as any[]) {
+          if (!mergedMap.has(sb.id)) {
+            mergedMap.set(sb.id, sb as ExtBom);
+          }
+        }
+        return Array.from(mergedMap.values());
+      });
+    }
+  }, [supabaseBoms]);
+
   const [selectedStyleId, setSelectedStyleId] = useState<string>(() => {
     // 1) URL 파라미터 우선 처리
     const urlParams = new URLSearchParams(searchString);
     const urlStyleNo = urlParams.get('styleNo');
     if (urlStyleNo) {
-      const item = store.getItems().find(i => i.styleNo === urlStyleNo);
-      if (item) return item.id;
+      // items는 아직 로드되지 않을 수 있으므로 fallback
+      return urlStyleNo;
     }
     // 2) localStorage prefill 처리
     const prefillStyleNo = localStorage.getItem('ames_prefill_bom');
     if (prefillStyleNo) {
       localStorage.removeItem('ames_prefill_bom');
-      const item = store.getItems().find(i => i.styleNo === prefillStyleNo);
-      return item?.id || '';
+      return prefillStyleNo;
     }
     return '';
   });
@@ -1876,11 +1896,12 @@ export default function BomManagement() {
           ...(updated.colorBoms || []).map((c: any) => c.color),
           ...(updated.postColorBoms || []).map((c: any) => c.color),
         ])].filter(c => c !== '기본').map(c => ({ name: c }));
-        store.updateItem(updated.styleId, { 
-          baseCostKrw: stillHasBom ? Math.round(summary2.totalCostKrw) : 0, 
+        import('@/lib/supabaseQueries').then(m => m.upsertItem({
+          id: updated.styleId,
+          baseCostKrw: stillHasBom ? Math.round(summary2.totalCostKrw) : 0,
           hasBom: stillHasBom,
           colors: remainingColors,
-        });
+        } as any)).catch(() => {});
       }, 100);
       return updated;
     });
@@ -2148,8 +2169,10 @@ export default function BomManagement() {
     }
     saveExtBoms(newBoms);
     setExtBoms(newBoms);
-    // store.saveBom으로 Supabase에도 직접 저장 (colorBoms, postColorBoms 포함)
-    store.saveBom(updated);
+    // Supabase에 직접 저장
+    upsertBom(updated)
+      .then(() => { queryClient.invalidateQueries({ queryKey: ['boms'] }); })
+      .catch((e: Error) => console.warn('[BomManagement] BOM 저장 실패:', e.message));
     // 첫 번째 컬러 BOM 기준으로 원가 업데이트 (없으면 lines 기준)
     const firstColor = (updated.colorBoms || [])[0];
     const summary = calcSummary(updated, settings.usdKrw, firstColor);
@@ -2158,27 +2181,25 @@ export default function BomManagement() {
       ...(updated.colorBoms || []).map(c => c.color),
       ...(updated.postColorBoms || []).map(c => c.color),
     ]));
-    const currentItem = items.find(i => i.id === editBom.styleId);
+    const currentItem = (items as Item[]).find((i: any) => i.id === editBom.styleId);
     const currentColorNames = normalizeColors(currentItem?.colors || []).map(c => c.name);
     const newColors = bomColors.filter(c => !currentColorNames.includes(c));
-    if (newColors.length > 0) {
-      const updatedColors = [
-        ...normalizeColors(currentItem?.colors || []),
-        ...newColors.map(c => ({ name: c })),
-      ];
-      store.updateItem(editBom.styleId, {
-        baseCostKrw: Math.round(summary.totalCostKrw),
-        hasBom: true,
-        colors: updatedColors,
-      });
-    } else {
-      store.updateItem(editBom.styleId, {
-        baseCostKrw: Math.round(summary.totalCostKrw),
-        hasBom: true,
-      });
-    }
+    const updatedItemData = {
+      ...(currentItem || {}),
+      id: editBom.styleId,
+      baseCostKrw: Math.round(summary.totalCostKrw),
+      hasBom: true,
+      ...(newColors.length > 0 ? {
+        colors: [
+          ...normalizeColors(currentItem?.colors || []),
+          ...newColors.map(c => ({ name: c })),
+        ],
+      } : {}),
+    };
+    import('@/lib/supabaseQueries').then(m => m.upsertItem(updatedItemData as any))
+      .then(() => queryClient.invalidateQueries({ queryKey: ['items'] }))
+      .catch(() => {});
     setIsDirty(false);
-    // Supabase 저장은 store.saveBom에서 처리 (위에서 이미 호출)
     toast.success('BOM이 저장되었습니다' + (newColors.length > 0 ? ` (컬러 ${newColors.length}개 품목에 추가됨)` : ''));
   };
 
@@ -2669,7 +2690,11 @@ export default function BomManagement() {
     if (selectedBomIds.size === 0) return;
     if (confirm(`${selectedBomIds.size}개 BOM을 삭제하시겠습니까?`)) {
       const newBoms = extBoms.filter(b => !selectedBomIds.has(b.id));
-      extBoms.filter(b => selectedBomIds.has(b.id)).forEach(b => store.updateItem(b.styleId, { hasBom: false }));
+      const deletedIds = [...selectedBomIds];
+      deletedIds.forEach(id => deleteBomSB(id).catch(() => {}));
+      extBoms.filter(b => selectedBomIds.has(b.id)).forEach(b => {
+        import('@/lib/supabaseQueries').then(m => m.upsertItem({ id: b.styleId, hasBom: false } as any)).catch(() => {});
+      });
       saveExtBoms(newBoms);
       setExtBoms(newBoms);
       setSelectedBomIds(new Set());
@@ -3904,7 +3929,7 @@ export default function BomManagement() {
                         onChange={e => {
                           const val = Number(e.target.value);
                           updateField('postDeliveryPrice', val);
-                          if (editBom.styleId) store.updateItem(editBom.styleId, { deliveryPrice: val });
+                          if (editBom.styleId) import('@/lib/supabaseQueries').then(m => m.upsertItem({ id: editBom.styleId, deliveryPrice: val } as any)).catch(() => {});
                         }}
                         className="h-8 text-sm border-stone-300 text-right w-36 font-semibold"
                         placeholder="납품가 입력"

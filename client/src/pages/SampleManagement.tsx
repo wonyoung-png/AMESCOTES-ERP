@@ -1,6 +1,7 @@
 // AMESCOTES ERP — 샘플 관리 (Phase 1 전면 재작성)
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useSearch } from 'wouter';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   store, genId, formatKRW, formatNumber,
   type Sample, type SampleStage, type Season, type SampleBillingStatus,
@@ -8,6 +9,7 @@ import {
   type SampleMaterialRequest, type SampleDocument,
   type Item, type TradeStatement, type TradeStatementLine,
 } from '@/lib/store';
+import { fetchSamples, upsertSample as upsertSampleSB, deleteSample as deleteSampleSB, fetchItems, fetchVendors } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,14 +87,18 @@ function createTempItem(styleName: string, season: Season): Item {
 }
 
 export default function SampleManagement() {
+  const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   // URL 파라미터 읽기 (Dashboard에서 "샘플 관리로 이동" 클릭 시 openId 전달됨)
   const searchString = useSearch();
-  const [samples, setSamples] = useState<Sample[]>(() => store.getSamples());
-  const [items, setItems] = useState<Item[]>(() => store.getItems());
-  const [vendors] = useState(() => store.getVendors().filter(v => v.type === '바이어'));
-  // 자재거래처 목록 (store에서 동적으로 불러옴)
-  const [materialVendors] = useState(() => store.getVendors().filter(v => v.type === '자재거래처'));
+  const { data: samples = [] } = useQuery({ queryKey: ['samples'], queryFn: fetchSamples });
+  const setSamples = (_v: Sample[]) => {}; // no-op
+  const { data: items = [] } = useQuery({ queryKey: ['items'], queryFn: fetchItems });
+  const setItems = (_v: Item[]) => {}; // no-op
+  const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
+  const vendors = allVendors.filter((v: any) => v.type === '바이어');
+  // 자재거래처 목록
+  const materialVendors = allVendors.filter((v: any) => v.type === '자재거래처');
   const settings = store.getSettings();
 
   // 월별 통계 상태 + 필터
@@ -245,8 +251,8 @@ export default function SampleManagement() {
   const [newCheckItem, setNewCheckItem] = useState('');
 
   const refresh = () => {
-    setSamples(store.getSamples());
-    setItems(store.getItems());
+    queryClient.invalidateQueries({ queryKey: ['samples'] });
+    queryClient.invalidateQueries({ queryKey: ['items'] });
   };
 
   const IN_PROGRESS_STAGES: SampleStage[] = ['1차', '2차', '3차', '4차'];
@@ -396,12 +402,12 @@ export default function SampleManagement() {
     if (createTempMode) {
       if (!tempStyleName.trim()) { toast.error('품명을 입력해주세요'); return; }
       const tempItem = createTempItem(tempStyleName.trim(), form.season || '26SS');
-      store.addItem(tempItem);
+      upsertSampleSB(tempItem as any).catch(() => {});
       styleId = tempItem.id;
       styleNo = tempItem.styleNo;
       styleName = tempItem.name;
       toast.success(`TEMP 품목 ${tempItem.styleNo} 자동생성 완료`);
-      setItems(store.getItems());
+      queryClient.invalidateQueries({ queryKey: ['items'] });
     }
 
     if (!styleId && !form.styleNo) { toast.error('스타일번호를 입력해주세요'); return; }
@@ -409,7 +415,7 @@ export default function SampleManagement() {
 
     // 스타일번호 중복 체크 (신규 등록 시)
     if (!editId && form.styleNo) {
-      const dupSample = store.getSamples().find(s => s.styleNo === form.styleNo);
+      const dupSample = (samples as Sample[]).find(s => s.styleNo === form.styleNo);
       if (dupSample) {
         const confirmed = confirm(`스타일번호 '${form.styleNo}'가 이미 샘플에 등록되어 있습니다.\n(${dupSample.styleName}, ${dupSample.stage})\n\n그래도 등록하시겠습니까?`);
         if (!confirmed) return;
@@ -419,47 +425,48 @@ export default function SampleManagement() {
     // 샘플 단가는 원화(sampleUnitPrice)로 입력 → costKrw로 저장
     const costKrw = form.sampleUnitPrice || (form.costCny || 0) * settings.cnyKrw;
 
-    if (editId) {
-      store.updateSample(editId, { ...form, styleId: styleId || form.styleId || '', styleNo: form.styleNo || styleNo || '', styleName: form.styleName || styleName || '', costKrw } as Partial<Sample>);
-      toast.success('수정되었습니다');
-    } else {
-      const s: Sample = {
-        id: genId(),
-        styleId: form.styleId || styleId || genId(),
-        styleNo: form.styleNo || styleNo || '',
-        styleName: form.styleName || styleName || '',
-        buyerId: form.buyerId,
-        season: form.season || '26SS',
-        stage: form.stage || '1차',
-        location: form.location,
-        round: form.round,
-        roundName: form.roundName,
-        color: form.color,
-        assignee: form.assignee,
-        salesPerson: form.salesPerson,
-        requestDate: form.requestDate!,
-        expectedDate: form.expectedDate,
-        receivedDate: form.receivedDate,
-        revisionNote: form.revisionNote,
-        revisionHistory: form.revisionHistory || [],
-        sampleUnitPrice: form.sampleUnitPrice,
-        costCny: form.costCny || 0,
-        costKrw,
-        approvedBy: form.approvedBy,
-        imageUrls: form.imageUrls || [],
-        documents: form.documents || [],
-        materialChecklist: form.materialChecklist || [],
-        materialRequests: form.materialRequests || [],
-        billingStatus: '미청구',  // 접수 시 항상 미청구 (청구 상태는 명세표 발행 시 자동 업데이트)
-        createdAt: new Date().toISOString(),
-        memo: form.memo,
-      };
-      store.addSample(s);
-      toast.success('샘플이 등록되었습니다');
-    }
-    refresh();
-    setIsDirty(false);
-    setShowModal(false);
+    const sampleData = editId
+      ? { ...form, id: editId, styleId: styleId || form.styleId || '', styleNo: form.styleNo || styleNo || '', styleName: form.styleName || styleName || '', costKrw } as Sample
+      : {
+          id: genId(),
+          styleId: form.styleId || styleId || genId(),
+          styleNo: form.styleNo || styleNo || '',
+          styleName: form.styleName || styleName || '',
+          buyerId: form.buyerId,
+          season: form.season || '26SS',
+          stage: form.stage || '1차',
+          location: form.location,
+          round: form.round,
+          roundName: form.roundName,
+          color: form.color,
+          assignee: form.assignee,
+          salesPerson: form.salesPerson,
+          requestDate: form.requestDate!,
+          expectedDate: form.expectedDate,
+          receivedDate: form.receivedDate,
+          revisionNote: form.revisionNote,
+          revisionHistory: form.revisionHistory || [],
+          sampleUnitPrice: form.sampleUnitPrice,
+          costCny: form.costCny || 0,
+          costKrw,
+          approvedBy: form.approvedBy,
+          imageUrls: form.imageUrls || [],
+          documents: form.documents || [],
+          materialChecklist: form.materialChecklist || [],
+          materialRequests: form.materialRequests || [],
+          billingStatus: '미청구' as const,
+          createdAt: new Date().toISOString(),
+          memo: form.memo,
+        } as Sample;
+
+    upsertSampleSB(sampleData)
+      .then(() => {
+        toast.success(editId ? '수정되었습니다' : '샘플이 등록되었습니다');
+        refresh();
+        setIsDirty(false);
+        setShowModal(false);
+      })
+      .catch((e: Error) => toast.error(`저장 실패: ${e.message}`));
   };
 
   // form 변경 감지로 isDirty 설정 (초기화 시는 무시)
@@ -483,9 +490,9 @@ export default function SampleManagement() {
 
   const handleDelete = (id: string) => {
     if (!confirm('삭제하시겠습니까?')) return;
-    store.deleteSample(id);
-    refresh();
-    toast.success('삭제되었습니다');
+    deleteSampleSB(id)
+      .then(() => { refresh(); toast.success('삭제되었습니다'); })
+      .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
   };
 
   // 체크박스 다중 선택 관련
@@ -513,10 +520,10 @@ export default function SampleManagement() {
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
     if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
-      selectedIds.forEach(id => store.deleteSample(id));
-      setSelectedIds(new Set());
-      refresh();
-      toast.success(`${selectedIds.size}개 항목이 삭제되었습니다`);
+      const count = selectedIds.size;
+      Promise.all([...selectedIds].map(id => deleteSampleSB(id)))
+        .then(() => { setSelectedIds(new Set()); refresh(); toast.success(`${count}개 항목이 삭제되었습니다`); })
+        .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
     }
   };
 
@@ -527,9 +534,12 @@ export default function SampleManagement() {
       updates.approvedBy = '관리자';
       // ⚠️ 자동 ACTIVE 전환 제거: 승인 후 담당자가 정식 스타일번호로 품목 마스터에 직접 등록해야 함
     }
-    store.updateSample(id, updates);
-    refresh();
-    toast.success(`단계가 "${stage}"로 변경되었습니다`);
+    const targetSample = (samples as Sample[]).find(s => s.id === id);
+    if (targetSample) {
+      upsertSampleSB({ ...targetSample, ...updates })
+        .then(() => { refresh(); toast.success(`단계가 "${stage}"로 변경되었습니다`); })
+        .catch((e: Error) => toast.error(`변경 실패: ${e.message}`));
+    }
   };
 
   const handleBillAll = () => {
@@ -577,13 +587,13 @@ export default function SampleManagement() {
         createdAt: new Date().toISOString(),
       };
 
-      store.addTradeStatement(statement);
+      store.addTradeStatement(statement); // 거래명세표는 store에 유지 (Supabase 테이블 없음)
       createdCount++;
     });
 
     // billingStatus 업데이트
-    unclaimed.forEach(s => store.updateSample(s.id, { billingStatus: '청구완료', billingDate: today }));
-    refresh();
+    const updatePromises = unclaimed.map(s => upsertSampleSB({ ...s, billingStatus: '청구완료', billingDate: today }));
+    Promise.all(updatePromises).then(() => refresh()).catch(() => {});
     toast.success(`거래명세표 ${createdCount}건이 생성되었습니다`);
   };
 
@@ -599,10 +609,9 @@ export default function SampleManagement() {
       ...detailSample,
       revisionHistory: [...(detailSample.revisionHistory || []), note],
     };
-    store.updateSample(detailSample.id, { revisionHistory: updated.revisionHistory });
+    upsertSampleSB({ ...updated }).then(() => refresh()).catch(() => {});
     setDetailSample(updated);
     setNewRevNote('');
-    refresh();
     toast.success('메모가 추가되었습니다');
   };
 
@@ -614,10 +623,9 @@ export default function SampleManagement() {
       ...detailSample,
       materialChecklist: [...(detailSample.materialChecklist || []), item],
     };
-    store.updateSample(detailSample.id, { materialChecklist: updated.materialChecklist });
+    upsertSampleSB({ ...updated }).then(() => refresh()).catch(() => {});
     setDetailSample(updated);
     setNewCheckItem('');
-    refresh();
   };
 
   // 체크리스트 토글
@@ -629,15 +637,14 @@ export default function SampleManagement() {
         c.id === itemId ? { ...c, isReady: !c.isReady } : c
       ),
     };
-    store.updateSample(detailSample.id, { materialChecklist: updated.materialChecklist });
+    upsertSampleSB({ ...updated }).then(() => refresh()).catch(() => {});
     setDetailSample(updated);
-    refresh();
   };
 
   // 샘플 승인 처리 — TEMP 품목은 TEMP 상태 그대로 유지
   // 승인 후 담당자가 정확한 스타일번호로 품목 마스터에 직접 등록해야 함
   const handleApprove = (s: Sample) => {
-    store.updateSample(s.id, { stage: '최종승인', approvedBy: '관리자' });
+    upsertSampleSB({ ...s, stage: '최종승인', approvedBy: '관리자' }).then(() => refresh()).catch(() => {});
     // ⚠️ 자동 ACTIVE 전환 제거: 승인은 샘플 단계만 "최종승인"으로 변경
     // TEMP 품목은 TEMP 상태 그대로 유지 (정식 스타일번호 등록 후 ACTIVE 처리)
     refresh();
@@ -1079,8 +1086,7 @@ export default function SampleManagement() {
                           <button
                             onClick={() => {
                               if (confirm('청구완료를 미청구로 되돌리겠습니까?')) {
-                                store.updateSample(s.id, { billingStatus: '미청구', billingDate: undefined });
-                                setSamples(store.getSamples());
+                                upsertSampleSB({ ...s, billingStatus: '미청구', billingDate: undefined }).then(() => refresh()).catch(() => {});
                               }
                             }}
                             className="text-[10px] text-stone-400 hover:text-red-500"
@@ -1308,7 +1314,7 @@ export default function SampleManagement() {
                     const item = items.find(i => i.id === v);
                     if (item) {
                       // 컬러추가 샘플: 스타일번호 자동생성(기존번호-1,-2,...), 품명 자동입력, 이미지 불러오기
-                      const existingColorSamples = store.getSamples().filter(s =>
+                      const existingColorSamples = (samples as Sample[]).filter(s =>
                         s.styleNo.startsWith(item.styleNo + '-') && /^.+-\d+$/.test(s.styleNo)
                       );
                       const maxSuffix = existingColorSamples.length > 0
@@ -1343,8 +1349,8 @@ export default function SampleManagement() {
                       <Input value={form.styleNo || ''} onChange={e => setForm(f => ({ ...f, styleNo: e.target.value }))} placeholder="예: AT2603HB01" className="h-8 text-xs" />
                       {/* 스타일번호 중복 체크 */}
                       {form.styleNo && !editId && (() => {
-                        const dupSample = store.getSamples().find(s => s.styleNo === form.styleNo && s.id !== editId);
-                        const dupItem = store.getItems().find(i => i.styleNo === form.styleNo);
+                        const dupSample = (samples as Sample[]).find(s => s.styleNo === form.styleNo && s.id !== editId);
+                        const dupItem = (items as Item[]).find(i => i.styleNo === form.styleNo);
                         if (dupSample || dupItem) {
                           return (
                             <p className="text-xs text-amber-600 flex items-center gap-1 mt-0.5">
@@ -1990,8 +1996,7 @@ export default function SampleManagement() {
                       toast.success(`${stmt.statementNo}에 추가됐습니다`);
                     }
                   }
-                  store.updateSample(billingTarget.id, { billingStatus: '청구완료', billingDate: today });
-                  setSamples(store.getSamples());
+                  upsertSampleSB({ ...billingTarget, billingStatus: '청구완료', billingDate: today }).then(() => refresh()).catch(() => {});
                   setBillingModal(false);
                 }}
               >

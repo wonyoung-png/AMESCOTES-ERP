@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { syncFromSupabase } from '@/lib/syncFromSupabase';
+import { useState } from 'react';
 import { useAutoExchangeRate } from '@/hooks/useAutoExchangeRate';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -64,11 +63,6 @@ function Router() {
 }
 
 function App() {
-  useEffect(() => {
-    // 앱 시작 시 Supabase에서 최신 데이터 동기화 (실패해도 localStorage 유지)
-    syncFromSupabase().catch(e => console.warn('[App] syncFromSupabase 오류:', e));
-  }, []);
-
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">

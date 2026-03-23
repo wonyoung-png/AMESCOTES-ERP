@@ -1,7 +1,9 @@
 // AMESCOTES ERP — 거래처 마스터 (Phase 1 개편)
 import { useState, useMemo, useRef, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { store, genId, type Vendor, type VendorType, type Currency, type BillingType } from '@/lib/store';
+import { fetchVendors, upsertVendor, deleteVendor as deleteVendorSB } from '@/lib/supabaseQueries';
 import { parseBizLicense } from '@/lib/bizLicense';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,7 +44,9 @@ const EMPTY_VENDOR: Partial<Vendor> = {
 };
 
 export default function VendorMaster() {
-  const [vendors, setVendors] = useState<Vendor[]>(() => store.getVendors());
+  const queryClient = useQueryClient();
+  const { data: vendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
+  const setVendors = (_v: Vendor[]) => {}; // no-op, replaced by useQuery
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterMaterialType, setFilterMaterialType] = useState<string>('all');
@@ -58,7 +62,7 @@ export default function VendorMaster() {
   const [isDirty, setIsDirty] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
 
-  const refresh = () => setVendors(store.getVendors());
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['vendors'] });
 
   const filtered = useMemo(() => {
     let list = vendors;
@@ -98,45 +102,47 @@ export default function VendorMaster() {
     // 코드 중복 검사
     if (editVendor.code) {
       const code = editVendor.code.toUpperCase();
-      const dup = store.getVendors().find(v => v.code?.toUpperCase() === code && v.id !== editVendor.id);
+      const dup = vendors.find((v: Vendor) => v.code?.toUpperCase() === code && v.id !== editVendor.id);
       if (dup) { toast.error(`코드 '${code}'는 이미 '${dup.name}'에서 사용 중입니다`); return; }
     }
 
     // vendorCode 코드 중복 검사 (하위 호환)
     if (editVendor.vendorCode) {
       const code = editVendor.vendorCode.toUpperCase();
-      const dup = store.getVendors().find(v => v.vendorCode?.toUpperCase() === code && v.id !== editVendor.id);
+      const dup = vendors.find((v: Vendor) => (v as any).vendorCode?.toUpperCase() === code && v.id !== editVendor.id);
       if (dup) { toast.error(`거래처코드 '${code}'는 이미 '${dup.name}'에서 사용 중입니다`); return; }
     }
 
-    if (isEdit && editVendor.id) {
-      store.updateVendor(editVendor.id, {
-        ...editVendor,
-        code: editVendor.code?.toUpperCase(),
-        vendorCode: editVendor.vendorCode?.toUpperCase(),
-      } as Partial<Vendor>);
-      toast.success('거래처가 수정되었습니다');
-    } else {
-      store.addVendor({
-        ...editVendor,
-        code: editVendor.code ? editVendor.code.toUpperCase() : undefined,
-        vendorCode: editVendor.vendorCode ? editVendor.vendorCode.toUpperCase() : undefined,
-        id: genId(),
-        contactHistory: [],
-        createdAt: new Date().toISOString(),
-      } as Vendor);
-      toast.success('거래처가 등록되었습니다');
-    }
-    setIsDirty(false);
-    setShowModal(false);
-    refresh();
+    const vendorData = isEdit && editVendor.id
+      ? {
+          ...editVendor,
+          code: editVendor.code?.toUpperCase(),
+          vendorCode: editVendor.vendorCode?.toUpperCase(),
+        } as Vendor
+      : {
+          ...editVendor,
+          code: editVendor.code ? editVendor.code.toUpperCase() : undefined,
+          vendorCode: editVendor.vendorCode ? editVendor.vendorCode.toUpperCase() : undefined,
+          id: genId(),
+          contactHistory: [],
+          createdAt: new Date().toISOString(),
+        } as Vendor;
+
+    upsertVendor(vendorData)
+      .then(() => {
+        toast.success(isEdit ? '거래처가 수정되었습니다' : '거래처가 등록되었습니다');
+        setIsDirty(false);
+        setShowModal(false);
+        refresh();
+      })
+      .catch((e: Error) => toast.error(`저장 실패: ${e.message}`));
   };
 
   const handleDelete = (id: string) => {
     if (!confirm('거래처를 삭제하시겠습니까?')) return;
-    store.deleteVendor(id);
-    refresh();
-    toast.success('삭제되었습니다');
+    deleteVendorSB(id)
+      .then(() => { refresh(); toast.success('삭제되었습니다'); })
+      .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
   };
 
   // 체크박스 다중 선택 관련
@@ -163,10 +169,10 @@ export default function VendorMaster() {
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
     if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
-      selectedIds.forEach(id => store.deleteVendor(id));
-      setSelectedIds(new Set());
-      refresh();
-      toast.success(`${selectedIds.size}개 항목이 삭제되었습니다`);
+      const count = selectedIds.size;
+      Promise.all([...selectedIds].map(id => deleteVendorSB(id)))
+        .then(() => { setSelectedIds(new Set()); refresh(); toast.success(`${count}개 항목이 삭제되었습니다`); })
+        .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
     }
   };
 

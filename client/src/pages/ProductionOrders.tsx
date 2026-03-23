@@ -1,7 +1,10 @@
 // AMESCOTES ERP — 생산 발주 관리 (BOM 연동)
 import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems } from '@/lib/supabaseQueries';
 import {
   store, genId, calcDDay, dDayLabel, dDayColor, formatNumber, formatKRW, normalizeColors,
+  getBomForOrderFromList,
   type ProductionOrder, type OrderStatus, type Season, type Item, type Bom,
   type HqSupplyItem, type ColorQty, type CartItem,
   type TradeStatement, type TradeStatementLine,
@@ -42,13 +45,16 @@ interface BomCalcResult {
 }
 
 export default function ProductionOrders() {
-  const [orders, setOrders] = useState<ProductionOrder[]>(() => store.getOrders());
-  const [items] = useState<Item[]>(() => store.getItems());
-  const [boms] = useState<Bom[]>(() => store.getBoms());
+  const queryClient = useQueryClient();
+  const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
+  const setOrders = (_v: ProductionOrder[]) => {}; // no-op
+  const { data: items = [] } = useQuery({ queryKey: ['items'], queryFn: fetchItems });
+  const { data: boms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
+  const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
+  const buyers = allVendors.filter((v: any) => v.type === '바이어');
+  const factories = allVendors.filter((v: any) => v.type === '공장' || v.type === '해외공장');
   const [search, setSearch] = useState('');
   const [filterBuyer, setFilterBuyer] = useState('all');
-  const [buyers] = useState(() => store.getVendors().filter(v => v.type === '바이어'));
-  const [factories] = useState(() => store.getVendors().filter(v => v.type === '공장' || v.type === '해외공장'));
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterSeason, setFilterSeason] = useState('all');
   const [showModal, setShowModal] = useState(false);
@@ -129,7 +135,7 @@ export default function ProductionOrders() {
   const [pendingEmailItems, setPendingEmailItems] = useState<Array<CartItem & { orderQty: number }>>([]);
 
   const refreshCart = () => setCartItems(store.getMaterialCart());
-  const refresh = () => setOrders(store.getOrders());
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['orders'] });
 
   // 거래처 이메일 발주서 발송 (gog Gmail API 사용)
   const sendVendorEmail = async (vendor: string, email: string, items: Array<CartItem & { orderQty: number }>) => {
@@ -320,7 +326,7 @@ export default function ProductionOrders() {
     const bom = bomList.sort((a, b) => b.version - a.version)[0];
 
     // HQ 제공 자재 추출 (BOM에서)
-    const { bom: bomForOrder } = store.getBomForOrder(item.styleNo);
+    const { bom: bomForOrder } = getBomForOrderFromList(boms as Bom[], item.styleNo);
     const usedLines = bomForOrder
       ? ((bomForOrder.postMaterials && bomForOrder.postMaterials.length > 0)
           ? bomForOrder.postMaterials
@@ -363,7 +369,7 @@ export default function ProductionOrders() {
       recalcBom(item.styleNo, currentQty);
     } else {
       // 수량 없어도 BOM 존재 여부 확인
-      const { bom: b } = store.getBomForOrder(item.styleNo);
+      const { bom: b } = getBomForOrderFromList(boms as Bom[], item.styleNo);
       setBomCalc(prev => ({
         ...prev,
         bomLoaded: !!b,
@@ -476,12 +482,11 @@ export default function ProductionOrders() {
         memo: form.memo,
         updatedAt: new Date().toISOString(),
       };
-      store.updateOrder(editOrderId, updates);
-      toast.success('발주가 수정되었습니다');
-      refresh();
-      setShowModal(false);
-      setIsEditMode(false);
-      setEditOrderId(null);
+      const existingOrder = (orders as ProductionOrder[]).find(o => o.id === editOrderId);
+      const fullUpdated = { ...(existingOrder || {}), ...updates, id: editOrderId } as ProductionOrder;
+      upsertOrder(fullUpdated)
+        .then(() => { toast.success('발주가 수정되었습니다'); refresh(); setShowModal(false); setIsEditMode(false); setEditOrderId(null); })
+        .catch((e: Error) => toast.error(`저장 실패: ${e.message}`));
       return;
     }
 
@@ -513,19 +518,22 @@ export default function ProductionOrders() {
       updatedAt: new Date().toISOString(),
       memo: form.memo,
     };
-    store.addOrder(order);
+    upsertOrder(order).catch((e: Error) => toast.error(`발주 저장 실패: ${e.message}`));
 
-    // 새 컬러 → 품목 마스터 자동 추가
-    let newColorCount = 0;
+    // 새 컬러 → 품목 마스터 자동 추가 (낙관적 업데이트)
     if (colorQtys.length > 0 && form.styleId) {
-      const currentItem = store.getItems().find(i => i.id === form.styleId);
+      const currentItem = (items as Item[]).find((i: any) => i.id === form.styleId);
       const existingColorNames = normalizeColors(currentItem?.colors || []).map(c => c.name);
-      for (const cq of colorQtys) {
-        const trimmed = cq.color.trim();
-        if (trimmed && !existingColorNames.includes(trimmed)) {
-          store.addItemColor(form.styleId, trimmed);
-          newColorCount++;
-        }
+      const newColors = colorQtys
+        .map(cq => cq.color.trim())
+        .filter(c => c && !existingColorNames.includes(c))
+        .map(c => ({ name: c }));
+      if (newColors.length > 0 && currentItem) {
+        const updatedColors = [...normalizeColors(currentItem.colors || []), ...newColors];
+        import('@/lib/supabaseQueries').then(m => m.upsertItem({ ...currentItem, colors: updatedColors } as any)).catch(() => {});
+        queryClient.setQueryData(['items'], (old: any[] = []) =>
+          old.map((it: any) => it.id === form.styleId ? { ...it, colors: updatedColors } : it)
+        );
       }
     }
 
@@ -535,7 +543,7 @@ export default function ProductionOrders() {
     // 발주 완료 후 액션 팝업: BOM 자재 목록 계산
     const bomMaterials: Array<any> = [];
     if (form.styleNo) {
-      const { bom } = store.getBomForOrder(form.styleNo);
+      const { bom } = getBomForOrderFromList(boms as Bom[], form.styleNo);
       if (bom) {
         // postColorBoms 우선 → postMaterials → lines 순서로 확인
         const postColorBoms = (bom as any).postColorBoms || [];
@@ -574,9 +582,9 @@ export default function ProductionOrders() {
 
   const handleDelete = (id: string) => {
     if (!confirm('발주를 삭제하시겠습니까?')) return;
-    store.deleteOrder(id);
-    refresh();
-    toast.success('삭제되었습니다');
+    deleteOrderSB(id)
+      .then(() => { refresh(); toast.success('삭제되었습니다'); })
+      .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
   };
 
   const handleStatusChange = (id: string, status: OrderStatus) => {
@@ -592,22 +600,26 @@ export default function ProductionOrders() {
       setShowReceiveModal(true);
       return;
     }
-    store.updateOrder(id, { status, updatedAt: new Date().toISOString() });
-    refresh();
+    const existing = (orders as ProductionOrder[]).find(o => o.id === id);
+    if (existing) {
+      upsertOrder({ ...existing, status, updatedAt: new Date().toISOString() }).then(() => refresh()).catch(() => {});
+    }
   };
 
   const handleReceiveConfirm = () => {
-    store.updateOrder(receiveOrderId, {
-      status: '입고완료',
-      receivedQty: receiveForm.receivedQty,
-      defectQty: receiveForm.defectQty,
-      defectNote: receiveForm.defectNote,
-      receivedDate: receiveForm.receivedDate,
-      updatedAt: new Date().toISOString(),
-    });
-    setShowReceiveModal(false);
-    refresh();
-    toast.success('입고 처리 완료');
+    const existing = (orders as ProductionOrder[]).find(o => o.id === receiveOrderId);
+    if (existing) {
+      upsertOrder({
+        ...existing,
+        status: '입고완료',
+        receivedQty: receiveForm.receivedQty,
+        defectQty: receiveForm.defectQty,
+        defectNote: receiveForm.defectNote,
+        receivedDate: receiveForm.receivedDate,
+        updatedAt: new Date().toISOString(),
+      }).then(() => { setShowReceiveModal(false); refresh(); toast.success('입고 처리 완료'); })
+        .catch((e: Error) => toast.error(`처리 실패: ${e.message}`));
+    }
   };
 
   const openBillingModal = (order: ProductionOrder) => {
@@ -657,9 +669,12 @@ export default function ProductionOrders() {
         memo: `발주번호 ${order.orderNo}에서 자동 생성`,
       };
 
-      store.addTradeStatement(newStatement);
-      store.updateOrder(order.id, { tradeStatementId: newStatement.id, updatedAt: new Date().toISOString() });
-      refresh();
+      store.addTradeStatement(newStatement); // 거래명세표 store에 유지
+      const existingOrder1 = (orders as ProductionOrder[]).find(o => o.id === order.id);
+      if (existingOrder1) {
+        upsertOrder({ ...existingOrder1, tradeStatementId: newStatement.id, updatedAt: new Date().toISOString() })
+          .then(() => refresh()).catch(() => {});
+      }
       setBillingModal(false);
       toast.success(`거래명세표 ${statementNo} 생성 완료 → 거래명세표 탭에서 확인하세요`);
     } else {
@@ -678,8 +693,11 @@ export default function ProductionOrders() {
       }));
 
       store.updateTradeStatement(linkStatementId, { lines: [...(stmt.lines || []), ...newLines] });
-      store.updateOrder(order.id, { tradeStatementId: linkStatementId, updatedAt: new Date().toISOString() });
-      refresh();
+      const existingOrder2 = (orders as ProductionOrder[]).find(o => o.id === order.id);
+      if (existingOrder2) {
+        upsertOrder({ ...existingOrder2, tradeStatementId: linkStatementId, updatedAt: new Date().toISOString() })
+          .then(() => refresh()).catch(() => {});
+      }
       setBillingModal(false);
       toast.success(`${stmt.statementNo}에 발주 항목이 추가됐습니다`);
     }
@@ -690,7 +708,7 @@ export default function ProductionOrders() {
     setWorkOrderNote('');
     setWorkOrderWithBom(withBom);
     // 본사제공 자재 수령 체크란 초기화
-    const { bom } = store.getBomForOrder(order.styleNo);
+    const { bom } = getBomForOrderFromList(boms as Bom[], order.styleNo);
     const bomLines = bom ? ((bom.postMaterials && bom.postMaterials.length > 0) ? bom.postMaterials : (bom.lines || [])) : [];
     const hqMats = bomLines.filter((l: any) => l.isHqProvided);
     setHqReceive(hqMats.map(() => ({ received: '', checked: false })));
@@ -742,16 +760,16 @@ export default function ProductionOrders() {
 
   // 공장단가 (수동/BOM)
   const displayFactoryPriceCny = manualFactoryPrice ? manualPriceCny : bomCalc.factoryUnitPriceCny;
-  const settings = store.getSettings();
-  const cnyKrw = settings.cnyKrw || 191;
-  const usdKrw = settings.usdKrw || 1380;
+  const _appSettings = store.getSettings();
+  const cnyKrwDisplay = _appSettings.cnyKrw || 191;
+  const usdKrwDisplay = _appSettings.usdKrw || 1380;
   let displayFactoryPriceKrw: number;
   if (factoryCurrency === 'KRW') {
     displayFactoryPriceKrw = Math.round(displayFactoryPriceCny);
   } else if (factoryCurrency === 'USD') {
-    displayFactoryPriceKrw = Math.round(displayFactoryPriceCny * usdKrw);
+    displayFactoryPriceKrw = Math.round(displayFactoryPriceCny * usdKrwDisplay);
   } else {
-    displayFactoryPriceKrw = Math.round(displayFactoryPriceCny * cnyKrw);
+    displayFactoryPriceKrw = Math.round(displayFactoryPriceCny * cnyKrwDisplay);
   }
   const displayTotalAmountKrw = displayFactoryPriceKrw * currentQty;
 
@@ -1322,7 +1340,7 @@ export default function ProductionOrders() {
                     <div className="space-y-1.5">
                       <Label>발주처 (공장) *</Label>
                       <Select value={form.vendorId || ''} onValueChange={v => {
-                        const vendor = store.getVendors().find(x => x.id === v);
+                        const vendor = allVendors.find(x => x.id === v);
                         if (vendor?.leadTimeDays && vendor.leadTimeDays > 0 && !form.deliveryDate) {
                           const suggestedDate = new Date();
                           suggestedDate.setDate(suggestedDate.getDate() + vendor.leadTimeDays);
@@ -1914,7 +1932,7 @@ export default function ProductionOrders() {
               <div className="space-y-1.5">
                 <Label>발주처 (공장) *</Label>
                 <Select value={form.vendorId || ''} onValueChange={v => {
-                  const vendor = store.getVendors().find(x => x.id === v);
+                  const vendor = allVendors.find(x => x.id === v);
                   setForm(f => ({ ...f, vendorId: v, vendorName: vendor?.name || '' }));
                 }}>
                   <SelectTrigger><SelectValue placeholder="공장 선택" /></SelectTrigger>
@@ -2245,7 +2263,7 @@ export default function ProductionOrders() {
               {(() => {
                 const order = workOrderTarget;
                 const item = items.find(i => i.id === order.styleId);
-                const { bom } = store.getBomForOrder(order.styleNo);
+                const { bom } = getBomForOrderFromList(boms as Bom[], order.styleNo);
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 // 컬러별 BOM에서 첫 번째 컬러 사용, 없으면 기존 방식
                 const getColorBomLines = (b: any) => {
@@ -2923,7 +2941,7 @@ export default function ProductionOrders() {
                 return Array.from(grouped.entries()).map(([vendor, items]) => {
                   const handleSendEmail = async () => {
                     // 거래처 이메일 자동 조회
-                    const vendorRecord = store.getVendors().find(v => v.name === vendor && v.type === '자재거래처');
+                    const vendorRecord = allVendors.find(v => v.name === vendor && v.type === '자재거래처');
                     const vendorEmail = vendorRecord?.contactEmail || '';
                     if (!vendorEmail) {
                       setPendingEmailVendor(vendor);
@@ -2986,7 +3004,7 @@ export default function ProductionOrders() {
                           orderDate: today,
                           orderQty: item.orderQty,
                           orderVendorName: vendor,
-                          vendorId: store.getVendors().find(v => v.name === vendor && v.type === '자재거래처')?.id,
+                          vendorId: allVendors.find(v => v.name === vendor && v.type === '자재거래처')?.id,
                           createdAt: new Date().toISOString(),
                         });
                       }
@@ -3051,3 +3069,4 @@ export default function ProductionOrders() {
     </div>
   );
 }
+
