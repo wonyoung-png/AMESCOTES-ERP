@@ -245,13 +245,14 @@ export default function MaterialMaster() {
               <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (USD)</th>
               <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (KRW)</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">단위</th>
+              <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">발주상태</th>
               <th className="text-center px-3 py-3 text-xs font-medium text-stone-500">작업</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-12 text-stone-400">
+                <td colSpan={10} className="text-center py-12 text-stone-400">
                   <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">등록된 자재가 없습니다</p>
                 </td>
@@ -297,6 +298,36 @@ export default function MaterialMaster() {
                   {m.unitPriceKrw != null ? `₩${m.unitPriceKrw.toLocaleString()}` : '—'}
                 </td>
                 <td className="px-3 py-2.5 text-xs text-stone-600">{m.unit}</td>
+                <td className="px-3 py-2.5">
+                  {m.orderStatus ? (
+                    <div className="space-y-0.5">
+                      <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+                        m.orderStatus === '발주중'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-green-50 text-green-700 border-green-200'
+                      }`}>
+                        {m.orderStatus === '발주중' ? '📦 발주중' : '✅ 입고완료'}
+                      </span>
+                      {m.orderStatus === '발주중' && m.orderQty && (
+                        <p className="text-[10px] text-stone-400 font-mono">{m.orderQty.toLocaleString()} {m.unit}</p>
+                      )}
+                      {m.orderStatus === '발주중' && (
+                        <button
+                          onClick={() => {
+                            store.updateMaterial(m.id, { orderStatus: '입고완료' });
+                            refresh();
+                            toast.success(`${m.name} 입고 완료 처리됐습니다`);
+                          }}
+                          className="text-[10px] text-green-600 underline hover:text-green-700"
+                        >
+                          입고완료 처리
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-stone-300 text-xs">—</span>
+                  )}
+                </td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center justify-center gap-1">
                     <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-stone-100 text-stone-500">

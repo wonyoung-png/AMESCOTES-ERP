@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 const ORDER_STATUSES: OrderStatus[] = ['발주생성', '샘플승인', '생산중', '선적중', '통관중', '입고완료', '지연'];
@@ -122,8 +122,67 @@ export default function ProductionOrders() {
   // 거래처별 발주서 모달 상태
   const [vendorOrderModal, setVendorOrderModal] = useState(false);
 
+  // 이메일 입력 모달 상태
+  const [emailInputModal, setEmailInputModal] = useState(false);
+  const [emailInputValue, setEmailInputValue] = useState('');
+  const [pendingEmailVendor, setPendingEmailVendor] = useState<string>('');
+  const [pendingEmailItems, setPendingEmailItems] = useState<Array<CartItem & { orderQty: number }>>([]);
+
   const refreshCart = () => setCartItems(store.getMaterialCart());
   const refresh = () => setOrders(store.getOrders());
+
+  // 거래처 이메일 발주서 발송 (gog Gmail API 사용)
+  const sendVendorEmail = async (vendor: string, email: string, items: Array<CartItem & { orderQty: number }>) => {
+    const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const subject = `[AMESCOTES] 자재 발주서 - ${vendor} ${today}`;
+    const bodyLines = [
+      `안녕하세요, ${vendor} 담당자님.`,
+      ``,
+      `아래와 같이 자재 발주 드립니다. 확인 및 납기 일정 회신 부탁드립니다.`,
+      ``,
+      `[발주 일자] ${today}`,
+      `[거래처] ${vendor}`,
+      ``,
+      `─────────────────────────────`,
+      `No. | 자재명 | 규격 | 단위 | 발주수량`,
+      `─────────────────────────────`,
+      ...items.map((item, i) =>
+        `${i + 1}. ${item.materialName}${item.spec ? ` (${item.spec})` : ''} | ${item.unit} | ${item.orderQty % 1 === 0 ? item.orderQty.toLocaleString() : item.orderQty.toFixed(3)}`
+      ),
+      `─────────────────────────────`,
+      `총 ${items.length}종`,
+      ``,
+      `담긴 발주: ${[...new Set(items.flatMap(item => item.orders.map(o => o.styleNo)))].join(', ')}`,
+      ``,
+      `문의사항은 회신 주시기 바랍니다.`,
+      ``,
+      `감사합니다.`,
+      `AMESCOTES Co., Ltd`,
+    ];
+    const body = bodyLines.join('\n');
+    // fetch 방식으로 서버 API 호출 시도
+    try {
+      const resp = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: email, subject, body, account: 'info@atlm.kr' }),
+      });
+      if (resp.ok) {
+        toast.success(`📧 ${vendor} 발주서를 ${email}로 발송했습니다`);
+        return;
+      }
+    } catch {
+      // API 없음 - 아래로 fall-through
+    }
+    // gog CLI 명령어 생성하여 클립보드에 복사
+    const gogCmd = `gog gmail send --to "${email}" --subject "${subject}" --body "${body.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}" --account info@atlm.kr`;
+    try {
+      await navigator.clipboard.writeText(gogCmd);
+      toast.success(`📋 ${vendor} 발주서 이메일 명령어가 클립보드에 복사됐습니다!\n수신: ${email}\n터미널에 붙여넣기해서 실행하세요`);
+    } catch {
+      toast.info(`📧 ${vendor} 발주서\n수신: ${email}\n수동으로 gog 명령어를 실행해주세요`);
+    }
+  };
 
   const filtered = useMemo(() => {
     let list = orders;
@@ -2837,11 +2896,144 @@ export default function ProductionOrders() {
               <p className="text-center text-stone-400 py-8">장바구니에 담긴 자재가 없습니다</p>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex flex-wrap gap-2 justify-between">
             <Button variant="outline" onClick={() => { setVendorOrderModal(false); setCartModal(true); }}>
-              장바구니로 돌아가기
+              뒤로
             </Button>
-            <Button variant="outline" onClick={() => setVendorOrderModal(false)}>닫기</Button>
+            <div className="flex gap-2 flex-wrap">
+              {/* 이메일 발송 버튼 (거래처별 발주서 전체에 대한 안내) */}
+              {(() => {
+                const grouped = new Map<string, Array<CartItem & { orderQty: number }>>();
+                for (const item of cartItems) {
+                  const stockQty = item.stockQty ?? 0;
+                  const orderQty = Math.max(0, item.qty - stockQty);
+                  if (orderQty === 0) continue;
+                  const vendor = item.vendorName || '미지정';
+                  if (!grouped.has(vendor)) grouped.set(vendor, []);
+                  grouped.get(vendor)!.push({ ...item, orderQty });
+                }
+                return Array.from(grouped.entries()).map(([vendor, items]) => {
+                  const handleSendEmail = async () => {
+                    // 거래처 이메일 자동 조회
+                    const vendorRecord = store.getVendors().find(v => v.name === vendor && v.type === '자재거래처');
+                    const vendorEmail = vendorRecord?.contactEmail || '';
+                    if (!vendorEmail) {
+                      setPendingEmailVendor(vendor);
+                      setPendingEmailItems(items);
+                      setEmailInputValue('');
+                      setEmailInputModal(true);
+                      return;
+                    }
+                    await sendVendorEmail(vendor, vendorEmail, items);
+                  };
+                  return (
+                    <Button
+                      key={`email-${vendor}`}
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs text-blue-700 border-blue-300 hover:bg-blue-50"
+                      onClick={handleSendEmail}
+                    >
+                      <Mail className="w-3.5 h-3.5 mr-1" />📧 {vendor} 이메일
+                    </Button>
+                  );
+                });
+              })()}
+              {/* 발주 확정 버튼 */}
+              <Button
+                className="h-8 text-xs bg-green-700 hover:bg-green-800 text-white"
+                onClick={() => {
+                  const grouped = new Map<string, Array<CartItem & { orderQty: number }>>();
+                  for (const item of cartItems) {
+                    const stockQty = item.stockQty ?? 0;
+                    const orderQty = Math.max(0, item.qty - stockQty);
+                    if (orderQty === 0) continue;
+                    const vendor = item.vendorName || '미지정';
+                    if (!grouped.has(vendor)) grouped.set(vendor, []);
+                    grouped.get(vendor)!.push({ ...item, orderQty });
+                  }
+                  let savedCount = 0;
+                  const today = new Date().toISOString().split('T')[0];
+                  for (const [vendor, items] of grouped.entries()) {
+                    for (const item of items) {
+                      const existingMaterials = store.getMaterials();
+                      const existing = existingMaterials.find(m =>
+                        m.name === item.materialName && m.unit === item.unit
+                      );
+                      if (existing) {
+                        store.updateMaterial(existing.id, {
+                          orderStatus: '발주중',
+                          orderDate: today,
+                          orderQty: item.orderQty,
+                          orderVendorName: vendor,
+                        });
+                      } else {
+                        store.addMaterial({
+                          id: genId(),
+                          name: item.materialName,
+                          spec: item.spec,
+                          unit: item.unit,
+                          category: '원자재',
+                          orderStatus: '발주중',
+                          orderDate: today,
+                          orderQty: item.orderQty,
+                          orderVendorName: vendor,
+                          vendorId: store.getVendors().find(v => v.name === vendor && v.type === '자재거래처')?.id,
+                          createdAt: new Date().toISOString(),
+                        });
+                      }
+                      savedCount++;
+                    }
+                  }
+                  toast.success(`✅ ${savedCount}종 자재가 자재구매 탭에 저장되었습니다`);
+                }}
+              >
+                ✅ 발주 확정
+              </Button>
+              <Button variant="outline" onClick={() => setVendorOrderModal(false)}>닫기</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 이메일 입력 모달 ── */}
+      <Dialog open={emailInputModal} onOpenChange={setEmailInputModal}>
+        <DialogContent className="w-full rounded-none sm:w-[95vw] sm:max-w-sm sm:rounded-lg">
+          <DialogHeader>
+            <DialogTitle>이메일 주소 입력</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-stone-600">
+              <span className="font-semibold">{pendingEmailVendor}</span> 거래처의 이메일 주소가 등록되어 있지 않습니다.
+            </p>
+            <div className="space-y-1.5">
+              <Label>이메일 주소</Label>
+              <Input
+                type="email"
+                placeholder="example@company.com"
+                value={emailInputValue}
+                onChange={e => setEmailInputValue(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && emailInputValue.trim()) {
+                    setEmailInputModal(false);
+                    sendVendorEmail(pendingEmailVendor, emailInputValue.trim(), pendingEmailItems);
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailInputModal(false)}>취소</Button>
+            <Button
+              className="bg-blue-700 hover:bg-blue-800 text-white"
+              disabled={!emailInputValue.trim()}
+              onClick={() => {
+                setEmailInputModal(false);
+                sendVendorEmail(pendingEmailVendor, emailInputValue.trim(), pendingEmailItems);
+              }}
+            >
+              <Mail className="w-4 h-4 mr-1" />발송
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

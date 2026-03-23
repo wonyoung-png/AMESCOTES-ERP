@@ -156,6 +156,10 @@ export interface Material {
   vendorId?: string;      // 주 공급업체
   imageUrl?: string;      // 이미지 (base64 또는 URL)
   memo?: string;
+  orderStatus?: '발주중' | '입고완료';  // 발주 상태
+  orderDate?: string;     // 발주일
+  orderQty?: number;      // 발주수량
+  orderVendorName?: string; // 발주 거래처명
   createdAt: string;
 }
 
