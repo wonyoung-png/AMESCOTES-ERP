@@ -54,11 +54,16 @@ export default function MaterialMaster() {
 
   const refresh = () => setMaterials(store.getMaterials());
 
-  // 발주 확정 이벤트 수신 시 자동 갱신
+  // 마운트 시 + 발주 확정 이벤트 시 자동 갱신
   useEffect(() => {
+    setMaterials(store.getMaterials()); // 탭 진입 시 최신 데이터
     const handler = () => setMaterials(store.getMaterials());
     window.addEventListener('materials-updated', handler);
-    return () => window.removeEventListener('materials-updated', handler);
+    window.addEventListener('focus', handler);
+    return () => {
+      window.removeEventListener('materials-updated', handler);
+      window.removeEventListener('focus', handler);
+    };
   }, []);
 
   const filtered = useMemo(() => {
