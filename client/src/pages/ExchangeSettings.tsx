@@ -57,6 +57,7 @@ export default function ExchangeSettings() {
   };
 
   const handleDeleteHistory = (id: string) => {
+    if (!confirm('환율 이력을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.')) return;
     const newHistory = settings.exchangeHistory.filter(h => h.id !== id);
     const updated = { ...settings, exchangeHistory: newHistory };
     store.setSettings(updated);

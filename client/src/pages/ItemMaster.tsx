@@ -395,6 +395,8 @@ export default function ItemMaster() {
   };
 
   const removeColor = (idx: number) => {
+    const colorName = normalizeColors(editItem.colors || [])[idx]?.name;
+    if (!confirm(`"${colorName || '이 컬러'}"를 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`)) return;
     setEditItem(prev => {
       const normalized = normalizeColors(prev.colors || []);
       return { ...prev, colors: normalized.filter((_, i) => i !== idx) };

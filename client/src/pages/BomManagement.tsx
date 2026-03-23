@@ -1675,6 +1675,7 @@ export default function BomManagement() {
   }, []);
 
   const deleteLine = useCallback((id: string) => {
+    if (!confirm('자재 행을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.')) return;
     setEditBom(prev => prev ? { ...prev, lines: prev.lines.filter(l => l.id !== id) } : prev);
     markDirty();
   }, []);
@@ -1697,6 +1698,7 @@ export default function BomManagement() {
   }, []);
 
   const deletePostMaterialLine = useCallback((id: string) => {
+    if (!confirm('자재 행을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.')) return;
     setEditBom(prev => prev ? { ...prev, postMaterials: (prev.postMaterials || []).filter(l => l.id !== id) } : prev);
     markDirty();
   }, []);
@@ -1719,6 +1721,7 @@ export default function BomManagement() {
   }, []);
 
   const deletePostLine = useCallback((id: string) => {
+    if (!confirm('후가공 행을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.')) return;
     setEditBom(prev => prev ? { ...prev, postProcessLines: prev.postProcessLines.filter(l => l.id !== id) } : prev);
     markDirty();
   }, []);
@@ -1780,6 +1783,7 @@ export default function BomManagement() {
 
   // 컬러 탭 삭제 (사전/사후 구분) - 삭제 후 자동 저장
   const removeColorBom = useCallback((color: string, forTab: 'pre' | 'post' = 'pre') => {
+    if (!confirm(`"${color}" 컬러 탭을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`)) return;
     setEditBom(prev => {
       if (!prev) return prev;
       const bomKey = forTab === 'post' ? 'postColorBoms' : 'colorBoms';
@@ -1841,6 +1845,7 @@ export default function BomManagement() {
 
   // 컬러 BOM 행 삭제 (lines)
   const deleteColorBomLine = useCallback((color: string, id: string) => {
+    if (!confirm('자재 행을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.')) return;
     setEditBom(prev => {
       if (!prev) return prev;
       return {
@@ -1891,6 +1896,7 @@ export default function BomManagement() {
 
   // 컬러 BOM 후가공 행 삭제
   const deleteColorPostLine = useCallback((color: string, id: string) => {
+    if (!confirm('후가공 행을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.')) return;
     setEditBom(prev => {
       if (!prev) return prev;
       return {
@@ -1953,6 +1959,7 @@ export default function BomManagement() {
   }, []);
 
   const deletePostColorBomLine = useCallback((color: string, id: string) => {
+    if (!confirm('자재 행을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.')) return;
     setEditBom(prev => {
       if (!prev) return prev;
       return {
@@ -2000,6 +2007,7 @@ export default function BomManagement() {
   }, []);
 
   const deletePostColorPostLine = useCallback((color: string, id: string) => {
+    if (!confirm('후가공 행을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.')) return;
     setEditBom(prev => {
       if (!prev) return prev;
       return {
