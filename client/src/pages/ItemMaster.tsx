@@ -1056,7 +1056,12 @@ export default function ItemMaster() {
                           {c.name}
                           <span className="text-xs text-stone-400 font-normal">
                             {[c.leatherColor, c.decorColor, c.threadColor, c.girimaeColor].filter(Boolean).length > 0
-                              ? `(${[c.leatherColor, c.decorColor, c.threadColor, c.girimaeColor].filter(Boolean).join(' / ')})`
+                              ? `— ${[
+                                  c.leatherColor ? `가죽: ${c.leatherColor}` : null,
+                                  c.decorColor ? `장식: ${c.decorColor}` : null,
+                                  c.threadColor ? `실: ${c.threadColor}` : null,
+                                  c.girimaeColor ? `기리매: ${c.girimaeColor}` : null,
+                                ].filter(Boolean).join(', ')}`
                               : '— 세부정보 없음'}
                           </span>
                           <span className="text-xs text-stone-300 ml-auto">{colorDetailOpen === idx ? '▲' : '▼'}</span>
@@ -1274,13 +1279,44 @@ function MultiBulkOrderModal({
     }));
   };
 
+  // 컬러 상세정보 변경 후 포커스 아웃 시 품목 마스터에 즉각 저장
+  const saveColorDetailToMaster = (itemId: string, colorName: string, field: keyof Omit<BulkColorQty, 'color' | 'qty'>, value: string) => {
+    const currentItem = store.getItems().find(i => i.id === itemId);
+    if (!currentItem) return;
+    const currentColors = normalizeColors(currentItem.colors || []);
+    const existingIdx = currentColors.findIndex(c => c.name === colorName);
+    let updatedColors: ItemColor[];
+    if (existingIdx >= 0) {
+      updatedColors = currentColors.map(c =>
+        c.name === colorName ? { ...c, [field]: value } : c
+      );
+    } else {
+      updatedColors = [...currentColors, { name: colorName, [field]: value }];
+    }
+    store.updateItem(itemId, { colors: updatedColors });
+  };
+
   const addColorToItem = (itemId: string, colorName: string) => {
     const trimmed = colorName.trim();
     if (!trimmed) return;
+    // 품목 마스터에서 기존 컬러 정보 로드
+    const masterItem = store.getItems().find(i => i.id === itemId);
+    const masterColors = normalizeColors(masterItem?.colors || []);
+    const existingMasterColor = masterColors.find(c => c.name === trimmed);
     setItemStates(prev => prev.map(s => {
       if (s.item.id !== itemId) return s;
       if (s.colorQtys.find(cq => cq.color === trimmed)) return s;
-      return { ...s, colorQtys: [...s.colorQtys, { color: trimmed, qty: 0 }] };
+      return {
+        ...s,
+        colorQtys: [...s.colorQtys, {
+          color: trimmed,
+          qty: 0,
+          leatherColor: existingMasterColor?.leatherColor || '',
+          decorColor: existingMasterColor?.decorColor || '',
+          threadColor: existingMasterColor?.threadColor || '',
+          girimaeColor: existingMasterColor?.girimaeColor || '',
+        }],
+      };
     }));
   };
 
@@ -1573,6 +1609,7 @@ function MultiBulkOrderModal({
                   onToggle={() => toggleItem(state.item.id)}
                   onSetColorQty={(color, qty) => setColorQty(state.item.id, color, qty)}
                   onUpdateColorDetail={(color, field, value) => updateColorDetail(state.item.id, color, field, value)}
+                  onSaveColorDetail={(color, field, value) => saveColorDetailToMaster(state.item.id, color, field, value)}
                   onAddColor={(color) => addColorToItem(state.item.id, color)}
                   onRemoveColor={(color) => removeColorFromItem(state.item.id, color)}
                 />
@@ -1624,6 +1661,7 @@ function BulkOrderItemRow({
   onToggle,
   onSetColorQty,
   onUpdateColorDetail,
+  onSaveColorDetail,
   onAddColor,
   onRemoveColor,
 }: {
@@ -1631,6 +1669,7 @@ function BulkOrderItemRow({
   onToggle: () => void;
   onSetColorQty: (color: string, qty: number) => void;
   onUpdateColorDetail: (color: string, field: keyof Omit<BulkColorQty, 'color' | 'qty'>, value: string) => void;
+  onSaveColorDetail: (color: string, field: keyof Omit<BulkColorQty, 'color' | 'qty'>, value: string) => void;
   onAddColor: (color: string) => void;
   onRemoveColor: (color: string) => void;
 }) {
@@ -1735,6 +1774,7 @@ function BulkOrderItemRow({
                           <Input
                             value={cq.leatherColor || ''}
                             onChange={e => onUpdateColorDetail(cq.color, 'leatherColor', e.target.value)}
+                            onBlur={e => onSaveColorDetail(cq.color, 'leatherColor', e.target.value)}
                             placeholder="가죽/원단 컬러"
                             className="h-6 text-xs flex-1"
                           />
@@ -1744,6 +1784,7 @@ function BulkOrderItemRow({
                           <Input
                             value={cq.decorColor || ''}
                             onChange={e => onUpdateColorDetail(cq.color, 'decorColor', e.target.value)}
+                            onBlur={e => onSaveColorDetail(cq.color, 'decorColor', e.target.value)}
                             placeholder="장식 컬러"
                             className="h-6 text-xs flex-1"
                           />
@@ -1753,6 +1794,7 @@ function BulkOrderItemRow({
                           <Input
                             value={cq.threadColor || ''}
                             onChange={e => onUpdateColorDetail(cq.color, 'threadColor', e.target.value)}
+                            onBlur={e => onSaveColorDetail(cq.color, 'threadColor', e.target.value)}
                             placeholder="실 컬러"
                             className="h-6 text-xs flex-1"
                           />
@@ -1762,6 +1804,7 @@ function BulkOrderItemRow({
                           <Input
                             value={cq.girimaeColor || ''}
                             onChange={e => onUpdateColorDetail(cq.color, 'girimaeColor', e.target.value)}
+                            onBlur={e => onSaveColorDetail(cq.color, 'girimaeColor', e.target.value)}
                             placeholder="기리매 컬러"
                             className="h-6 text-xs flex-1"
                           />
