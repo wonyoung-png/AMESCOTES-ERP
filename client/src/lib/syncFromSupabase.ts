@@ -169,7 +169,19 @@ function convertBomRow(row: Record<string, any>): Record<string, any> {
 
 const TABLE_KEY_MAP: { table: string; key: string; converter?: (row: Record<string, any>) => Record<string, any> }[] = [
   { table: 'vendors',           key: 'ames_vendors' },
-  { table: 'items',             key: 'ames_items' },
+  { table: 'items',             key: 'ames_items', converter: (row: Record<string, any>) => {
+    const base = toCamelCase(row);
+    return {
+      ...base,
+      colors: Array.isArray(row.colors) ? row.colors : (row.colors ? JSON.parse(row.colors) : []),
+      hasBom: row.has_bom ?? false,
+      baseCostKrw: row.base_cost_krw ?? 0,
+      deliveryPrice: row.delivery_price,
+      marginRate: row.margin_rate,
+      imageUrl: row.image_url,
+      designer: row.designer,
+    };
+  }},
   { table: 'samples',           key: 'ames_samples' },
   { table: 'boms',              key: 'ames_boms', converter: convertBomRow },
   { table: 'production_orders', key: 'ames_orders' },
