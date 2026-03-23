@@ -729,6 +729,12 @@ export const store = {
       const boms = JSON.parse(raw) as Array<{
         styleNo: string;
         lines?: Array<{ unitPriceCny?: number; unitPrice?: number; netQty: number; lossRate: number; isHqProvided?: boolean; isVendorProvided?: boolean }>;
+        colorBoms?: Array<{
+          color: string;
+          lines?: Array<{ unitPriceCny?: number; unitPrice?: number; netQty: number; lossRate: number; isHqProvided?: boolean; isVendorProvided?: boolean }>;
+          postProcessLines?: Array<{ netQty: number; unitPrice: number }>;
+          processingFee?: number;
+        }>;
         postProcessLines?: Array<{ netQty: number; unitPrice: number }>;
         processingFee?: number;
         snapshotCnyKrw?: number;
@@ -736,16 +742,23 @@ export const store = {
       const bom = boms.find(b => b.styleNo === styleNo);
       if (!bom) return 0;
       const cnyKrw = bom.snapshotCnyKrw ?? 191;
-      // 자재비 합계 (전체 자재 포함 - 제품원가 기준, LOSS 포함 소요량 × 단가)
-      const materialCny = (bom.lines || []).reduce((s, l) => {
+
+      // colorBoms가 있으면 첫 번째 컬러 탭 기준으로 계산
+      const firstColorBom = (bom.colorBoms && bom.colorBoms.length > 0) ? bom.colorBoms[0] : null;
+      const effectiveLines = firstColorBom?.lines ?? bom.lines ?? [];
+      const effectivePostProcessLines = firstColorBom?.postProcessLines ?? bom.postProcessLines ?? [];
+      const effectiveProcessingFee = firstColorBom?.processingFee ?? bom.processingFee ?? 0;
+
+      // 자재비 합계 (제품원가 기준, LOSS 포함 소요량 × 단가)
+      const materialCny = effectiveLines.reduce((s, l) => {
         const price = l.unitPriceCny ?? (l as { unitPrice?: number }).unitPrice ?? 0;
         const qty = l.netQty * (1 + (l.lossRate ?? 0));
         return s + price * qty;
       }, 0);
       // 후가공비
-      const postProcessCny = (bom.postProcessLines || []).reduce((s, l) => s + l.netQty * l.unitPrice, 0);
+      const postProcessCny = effectivePostProcessLines.reduce((s, l) => s + l.netQty * l.unitPrice, 0);
       // 임가공비
-      const processingCny = bom.processingFee ?? 0;
+      const processingCny = effectiveProcessingFee;
       // KRW 환산 합계
       return Math.round((materialCny + postProcessCny + processingCny) * cnyKrw);
     } catch { return 0; }

@@ -63,14 +63,30 @@ function normalizeColorBom(cb: any): any {
   };
 }
 
+// items localStorage에서 styleNo로 item id 찾기
+function findItemIdByStyleNo(styleNo: string): string | undefined {
+  try {
+    const raw = localStorage.getItem('ames_items');
+    if (!raw) return undefined;
+    const items: Array<Record<string, any>> = JSON.parse(raw);
+    const found = items.find(i => i.styleNo === styleNo || i.style_no === styleNo);
+    return found?.id;
+  } catch {
+    return undefined;
+  }
+}
+
 // BOM 데이터 특수 변환
 // Supabase boms 테이블: snake_case 컬럼 + JSONB 필드
-// 앱에서 사용하는 ExtBom 구조(camelCase)로 완전 변환
+// 앱에서 사용하는 ExtBom 구조(camelCase + colorBoms)로 완전 변환
 function convertBomRow(row: Record<string, any>): Record<string, any> {
   const base = toCamelCase(row);
 
-  // pre_materials(JSONB) → lines (앱 필드명)
-  // Supabase에서 pre_materials로 저장된 경우 lines로 매핑
+  // styleId: items localStorage에서 styleNo로 찾기
+  const styleNo = base.styleNo ?? base.style_no ?? '';
+  const styleId = base.styleId ?? findItemIdByStyleNo(styleNo) ?? styleNo;
+
+  // pre_materials(JSONB) → lines
   const preMats = base.preMaterials ?? base.lines ?? base.pre_materials;
   const lines = Array.isArray(preMats) ? preMats.map(normalizeBomLine) : [];
 
@@ -82,14 +98,38 @@ function convertBomRow(row: Record<string, any>): Record<string, any> {
   const postProcLines = base.postProcessLines ?? base.post_process_lines;
   const postProcessLines = Array.isArray(postProcLines) ? postProcLines.map(normalizePostLine) : [];
 
-  // colorBoms/postColorBoms 정규화
-  const colorBoms = Array.isArray(base.colorBoms) ? base.colorBoms.map(normalizeColorBom)
-    : Array.isArray(base.color_boms) ? base.color_boms.map(normalizeColorBom)
-    : undefined;
+  // colorBoms: 이미 colorBoms 배열이 있으면 정규화, 없으면 pre_materials로 기본 탭 생성
+  let colorBoms: Array<Record<string, any>>;
+  if (Array.isArray(base.colorBoms) && base.colorBoms.length > 0) {
+    colorBoms = base.colorBoms.map(normalizeColorBom);
+  } else if (Array.isArray(base.color_boms) && base.color_boms.length > 0) {
+    colorBoms = base.color_boms.map(normalizeColorBom);
+  } else {
+    // Supabase에서 pre_materials로만 저장된 경우 → '기본' 컬러 탭으로 변환
+    colorBoms = [{
+      color: '기본',
+      lines,
+      postProcessLines: [],
+      processingFee: base.preProcessingFee ?? base.pre_processing_fee ?? 0,
+    }];
+  }
 
-  const postColorBoms = Array.isArray(base.postColorBoms) ? base.postColorBoms.map(normalizeColorBom)
-    : Array.isArray(base.post_color_boms) ? base.post_color_boms.map(normalizeColorBom)
-    : undefined;
+  // postColorBoms: 이미 있으면 정규화, 없으면 post_materials로 기본 탭 생성 (데이터 있을 때만)
+  let postColorBoms: Array<Record<string, any>> | undefined;
+  if (Array.isArray(base.postColorBoms) && base.postColorBoms.length > 0) {
+    postColorBoms = base.postColorBoms.map(normalizeColorBom);
+  } else if (Array.isArray(base.post_color_boms) && base.post_color_boms.length > 0) {
+    postColorBoms = base.post_color_boms.map(normalizeColorBom);
+  } else if (postMaterials.length > 0) {
+    postColorBoms = [{
+      color: '기본',
+      lines: postMaterials,
+      postProcessLines: [],
+      processingFee: base.postProcessingFee ?? base.post_processing_fee ?? 0,
+    }];
+  } else {
+    postColorBoms = [];
+  }
 
   // pnl 필드 정규화
   const pnl = base.pnl ?? {
@@ -98,18 +138,33 @@ function convertBomRow(row: Record<string, any>): Record<string, any> {
     sgaRate: 0.10,
   };
 
-  const result = {
+  return {
     ...base,
+    styleId,
+    styleNo,
+    styleName: base.styleName ?? base.style_name ?? '',
+    season: base.season ?? '',
+    erpCategory: base.erpCategory ?? base.erp_category ?? '',
+    designer: base.designer ?? '',
+    lineName: base.lineName ?? base.line_name ?? '',
+    version: base.version ?? 1,
+    snapshotCnyKrw: base.snapshotCnyKrw ?? base.exchangeRateCny ?? base.exchange_rate_cny ?? 191,
+    processingFee: base.preProcessingFee ?? base.pre_processing_fee ?? base.processingFee ?? 0,
+    productionMarginRate: base.productionMarginRate ?? 0.16,
+    logisticsCostKrw: base.logisticsCostKrw ?? base.logistics_cost_krw ?? 0,
+    customsRate: base.customsRate ?? 0,
+    packagingCostKrw: base.packagingCostKrw ?? 0,
+    packingCostKrw: base.packingCostKrw ?? 0,
+    pnl,
+    colorBoms,
+    postColorBoms,
     lines,
     postMaterials,
     postProcessLines,
-    pnl,
-  } as Record<string, any>;
-
-  if (colorBoms !== undefined) result.colorBoms = colorBoms;
-  if (postColorBoms !== undefined) result.postColorBoms = postColorBoms;
-
-  return result;
+    postProcessingFee: base.postProcessingFee ?? base.post_processing_fee ?? 0,
+    createdAt: base.createdAt ?? base.created_at ?? new Date().toISOString(),
+    updatedAt: base.updatedAt ?? base.updated_at ?? new Date().toISOString(),
+  };
 }
 
 const TABLE_KEY_MAP: { table: string; key: string; converter?: (row: Record<string, any>) => Record<string, any> }[] = [
@@ -136,31 +191,45 @@ export async function syncFromSupabase(): Promise<void> {
         converter ? converter(row as Record<string, any>) : toCamelCase(row as Record<string, any>)
       );
 
-      // ─── BOM 테이블은 병합 방식으로 동기화 (localStorage 데이터 보호) ───
-      // Supabase의 BOM은 기본 구조(Bom 타입)로 저장되는 반면,
-      // localStorage의 BOM은 ExtBom 타입(colorBoms, postColorBoms 등 포함)으로 저장됨.
-      // Supabase 데이터로 localStorage를 무조건 덮어쓰면 ExtBom 형식이 파괴될 수 있으므로
-      // localStorage에 있는 BOM을 우선 유지하고, Supabase에만 있는 데이터는 병합.
+      // ─── BOM 테이블은 스마트 병합으로 동기화 ───
+      // 변환된 Supabase BOM(ExtBom 형식, colorBoms 포함)과 localStorage를 병합.
+      // - 로컬에 없는 BOM → 추가
+      // - 로컬에 있지만 colorBoms가 없는(구형식) BOM → Supabase 버전으로 교체
+      // - 로컬에 있고 colorBoms가 이미 있는 BOM → 로컬 유지 (앱에서 수정한 데이터 보호)
       if (key === 'ames_boms') {
         try {
           const localRaw = localStorage.getItem(key);
           const localBoms: Array<Record<string, any>> = localRaw ? JSON.parse(localRaw) : [];
 
-          // Supabase에서 온 데이터는 id 기준으로 매핑
-          const remoteById = new Map<string, Record<string, any>>();
-          converted.forEach(r => { if (r.id) remoteById.set(r.id, r); });
+          const localById = new Map<string, Record<string, any>>();
+          localBoms.forEach(b => { if (b.id) localById.set(b.id, b); });
 
-          // 로컬에 있는 BOM은 보존, Supabase에만 있는 BOM은 추가
-          const localIds = new Set(localBoms.map(b => b.id));
-          const onlyRemote = converted.filter(r => r.id && !localIds.has(r.id));
+          let added = 0;
+          let updated = 0;
+          let kept = 0;
 
-          if (onlyRemote.length > 0) {
-            const merged = [...localBoms, ...onlyRemote];
-            localStorage.setItem(key, JSON.stringify(merged));
-            console.log(`[syncFromSupabase] boms 병합 완료 — 로컬 ${localBoms.length}건 유지, 원격 신규 ${onlyRemote.length}건 추가`);
-          } else {
-            console.log(`[syncFromSupabase] boms 로컬 데이터 유지 (${localBoms.length}건) — Supabase에 신규 없음`);
+          const merged: Array<Record<string, any>> = [...localBoms];
+
+          for (const remote of converted) {
+            if (!remote.id) continue;
+            const local = localById.get(remote.id);
+            if (!local) {
+              // 로컬에 없음 → 추가
+              merged.push(remote);
+              added++;
+            } else if (!Array.isArray(local.colorBoms) || local.colorBoms.length === 0) {
+              // 로컬에 있지만 colorBoms 없음(구형식) → Supabase 버전으로 교체
+              const idx = merged.findIndex(b => b.id === remote.id);
+              if (idx >= 0) merged[idx] = remote;
+              updated++;
+            } else {
+              // 로컬에 colorBoms 있음 → 유지
+              kept++;
+            }
           }
+
+          localStorage.setItem(key, JSON.stringify(merged));
+          console.log(`[syncFromSupabase] boms 병합 완료 — 신규 ${added}건 추가, 업데이트 ${updated}건(colorBoms 복원), 유지 ${kept}건`);
         } catch (mergeErr) {
           console.warn('[syncFromSupabase] boms 병합 중 오류, 로컬 데이터 유지:', mergeErr);
         }
