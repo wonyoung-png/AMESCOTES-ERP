@@ -946,14 +946,24 @@ export const store = {
     const { bom, type } = store.getBomForOrder(styleNo);
     if (!bom) return { hqProvided: [], factoryProvided: [], processingFee: 0, factoryUnitPriceCny: 0, bomType: null };
 
-    // 사용할 자재 라인 결정 (사후원가 우선)
+    // 사용할 자재 라인 결정 (사후원가 우선, colorBoms/postColorBoms 지원)
+    const firstPostColorBom = (bom as any).postColorBoms && (bom as any).postColorBoms.length > 0
+      ? (bom as any).postColorBoms[0]
+      : null;
+    const firstPreColorBom = (bom as any).colorBoms && (bom as any).colorBoms.length > 0
+      ? (bom as any).colorBoms[0]
+      : null;
     const baseLines: BomLine[] = (type === 'post' && bom.postMaterials && bom.postMaterials.length > 0)
       ? bom.postMaterials
+      : (type === 'post' && firstPostColorBom?.lines?.length > 0)
+      ? firstPostColorBom.lines
+      : (firstPreColorBom?.lines?.length > 0)
+      ? firstPreColorBom.lines
       : (bom.lines || []);
 
     const processingFee = type === 'post'
-      ? (bom.postProcessingFee ?? bom.processingFee ?? 0)
-      : (bom.processingFee ?? 0);
+      ? (firstPostColorBom?.processingFee ?? bom.postProcessingFee ?? bom.processingFee ?? 0)
+      : (firstPreColorBom?.processingFee ?? bom.processingFee ?? 0);
 
     const hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string }> = [];
     const factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string }> = [];
