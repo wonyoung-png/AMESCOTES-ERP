@@ -1806,9 +1806,15 @@ export default function BomManagement() {
         const remainingPre = (updated.colorBoms || []).length;
         const remainingPost = (updated.postColorBoms || []).length;
         const stillHasBom = remainingPre > 0 || remainingPost > 0;
+        // 남은 컬러 목록도 품목 마스터에 반영
+        const remainingColors = [...new Set([
+          ...(updated.colorBoms || []).map((c: any) => c.color),
+          ...(updated.postColorBoms || []).map((c: any) => c.color),
+        ])].filter(c => c !== '기본').map(c => ({ name: c }));
         store.updateItem(updated.styleId, { 
           baseCostKrw: stillHasBom ? Math.round(summary2.totalCostKrw) : 0, 
-          hasBom: stillHasBom 
+          hasBom: stillHasBom,
+          colors: remainingColors,
         });
       }, 100);
       return updated;
