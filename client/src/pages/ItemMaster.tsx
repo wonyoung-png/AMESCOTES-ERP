@@ -1775,8 +1775,7 @@ function BulkOrderItemRow({
                           <span className="text-xs text-stone-400 w-16 shrink-0">가죽/원단</span>
                           <Input
                             value={cq.leatherColor || ''}
-                            onChange={e => onUpdateColorDetail(cq.color, 'leatherColor', e.target.value)}
-                            onChange={e => onSaveColorDetail(cq.color, 'leatherColor', e.target.value)} onBlur={e => onSaveColorDetail(cq.color, 'leatherColor', e.target.value)}
+                            onChange={e => { onUpdateColorDetail(cq.color, 'leatherColor', e.target.value); onSaveColorDetail(cq.color, 'leatherColor', e.target.value); }}
                             placeholder="가죽/원단 컬러"
                             className="h-6 text-xs flex-1"
                           />
@@ -1785,8 +1784,7 @@ function BulkOrderItemRow({
                           <span className="text-xs text-stone-400 w-10 shrink-0">장식</span>
                           <Input
                             value={cq.decorColor || ''}
-                            onChange={e => onUpdateColorDetail(cq.color, 'decorColor', e.target.value)}
-                            onChange={e => onSaveColorDetail(cq.color, 'decorColor', e.target.value)} onBlur={e => onSaveColorDetail(cq.color, 'decorColor', e.target.value)}
+                            onChange={e => { onUpdateColorDetail(cq.color, 'decorColor', e.target.value); onSaveColorDetail(cq.color, 'decorColor', e.target.value); }}
                             placeholder="장식 컬러"
                             className="h-6 text-xs flex-1"
                           />
@@ -1795,8 +1793,7 @@ function BulkOrderItemRow({
                           <span className="text-xs text-stone-400 w-16 shrink-0">실</span>
                           <Input
                             value={cq.threadColor || ''}
-                            onChange={e => onUpdateColorDetail(cq.color, 'threadColor', e.target.value)}
-                            onChange={e => onSaveColorDetail(cq.color, 'threadColor', e.target.value)} onBlur={e => onSaveColorDetail(cq.color, 'threadColor', e.target.value)}
+                            onChange={e => { onUpdateColorDetail(cq.color, 'threadColor', e.target.value); onSaveColorDetail(cq.color, 'threadColor', e.target.value); }}
                             placeholder="실 컬러"
                             className="h-6 text-xs flex-1"
                           />
@@ -1805,8 +1802,7 @@ function BulkOrderItemRow({
                           <span className="text-xs text-stone-400 w-10 shrink-0">기리매</span>
                           <Input
                             value={cq.girimaeColor || ''}
-                            onChange={e => onUpdateColorDetail(cq.color, 'girimaeColor', e.target.value)}
-                            onChange={e => onSaveColorDetail(cq.color, 'girimaeColor', e.target.value)} onBlur={e => onSaveColorDetail(cq.color, 'girimaeColor', e.target.value)}
+                            onChange={e => { onUpdateColorDetail(cq.color, 'girimaeColor', e.target.value); onSaveColorDetail(cq.color, 'girimaeColor', e.target.value); }}
                             placeholder="기리매 컬러"
                             className="h-6 text-xs flex-1"
                           />
