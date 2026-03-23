@@ -1803,7 +1803,13 @@ export default function BomManagement() {
         const firstColor = (updated.colorBoms || [])[0];
         const settings2 = store.getSettings();
         const summary2 = calcSummary(updated, settings2.usdKrw, firstColor);
-        store.updateItem(updated.styleId, { baseCostKrw: Math.round(summary2.totalCostKrw), hasBom: (newColors.length > 0 || (updated[forTab === 'pre' ? 'postColorBoms' : 'colorBoms'] || []).length > 0) });
+        const remainingPre = (updated.colorBoms || []).length;
+        const remainingPost = (updated.postColorBoms || []).length;
+        const stillHasBom = remainingPre > 0 || remainingPost > 0;
+        store.updateItem(updated.styleId, { 
+          baseCostKrw: stillHasBom ? Math.round(summary2.totalCostKrw) : 0, 
+          hasBom: stillHasBom 
+        });
       }, 100);
       return updated;
     });
