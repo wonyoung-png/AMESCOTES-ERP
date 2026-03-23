@@ -2987,6 +2987,9 @@ export default function ProductionOrders() {
                     }
                   }
                   toast.success(`✅ ${savedCount}종 자재가 자재구매 탭에 저장되었습니다`);
+                  // 자재구매 탭 갱신 이벤트
+                  window.dispatchEvent(new Event('materials-updated'));
+                  setVendorOrderModal(false);
                 }}
               >
                 ✅ 발주 확정

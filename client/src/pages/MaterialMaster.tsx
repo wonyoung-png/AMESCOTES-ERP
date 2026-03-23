@@ -1,5 +1,5 @@
 // AMESCOTES ERP — 자재 마스터
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { store, genId, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,13 @@ export default function MaterialMaster() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => setMaterials(store.getMaterials());
+
+  // 발주 확정 이벤트 수신 시 자동 갱신
+  useEffect(() => {
+    const handler = () => setMaterials(store.getMaterials());
+    window.addEventListener('materials-updated', handler);
+    return () => window.removeEventListener('materials-updated', handler);
+  }, []);
 
   const filtered = useMemo(() => {
     let list = materials;
