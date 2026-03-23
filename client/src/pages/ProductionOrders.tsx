@@ -471,11 +471,18 @@ export default function ProductionOrders() {
     if (form.styleNo) {
       const { bom } = store.getBomForOrder(form.styleNo);
       if (bom) {
-        const usedLines = (bom.postMaterials && bom.postMaterials.length > 0)
-          ? bom.postMaterials
-          : (bom.lines || []);
-        for (const l of usedLines) {
-          if (l.isHqProvided) {
+        // postColorBoms 우선 → postMaterials → lines 순서로 확인
+        const postColorBoms = (bom as any).postColorBoms || [];
+        const allLines: any[] = postColorBoms.length > 0
+          ? postColorBoms.flatMap((cb: any) => cb.lines || [])
+          : (bom.postMaterials && bom.postMaterials.length > 0)
+            ? bom.postMaterials
+            : (bom.lines || []);
+        // 중복 제거 (같은 itemName)
+        const seen = new Set<string>();
+        for (const l of allLines) {
+          if (l.isHqProvided && !seen.has(l.itemName)) {
+            seen.add(l.itemName);
             bomMaterials.push({
               itemName: l.itemName,
               spec: l.spec,
