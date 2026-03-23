@@ -436,7 +436,7 @@ export default function ProductionOrders() {
     if (negoApplied && negoRequestedPrice > 0) {
       const negoReqKrwForHistory = (() => {
         if (negoCurrency === 'KRW') return negoRequestedPrice;
-        if (negoCurrency === 'USD') return Math.round(negoRequestedPrice * usdKrw);
+        if (negoCurrency === 'USD') return Math.round(negoRequestedPrice * usdKrwDisplay);
         return Math.round(negoRequestedPrice * cnyKrw);
       })();
       const savedPerPcsForHistory = originalFactoryPriceKrw > 0 ? originalFactoryPriceKrw - negoReqKrwForHistory : 0;
@@ -1476,13 +1476,13 @@ export default function ProductionOrders() {
                   // 공장 제시단가를 원본 통화 기준으로 역산
                   const currentPriceInFactoryCurrency = (() => {
                     if (factoryCurrency === 'KRW') return currentPriceKrw;
-                    if (factoryCurrency === 'USD') return usdKrw > 0 ? currentPriceKrw / usdKrw : 0;
-                    return cnyKrw > 0 ? currentPriceKrw / cnyKrw : 0;
+                    if (factoryCurrency === 'USD') return usdKrwDisplay > 0 ? currentPriceKrw / usdKrwDisplay : 0;
+                    return cnyKrwDisplay > 0 ? currentPriceKrw / cnyKrwDisplay : 0;
                   })();
 
                   // 공장 제시단가 통화별 환산
                   const factoryPriceUsd = usdKrw > 0 ? currentPriceKrw / usdKrw : 0;
-                  const factoryPriceCny = cnyKrw > 0 ? currentPriceKrw / cnyKrw : 0;
+                  const factoryPriceCny = cnyKrwDisplay > 0 ? currentPriceKrw / cnyKrwDisplay : 0;
                   const factoryPriceKrw = currentPriceKrw;
 
                   // 네고 최종단가 → KRW 환산
@@ -1490,12 +1490,12 @@ export default function ProductionOrders() {
                     if (!negoRequestedPrice || negoRequestedPrice <= 0) return 0;
                     if (negoCurrency === 'KRW') return negoRequestedPrice;
                     if (negoCurrency === 'USD') return Math.round(negoRequestedPrice * usdKrw);
-                    return Math.round(negoRequestedPrice * cnyKrw);
+                    return Math.round(negoRequestedPrice * cnyKrwDisplay);
                   })();
 
                   // 네고 최종단가 통화별 환산
                   const negoPriceUsd = negoReqKrw > 0 && usdKrw > 0 ? negoReqKrw / usdKrw : 0;
-                  const negoPriceCny = negoReqKrw > 0 && cnyKrw > 0 ? negoReqKrw / cnyKrw : 0;
+                  const negoPriceCny = negoReqKrw > 0 && cnyKrwDisplay > 0 ? negoReqKrw / cnyKrwDisplay : 0;
 
                   const savedPerPcs = currentPriceKrw > 0 && negoReqKrw > 0 ? currentPriceKrw - negoReqKrw : 0;
                   const savedTotal = savedPerPcs * currentQty;
@@ -1517,7 +1517,7 @@ export default function ProductionOrders() {
                     setForm(f => ({
                       ...f,
                       factoryUnitPriceKrw: negoReqKrw,
-                      factoryUnitPriceCny: negoCurrency === 'CNY' ? negoRequestedPrice : (negoCurrency === 'USD' ? negoRequestedPrice * usdKrw / cnyKrw : negoReqKrw / cnyKrw),
+                      factoryUnitPriceCny: negoCurrency === 'CNY' ? negoRequestedPrice : (negoCurrency === 'USD' ? negoRequestedPrice * usdKrwDisplay / cnyKrwDisplay : negoReqKrw / cnyKrwDisplay),
                     }));
                     setFactoryCurrency(negoCurrency);
                     setManualFactoryPrice(true);
