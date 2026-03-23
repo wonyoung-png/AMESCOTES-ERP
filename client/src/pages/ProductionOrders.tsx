@@ -1157,8 +1157,13 @@ export default function ProductionOrders() {
                     <div className="space-y-1.5">
                       {colorQtys.map((cq, idx) => {
                         const isNew = !registeredColors.includes(cq.color);
+                        // 품목 마스터에서 컬러 상세 정보 조회
+                        const masterItem2 = items.find(i => i.styleNo === form.styleNo || i.id === form.styleId);
+                        const masterColors2 = normalizeColors(masterItem2?.colors || []);
+                        const masterColor2 = masterColors2.find(c => c.name === cq.color);
                         return (
-                          <div key={idx} className="flex items-center gap-2">
+                          <div key={idx} className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
                             <div className="flex-1 flex items-center gap-1.5">
                               <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${isNew ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                                 {cq.color || '?'}
@@ -1191,6 +1196,16 @@ export default function ProductionOrders() {
                             >
                               <Trash2 className="w-3 h-3" />
                             </Button>
+                          </div>
+                          {/* 컬러 상세정보 (품목 마스터 연동) */}
+                          {masterColor2 && (masterColor2.leatherColor || masterColor2.decorColor || masterColor2.threadColor || masterColor2.girimaeColor) && (
+                            <div className="ml-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-stone-500 bg-stone-50 rounded px-2 py-1">
+                              {masterColor2.leatherColor && <span>🪶 가죽: <span className="text-stone-700 font-medium">{masterColor2.leatherColor}</span></span>}
+                              {masterColor2.decorColor && <span>✨ 장식: <span className="text-stone-700 font-medium">{masterColor2.decorColor}</span></span>}
+                              {masterColor2.threadColor && <span>🧵 실: <span className="text-stone-700 font-medium">{masterColor2.threadColor}</span></span>}
+                              {masterColor2.girimaeColor && <span>🎀 기리매: <span className="text-stone-700 font-medium">{masterColor2.girimaeColor}</span></span>}
+                            </div>
+                          )}
                           </div>
                         );
                       })}
