@@ -2609,9 +2609,9 @@ export default function BomManagement() {
               <FileText className="w-3.5 h-3.5" /> 업체용 견적서
             </Button>
           )}
-          {editBom && isDirty && (
-            <Button size="sm" onClick={handleSave} className="gap-1.5 text-xs bg-stone-800 hover:bg-stone-700 text-white">
-              <Save className="w-3.5 h-3.5" /> 저장
+          {editBom && (
+            <Button size="sm" onClick={handleSave} className={`gap-1.5 text-xs text-white ${isDirty ? 'bg-stone-800 hover:bg-stone-700' : 'bg-stone-400 hover:bg-stone-500'}`}>
+              <Save className="w-3.5 h-3.5" /> 저장{isDirty ? '' : ' (변경없음)'}
             </Button>
           )}
         </div>
