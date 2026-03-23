@@ -941,8 +941,8 @@ export const store = {
    * - colorBom이 없는 컬러 or 원자재가 아닌 섹션 → 기본 BOM lines 사용
    */
   calcMaterialRequirements: (styleNo: string, qty: number, colorQtys?: ColorQty[]): {
-    hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string }>;
-    factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string }>;
+    hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string; category?: string }>;
+    factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string; category?: string }>;
     processingFee: number;
     factoryUnitPriceCny: number;
     bomType: 'post' | 'pre' | null;
@@ -971,8 +971,8 @@ export const store = {
     const processingFee = (firstPostColorBom?.processingFee ?? bom.postProcessingFee)
       || (firstPreColorBom?.processingFee ?? bom.processingFee) || 0;
 
-    const hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string }> = [];
-    const factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string }> = [];
+    const hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string; category?: string }> = [];
+    const factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string; category?: string }> = [];
 
     // 원자재가 아닌 섹션: 기본 BOM에서 전체 수량 적용
     const nonRawLines = baseLines.filter(l => l.category !== '원자재');
@@ -988,6 +988,7 @@ export const store = {
         vendorName: line.vendorName,
         color: undefined,
         imageUrl: (line as any).imageUrl,
+        category: line.category as string | undefined,
       };
       if (line.isHqProvided) hqProvided.push(entry);
       else factoryProvided.push(entry);
@@ -1012,6 +1013,7 @@ export const store = {
             vendorName: line.vendorName,
             color: cq.color,
             imageUrl: (line as any).imageUrl,
+            category: line.category as string | undefined,
           };
           if (line.isHqProvided) hqProvided.push(entry);
           else factoryProvided.push(entry);
@@ -1032,6 +1034,7 @@ export const store = {
           vendorName: line.vendorName,
           color: undefined,
           imageUrl: (line as any).imageUrl,
+          category: line.category as string | undefined,
         };
         if (line.isHqProvided) hqProvided.push(entry);
         else factoryProvided.push(entry);

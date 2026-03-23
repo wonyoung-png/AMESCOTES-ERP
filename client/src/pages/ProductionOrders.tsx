@@ -36,8 +36,8 @@ interface BomCalcResult {
   factoryUnitPriceCny: number;
   factoryUnitPriceKrw: number;
   totalFactoryAmountKrw: number;
-  hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; imageUrl?: string }>;
-  factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; imageUrl?: string }>;
+  hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; imageUrl?: string; category?: string }>;
+  factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; imageUrl?: string; category?: string }>;
   manufacturingCountry?: string;
 }
 
@@ -113,6 +113,11 @@ export default function ProductionOrders() {
   // 자재 장바구니 모달 상태
   const [cartModal, setCartModal] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>(() => store.getMaterialCart());
+
+  // 공장구매/본사제공 자재 카테고리 접기/펼치기 상태
+  const CATEGORY_ORDER = ['원자재', '장식', '지퍼', '보강재', '봉사·접착제', '포장재', '철형', '후가공', '기타'];
+  const [factoryCategoryOpen, setFactoryCategoryOpen] = useState<Record<string, boolean>>({ '원자재': true });
+  const [hqCategoryOpen, setHqCategoryOpen] = useState<Record<string, boolean>>({ '원자재': true });
 
   // 거래처별 발주서 모달 상태
   const [vendorOrderModal, setVendorOrderModal] = useState(false);
@@ -1651,113 +1656,182 @@ export default function ProductionOrders() {
                           </DialogContent>
                         </Dialog>
                       )}
-                      <table className="w-full text-xs">
-                        <thead className="bg-stone-50 border-b border-stone-100">
-                          <tr>
-                            <th className="text-left px-3 py-2 font-medium text-stone-500">자재명</th>
-                            <th className="text-right px-3 py-2 font-medium text-stone-500">소요량</th>
-                            <th className="text-center px-3 py-2 font-medium text-stone-500">단위</th>
-                            <th className="text-left px-3 py-2 font-medium text-stone-500">구매업체</th>
-                            <th className="text-left px-3 py-2 font-medium text-stone-500">구매상태</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {hqItems.map((item, idx) => {
-                            const calcItem = bomCalc.hqProvided.find(h => h.bomLineId === item.bomLineId);
-                            return (
-                              <tr key={item.bomLineId} className="border-t border-stone-100 hover:bg-stone-50">
-                                <td className="px-3 py-2 font-medium text-stone-700">
-                                  <div className="flex items-center gap-2">
-                                    {calcItem?.imageUrl ? (
-                                      <img
-                                        src={calcItem.imageUrl}
-                                        alt={item.itemName}
-                                        className="w-6 h-6 object-cover rounded cursor-pointer border border-stone-200 shrink-0"
-                                        onClick={() => setMaterialImagePreview(calcItem.imageUrl!)}
-                                        title="클릭하여 확대"
-                                      />
-                                    ) : null}
-                                    <span>
-                                      {item.itemName}
-                                      {item.spec && <span className="text-stone-400 ml-1">({item.spec})</span>}
+                      {/* hqItems 카테고리별 드롭다운 */}
+                      {(() => {
+                        // hqItems를 calcItem의 category 기준으로 그룹화
+                        const grouped: Record<string, Array<{ item: typeof hqItems[0]; idx: number }>> = {};
+                        hqItems.forEach((item, idx) => {
+                          const calcItem = bomCalc.hqProvided.find(h => h.bomLineId === item.bomLineId);
+                          const cat = calcItem?.category || '기타';
+                          if (!grouped[cat]) grouped[cat] = [];
+                          grouped[cat].push({ item, idx });
+                        });
+                        const sortedCats = CATEGORY_ORDER.filter(c => grouped[c]);
+                        return (
+                          <div className="divide-y divide-stone-100">
+                            {sortedCats.map(cat => {
+                              const entries = grouped[cat];
+                              const isOpen = hqCategoryOpen[cat] ?? false;
+                              return (
+                                <div key={cat}>
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-blue-50 transition-colors text-left bg-stone-50"
+                                    onClick={() => setHqCategoryOpen(prev => ({ ...prev, [cat]: !isOpen }))}
+                                  >
+                                    <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-800">
+                                      <span className="text-blue-400">{isOpen ? '▼' : '▶'}</span>
+                                      {cat}
+                                      <span className="bg-blue-100 text-blue-600 text-xs px-1.5 py-0.5 rounded-full font-normal">{entries.length}종</span>
                                     </span>
-                                  </div>
-                                </td>
-                                <td className="px-3 py-2 text-right">
-                                  {calcItem ? (
-                                    <span className="font-mono font-semibold text-blue-700">
-                                      {calcItem.reqQty % 1 === 0 ? calcItem.reqQty.toLocaleString() : calcItem.reqQty.toFixed(2)}
-                                    </span>
-                                  ) : (
-                                    <Input
-                                      type="number" value={item.requiredQty || ''}
-                                      onChange={e => {
-                                        const updated = [...hqItems];
-                                        updated[idx] = { ...updated[idx], requiredQty: parseFloat(e.target.value) || 0 };
-                                        setHqItems(updated);
-                                      }}
-                                      className="h-6 text-xs w-20 ml-auto"
-                                    />
+                                  </button>
+                                  {isOpen && (
+                                    <table className="w-full text-xs">
+                                      <thead className="bg-stone-50 border-b border-stone-100">
+                                        <tr>
+                                          <th className="text-left px-3 py-1.5 font-medium text-stone-500">자재명</th>
+                                          <th className="text-right px-3 py-1.5 font-medium text-stone-500">소요량</th>
+                                          <th className="text-center px-3 py-1.5 font-medium text-stone-500">단위</th>
+                                          <th className="text-left px-3 py-1.5 font-medium text-stone-500">구매업체</th>
+                                          <th className="text-left px-3 py-1.5 font-medium text-stone-500">구매상태</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {entries.map(({ item, idx }) => {
+                                          const calcItem = bomCalc.hqProvided.find(h => h.bomLineId === item.bomLineId);
+                                          return (
+                                            <tr key={item.bomLineId} className="border-t border-stone-100 hover:bg-stone-50">
+                                              <td className="px-3 py-2 font-medium text-stone-700">
+                                                <div className="flex items-center gap-2">
+                                                  {calcItem?.imageUrl ? (
+                                                    <img
+                                                      src={calcItem.imageUrl}
+                                                      alt={item.itemName}
+                                                      className="w-6 h-6 object-cover rounded cursor-pointer border border-stone-200 shrink-0"
+                                                      onClick={() => setMaterialImagePreview(calcItem.imageUrl!)}
+                                                      title="클릭하여 확대"
+                                                    />
+                                                  ) : null}
+                                                  <span>
+                                                    {item.itemName}
+                                                    {item.spec && <span className="text-stone-400 ml-1">({item.spec})</span>}
+                                                  </span>
+                                                </div>
+                                              </td>
+                                              <td className="px-3 py-2 text-right">
+                                                {calcItem ? (
+                                                  <span className="font-mono font-semibold text-blue-700">
+                                                    {calcItem.reqQty % 1 === 0 ? calcItem.reqQty.toLocaleString() : calcItem.reqQty.toFixed(2)}
+                                                  </span>
+                                                ) : (
+                                                  <Input
+                                                    type="number" value={item.requiredQty || ''}
+                                                    onChange={e => {
+                                                      const updated = [...hqItems];
+                                                      updated[idx] = { ...updated[idx], requiredQty: parseFloat(e.target.value) || 0 };
+                                                      setHqItems(updated);
+                                                    }}
+                                                    className="h-6 text-xs w-20 ml-auto"
+                                                  />
+                                                )}
+                                              </td>
+                                              <td className="px-3 py-2 text-center text-stone-500">{item.unit}</td>
+                                              <td className="px-3 py-2 text-stone-600">
+                                                {calcItem?.vendorName || item.memo?.replace('구매처: ', '') || <span className="text-stone-300">미지정</span>}
+                                              </td>
+                                              <td className="px-3 py-2">
+                                                <Select value={item.purchaseStatus} onValueChange={v => {
+                                                  const updated = [...hqItems];
+                                                  updated[idx] = { ...updated[idx], purchaseStatus: v as HqSupplyItem['purchaseStatus'] };
+                                                  setHqItems(updated);
+                                                }}>
+                                                  <SelectTrigger className="h-6 text-xs w-24"><SelectValue /></SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="미구매">미구매</SelectItem>
+                                                    <SelectItem value="구매완료">구매완료</SelectItem>
+                                                    <SelectItem value="발송완료">발송완료</SelectItem>
+                                                  </SelectContent>
+                                                </Select>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
                                   )}
-                                </td>
-                                <td className="px-3 py-2 text-center text-stone-500">{item.unit}</td>
-                                <td className="px-3 py-2 text-stone-600">
-                                  {calcItem?.vendorName || item.memo?.replace('구매처: ', '') || <span className="text-stone-300">미지정</span>}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <Select value={item.purchaseStatus} onValueChange={v => {
-                                    const updated = [...hqItems];
-                                    updated[idx] = { ...updated[idx], purchaseStatus: v as HqSupplyItem['purchaseStatus'] };
-                                    setHqItems(updated);
-                                  }}>
-                                    <SelectTrigger className="h-6 text-xs w-24"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="미구매">미구매</SelectItem>
-                                      <SelectItem value="구매완료">구매완료</SelectItem>
-                                      <SelectItem value="발송완료">발송완료</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
 
-                {/* 본사미제공(공장발주) 자재 목록 */}
-                {bomCalc.factoryProvided.length > 0 && (
-                  <div className="rounded-lg border border-stone-100 bg-stone-50 p-3">
-                    <p className="text-xs font-medium text-stone-600 mb-2 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-stone-400" />
-                      공장 구매 자재 ({bomCalc.factoryProvided.length}종) — 공장이 직접 구매
-                    </p>
-                    <div className="space-y-1">
-                      {bomCalc.factoryProvided.map(m => (
-                        <div key={m.bomLineId} className="flex items-center justify-between text-xs text-stone-500">
-                          <div className="flex items-center gap-2">
-                            {m.imageUrl ? (
-                              <img
-                                src={m.imageUrl}
-                                alt={m.itemName}
-                                className="w-5 h-5 object-cover rounded cursor-pointer border border-stone-200 shrink-0"
-                                onClick={() => setMaterialImagePreview(m.imageUrl!)}
-                                title="클릭하여 확대"
-                              />
-                            ) : null}
-                            <span>{m.itemName}{m.spec ? ` (${m.spec})` : ''}</span>
-                          </div>
-                          <span className="font-mono">
-                            {m.reqQty % 1 === 0 ? m.reqQty.toLocaleString() : m.reqQty.toFixed(2)} {m.unit}
-                            {m.vendorName && <span className="ml-2 text-stone-400">({m.vendorName})</span>}
-                          </span>
-                        </div>
-                      ))}
+                {/* 본사미제공(공장발주) 자재 목록 — 카테고리별 드롭다운 */}
+                {bomCalc.factoryProvided.length > 0 && (() => {
+                  const grouped: Record<string, typeof bomCalc.factoryProvided> = {};
+                  for (const m of bomCalc.factoryProvided) {
+                    const cat = m.category || '기타';
+                    if (!grouped[cat]) grouped[cat] = [];
+                    grouped[cat].push(m);
+                  }
+                  const sortedCats = CATEGORY_ORDER.filter(c => grouped[c]);
+                  return (
+                    <div className="rounded-lg border border-stone-200 bg-stone-50 overflow-hidden">
+                      <p className="text-xs font-medium text-stone-600 px-3 py-2 flex items-center gap-1 border-b border-stone-200 bg-stone-100">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-stone-400" />
+                        📦 공장 구매 자재 ({bomCalc.factoryProvided.length}종) — 공장이 직접 구매
+                      </p>
+                      <div className="divide-y divide-stone-100">
+                        {sortedCats.map(cat => {
+                          const items = grouped[cat];
+                          const isOpen = factoryCategoryOpen[cat] ?? false;
+                          return (
+                            <div key={cat}>
+                              <button
+                                type="button"
+                                className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-stone-100 transition-colors text-left"
+                                onClick={() => setFactoryCategoryOpen(prev => ({ ...prev, [cat]: !isOpen }))}
+                              >
+                                <span className="flex items-center gap-1.5 text-xs font-semibold text-stone-700">
+                                  <span className="text-stone-400">{isOpen ? '▼' : '▶'}</span>
+                                  {cat}
+                                  <span className="bg-stone-200 text-stone-600 text-xs px-1.5 py-0.5 rounded-full font-normal">{items.length}종</span>
+                                </span>
+                              </button>
+                              {isOpen && (
+                                <div className="bg-white px-3 pb-1">
+                                  {items.map(m => (
+                                    <div key={m.bomLineId} className="flex items-center justify-between text-xs text-stone-500 py-1 border-t border-stone-50 first:border-t-0">
+                                      <div className="flex items-center gap-2">
+                                        {m.imageUrl ? (
+                                          <img
+                                            src={m.imageUrl}
+                                            alt={m.itemName}
+                                            className="w-5 h-5 object-cover rounded cursor-pointer border border-stone-200 shrink-0"
+                                            onClick={() => setMaterialImagePreview(m.imageUrl!)}
+                                            title="클릭하여 확대"
+                                          />
+                                        ) : null}
+                                        <span className="text-stone-700">{m.itemName}{m.spec ? <span className="text-stone-400 ml-1">({m.spec})</span> : null}</span>
+                                      </div>
+                                      <span className="font-mono text-stone-600 shrink-0 ml-2">
+                                        {m.reqQty % 1 === 0 ? m.reqQty.toLocaleString() : m.reqQty.toFixed(2)} {m.unit}
+                                        {m.vendorName && <span className="ml-1 text-stone-400">({m.vendorName})</span>}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
