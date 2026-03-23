@@ -16,18 +16,25 @@ function toCamelCase(obj: Record<string, any>): Record<string, any> {
 // BOM 행(ExtBomLine) 배열 정규화 — snake_case/camelCase 혼용 처리
 function normalizeBomLine(l: any): any {
   if (!l || typeof l !== 'object') return l;
+  // Supabase에서 저장된 단순 형식 (name, qty, unit_price) 지원
+  const itemName = l.itemName ?? l.item_name ?? l.name ?? '';
+  const unitPriceCny = l.unitPriceCny ?? l.unit_price_cny ?? l.unitPrice ?? l.unit_price ?? 0;
+  // qty가 있고 netQty가 없으면 qty를 netQty로 사용 (Supabase 단순 형식)
+  const netQty = l.netQty ?? l.net_qty ?? l.qty ?? 0;
+  // Supabase 단순 형식에서 total이 있으면 total/unit_price로 qty 역산
+  const effectiveQty = netQty || (unitPriceCny > 0 && l.total ? parseFloat((l.total / unitPriceCny).toFixed(4)) : 0);
   return {
-    id: l.id,
-    category: l.category,
-    subPart: l.subPart ?? l.sub_part,
-    itemName: l.itemName ?? l.item_name ?? '',
+    id: l.id ?? Math.random().toString(36).slice(2),
+    category: l.category ?? '원자재',
+    subPart: l.subPart ?? l.sub_part ?? l.subpart,
+    itemName,
     spec: l.spec ?? '',
     unit: l.unit ?? 'EA',
     customUnit: l.customUnit ?? l.custom_unit ?? '',
-    unitPriceCny: l.unitPriceCny ?? l.unit_price_cny ?? l.unitPrice ?? l.unit_price ?? 0,
-    netQty: l.netQty ?? l.net_qty ?? 0,
-    lossRate: l.lossRate ?? l.loss_rate ?? 0.05,
-    isHqProvided: l.isHqProvided ?? l.is_hq_provided ?? false,
+    unitPriceCny,
+    netQty: effectiveQty,
+    lossRate: l.lossRate ?? l.loss_rate ?? 0,
+    isHqProvided: l.isHqProvided ?? l.is_hq_provided ?? (l.hq_provided === true) ?? false,
     isVendorProvided: l.isVendorProvided ?? l.is_vendor_provided ?? false,
     vendorName: l.vendorName ?? l.vendor_name ?? '',
     vendorId: l.vendorId ?? l.vendor_id ?? '',
