@@ -1778,7 +1778,7 @@ export default function BomManagement() {
     else setActivePreColor(color);
   }, []);
 
-  // 컬러 탭 삭제 (사전/사후 구분)
+  // 컬러 탭 삭제 (사전/사후 구분) - 삭제 후 자동 저장
   const removeColorBom = useCallback((color: string, forTab: 'pre' | 'post' = 'pre') => {
     setEditBom(prev => {
       if (!prev) return prev;
@@ -1791,9 +1791,24 @@ export default function BomManagement() {
         if (newColors.length > 0) setActivePreColor(newColors[0].color);
         else { setActivePreColor(''); setAddColorForTab('pre'); setShowAddColorModal(true); }
       }
-      return { ...prev, [bomKey]: newColors };
+      const updated = { ...prev, [bomKey]: newColors };
+      // 삭제 후 자동 저장 (품목 마스터 연동)
+      setTimeout(() => {
+        const extBoms = getExtBoms();
+        const existing = extBoms.find(b => b.id === updated.id);
+        const newBoms = existing ? extBoms.map(b => b.id === updated.id ? updated : b) : [...extBoms, updated];
+        saveExtBoms(newBoms);
+        // 품목 마스터 업데이트
+        const allColors = [...new Set([...(updated.colorBoms||[]).map((c:any)=>c.color), ...(updated.postColorBoms||[]).map((c:any)=>c.color)])];
+        const firstColor = (updated.colorBoms || [])[0];
+        const settings2 = store.getSettings();
+        const summary2 = calcSummary(updated, settings2.usdKrw, firstColor);
+        store.updateItem(updated.styleId, { baseCostKrw: Math.round(summary2.totalCostKrw), hasBom: (newColors.length > 0 || (updated[forTab === 'pre' ? 'postColorBoms' : 'colorBoms'] || []).length > 0) });
+      }, 100);
+      return updated;
     });
     markDirty();
+    toast.info(`[${color}] 컬러 탭 삭제됨`);
   }, []);
 
   // 컬러 BOM 행 업데이트 (lines)
