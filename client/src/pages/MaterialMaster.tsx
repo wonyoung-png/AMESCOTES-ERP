@@ -44,7 +44,7 @@ const emptyForm: Partial<Material> = {
 
 export default function MaterialMaster() {
   const queryClient = useQueryClient();
-  const { data: materials = [], refetch: refetchMaterials } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
+  const { data: materials = [], refetch: refetchMaterials, isLoading: materialsLoading, error: materialsError } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
 
   // 탭 진입 시 항상 최신 데이터 로드
   useEffect(() => {
@@ -177,6 +177,9 @@ export default function MaterialMaster() {
         <div>
           <h1 className="text-2xl font-bold text-stone-800">자재 마스터</h1>
           <p className="text-sm text-stone-500 mt-0.5">원자재·부자재 단가 등록 · BOM 자동 연결</p>
+          {materialsLoading && <p className="text-xs text-blue-500">로딩 중...</p>}
+          {materialsError && <p className="text-xs text-red-500">오류: {String(materialsError)}</p>}
+          <p className="text-xs text-stone-400">총 {materials.length}건 (표시: {filtered.length}건)</p>
         </div>
         <Button onClick={openNew} className="bg-[#C9A96E] hover:bg-[#B8985D] text-white gap-2">
           <Plus size={16} />자재 등록
