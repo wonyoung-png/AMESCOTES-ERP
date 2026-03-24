@@ -595,24 +595,10 @@ export default function ItemMaster() {
                 // 납품가: BOM 사후원가의 postDeliveryPrice 우선 → item.deliveryPrice → targetSalePrice
                 const itemBom = (boms as any[]).find(b => b.styleNo === item.styleNo);
                 const delivery = itemBom?.postDeliveryPrice || item.deliveryPrice || item.targetSalePrice || 0;
-                // BOM 총원가: Supabase boms에서 계산 (사후원가 기준, 생산마진 제외)
-                const getBomCostFromSupabase = () => {
-                  if (!itemBom) return 0;
-                  const settings = store.getSettings();
-                  const cnyKrw = itemBom.postExchangeRateCny || settings.cnyKrw || 191;
-                  const postColorBom = (itemBom.postColorBoms || [])[0];
-                  const lines = postColorBom?.lines || itemBom.postMaterials || itemBom.lines || [];
-                  const materialCny = lines.reduce((s: number, l: any) => {
-                    if (l.isHqProvided || l.isVendorProvided) return s;
-                    const price = l.unitPriceCny ?? l.unitPrice ?? 0;
-                    return s + price * (l.netQty || 0) * (1 + (l.lossRate ?? 0));
-                  }, 0);
-                  const processingFee = postColorBom?.processingFee || itemBom.postProcessingFee || 0;
-                  const postProcessCny = (itemBom.postProcessLines || []).reduce((s: number, l: any) => s + (l.netQty || 0) * (l.unitPrice || 0), 0);
-                  const logisticsKrw = itemBom.logisticsCostKrw || 0;
-                  return Math.round((materialCny + processingFee + postProcessCny) * cnyKrw) + logisticsKrw;
-                };
-                const bomCost = item.hasBom ? getBomCostFromSupabase() : 0;
+                // BOM원가: Supabase에 저장된 사후원가 소계(생산마진 제외) 우선 사용
+                const bomCost = item.hasBom
+                  ? ((itemBom as any)?.postSubtotalKrw || (itemBom as any)?.postTotalCostKrw || store.getBomTotalCost(item.styleNo))
+                  : 0;
                 const { rate: marginRate, amount: marginAmount } = calcMargin(delivery, bomCost);
                 const months = monthsSinceLastOrder(item);
                 const isChecked = selectedIds.has(item.id);

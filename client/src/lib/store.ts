@@ -291,6 +291,8 @@ export interface Bom {
   exchangeRateCny?: number;       // 사후원가 CNY 환율
   exchangeRateUsd?: number;       // 사후원가 USD 환율
   postDeliveryPrice?: number;     // 사후원가용 납품가 (직접입력)
+  postTotalCostKrw?: number;      // 사후원가 제품원가 (저장값)
+  postSubtotalKrw?: number;       // 사후원가 소계 (생산마진 전)
   postSourceFileName?: string;    // 사후원가 업로드 파일명
   colorBoms?: ColorBom[];     // 컬러별 BOM (원자재만 별도 관리)
   createdAt: string;

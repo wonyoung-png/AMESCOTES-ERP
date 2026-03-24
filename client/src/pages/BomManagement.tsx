@@ -403,6 +403,8 @@ function syncBomToSupabase(bom: ExtBom) {
       post_color_boms: bom.postColorBoms ?? [],
       post_process_lines: bom.postProcessLines ?? [],
       post_delivery_price: bom.postDeliveryPrice ?? null,
+      post_total_cost_krw: (bom as any).postTotalCostKrw ?? null,
+      post_subtotal_krw: (bom as any).postSubtotalKrw ?? null,
       pre_currency: bom.preCurrency ?? bom.currency ?? 'CNY',
       post_currency: bom.currency ?? 'CNY',
       pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
@@ -2176,6 +2178,13 @@ export default function BomManagement() {
     saveExtBoms(newBoms);
     setExtBoms(newBoms);
     // Supabase에 직접 저장
+    // 사후원가 소계/원가 계산 후 저장 (품목마스터 연동용)
+    const activePostCB = (updated.postColorBoms || [])[0];
+    if (activePostCB) {
+      const ps = calcPostSummary(updated, store.getSettings().usdKrw || 1380, activePostCB);
+      (updated as any).postSubtotalKrw = Math.round(ps.subTotal || ps.factoryUnitCostKrw || 0);
+      (updated as any).postTotalCostKrw = Math.round(ps.totalCostKrw || 0);
+    }
     upsertBom(updated)
       .then(async () => {
         queryClient.invalidateQueries({ queryKey: ['boms'] });
