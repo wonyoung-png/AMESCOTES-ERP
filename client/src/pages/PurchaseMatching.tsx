@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchPurchaseItems, upsertPurchaseItem, deletePurchaseItem as deletePurchaseItemSB,
-  updatePurchaseItemStatus, fetchOrders, upsertOrder,
+  updatePurchaseItemStatus, fetchOrders, upsertOrder, fetchVendors,
 } from '@/lib/supabaseQueries';
 import {
   store, genId, formatKRW, formatNumber,
