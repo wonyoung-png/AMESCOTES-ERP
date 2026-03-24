@@ -70,6 +70,68 @@ export default function PurchaseMatching() {
       return next;
     });
   };
+
+  // 체크박스 선택 상태
+  const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<Set<string>>(new Set());
+
+  const togglePurchaseSelect = (id: string) => {
+    setSelectedPurchaseIds(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+
+  const toggleGroupSelect = (orderNo: string, items: PurchaseItem[]) => {
+    const ids = items.map(i => i.id);
+    const allSelected = ids.every(id => selectedPurchaseIds.has(id));
+    setSelectedPurchaseIds(prev => {
+      const n = new Set(prev);
+      if (allSelected) ids.forEach(id => n.delete(id));
+      else ids.forEach(id => n.add(id));
+      return n;
+    });
+  };
+
+  const handleGroupStatusChange = (orderNo: string, items: PurchaseItem[], status: string) => {
+    items.forEach(item => {
+      store.updatePurchaseItem(item.id, { purchaseStatus: status as PurchaseItem['purchaseStatus'] });
+      if (status === '발송완료') {
+        import('@/lib/supabaseQueries').then(async m => {
+          const allOrders = await m.fetchOrders();
+          const relatedOrder = allOrders.find((o: any) => o.orderNo === item.orderNo);
+          if (relatedOrder && (relatedOrder.status === '발주생성' || !relatedOrder.status)) {
+            await m.upsertOrder({ ...relatedOrder, status: '생산중', updatedAt: new Date().toISOString() });
+            store.updateOrder(relatedOrder.id, { status: '생산중' });
+          } else {
+            const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
+            if (localOrder && localOrder.status === '발주생성') {
+              store.updateOrder(localOrder.id, { status: '생산중' });
+              m.upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(() => {});
+            }
+          }
+        }).catch(() => {
+          const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
+          if (localOrder && localOrder.status === '발주생성') {
+            store.updateOrder(localOrder.id, { status: '생산중' });
+          }
+        });
+      }
+    });
+    refresh();
+    toast.success(`[${orderNo}] ${items.length}종 → ${status}로 변경됐어요`);
+  };
+
+  const handleBulkDeletePurchase = () => {
+    if (!confirm(`선택한 ${selectedPurchaseIds.size}건을 삭제하시겠습니까?`)) return;
+    const count = selectedPurchaseIds.size;
+    Array.from(selectedPurchaseIds).forEach(id => {
+      store.deletePurchaseItem(id);
+    });
+    setSelectedPurchaseIds(new Set());
+    refresh();
+    toast.success(`${count}건 삭제됐어요`);
+  };
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<Partial<PurchaseItem>>({});
   const [editId, setEditId] = useState<string | null>(null);
@@ -394,7 +456,7 @@ export default function PurchaseMatching() {
         ))}
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 items-center flex-wrap">
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-28 h-9"><SelectValue placeholder="상태" /></SelectTrigger>
           <SelectContent>
@@ -402,12 +464,28 @@ export default function PurchaseMatching() {
             {PURCHASE_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
+        {selectedPurchaseIds.size > 0 && (
+          <Button variant="destructive" size="sm" onClick={handleBulkDeletePurchase}>
+            선택 삭제 ({selectedPurchaseIds.size}건)
+          </Button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50">
+              <th className="w-10 px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={filtered.length > 0 && filtered.every(p => selectedPurchaseIds.has(p.id))}
+                  onChange={() => {
+                    const allSelected = filtered.every(p => selectedPurchaseIds.has(p.id));
+                    setSelectedPurchaseIds(allSelected ? new Set() : new Set(filtered.map(p => p.id)));
+                  }}
+                  className="cursor-pointer"
+                />
+              </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">품목명</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">공급업체</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">구매일</th>
@@ -421,7 +499,7 @@ export default function PurchaseMatching() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={9} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={10} className="text-center py-12 text-stone-400">
                 <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 구매 내역이 없습니다</p>
               </td></tr>
@@ -444,6 +522,17 @@ export default function PurchaseMatching() {
                       className="border-b border-stone-200 bg-stone-50 cursor-pointer hover:bg-amber-50/30"
                       onClick={() => toggleGroup(orderNo)}
                     >
+                      <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={groupItems.length > 0 && groupItems.every(i => selectedPurchaseIds.has(i.id))}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleGroupSelect(orderNo, groupItems);
+                          }}
+                          className="cursor-pointer"
+                        />
+                      </td>
                       <td colSpan={9} className="px-4 py-2.5">
                         <div className="flex items-center gap-3 flex-wrap">
                           <span className="text-stone-400 text-xs w-3">{isOpen ? '▼' : '▶'}</span>
@@ -456,13 +545,31 @@ export default function PurchaseMatching() {
                             <span className="text-xs text-stone-500">공급가액 {formatKRW(totalKrw)}</span>
                             <span className="text-xs text-stone-400">+ 세액 {formatKRW(Math.round(totalKrw * 0.1))}</span>
                             <span className="text-xs font-semibold text-stone-700">= {formatKRW(totalKrw + Math.round(totalKrw * 0.1))}</span>
+                            <div onClick={e => e.stopPropagation()}>
+                              <Select onValueChange={(v) => handleGroupStatusChange(orderNo, groupItems, v)}>
+                                <SelectTrigger className="w-28 h-7 text-xs" onClick={e => e.stopPropagation()}>
+                                  <SelectValue placeholder="일괄변경" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {PURCHASE_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </span>
                         </div>
                       </td>
                     </tr>
                     {/* 그룹 내 자재 행들 */}
                     {isOpen && groupItems.map(p => (
-                      <tr key={p.id} className="border-b border-stone-50 hover:bg-stone-50/50">
+                      <tr key={p.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${selectedPurchaseIds.has(p.id) ? 'bg-amber-50/60' : ''}`}>
+                        <td className="px-3 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedPurchaseIds.has(p.id)}
+                            onChange={() => togglePurchaseSelect(p.id)}
+                            className="cursor-pointer"
+                          />
+                        </td>
                         <td className="px-4 py-3 font-medium text-stone-800">{p.itemName}</td>
                         <td className="px-4 py-3 text-stone-600">{p.vendorName || '-'}</td>
                         <td className="px-4 py-3 text-stone-600">{p.purchaseDate}</td>
