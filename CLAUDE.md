@@ -64,3 +64,29 @@ npx vite --port 3456 --host 0.0.0.0
 - 작업 완료 후 변경 내용을 한 번에 요약해서 보고
 - `git commit && git push` 까지 자동으로 완료할 것
 - 빌드 오류 발생 시 → 스스로 수정해서 오류 없을 때까지 반복
+
+## ⚠️ 절대 수정 금지 - 연동 흐름 (2026-03-24 확정)
+
+### 발주 → 자재구매 연동 흐름 (절대 변경 금지)
+```
+생산발주 등록 → upsertOrder() → Supabase production_orders 저장 → queryClient.invalidateQueries(['orders']) → 생산발주 목록 갱신
+
+발주 완료 팝업 → "📦 자재 장바구니 담기" → store.addToMaterialCart()
+
+거래처별 발주서 → "✅ 발주 확정" 클릭 →
+  1. fetchMaterials() 조회 후 upsertMaterial() → Supabase materials 저장
+  2. store.addPurchaseItem() → localStorage 저장 → 자재구매(PurchaseMatching) 탭에 표시
+  3. store.clearMaterialCart() → 장바구니 비우기
+  4. queryClient.invalidateQueries(['materials'])
+```
+
+### 핵심 규칙
+- 생산발주 목록: useQuery({ queryKey: ['orders'], queryFn: fetchOrders }) — Supabase
+- 자재구매 탭(PurchaseMatching): store.getPurchaseItems() — localStorage (별도 테이블)
+- 자재마스터 탭(MaterialMaster): useQuery({ queryKey: ['materials'], queryFn: fetchMaterials }) — Supabase
+- 발주 확정은 위 두 곳 모두에 저장해야 함
+
+### 컬러별 BOM 소요량 계산
+- 발주 완료 팝업의 bomMaterials: order.colorQtys 기준으로 선택된 컬러만 필터링
+- colorQtys가 빈 배열이면 postColorBoms[0] (첫 번째 컬러) 사용
+- 절대로 postColorBoms.flatMap() 전체 사용 금지
