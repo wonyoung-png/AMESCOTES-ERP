@@ -518,7 +518,7 @@ export default function ProductionOrders() {
       updatedAt: new Date().toISOString(),
       memo: form.memo,
     };
-    upsertOrder(order).catch((e: Error) => toast.error(`발주 저장 실패: ${e.message}`));
+    upsertOrder(order).then(() => refresh()).catch((e: Error) => toast.error(`발주 저장 실패: ${e.message}`));
 
     // 새 컬러 → 품목 마스터 자동 추가 (낙관적 업데이트)
     if (colorQtys.length > 0 && form.styleId) {

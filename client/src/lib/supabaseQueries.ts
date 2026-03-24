@@ -161,8 +161,11 @@ const TABLE_COLUMNS: Record<string, string[]> = {
          'pre_exchange_rate_cny', 'post_exchange_rate_cny', 'customs_rate', 'post_process_lines'],
   production_orders: ['id', 'style_no', 'style_name', 'buyer_id', 'vendor_id', 'quantity', 'unit_price',
                       'currency', 'order_date', 'expected_date', 'status', 'memo',
-                      'order_no', 'vendor_name', 'factory_unit_price_krw', 'color_qtys',
-                      'delivery_date', 'style_id', 'revision',
+                      'order_no', 'vendor_name', 'factory_unit_price_krw', 'factory_unit_price_cny',
+                      'factory_currency', 'color_qtys', 'delivery_date', 'style_id', 'revision',
+                      'is_reorder', 'season', 'bom_id', 'bom_type', 'hq_supply_items',
+                      'nego_history', 'received_qty', 'defect_qty', 'defect_note', 'received_date',
+                      'trade_statement_id',
                       'created_at', 'updated_at'],
   materials: ['id', 'name', 'name_en', 'spec', 'unit', 'unit_price', 'unit_price_cny', 'unit_price_krw',
               'currency', 'vendor_id', 'category', 'stock_qty', 'memo',
@@ -492,8 +495,18 @@ export async function upsertOrder(order: Record<string, any>) {
     delivery_date: order.deliveryDate,
     style_id: order.styleId,
     revision: order.revision,
+    is_reorder: order.isReorder ?? false,
+    season: order.season,
+    bom_id: order.bomId,
+    bom_type: order.bomType,
+    factory_unit_price_cny: order.factoryUnitPriceCny,
+    factory_currency: order.factoryCurrency ?? 'CNY',
+    hq_supply_items: order.hqSupplyItems ?? [],
+    nego_history: order.negoHistory ?? [],
+    updated_at: order.updatedAt ?? new Date().toISOString(),
+    created_at: order.createdAt ?? new Date().toISOString(),
   });
-  const { error } = await supabase.from('production_orders').upsert(row);
+  const { error } = await supabase.from('production_orders').upsert(row, { onConflict: 'id' });
   if (error) throw error;
 }
 
