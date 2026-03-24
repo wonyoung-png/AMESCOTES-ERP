@@ -1,5 +1,5 @@
 // AMESCOTES ERP — 자재 구매 매칭
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   store, genId, formatKRW, formatNumber,
   type PurchaseItem, type Currency, type ExpenseType, type Expense, type ExpenseCategory,
@@ -58,6 +58,15 @@ export default function PurchaseMatching() {
   const settings = store.getSettings();
   const [filterOrder, setFilterOrder] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) => {
+    setOpenGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<Partial<PurchaseItem>>({});
   const [editId, setEditId] = useState<string | null>(null);
@@ -240,13 +249,6 @@ export default function PurchaseMatching() {
       </div>
 
       <div className="flex gap-3">
-        <Select value={filterOrder} onValueChange={setFilterOrder}>
-          <SelectTrigger className="w-52 h-9"><SelectValue placeholder="발주번호 필터" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체 발주</SelectItem>
-            {orders.map(o => <SelectItem key={o.id} value={o.id}>{o.orderNo} — {o.styleName}</SelectItem>)}
-          </SelectContent>
-        </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-28 h-9"><SelectValue placeholder="상태" /></SelectTrigger>
           <SelectContent>
@@ -260,7 +262,6 @@ export default function PurchaseMatching() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50">
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">발주번호</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">품목명</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">공급업체</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">구매일</th>
@@ -274,70 +275,105 @@ export default function PurchaseMatching() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={10} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={9} className="text-center py-12 text-stone-400">
                 <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 구매 내역이 없습니다</p>
               </td></tr>
-            ) : filtered.map(p => (
-              <tr key={p.id} className="border-b border-stone-50 hover:bg-stone-50/50">
-                <td className="px-4 py-3 font-mono text-xs text-stone-600">{p.orderNo}</td>
-                <td className="px-4 py-3 font-medium text-stone-800">{p.itemName}</td>
-                <td className="px-4 py-3 text-stone-600">{p.vendorName || '-'}</td>
-                <td className="px-4 py-3 text-stone-600">{p.purchaseDate}</td>
-                <td className="px-4 py-3 text-right font-mono">{formatNumber(p.qty)} {p.unit}</td>
-                <td className="px-4 py-3 text-right font-mono text-stone-600">{formatNumber(p.unitPriceCny, 2)} {p.currency}</td>
-                <td className="px-4 py-3 text-right font-mono font-semibold text-stone-800">{formatKRW(p.amountKrw)}</td>
-                <td className="px-4 py-3"><Badge variant="outline" className="text-xs">{p.paymentMethod}</Badge></td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1.5">
-                    <Select value={p.purchaseStatus} onValueChange={v => handleStatusChange(p.id, v)}>
-                      <SelectTrigger className={`h-7 text-xs w-24 border ${STATUS_COLOR[p.purchaseStatus]}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PURCHASE_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {/* 지출전표 연결 여부 아이콘 */}
-                    {p.statementNo ? (
-                      <span title="지출전표 연결됨" className="text-emerald-600 text-sm">📄</span>
-                    ) : (
-                      <span title="지출전표 미생성" className="text-stone-300 text-sm">➕</span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(p)}>수정</Button>
-                    {/* 지출전표 생성 / 전표 보기 버튼 */}
-                    {p.statementNo ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs px-2 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
-                        onClick={() => viewLinkedExpense(p.statementNo!)}
-                        title="연결된 지출전표 보기"
-                      >
-                        <FileText className="w-3.5 h-3.5 mr-1" />전표
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs px-2 text-amber-700 hover:text-amber-800 hover:bg-amber-50"
-                        onClick={() => openExpenseModal(p)}
-                        title="지출전표 생성"
-                      >
-                        <Receipt className="w-3.5 h-3.5 mr-1" />전표생성
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(p.id)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            ) : (() => {
+              // 발주번호별 그룹화
+              const groups = new Map<string, typeof filtered>();
+              filtered.forEach(p => {
+                const key = p.orderNo || '발주번호 없음';
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key)!.push(p);
+              });
+              return Array.from(groups.entries()).map(([orderNo, groupItems]) => {
+                const isOpen = openGroups.has(orderNo);
+                const totalKrw = groupItems.reduce((s, i) => s + i.amountKrw, 0);
+                const unpurchased = groupItems.filter(i => i.purchaseStatus === '미구매').length;
+                return (
+                  <React.Fragment key={orderNo}>
+                    {/* 그룹 헤더 */}
+                    <tr
+                      className="border-b border-stone-200 bg-stone-50 cursor-pointer hover:bg-amber-50/30"
+                      onClick={() => toggleGroup(orderNo)}
+                    >
+                      <td colSpan={9} className="px-4 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-stone-400 text-xs w-3">{isOpen ? '▼' : '▶'}</span>
+                          <span className="font-mono font-semibold text-stone-700">{orderNo}</span>
+                          <span className="text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{groupItems.length}종</span>
+                          {unpurchased > 0 && (
+                            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">미구매 {unpurchased}건</span>
+                          )}
+                          <span className="text-xs text-stone-500 ml-auto">{formatKRW(totalKrw)}</span>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* 그룹 내 자재 행들 */}
+                    {isOpen && groupItems.map(p => (
+                      <tr key={p.id} className="border-b border-stone-50 hover:bg-stone-50/50">
+                        <td className="px-4 py-3 font-medium text-stone-800">{p.itemName}</td>
+                        <td className="px-4 py-3 text-stone-600">{p.vendorName || '-'}</td>
+                        <td className="px-4 py-3 text-stone-600">{p.purchaseDate}</td>
+                        <td className="px-4 py-3 text-right font-mono">{formatNumber(p.qty)} {p.unit}</td>
+                        <td className="px-4 py-3 text-right font-mono text-stone-600">{formatNumber(p.unitPriceCny, 2)} {p.currency}</td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-stone-800">{formatKRW(p.amountKrw)}</td>
+                        <td className="px-4 py-3"><Badge variant="outline" className="text-xs">{p.paymentMethod}</Badge></td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <Select value={p.purchaseStatus} onValueChange={v => handleStatusChange(p.id, v)}>
+                              <SelectTrigger className={`h-7 text-xs w-24 border ${STATUS_COLOR[p.purchaseStatus]}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PURCHASE_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            {/* 지출전표 연결 여부 아이콘 */}
+                            {p.statementNo ? (
+                              <span title="지출전표 연결됨" className="text-emerald-600 text-sm">📄</span>
+                            ) : (
+                              <span title="지출전표 미생성" className="text-stone-300 text-sm">➕</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(p)}>수정</Button>
+                            {/* 지출전표 생성 / 전표 보기 버튼 */}
+                            {p.statementNo ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs px-2 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
+                                onClick={() => viewLinkedExpense(p.statementNo!)}
+                                title="연결된 지출전표 보기"
+                              >
+                                <FileText className="w-3.5 h-3.5 mr-1" />전표
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs px-2 text-amber-700 hover:text-amber-800 hover:bg-amber-50"
+                                onClick={() => openExpenseModal(p)}
+                                title="지출전표 생성"
+                              >
+                                <Receipt className="w-3.5 h-3.5 mr-1" />전표생성
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(p.id)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                );
+              });
+            })()}
           </tbody>
         </table>
       </div>
