@@ -55,6 +55,11 @@ export default function ProductionOrders() {
   const [filterBuyer, setFilterBuyer] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterSeason, setFilterSeason] = useState('all');
+  const [filterFactory, setFilterFactory] = useState('all');
+  const [filterStyle, setFilterStyle] = useState('all');
+  const [filterDeadline, setFilterDeadline] = useState('all'); // 'all' | 'urgent' | 'week' | 'overdue'
+  const [sortBy, setSortBy] = useState('createdAt'); // 'createdAt' | 'deliveryDate' | 'orderNo'
+  const [filterExpense, setFilterExpense] = useState('all'); // 'all' | 'done' | 'none'
   const [filterUrgent, setFilterUrgent] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -285,8 +290,22 @@ export default function ProductionOrders() {
       o.styleNo.toLowerCase().includes(search.toLowerCase()) ||
       o.styleName.toLowerCase().includes(search.toLowerCase())
     );
+    // 공장 필터
+    if (filterFactory !== 'all') list = list.filter(o => o.vendorId === filterFactory || o.vendorName === filterFactory);
+    // 스타일 필터
+    if (filterStyle !== 'all') list = list.filter(o => o.styleNo === filterStyle);
+    // 납기일 상세 필터
+    if (filterDeadline === 'urgent') list = list.filter(o => { if (!o.deliveryDate) return false; const d = calcDDay(o.deliveryDate); return d >= 0 && d <= 3; });
+    if (filterDeadline === 'week') list = list.filter(o => { if (!o.deliveryDate) return false; const d = calcDDay(o.deliveryDate); return d >= 0 && d <= 7; });
+    if (filterDeadline === 'overdue') list = list.filter(o => o.deliveryDate ? calcDDay(o.deliveryDate) < 0 : false);
+    // 전표 필터
+    if (filterExpense === 'done') list = list.filter(o => !!(o as any).expenseId);
+    if (filterExpense === 'none') list = list.filter(o => !(o as any).expenseId);
+    // 정렬
+    if (sortBy === 'deliveryDate') return list.sort((a, b) => (a.deliveryDate || '9999').localeCompare(b.deliveryDate || '9999'));
+    if (sortBy === 'orderNo') return list.sort((a, b) => a.orderNo.localeCompare(b.orderNo));
     return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [orders, filterStatus, filterSeason, filterBuyer, filterUrgent, items, search]);
+  }, [orders, filterStatus, filterSeason, filterBuyer, filterFactory, filterStyle, filterDeadline, filterExpense, sortBy, filterUrgent, items, search]);
 
   const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const isAllSelected = filtered.length > 0 && filtered.every(o => selectedIds.has(o.id));
@@ -1016,6 +1035,42 @@ export default function ProductionOrders() {
         >
           🔴 납기임박
         </button>
+        {/* 공장 필터 */}
+        <Select value={filterFactory} onValueChange={setFilterFactory}>
+          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="공장" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">전체 공장</SelectItem>
+            {vendors.filter(v => v.type === '해외공장' || v.type === '공장').map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {/* 납기일 필터 */}
+        <Select value={filterDeadline} onValueChange={setFilterDeadline}>
+          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="납기" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">전체 납기</SelectItem>
+            <SelectItem value="urgent">🔴 D-3 이내</SelectItem>
+            <SelectItem value="week">🟡 D-7 이내</SelectItem>
+            <SelectItem value="overdue">⚫ 납기 초과</SelectItem>
+          </SelectContent>
+        </Select>
+        {/* 전표 필터 */}
+        <Select value={filterExpense} onValueChange={setFilterExpense}>
+          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="전표" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">전체</SelectItem>
+            <SelectItem value="done">📄 전표완료</SelectItem>
+            <SelectItem value="none">미작성</SelectItem>
+          </SelectContent>
+        </Select>
+        {/* 정렬 */}
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="정렬" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="createdAt">등록일순</SelectItem>
+            <SelectItem value="deliveryDate">납기일순</SelectItem>
+            <SelectItem value="orderNo">발주번호순</SelectItem>
+          </SelectContent>
+        </Select>
         {selectedIds.size > 0 && (
           <Button
             variant="destructive"
@@ -1067,9 +1122,10 @@ export default function ProductionOrders() {
                     <input type="checkbox" checked={selectedIds.has(o.id)} onChange={() => toggleSelect(o.id)} className="cursor-pointer" />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono font-semibold text-stone-800">{o.orderNo}</span>
                       {o.isReorder && <Badge variant="outline" className="text-[10px] h-4 text-blue-600 border-blue-200">리오더</Badge>}
+                      {(o as any).expenseId && <Badge variant="outline" className="text-[10px] h-4 text-emerald-600 border-emerald-200 bg-emerald-50">📄 전표완료</Badge>}
                     </div>
                   </td>
                   <td className="px-4 py-3">
