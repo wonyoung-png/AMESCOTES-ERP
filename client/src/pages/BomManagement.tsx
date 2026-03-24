@@ -207,6 +207,8 @@ interface PostSummary {
   customsRate: number;          // 관세율 (%)
   customsKrw: number;           // 관세금액 (KRW)
   logisticsKrw: number;         // 물류비 (KRW)
+  packagingKrw: number;         // 포장/검사비 (KRW)
+  packingKrw: number;           // 패킹재 (KRW)
   factoryUnitCostKrw: number;
   totalCostKrw: number;
 }
@@ -235,11 +237,13 @@ function calcPostSummary(bom: ExtBom, settingsUsdKrw = 1380, postColorBom?: ExtC
   const processingKrw = processingCny * rate;
   const customsKrw = processingKrw * (customsRate / 100);
   const logisticsKrw = bom.logisticsCostKrw || 0;
+  const packagingKrw = bom.packagingCostKrw || 0;
+  const packingKrw = bom.packingCostKrw || 0;
   // 공장단가 = 공장구매자재 + 임가공비 + 후가공비 (관세는 우리가 내는 것 - 제외)
   const factoryUnitCostKrw = factoryMaterialCny * rate + processingKrw + postProcessCny2 * rate;
   const factoryUnitCostCny = factoryUnitCostKrw / (rate || 1);
-  // 제품원가 = 공장단가 + 본사제공 + 물류비
-  const totalCostKrw = factoryUnitCostKrw + hqMaterialCny * rate + logisticsKrw;
+  // 제품원가 = 공장단가 + 본사제공 + 관세 + 물류비 + 포장/검사비 + 패킹재
+  const totalCostKrw = factoryUnitCostKrw + hqMaterialCny * rate + customsKrw + logisticsKrw + packagingKrw + packingKrw;
   const totalCostCny = totalCostKrw / (rate || 1);
 
   return {
@@ -259,6 +263,8 @@ function calcPostSummary(bom: ExtBom, settingsUsdKrw = 1380, postColorBom?: ExtC
     customsRate,
     customsKrw,
     logisticsKrw,
+    packagingKrw,
+    packingKrw,
     factoryUnitCostKrw,
     totalCostKrw,
   };
@@ -3811,33 +3817,7 @@ export default function BomManagement() {
                             <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">{fmtKrw((postColorBom.processingFee ?? 0) * postRate)}</td>
                             <td colSpan={3}></td>
                           </tr>
-                          {/* 관세율 */}
-                          <tr className="bg-amber-50/20 border-b border-stone-100">
-                            <td className="px-1 py-1" colSpan={3}>
-                              <span className="text-xs text-stone-500 px-2">관세율 (%)</span>
-                              <span className="text-[10px] text-stone-400 ml-1">임가공비 × 관세율</span>
-                            </td>
-                            <td className="px-1 py-1">
-                              <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="%" />
-                            </td>
-                            <td colSpan={3}></td>
-                            <td className="px-2 py-1 text-right text-xs font-semibold tabular-nums text-stone-500">{(editBom.customsRate || 0) > 0 ? `${editBom.customsRate}%` : '—'}</td>
-                            <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">{(editBom.customsRate || 0) > 0 ? fmtKrw((postColorBom.processingFee ?? 0) * postRate * ((editBom.customsRate || 0) / 100)) : '—'}</td>
-                            <td colSpan={3}></td>
-                          </tr>
-                          {/* 물류비 */}
-                          <tr className="bg-amber-50/20 border-b border-stone-100">
-                            <td className="px-1 py-1" colSpan={3}>
-                              <span className="text-xs text-stone-500 px-2">물류비 (KRW)</span>
-                              <span className="text-[10px] text-stone-400 ml-1">PCS 배분 물류비</span>
-                            </td>
-                            <td className="px-1 py-1">
-                              <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="₩" />
-                            </td>
-                            <td colSpan={4}></td>
-                            <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">{(editBom.logisticsCostKrw || 0) > 0 ? fmtKrw(editBom.logisticsCostKrw || 0) : '—'}</td>
-                            <td colSpan={3}></td>
-                          </tr>
+                          {/* 관세율/물류비 입력은 사후원가 요약 패널로 이동 */}
                         </tbody>
                       </table>
                     </div>
@@ -3868,24 +3848,35 @@ export default function BomManagement() {
                     <table className="w-full text-xs">
                       <thead><tr className="bg-stone-100 text-stone-600"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-stone-400">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
                       <tbody>
+                        {/* 1. 공장구매 자재 */}
                         <tr className="border-b border-stone-100 hover:bg-stone-50">
                           <td className="px-4 py-2 font-bold text-stone-400">자</td>
                           <td className="px-4 py-2 font-medium text-stone-700">공장구매 자재</td>
                           <td className="px-4 py-2 text-stone-400">본사제공 제외 ({postCur})</td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.factoryMaterialKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.factoryMaterialKrw)}</span></td>
                         </tr>
+                        {/* 2. 본사제공 자재 */}
                         <tr className="border-b border-stone-100 hover:bg-stone-50">
                           <td className="px-4 py-2 font-bold text-stone-400">본</td>
                           <td className="px-4 py-2 font-medium text-stone-700">본사제공 자재</td>
                           <td className="px-4 py-2 text-stone-400">본사에서 공급</td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.hqMaterialKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.hqMaterialKrw)}</span></td>
                         </tr>
+                        {/* 3. 임가공비 */}
                         <tr className="border-b border-stone-100 hover:bg-stone-50">
                           <td className="px-4 py-2 font-bold text-stone-400">공</td>
                           <td className="px-4 py-2 font-medium text-stone-700">임가공비</td>
                           <td className="px-4 py-2 text-stone-400">NET ({postCur})</td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.processingKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.processingKrw)}</span></td>
                         </tr>
+                        {/* 4. 공장단가 (amber 강조) */}
+                        <tr className="bg-amber-50 border-y border-amber-200">
+                          <td className="px-4 py-3 font-bold text-amber-600">🏭</td>
+                          <td className="px-4 py-3 font-bold text-stone-800">공장단가</td>
+                          <td className="px-4 py-3 text-stone-500 text-[11px]">공장구매자재 + 임가공 + 후가공 (관세 제외, 공장 결제금액)</td>
+                          <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">{fmtKrw(ps.factoryUnitCostKrw)}</td>
+                        </tr>
+                        {/* 5. 관세 (율 > 0일 때만) */}
                         {ps.customsRate > 0 && (
                           <tr className="border-b border-stone-100 hover:bg-stone-50">
                             <td className="px-4 py-2 font-bold text-stone-400">관</td>
@@ -3894,12 +3885,7 @@ export default function BomManagement() {
                             <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.customsKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.customsKrw)}</span></td>
                           </tr>
                         )}
-                        <tr className="bg-amber-50 border-y border-amber-200">
-                          <td className="px-4 py-3 font-bold text-amber-600">🏭</td>
-                          <td className="px-4 py-3 font-bold text-stone-800">공장단가</td>
-                          <td className="px-4 py-3 text-stone-500 text-[11px]">공장구매자재 + 임가공 + 후가공 (관세 제외, 공장 결제금액)</td>
-                          <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">{fmtKrw(ps.factoryUnitCostKrw)}</td>
-                        </tr>
+                        {/* 6. 물류비 */}
                         {ps.logisticsKrw > 0 && (
                           <tr className="border-b border-stone-100 hover:bg-stone-50">
                             <td className="px-4 py-2 font-bold text-stone-400">물</td>
@@ -3908,13 +3894,31 @@ export default function BomManagement() {
                             <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(ps.logisticsKrw)}</span></td>
                           </tr>
                         )}
-                        {/* 제품 총원가 행 (생산마진 전 실원가) */}
+                        {/* 7. 포장/검사비 (값 있을 때만) */}
+                        {ps.packagingKrw > 0 && (
+                          <tr className="border-b border-stone-100 hover:bg-stone-50">
+                            <td className="px-4 py-2 font-bold text-stone-400">포</td>
+                            <td className="px-4 py-2 font-medium text-stone-700">포장/검사비</td>
+                            <td className="px-4 py-2 text-stone-400">포장 잡비, 검사 인건비</td>
+                            <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(ps.packagingKrw)}</span></td>
+                          </tr>
+                        )}
+                        {/* 8. 패킹재 (값 있을 때만) */}
+                        {ps.packingKrw > 0 && (
+                          <tr className="border-b border-stone-100 hover:bg-stone-50">
+                            <td className="px-4 py-2 font-bold text-stone-400">패</td>
+                            <td className="px-4 py-2 font-medium text-stone-700">패킹재</td>
+                            <td className="px-4 py-2 text-stone-400">쇼핑백, 박스, 에어캡 등</td>
+                            <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(ps.packingKrw)}</span></td>
+                          </tr>
+                        )}
+                        {/* 9. 제품 총원가 (생산마진 전 실원가) */}
                         <tr className="bg-amber-50 border-y border-amber-200">
                           <td className="px-4 py-2 font-bold text-amber-600">제</td>
                           <td className="px-4 py-2 font-semibold text-amber-800" colSpan={2}>제품 총원가 <span className="text-xs text-amber-500 font-normal">(생산마진 전 실원가)</span></td>
                           <td className="px-4 py-2 text-right font-bold tabular-nums text-amber-700">{fmtKrw(ps.totalCostKrw)}</td>
                         </tr>
-                        {/* 생산마진 행 (율 > 0인 경우에만 표시) */}
+                        {/* 10. 생산마진 (율 > 0인 경우에만 표시) */}
                         {postMarginRate > 0 && (
                           <tr className="border-b border-stone-100 hover:bg-stone-50">
                             <td className="px-4 py-2 font-bold text-stone-400">마</td>
@@ -3923,6 +3927,7 @@ export default function BomManagement() {
                             <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(postProductionMarginKrw)}</span></td>
                           </tr>
                         )}
+                        {/* 11. 총원가액 */}
                         <tr className="bg-stone-800 text-white">
                           <td className="px-4 py-3 font-bold">📦</td>
                           <td className="px-4 py-3 font-bold text-base" colSpan={2}>{postMarginRate > 0 ? '총 원 가 액' : '제 품 원 가'}</td>
@@ -3956,6 +3961,28 @@ export default function BomManagement() {
                         )}
                       </tbody>
                     </table>
+                    {/* 원가 입력 필드 (관세율 / 물류비 / 포장검사비 / 패킹재) */}
+                    <div className="px-4 py-3 border-t border-stone-200 space-y-2">
+                      <p className="text-[11px] font-semibold text-stone-500 mb-1">추가 원가 입력</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-stone-600 whitespace-nowrap w-20">관세율 (%)</label>
+                          <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className="h-7 text-xs border-stone-200 text-right w-24" placeholder="%" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-stone-600 whitespace-nowrap w-20">물류비 (₩)</label>
+                          <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className="h-7 text-xs border-stone-200 text-right w-24" placeholder="₩" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-stone-600 whitespace-nowrap w-20">포장/검사비</label>
+                          <Input type="number" value={editBom.packagingCostKrw || ''} onChange={e => updateField('packagingCostKrw', Number(e.target.value))} className="h-7 text-xs border-stone-200 text-right w-24" placeholder="₩" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-stone-600 whitespace-nowrap w-20">패킹재 (₩)</label>
+                          <Input type="number" value={editBom.packingCostKrw || ''} onChange={e => updateField('packingCostKrw', Number(e.target.value))} className="h-7 text-xs border-stone-200 text-right w-24" placeholder="₩" />
+                        </div>
+                      </div>
+                    </div>
                     {/* 납품가 입력 */}
                     <div className="px-4 py-3 border-t border-stone-200 flex items-center gap-3">
                       <label className="text-xs font-semibold text-stone-700 whitespace-nowrap">납품가 (KRW)</label>
@@ -3972,6 +3999,106 @@ export default function BomManagement() {
                       />
                       {linkedItem?.deliveryPrice && linkedItem.deliveryPrice !== editBom.postDeliveryPrice && (
                         <span className="text-[10px] text-stone-400">품목마스터: {fmtKrw(linkedItem.deliveryPrice)}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 사후원가 P&L 분석 */}
+              {(() => {
+                const ps = calcPostSummary(editBom, settings.usdKrw, activePostColorBom);
+                const postMarginRate = editBom.productionMarginRate ?? 0;
+                const postTotalWithMarginKrw = ps.totalCostKrw * (1 + postMarginRate);
+                const finalCost = postMarginRate > 0 ? postTotalWithMarginKrw : ps.totalCostKrw;
+                const postPnlResult = editBom?.pnl ? calcPnl(finalCost, editBom.pnl) : null;
+                if (!editBom?.pnl || !postPnlResult) return null;
+                return (
+                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+                    <div className="px-5 py-3 border-b border-stone-100 bg-stone-800 text-white">
+                      <h2 className="text-sm font-semibold">P&L 분석 <span className="text-stone-400 text-xs font-normal ml-2">— 사후원가 [{activePostColorBom?.color}] 기준</span></h2>
+                    </div>
+                    <div className="p-5 space-y-5">
+                      <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
+                        <h3 className="text-xs font-semibold text-stone-600 mb-3">가정 (Assumptions)</h3>
+                        <div className="grid grid-cols-3 gap-4">
+                          {([
+                            { label: '할인율 (Discount)', field: 'discountRate' as keyof BomPnlAssumptions },
+                            { label: '플랫폼 수수료', field: 'platformFeeRate' as keyof BomPnlAssumptions },
+                            { label: '인건비 / 판관비', field: 'sgaRate' as keyof BomPnlAssumptions },
+                          ] as const).map(item => (
+                            <div key={item.field}>
+                              <label className="text-[11px] text-stone-500 mb-1 block">{item.label}</label>
+                              <div className="flex items-center gap-1">
+                                <Input type="number" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className="h-7 text-xs border-stone-200 text-right w-20" />
+                                <span className="text-xs text-stone-500">%</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
+                        <h3 className="text-xs font-semibold text-stone-600 mb-3">배수 분석</h3>
+                        <div className="space-y-2">
+                          {[
+                            { label: '3.5배 기준 최소 판매가', val: postPnlResult.price35 },
+                            { label: '4.0배 기준 목표 판매가', val: postPnlResult.price40 },
+                            { label: '4.5배 기준 이상적 판매가', val: postPnlResult.price45 },
+                          ].map(item => (
+                            <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-stone-200 last:border-0">
+                              <span className="text-xs text-stone-600">{item.label}</span>
+                              <span className="text-sm font-bold text-stone-800 tabular-nums">{fmtKrw(item.val)}</span>
+                            </div>
+                          ))}
+                          <div className="pt-2">
+                            <label className="text-xs font-semibold text-stone-700 mb-1.5 block">확정 판매가 — 직접 입력</label>
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <Input type="number" value={editBom.pnl.confirmedSalePrice || ''} onChange={e => updatePnl('confirmedSalePrice', e.target.value ? Number(e.target.value) : undefined)} className="h-8 text-sm border-stone-300 text-right w-40 font-semibold" placeholder="판매가 입력" />
+                              {editBom.pnl.confirmedSalePrice ? (
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className="text-stone-500">실현 배수:</span>
+                                  <span className={`font-bold ${postPnlResult.meets35x ? 'text-green-600' : 'text-red-500'}`}>{postPnlResult.actualMultiple.toFixed(2)}x</span>
+                                  {postPnlResult.meets35x
+                                    ? <span className="flex items-center gap-1 text-green-600"><CheckCircle className="w-3.5 h-3.5" /> 3.5배 달성</span>
+                                    : <span className="flex items-center gap-1 text-red-500"><AlertTriangle className="w-3.5 h-3.5" /> 원가 절감 필요: {fmtKrw(postPnlResult.costReductionNeeded)}</span>
+                                  }
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {editBom.pnl.confirmedSalePrice ? (
+                        <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
+                          <h3 className="text-xs font-semibold text-stone-600 mb-3">영업이익 분석 (P&L)</h3>
+                          <div className="space-y-1">
+                            {[
+                              { no: '①', label: '정가 (확정판매가)', desc: '', val: editBom.pnl.confirmedSalePrice, color: 'text-stone-800', bold: false },
+                              { no: '②', label: '(-) 할인', desc: `${Math.round(editBom.pnl.discountRate * 100)}%`, val: -(editBom.pnl.confirmedSalePrice * editBom.pnl.discountRate), color: 'text-red-500', bold: false },
+                              { no: '③', label: '실판가 (Net Sale)', desc: '', val: postPnlResult.netSale, color: 'text-stone-700', bold: true },
+                              { no: '④', label: '(-) 플랫폼 수수료', desc: `${Math.round(editBom.pnl.platformFeeRate * 100)}%`, val: -(postPnlResult.netSale * editBom.pnl.platformFeeRate), color: 'text-red-500', bold: false },
+                              { no: '⑤', label: '(-) 인건비 / 판관비', desc: `${Math.round(editBom.pnl.sgaRate * 100)}%`, val: -(postPnlResult.netSale * editBom.pnl.sgaRate), color: 'text-red-500', bold: false },
+                              { no: '⑥', label: '(-) 매출원가 (COGS)', desc: '총 원가액', val: -finalCost, color: 'text-red-500', bold: false },
+                              { no: '⑦', label: '영업이익', desc: '', val: postPnlResult.operatingProfit, color: postPnlResult.operatingProfit >= 0 ? 'text-green-600' : 'text-red-600', bold: true },
+                              { no: '★', label: '영업이익률', desc: '', val: null, color: postPnlResult.operatingMargin >= 0 ? 'text-green-600' : 'text-red-600', bold: true, rate: postPnlResult.operatingMargin },
+                            ].map(row => (
+                              <div key={row.no} className={`flex items-center justify-between py-1.5 px-3 rounded ${row.bold ? 'bg-white border border-stone-200' : ''}`}>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-[11px] text-stone-400 w-5">{row.no}</span>
+                                  <span className={`text-xs ${row.bold ? 'font-semibold text-stone-800' : 'text-stone-600'}`}>{row.label} <span className="text-stone-400 font-normal">{row.desc}</span></span>
+                                </div>
+                                <span className={`text-sm tabular-nums font-semibold ${row.color}`}>
+                                  {'rate' in row && row.rate !== undefined ? `${(row.rate * 100).toFixed(1)}%` : row.val !== null ? fmtKrw(row.val) : '—'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-stone-50 rounded-lg p-4 border border-dashed border-stone-300 text-center text-xs text-stone-400">
+                          <TrendingUp className="w-6 h-6 mx-auto mb-2 text-stone-300" />
+                          확정 판매가를 입력하면 영업이익 P&L 분석이 표시됩니다
+                        </div>
                       )}
                     </div>
                   </div>
