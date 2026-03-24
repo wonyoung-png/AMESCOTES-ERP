@@ -251,7 +251,7 @@ export default function MaterialMaster() {
               <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (CNY)</th>
               <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (KRW)</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">단위</th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">발주상태</th>
+              
               <th className="text-center px-3 py-3 text-xs font-medium text-stone-500">편집</th>
             </tr>
           </thead>
@@ -295,40 +295,7 @@ export default function MaterialMaster() {
                     {m.unitPriceKrw != null ? `₩${Number(m.unitPriceKrw).toLocaleString()}` : '—'}
                   </td>
                   <td className="px-3 py-2.5 text-xs text-stone-600">{m.unit}</td>
-                  <td className="px-3 py-2.5">
-                    {m.orderStatus ? (
-                      <div className="space-y-0.5">
-                        <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full border font-medium ${
-                          m.orderStatus === '발주중'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-green-50 text-green-700 border-green-200'
-                        }`}>
-                          {m.orderStatus === '발주중' ? '📦 발주중' : '✅ 입고완료'}
-                        </span>
-                        {m.orderStatus === '발주중' && m.orderQty && (
-                          <p className="text-[10px] text-stone-400 font-mono">{Number(m.orderQty).toLocaleString()} {m.unit}</p>
-                        )}
-                        {m.orderStatus === '발주중' && (
-                          <button
-                            onClick={async () => {
-                              try {
-                                await updateMaterialStatus(m.id, '입고완료');
-                                queryClient.invalidateQueries({ queryKey: ['materials'] });
-                                toast.success(`${m.name} 입고 완료 처리됐습니다`);
-                              } catch (e: any) {
-                                toast.error(`처리 실패: ${e.message}`);
-                              }
-                            }}
-                            className="text-[10px] text-green-600 underline hover:text-green-700"
-                          >
-                            입고완료 처리
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-stone-300 text-xs">—</span>
-                    )}
-                  </td>
+                  
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-center gap-1">
                       <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-stone-100 text-stone-500">
