@@ -439,8 +439,14 @@ export default function ProductionOrders() {
   const handleStyleSelect = (styleId: string) => {
     const item = items.find(i => i.id === styleId);
     if (!item) return;
-    const revision = store.getNextRevision(item.styleNo);
-    const orderNo = `${item.styleNo}-R${revision}`;
+    // Supabase orders(useQuery)에서 같은 스타일 발주 조회 → 최대 revision+1
+    const existingForStyle = (orders as any[]).filter(o => o.styleNo === item.styleNo);
+    const existingRevisions = existingForStyle.map((o: any) => {
+      const match = (o.orderNo || '').match(/-R(\d+)$/);
+      return match ? parseInt(match[1]) : 0;
+    });
+    const nextRevision = existingRevisions.length > 0 ? Math.max(...existingRevisions) + 1 : 1;
+    const orderNo = `${item.styleNo}-R${nextRevision}`;
     const bomList = boms.filter(b => b.styleId === styleId);
     const bom = bomList.sort((a, b) => b.version - a.version)[0];
 
