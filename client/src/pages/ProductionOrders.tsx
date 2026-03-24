@@ -1,7 +1,7 @@
 // AMESCOTES ERP — 생산 발주 관리 (BOM 연동)
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems, fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
+import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems, fetchMaterials, upsertMaterial, fetchPurchaseItems, upsertPurchaseItem } from '@/lib/supabaseQueries';
 import {
   store, genId, calcDDay, dDayLabel, dDayColor, formatNumber, formatKRW, normalizeColors,
   getBomForOrderFromList,
@@ -3261,12 +3261,12 @@ export default function ProductionOrders() {
                   }
 
                   queryClient.invalidateQueries({ queryKey: ['materials'] });
-                  // PurchaseMatching 탭에도 저장 (자재 구매 이력) - 중복 방지
+                  // PurchaseMatching 탭에도 저장 (자재 구매 이력) - Supabase 직접 저장, 중복 방지
                   const settings = store.getSettings();
                   // postOrderInfo.order.orderNo는 handleSave에서 finalOrderNo로 정확히 설정됨
                   const currentOrderNo = postOrderInfo?.order?.orderNo || '';
-                  const existingPurchases = store.getPurchaseItems();
-                  // 같은 발주번호+자재명으로 이미 등록된 항목 확인
+                  // Supabase에서 기존 항목 조회해 중복 방지
+                  const existingPurchases = await fetchPurchaseItems();
                   const existingKeys = new Set(
                     existingPurchases
                       .filter(p => p.orderNo === currentOrderNo)
@@ -3279,7 +3279,7 @@ export default function ProductionOrders() {
                     // 이미 같은 발주번호+자재명으로 등록됐으면 스킵
                     const key = item.materialName + '||' + item.unit;
                     if (existingKeys.has(key)) continue;
-                    store.addPurchaseItem({
+                    await upsertPurchaseItem({
                       id: genId(),
                       orderId: postOrderInfo?.order?.id || '',
                       orderNo: currentOrderNo,
@@ -3297,6 +3297,7 @@ export default function ProductionOrders() {
                       createdAt: new Date().toISOString(),
                     });
                   }
+                  queryClient.invalidateQueries({ queryKey: ['purchaseItems'] });
                   store.clearMaterialCart();  // 장바구니 비우기
                   refreshCart();
                   toast.success(`✅ ${savedCount}종 자재가 자재구매 탭에 저장되었습니다`);

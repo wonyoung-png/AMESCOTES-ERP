@@ -1,5 +1,10 @@
 // AMESCOTES ERP — 자재 구매 매칭
 import React, { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchPurchaseItems, upsertPurchaseItem, deletePurchaseItem as deletePurchaseItemSB,
+  updatePurchaseItemStatus, fetchOrders, upsertOrder,
+} from '@/lib/supabaseQueries';
 import {
   store, genId, formatKRW, formatNumber,
   type PurchaseItem, type Currency, type ExpenseType, type Expense, type ExpenseCategory,
@@ -55,7 +60,11 @@ const DEFAULT_EXPENSE_FORM: ExpenseFormState = {
 };
 
 export default function PurchaseMatching() {
-  const [purchases, setPurchases] = useState<PurchaseItem[]>(() => store.getPurchaseItems());
+  const queryClient = useQueryClient();
+  const { data: purchases = [] } = useQuery({
+    queryKey: ['purchaseItems'],
+    queryFn: fetchPurchaseItems,
+  });
   const orders = store.getOrders();
   const vendors = store.getVendors().filter(v => v.type === '자재거래처');
   const allVendors = store.getVendors();
@@ -94,41 +103,41 @@ export default function PurchaseMatching() {
     });
   };
 
-  const handleGroupStatusChange = (orderNo: string, items: PurchaseItem[], status: string) => {
-    items.forEach(item => {
-      store.updatePurchaseItem(item.id, { purchaseStatus: status as PurchaseItem['purchaseStatus'] });
+  const handleGroupStatusChange = async (orderNo: string, items: PurchaseItem[], status: string) => {
+    for (const item of items) {
+      await updatePurchaseItemStatus(item.id, status);
       if (status === '발송완료') {
-        import('@/lib/supabaseQueries').then(async m => {
-          const allOrders = await m.fetchOrders();
+        try {
+          const allOrders = await fetchOrders();
           const relatedOrder = allOrders.find((o: any) => o.orderNo === item.orderNo);
           if (relatedOrder && (relatedOrder.status === '발주생성' || !relatedOrder.status)) {
-            await m.upsertOrder({ ...relatedOrder, status: '생산중', updatedAt: new Date().toISOString() });
+            await upsertOrder({ ...relatedOrder, status: '생산중', updatedAt: new Date().toISOString() });
             store.updateOrder(relatedOrder.id, { status: '생산중' });
           } else {
             const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
             if (localOrder && localOrder.status === '발주생성') {
               store.updateOrder(localOrder.id, { status: '생산중' });
-              m.upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(() => {});
+              upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(() => {});
             }
           }
-        }).catch(() => {
+        } catch {
           const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
           if (localOrder && localOrder.status === '발주생성') {
             store.updateOrder(localOrder.id, { status: '생산중' });
           }
-        });
+        }
       }
-    });
+    }
     refresh();
     toast.success(`[${orderNo}] ${items.length}종 → ${status}로 변경됐어요`);
   };
 
-  const handleBulkDeletePurchase = () => {
+  const handleBulkDeletePurchase = async () => {
     if (!confirm(`선택한 ${selectedPurchaseIds.size}건을 삭제하시겠습니까?`)) return;
     const count = selectedPurchaseIds.size;
-    Array.from(selectedPurchaseIds).forEach(id => {
-      store.deletePurchaseItem(id);
-    });
+    for (const id of Array.from(selectedPurchaseIds)) {
+      await deletePurchaseItemSB(id);
+    }
     setSelectedPurchaseIds(new Set());
     refresh();
     toast.success(`${count}건 삭제됐어요`);
@@ -162,44 +171,9 @@ export default function PurchaseMatching() {
   const [pendingEmailItems, setPendingEmailItems] = useState<Array<CartItem & { orderQty: number }>>([]);
 
   const refreshCart = () => setCartItems(store.getMaterialCart());
-  const refresh = () => setPurchases(store.getPurchaseItems());
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['purchaseItems'] });
 
-  // 마운트 시 발주번호 동기화: Supabase 최신 발주 목록과 비교해서 orderNo 불일치 항목 업데이트
-  useEffect(() => {
-    import('@/lib/supabaseQueries').then(m => m.fetchOrders()).then((latestOrders: any[]) => {
-      const purchaseItems = store.getPurchaseItems();
-      let updated = false;
-      purchaseItems.forEach(p => {
-        if (p.orderId) {
-          const order = latestOrders.find((o: any) => o.id === p.orderId);
-          if (order && order.orderNo !== p.orderNo) {
-            store.updatePurchaseItem(p.id, { orderNo: order.orderNo });
-            updated = true;
-          }
-        }
-        // orderId가 있지만 orderNo가 없는 경우도 처리 (기존 로직 유지)
-        else if (!p.orderId && !p.orderNo) {
-          // orderId 없이 orderNo도 없는 항목은 스킵
-        }
-      });
-      if (updated) refresh();
-    }).catch(() => {
-      // Supabase 연결 실패 시 로컬 스토어로 폴백
-      const allOrders = store.getOrders();
-      const purchaseItems = store.getPurchaseItems();
-      let updated = false;
-      purchaseItems.forEach(p => {
-        if (p.orderId && !p.orderNo) {
-          const order = allOrders.find(o => o.id === p.orderId);
-          if (order) {
-            store.updatePurchaseItem(p.id, { orderNo: order.orderNo });
-            updated = true;
-          }
-        }
-      });
-      if (updated) refresh();
-    });
-  }, []);
+  // (Supabase 전환 후 orderNo 동기화 로직 불필요 - Supabase가 단일 소스)
 
   const filtered = useMemo(() => {
     let list = purchases;
@@ -245,11 +219,11 @@ export default function PurchaseMatching() {
     setForm(f => ({ ...f, qty, unitPriceCny, currency, appliedRate: rate, amountKrw }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.orderId) { toast.error('발주번호를 선택해주세요'); return; }
     if (!form.itemName) { toast.error('품목명을 입력해주세요'); return; }
     if (editId) {
-      store.updatePurchaseItem(editId, form as Partial<PurchaseItem>);
+      await upsertPurchaseItem({ ...form, id: editId });
       toast.success('수정되었습니다');
     } else {
       const p: PurchaseItem = {
@@ -272,51 +246,49 @@ export default function PurchaseMatching() {
         memo: form.memo,
         createdAt: new Date().toISOString(),
       };
-      store.addPurchaseItem(p);
+      await upsertPurchaseItem(p);
       toast.success('구매 내역이 등록되었습니다');
     }
     refresh();
     setShowModal(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('삭제하시겠습니까?')) return;
-    store.deletePurchaseItem(id);
+    await deletePurchaseItemSB(id);
     refresh();
     toast.success('삭제되었습니다');
   };
 
-  const handleStatusChange = (id: string, status: string) => {
-    store.updatePurchaseItem(id, { purchaseStatus: status as PurchaseItem['purchaseStatus'] });
+  const handleStatusChange = async (id: string, status: string) => {
+    await updatePurchaseItemStatus(id, status);
 
-    // 발송완료로 변경 시 → 해당 발주번호의 생산발주 상태를 '생산중'으로 자동 변경 (작업 3)
+    // 발송완료로 변경 시 → 해당 발주번호의 생산발주 상태를 '생산중'으로 자동 변경
     if (status === '발송완료') {
-      const item = store.getPurchaseItems().find(p => p.id === id);
+      const item = purchases.find(p => p.id === id);
       if (item?.orderNo) {
-        // Supabase에서 최신 발주 조회 후 상태 변경
-        import('@/lib/supabaseQueries').then(async m => {
-          const allOrders = await m.fetchOrders();
-          const relatedOrder = allOrders.find((o: any) => o.orderNo === item!.orderNo);
+        try {
+          const allOrders = await fetchOrders();
+          const relatedOrder = allOrders.find((o: any) => o.orderNo === item.orderNo);
           if (relatedOrder && (relatedOrder.status === '발주생성' || !relatedOrder.status)) {
-            await m.upsertOrder({ ...relatedOrder, status: '생산중', updatedAt: new Date().toISOString() });
+            await upsertOrder({ ...relatedOrder, status: '생산중', updatedAt: new Date().toISOString() });
             store.updateOrder(relatedOrder.id, { status: '생산중' });
-            toast.success(`✅ 생산발주 [${item!.orderNo}] → 생산중으로 자동 변경됐어요`);
+            toast.success(`✅ 생산발주 [${item.orderNo}] → 생산중으로 자동 변경됐어요`);
           } else {
-            // fallback: localStorage
-            const localOrder = store.getOrders().find(o => o.orderNo === item!.orderNo);
+            const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
             if (localOrder && localOrder.status === '발주생성') {
               store.updateOrder(localOrder.id, { status: '생산중' });
-              m.upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(() => {});
-              toast.success(`✅ 생산발주 [${item!.orderNo}] → 생산중으로 변경됐어요`);
+              upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(() => {});
+              toast.success(`✅ 생산발주 [${item.orderNo}] → 생산중으로 변경됐어요`);
             }
           }
-        }).catch(() => {
-          const localOrder = store.getOrders().find(o => o.orderNo === item!.orderNo);
+        } catch {
+          const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
           if (localOrder) {
             store.updateOrder(localOrder.id, { status: '생산중' });
-            toast.success(`✅ 생산발주 [${item!.orderNo}] → 생산중으로 변경됐어요`);
+            toast.success(`✅ 생산발주 [${item.orderNo}] → 생산중으로 변경됐어요`);
           }
-        });
+        }
       }
     }
 
@@ -341,7 +313,7 @@ export default function PurchaseMatching() {
     setExpenseModal(true);
   };
 
-  const handleSaveExpense = () => {
+  const handleSaveExpense = async () => {
     if (!expenseForm.description) { toast.error('내용을 입력해주세요'); return; }
     if (!expenseForm.amountKrw) { toast.error('금액을 입력해주세요'); return; }
 
@@ -375,8 +347,12 @@ export default function PurchaseMatching() {
 
     store.addExpense(expense);
 
-    // PurchaseItem의 statementNo에 expenseId 연결
-    store.updatePurchaseItem(expenseForm.purchaseItemId, { statementNo: expenseId });
+    // PurchaseItem의 statementNo에 expenseId 연결 (Supabase)
+    await upsertPurchaseItem({
+      ...purchases.find(p => p.id === expenseForm.purchaseItemId),
+      id: expenseForm.purchaseItemId,
+      statementNo: expenseId,
+    });
 
     toast.success('지출전표가 생성되었습니다');
     refresh();
@@ -398,9 +374,12 @@ export default function PurchaseMatching() {
     setLinkExpenseModal(true);
   };
 
-  const handleLinkExpense = (expenseId: string) => {
+  const handleLinkExpense = async (expenseId: string) => {
     if (!linkTargetItemId) return;
-    store.updatePurchaseItem(linkTargetItemId, { statementNo: expenseId });
+    const item = purchases.find(p => p.id === linkTargetItemId);
+    if (item) {
+      await upsertPurchaseItem({ ...item, statementNo: expenseId });
+    }
     toast.success('기존 지출전표가 연결되었습니다');
     refresh();
     setLinkExpenseModal(false);
@@ -1107,9 +1086,11 @@ export default function PurchaseMatching() {
               {/* 발주 확정 버튼 */}
               <Button
                 className="h-8 text-xs bg-green-700 hover:bg-green-800 text-white"
-                onClick={() => {
+                onClick={async () => {
                   const today = new Date().toISOString().split('T')[0];
                   let savedCount = 0;
+                  // 중복 방지: Supabase에서 기존 항목 조회
+                  const existingItems = await fetchPurchaseItems();
                   for (const item of cartItems) {
                     const stockQty = item.stockQty ?? 0;
                     const orderQty = Math.max(0, item.qty - stockQty);
@@ -1121,10 +1102,19 @@ export default function PurchaseMatching() {
                     const orderNos = [...new Set(item.orders.map(o => o.styleNo))];
                     for (const styleNo of orderNos) {
                       const matchOrder = orders.find(o => o.styleNo === styleNo);
-                      store.addPurchaseItem({
+                      const currentOrderNo = matchOrder?.orderNo || styleNo;
+                      // 중복 방지
+                      const existingKeys = new Set(
+                        existingItems
+                          .filter(p => p.orderNo === currentOrderNo)
+                          .map(p => p.itemName + '||' + p.unit)
+                      );
+                      const key = item.materialName + '||' + item.unit;
+                      if (existingKeys.has(key)) continue;
+                      await upsertPurchaseItem({
                         id: genId(),
                         orderId: matchOrder?.id || '',
-                        orderNo: matchOrder?.orderNo || styleNo,
+                        orderNo: currentOrderNo,
                         purchaseDate: today,
                         itemName: item.materialName,
                         qty: orderQty,

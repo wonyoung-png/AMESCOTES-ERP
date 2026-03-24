@@ -587,3 +587,71 @@ export async function deleteMaterial(id: string) {
   const { error } = await supabase.from('materials').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ─────────────────────────────────────────────
+// PURCHASE ITEMS
+// ─────────────────────────────────────────────
+
+export async function fetchPurchaseItems() {
+  const { data, error } = await supabase
+    .from('purchase_items')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    orderId: row.order_id || '',
+    orderNo: row.order_no || '',
+    purchaseDate: row.purchase_date || '',
+    itemName: row.item_name || '',
+    qty: row.qty || 0,
+    unit: row.unit || '',
+    unitPriceCny: row.unit_price_cny || 0,
+    currency: row.currency || 'CNY',
+    appliedRate: row.applied_rate || 191,
+    amountKrw: row.amount_krw || 0,
+    vendorId: row.vendor_id || '',
+    vendorName: row.vendor_name || '',
+    paymentMethod: row.payment_method || '기타',
+    purchaseStatus: row.purchase_status || '미발주',
+    statementNo: row.statement_no || undefined,
+    memo: row.memo || '',
+    createdAt: row.created_at || new Date().toISOString(),
+  }));
+}
+
+export async function upsertPurchaseItem(item: Record<string, any>): Promise<void> {
+  const row = {
+    id: item.id,
+    order_id: item.orderId || null,
+    order_no: item.orderNo || null,
+    purchase_date: item.purchaseDate || null,
+    item_name: item.itemName,
+    qty: item.qty || 0,
+    unit: item.unit || null,
+    unit_price_cny: item.unitPriceCny || 0,
+    currency: item.currency || 'CNY',
+    applied_rate: item.appliedRate || 191,
+    amount_krw: item.amountKrw || 0,
+    vendor_id: item.vendorId || null,
+    vendor_name: item.vendorName || null,
+    payment_method: item.paymentMethod || '기타',
+    purchase_status: item.purchaseStatus || '미발주',
+    statement_no: item.statementNo || null,
+    memo: item.memo || null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from('purchase_items').upsert(row, { onConflict: 'id' });
+  if (error) throw error;
+}
+
+export async function deletePurchaseItem(id: string): Promise<void> {
+  const { error } = await supabase.from('purchase_items').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function updatePurchaseItemStatus(id: string, status: string, extra?: Record<string, any>): Promise<void> {
+  const update: Record<string, any> = { purchase_status: status, updated_at: new Date().toISOString(), ...extra };
+  const { error } = await supabase.from('purchase_items').update(update).eq('id', id);
+  if (error) throw error;
+}
