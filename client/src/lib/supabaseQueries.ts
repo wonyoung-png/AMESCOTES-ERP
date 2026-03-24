@@ -639,7 +639,6 @@ export async function upsertPurchaseItem(item: Record<string, any>): Promise<voi
     purchase_status: item.purchaseStatus || '미발주',
     statement_no: item.statementNo || null,
     memo: item.memo || null,
-    updated_at: new Date().toISOString(),
   };
   const { error } = await supabase.from('purchase_items').upsert(row, { onConflict: 'id' });
   if (error) throw error;
@@ -651,7 +650,7 @@ export async function deletePurchaseItem(id: string): Promise<void> {
 }
 
 export async function updatePurchaseItemStatus(id: string, status: string, extra?: Record<string, any>): Promise<void> {
-  const update: Record<string, any> = { purchase_status: status, updated_at: new Date().toISOString(), ...extra };
+  const update: Record<string, any> = { purchase_status: status, ...extra };
   const { error } = await supabase.from('purchase_items').update(update).eq('id', id);
   if (error) throw error;
 }
