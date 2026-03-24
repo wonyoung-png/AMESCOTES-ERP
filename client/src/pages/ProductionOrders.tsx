@@ -186,6 +186,23 @@ export default function ProductionOrders() {
     }
   };
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const isAllSelected = filtered.length > 0 && filtered.every(o => selectedIds.has(o.id));
+  const toggleSelectAll = () => setSelectedIds(isAllSelected ? new Set() : new Set(filtered.map(o => o.id)));
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`선택한 ${selectedIds.size}건을 삭제하시겠습니까?`)) return;
+    for (const id of Array.from(selectedIds)) {
+      store.deleteOrder(id);
+      deleteOrderSB(id).catch(() => {});
+    }
+    setSelectedIds(new Set());
+    refresh();
+    toast.success(`${selectedIds.size}건 삭제됐어요`);
+  };
+
   const filtered = useMemo(() => {
     let list = orders;
     if (filterStatus !== 'all') list = list.filter(o => o.status === filterStatus);
@@ -892,6 +909,17 @@ export default function ProductionOrders() {
             {buyers.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
           </SelectContent>
         </Select>
+        {selectedIds.size > 0 && (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-9 gap-1.5"
+            onClick={handleBulkDelete}
+          >
+            <Trash2 className="w-4 h-4" />
+            선택 삭제 ({selectedIds.size}건)
+          </Button>
+        )}
       </div>
 
       {/* 테이블 (데스크탑) */}
@@ -899,6 +927,9 @@ export default function ProductionOrders() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50">
+              <th className="w-10 px-3 py-3">
+                <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} className="cursor-pointer" />
+              </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">발주번호</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">스타일</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">시즌</th>
@@ -923,7 +954,10 @@ export default function ProductionOrders() {
               const itemForOrder = items.find(i => i.styleNo === o.styleNo || i.id === o.styleId);
               const hasBom = !!o.bomId || o.bomType === 'post' || o.bomType === 'pre' || !!(itemForOrder as any)?.hasBom;
               return (
-                <tr key={o.id} className="border-b border-stone-50 hover:bg-stone-50/50">
+                <tr key={o.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${selectedIds.has(o.id) ? 'bg-amber-50/30' : ''}`}>
+                  <td className="w-10 px-3 py-3 text-center">
+                    <input type="checkbox" checked={selectedIds.has(o.id)} onChange={() => toggleSelect(o.id)} className="cursor-pointer" />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-semibold text-stone-800">{o.orderNo}</span>
