@@ -193,14 +193,30 @@ export default function PurchaseMatching() {
     if (status === '발송완료') {
       const item = store.getPurchaseItems().find(p => p.id === id);
       if (item?.orderNo) {
-        const relatedOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
-        if (relatedOrder && relatedOrder.status === '발주생성') {
-          store.updateOrder(relatedOrder.id, { status: '생산중', updatedAt: new Date().toISOString() });
-          import('@/lib/supabaseQueries').then(m => {
-            m.upsertOrder({ ...relatedOrder, status: '생산중', updatedAt: new Date().toISOString() });
-          }).catch(() => {});
-          toast.info(`생산발주 [${item.orderNo}] 상태가 "생산중"으로 자동 변경되었습니다`);
-        }
+        // Supabase에서 최신 발주 조회 후 상태 변경
+        import('@/lib/supabaseQueries').then(async m => {
+          const allOrders = await m.fetchOrders();
+          const relatedOrder = allOrders.find((o: any) => o.orderNo === item!.orderNo);
+          if (relatedOrder && (relatedOrder.status === '발주생성' || !relatedOrder.status)) {
+            await m.upsertOrder({ ...relatedOrder, status: '생산중', updatedAt: new Date().toISOString() });
+            store.updateOrder(relatedOrder.id, { status: '생산중' });
+            toast.success(`✅ 생산발주 [${item!.orderNo}] → 생산중으로 자동 변경됐어요`);
+          } else {
+            // fallback: localStorage
+            const localOrder = store.getOrders().find(o => o.orderNo === item!.orderNo);
+            if (localOrder && localOrder.status === '발주생성') {
+              store.updateOrder(localOrder.id, { status: '생산중' });
+              m.upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(() => {});
+              toast.success(`✅ 생산발주 [${item!.orderNo}] → 생산중으로 변경됐어요`);
+            }
+          }
+        }).catch(() => {
+          const localOrder = store.getOrders().find(o => o.orderNo === item!.orderNo);
+          if (localOrder) {
+            store.updateOrder(localOrder.id, { status: '생산중' });
+            toast.success(`✅ 생산발주 [${item!.orderNo}] → 생산중으로 변경됐어요`);
+          }
+        });
       }
     }
 
