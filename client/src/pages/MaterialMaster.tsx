@@ -1,7 +1,7 @@
 // AMESCOTES ERP — 자재 마스터 (Supabase 전환 완료)
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { genId, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
+import { store, genId, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
 import { fetchMaterials, upsertMaterial, deleteMaterial as deleteMaterialSB, fetchVendors, updateMaterialStatus } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
