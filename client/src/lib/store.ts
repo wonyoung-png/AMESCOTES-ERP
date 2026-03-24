@@ -679,13 +679,24 @@ export interface Settlement {
 }
 
 // ─── 지출 전표 ───
+export interface ExpenseLine {
+  id: string;
+  description: string;   // 품목명
+  qty: number;           // 수량
+  unit: string;          // 단위
+  unitPrice: number;     // 단가(KRW)
+  amountKrw: number;     // 금액 (qty * unitPrice)
+  memo?: string;
+}
+
 export interface Expense {
   id: string;
   expenseDate: string;
   expenseType: ExpenseType;
   category: ExpenseCategory;
-  description: string;
-  amountKrw: number;
+  lines?: ExpenseLine[];   // 여러 항목 (신규)
+  description: string;     // 대표 설명 (첫 번째 라인 or 수동)
+  amountKrw: number;       // lines 합산 자동 계산
   orderId?: string;
   orderNo?: string;
   vendorId?: string;

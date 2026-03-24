@@ -77,6 +77,11 @@ export default function PurchaseMatching() {
   const [expenseModal, setExpenseModal] = useState(false);
   const [expenseForm, setExpenseForm] = useState<ExpenseFormState>(DEFAULT_EXPENSE_FORM);
 
+  // 기존전표 연결 모달 상태 (작업 2)
+  const [linkExpenseModal, setLinkExpenseModal] = useState(false);
+  const [linkTargetItemId, setLinkTargetItemId] = useState<string | null>(null);
+  const [linkSearchText, setLinkSearchText] = useState('');
+
   // 자재 장바구니 모달 상태
   const [cartModal, setCartModal] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>(() => store.getMaterialCart());
@@ -178,6 +183,22 @@ export default function PurchaseMatching() {
 
   const handleStatusChange = (id: string, status: string) => {
     store.updatePurchaseItem(id, { purchaseStatus: status as PurchaseItem['purchaseStatus'] });
+
+    // 발송완료로 변경 시 → 해당 발주번호의 생산발주 상태를 '생산중'으로 자동 변경 (작업 3)
+    if (status === '발송완료') {
+      const item = store.getPurchaseItems().find(p => p.id === id);
+      if (item?.orderNo) {
+        const relatedOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
+        if (relatedOrder && relatedOrder.status === '발주생성') {
+          store.updateOrder(relatedOrder.id, { status: '생산중', updatedAt: new Date().toISOString() });
+          import('@/lib/supabaseQueries').then(m => {
+            m.upsertOrder({ ...relatedOrder, status: '생산중', updatedAt: new Date().toISOString() });
+          }).catch(() => {});
+          toast.info(`생산발주 [${item.orderNo}] 상태가 "생산중"으로 자동 변경되었습니다`);
+        }
+      }
+    }
+
     refresh();
   };
 
@@ -204,11 +225,23 @@ export default function PurchaseMatching() {
     if (!expenseForm.amountKrw) { toast.error('금액을 입력해주세요'); return; }
 
     const expenseId = genId();
+    // 자재구매 항목을 lines로 자동 구성 (작업 1)
+    const item = purchases.find(p => p.id === expenseForm.purchaseItemId);
+    const expenseLines = item ? [{
+      id: genId(),
+      description: item.itemName,
+      qty: item.qty,
+      unit: item.unit,
+      unitPrice: item.amountKrw && item.qty ? Math.round(item.amountKrw / item.qty) : 0,
+      amountKrw: item.amountKrw || expenseForm.amountKrw,
+    }] : undefined;
+
     const expense: Expense = {
       id: expenseId,
       expenseDate: expenseForm.expenseDate,
       expenseType: expenseForm.expenseType,
       category: expenseForm.category,
+      lines: expenseLines,
       description: expenseForm.description,
       amountKrw: expenseForm.amountKrw,
       orderId: expenseForm.orderId || undefined,
@@ -234,6 +267,22 @@ export default function PurchaseMatching() {
     const expense = expenses.find(e => e.id === statementNo);
     if (!expense) { toast.error('연결된 전표를 찾을 수 없습니다'); return; }
     toast.info(`전표: ${expense.description} / ${formatKRW(expense.amountKrw)} / ${expense.expenseDate}`);
+  };
+
+  // ── 기존전표 연결 (작업 2) ──────────────────────────────────
+  const openLinkExpenseModal = (itemId: string) => {
+    setLinkTargetItemId(itemId);
+    setLinkSearchText('');
+    setLinkExpenseModal(true);
+  };
+
+  const handleLinkExpense = (expenseId: string) => {
+    if (!linkTargetItemId) return;
+    store.updatePurchaseItem(linkTargetItemId, { statementNo: expenseId });
+    toast.success('기존 지출전표가 연결되었습니다');
+    refresh();
+    setLinkExpenseModal(false);
+    setLinkTargetItemId(null);
   };
 
   // 이메일 발송
@@ -418,9 +467,9 @@ export default function PurchaseMatching() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
+                          <div className="flex items-center justify-center gap-1 flex-wrap">
                             <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(p)}>수정</Button>
-                            {/* 지출전표 생성 / 전표 보기 버튼 */}
+                            {/* 지출전표 연결/생성/보기 버튼 (작업 2) */}
                             {p.statementNo ? (
                               <Button
                                 variant="ghost"
@@ -429,18 +478,29 @@ export default function PurchaseMatching() {
                                 onClick={() => viewLinkedExpense(p.statementNo!)}
                                 title="연결된 지출전표 보기"
                               >
-                                <FileText className="w-3.5 h-3.5 mr-1" />전표
+                                <FileText className="w-3.5 h-3.5 mr-1" />📄 전표 보기
                               </Button>
                             ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs px-2 text-amber-700 hover:text-amber-800 hover:bg-amber-50"
-                                onClick={() => openExpenseModal(p)}
-                                title="지출전표 생성"
-                              >
-                                <Receipt className="w-3.5 h-3.5 mr-1" />전표생성
-                              </Button>
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs px-2 text-blue-700 hover:text-blue-800 hover:bg-blue-50"
+                                  onClick={() => openLinkExpenseModal(p.id)}
+                                  title="기존 지출전표 연결"
+                                >
+                                  📄 기존전표 연결
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs px-2 text-amber-700 hover:text-amber-800 hover:bg-amber-50"
+                                  onClick={() => openExpenseModal(p)}
+                                  title="새 지출전표 생성"
+                                >
+                                  🧾 새전표 생성
+                                </Button>
+                              </>
                             )}
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(p.id)}>
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1062,6 +1122,55 @@ export default function PurchaseMatching() {
             <Button onClick={handleSaveExpense} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">
               <FileText className="w-4 h-4" />전표 저장
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 기존전표 연결 모달 (작업 2) ── */}
+      <Dialog open={linkExpenseModal} onOpenChange={setLinkExpenseModal}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              📄 기존 지출전표 연결
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Input
+              placeholder="전표 검색 (내용, 거래처, 발주번호)"
+              value={linkSearchText}
+              onChange={e => setLinkSearchText(e.target.value)}
+              className="h-9 text-sm"
+            />
+            <div className="space-y-1 max-h-80 overflow-y-auto">
+              {store.getExpenses()
+                .filter(e => {
+                  const q = linkSearchText.toLowerCase();
+                  return !q || e.description.toLowerCase().includes(q) || (e.vendorName || '').toLowerCase().includes(q) || (e.orderNo || '').toLowerCase().includes(q);
+                })
+                .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate))
+                .map(e => (
+                  <div
+                    key={e.id}
+                    className="flex items-center justify-between p-3 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"
+                    onClick={() => handleLinkExpense(e.id)}
+                  >
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <p className="text-sm font-medium text-stone-800 truncate">{e.description}</p>
+                      <p className="text-xs text-stone-500">{e.expenseDate} · {e.expenseType} · {e.vendorName || '거래처 미지정'} {e.orderNo ? `· ${e.orderNo}` : ''}</p>
+                    </div>
+                    <div className="text-right ml-3">
+                      <p className="text-sm font-semibold text-stone-800">{formatKRW(e.amountKrw)}</p>
+                      <span className="text-xs bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded">{e.category}</span>
+                    </div>
+                  </div>
+                ))}
+              {store.getExpenses().length === 0 && (
+                <p className="text-center py-8 text-stone-400 text-sm">등록된 지출전표가 없습니다</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkExpenseModal(false)}>취소</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

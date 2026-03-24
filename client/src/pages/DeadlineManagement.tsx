@@ -1,6 +1,6 @@
 // AMESCOTES ERP — 납기 관리
 import { useState, useMemo } from 'react';
-import { store, calcDDay, dDayColor, dDayLabel, formatNumber, type ProductionOrder, type OrderStatus, type MilestoneStage, type OrderMilestone } from '@/lib/store';
+import { store, calcDDay, dDayColor, dDayLabel, formatNumber, genId, type ProductionOrder, type OrderStatus, type MilestoneStage, type OrderMilestone } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,12 +41,38 @@ export default function DeadlineManagement() {
       updatePayload.status = '입고완료';
     }
     store.updateOrder(orderId, updatePayload);
-    refresh();
+
+    // 입고완료 시 → 매출관리(SalesRecord) 자동 데이터 생성 (작업 4)
     if (updatePayload.status === '입고완료') {
-      toast.success(`"${milestones[nextIdx].stage}" 완료 → 발주 상태가 "입고완료"로 자동 변경되었습니다 ✅`);
+      const order = store.getOrders().find(o => o.id === orderId);
+      if (order) {
+        const existingSales = store.getSalesRecords();
+        const alreadyExists = existingSales.some(s => s.memo?.includes(order.orderNo));
+        if (!alreadyExists) {
+          store.addSalesRecord({
+            id: genId(),
+            saleDate: today,
+            channel: '해외T/T',
+            buyerName: order.buyerId || order.vendorName || '-',
+            styleNo: order.styleNo,
+            styleName: order.styleName,
+            qty: order.qty,
+            unitPriceKrw: order.factoryUnitPriceKrw || 0,
+            totalKrw: (order.factoryUnitPriceKrw || 0) * order.qty,
+            season: order.season,
+            memo: `[납기완료 자동생성] ${order.orderNo}`,
+            createdAt: new Date().toISOString(),
+          });
+          toast.success(`"${milestones[nextIdx].stage}" 완료 → 발주 "입고완료" + 매출관리 자동 등록 ✅`);
+        } else {
+          toast.success(`"${milestones[nextIdx].stage}" 완료 → 발주 상태가 "입고완료"로 자동 변경되었습니다 ✅`);
+        }
+      }
     } else {
       toast.success(`"${milestones[nextIdx].stage}" 마일스톤 완료 처리`);
     }
+
+    refresh();
   };
 
   // Active orders: not fully completed (입고완료 status)
