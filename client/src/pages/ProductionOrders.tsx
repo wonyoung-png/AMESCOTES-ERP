@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt } from 'lucide-react';
@@ -189,6 +190,26 @@ export default function ProductionOrders() {
   };
 
   const EXPENSE_PAYMENT_METHODS: ExpenseType[] = ['법인카드', '계좌이체', '현금'];
+
+  // 기존전표 연결 모달 상태
+  const [linkExpenseModal, setLinkExpenseModal] = useState(false);
+  const [linkExpenseOrderId, setLinkExpenseOrderId] = useState<string | null>(null);
+  const [linkExpenseSearch, setLinkExpenseSearch] = useState('');
+
+  const openLinkExpenseForOrder = (order: ProductionOrder) => {
+    setLinkExpenseOrderId(order.id);
+    setLinkExpenseSearch('');
+    setLinkExpenseModal(true);
+  };
+
+  const handleLinkExpenseToOrder = (expenseId: string) => {
+    if (!linkExpenseOrderId) return;
+    store.updateOrder(linkExpenseOrderId, { expenseId });
+    queryClient.invalidateQueries({ queryKey: ['orders'] });
+    toast.success('기존 지출전표가 연결되었습니다');
+    setLinkExpenseModal(false);
+    setLinkExpenseOrderId(null);
+  };
 
   const refreshCart = () => setCartItems(store.getMaterialCart());
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -1125,50 +1146,62 @@ export default function ProductionOrders() {
                     </Select>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-1 flex-wrap">
-                      {o.tradeStatementId ? (
-                        <Badge variant="outline" className="text-[10px] h-6 px-2 text-amber-700 border-amber-300 bg-amber-50 cursor-pointer" title={`연결된 전표: ${store.getTradeStatements().find(t => t.id === o.tradeStatementId)?.statementNo || ''}`}>
-                          <FileText className="w-3 h-3 mr-1" />명세표 발행됨
-                        </Badge>
-                      ) : (
+                    <div className="flex flex-col gap-1 items-end">
+                      {/* 첫 번째 행: 명세표 + 전표 드롭다운 */}
+                      <div className="flex gap-1">
+                        {o.tradeStatementId ? (
+                          <Badge variant="outline" className="text-[10px] h-7 px-2 text-amber-700 border-amber-300 bg-amber-50 cursor-pointer" title={`연결된 전표: ${store.getTradeStatements().find(t => t.id === o.tradeStatementId)?.statementNo || ''}`}>
+                            <FileText className="w-3 h-3 mr-1" />명세표 발행됨
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-amber-700 border-amber-300 hover:bg-amber-50"
+                            onClick={() => openBillingModal(o)}
+                          >
+                            <FileText className="w-3 h-3 mr-1" />명세표 발행
+                          </Button>
+                        )}
+                        {o.status === '입고완료' && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-7 text-xs px-2 text-emerald-700 border-emerald-200 hover:bg-emerald-50">
+                                📋 전표 ▾
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openLinkExpenseForOrder(o)}>
+                                📄 기존전표 연결
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openExpenseModal(o)}>
+                                🧾 새전표 생성
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                      {/* 두 번째 행: 작업지시서 + 아이콘 버튼들 */}
+                      <div className="flex gap-1">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 px-2 text-xs text-amber-700 border-amber-300 hover:bg-amber-50"
-                          onClick={() => openBillingModal(o)}
+                          className="h-7 px-2 text-xs text-stone-600 border-stone-300 hover:bg-stone-50"
+                          onClick={() => openWorkOrderModal(o)}
+                          title="작업지시서 출력"
                         >
-                          <FileText className="w-3 h-3 mr-1" />명세표 발행
+                          <Package className="w-3 h-3 mr-1" />작업지시서
                         </Button>
-                      )}
-                      {o.status === '입고완료' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
-                          onClick={() => openExpenseModal(o)}
-                          title="지출전표 생성"
-                        >
-                          <Receipt className="w-3 h-3 mr-1" />전표생성
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowDetail(o)}>
+                          <Eye className="w-3.5 h-3.5" />
                         </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-xs text-stone-600 border-stone-300 hover:bg-stone-50"
-                        onClick={() => openWorkOrderModal(o)}
-                        title="작업지시서 출력"
-                      >
-                        <Package className="w-3 h-3 mr-1" />작업지시서
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowDetail(o)}>
-                        <Eye className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-500 hover:text-blue-600" onClick={() => openEdit(o)} title="발주 수정">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(o.id)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-500 hover:text-blue-600" onClick={() => openEdit(o)} title="발주 수정">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(o.id)}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -3185,6 +3218,55 @@ export default function ProductionOrders() {
               </Button>
               <Button variant="outline" onClick={() => setVendorOrderModal(false)}>닫기</Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 기존전표 연결 모달 ── */}
+      <Dialog open={linkExpenseModal} onOpenChange={setLinkExpenseModal}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              📄 기존 지출전표 연결
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Input
+              placeholder="전표 검색 (내용, 거래처, 발주번호)"
+              value={linkExpenseSearch}
+              onChange={e => setLinkExpenseSearch(e.target.value)}
+              className="h-9 text-sm"
+            />
+            <div className="space-y-1 max-h-80 overflow-y-auto">
+              {store.getExpenses()
+                .filter(e => {
+                  const q = linkExpenseSearch.toLowerCase();
+                  return !q || e.description.toLowerCase().includes(q) || (e.vendorName || '').toLowerCase().includes(q) || (e.orderNo || '').toLowerCase().includes(q);
+                })
+                .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate))
+                .map(e => (
+                  <div
+                    key={e.id}
+                    className="flex items-center justify-between p-3 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"
+                    onClick={() => handleLinkExpenseToOrder(e.id)}
+                  >
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <p className="text-sm font-medium text-stone-800 truncate">{e.description}</p>
+                      <p className="text-xs text-stone-500">{e.expenseDate} · {e.expenseType} · {e.vendorName || '거래처 미지정'} {e.orderNo ? `· ${e.orderNo}` : ''}</p>
+                    </div>
+                    <div className="text-right ml-3">
+                      <p className="text-sm font-semibold text-stone-800">{formatKRW(e.amountKrw)}</p>
+                      <span className="text-xs bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded">{e.category}</span>
+                    </div>
+                  </div>
+                ))}
+              {store.getExpenses().length === 0 && (
+                <p className="text-center py-8 text-stone-400 text-sm">등록된 지출전표가 없습니다</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkExpenseModal(false)}>취소</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -358,6 +358,7 @@ export interface ProductionOrder {
   postCostId?: string;
   logisticsCostId?: string;
   tradeStatementId?: string;      // 연결된 거래명세표 ID
+  expenseId?: string;             // 연결된 지출전표 ID
   deliveryDate?: string;          // 바이어 납기일 (납품 목표일)
   // BOM 연동 발주 필드
   factoryUnitPriceCny?: number;   // 공장단가 (CNY) — BOM 임가공비에서 자동 설정
