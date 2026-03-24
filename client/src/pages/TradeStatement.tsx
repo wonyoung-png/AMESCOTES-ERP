@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Search, Pencil, Trash2, FileText, X, Receipt, Printer, Download } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, FileText, X, Receipt, Printer, Download, Eye } from 'lucide-react';
 
 // 공급자 고정값 (우리 회사)
 const SUPPLIER = {
@@ -61,6 +61,9 @@ export default function TradeStatement() {
   const [isEdit, setIsEdit] = useState(false);
   const [form, setForm] = useState<Partial<TradeStatement>>({});
   const [lines, setLines] = useState<TradeStatementLine[]>([newLine()]);
+
+  // 상세보기 모달
+  const [detailStatement, setDetailStatement] = useState<TradeStatement | null>(null);
 
   // 발주에서 불러오기 모달
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -540,6 +543,9 @@ export default function TradeStatement() {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1 flex-wrap">
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-amber-700 hover:text-amber-900" onClick={() => setDetailStatement(s)}>
+                        <Eye className="w-3.5 h-3.5 mr-1" />보기
+                      </Button>
                       <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-blue-700 hover:text-blue-900" onClick={() => handlePrintStatement(s)}>
                         <Printer className="w-3.5 h-3.5 mr-1" />PDF
                       </Button>
@@ -588,6 +594,9 @@ export default function TradeStatement() {
                 </div>
               </div>
               <div className="flex items-center justify-end gap-1 mt-3">
+                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-amber-700" onClick={() => setDetailStatement(s)}>
+                  <Eye className="w-3.5 h-3.5 mr-1" />보기
+                </Button>
                 <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-blue-700" onClick={() => handlePrintStatement(s)}>
                   <Printer className="w-3.5 h-3.5 mr-1" />PDF
                 </Button>
@@ -1060,6 +1069,251 @@ export default function TradeStatement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 거래명세표 상세보기 모달 */}
+      {detailStatement && (
+        <TradeStatementDetailModal
+          statement={detailStatement}
+          vendors={vendors}
+          onClose={() => setDetailStatement(null)}
+          onSaved={() => { refresh(); setDetailStatement(null); }}
+          onPrint={handlePrintStatement}
+          onEdit={(s) => { setDetailStatement(null); openEdit(s); }}
+        />
+      )}
     </div>
+  );
+}
+
+// 거래명세표 상세 모달 (isEditing 토글)
+function TradeStatementDetailModal({
+  statement,
+  vendors,
+  onClose,
+  onSaved,
+  onPrint,
+  onEdit,
+}: {
+  statement: TradeStatement;
+  vendors: ReturnType<typeof store.getVendors>;
+  onClose: () => void;
+  onSaved: () => void;
+  onPrint: (s: TradeStatement) => void;
+  onEdit: (s: TradeStatement) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editLines, setEditLines] = useState<TradeStatementLine[]>(() => [...statement.lines]);
+
+  const updateItemPrice = (id: string, field: 'unitPrice' | 'qty', val: number) => {
+    setEditLines(prev => prev.map(l => l.id === id ? { ...l, [field]: val } : l));
+  };
+
+  const addItem = () => {
+    setEditLines(prev => [...prev, newLine()]);
+  };
+
+  const removeItem = (id: string) => {
+    if (editLines.length <= 1) { toast.error('항목은 최소 1개 이상이어야 합니다'); return; }
+    setEditLines(prev => prev.filter(l => l.id !== id));
+  };
+
+  const updateItemDesc = (id: string, val: string) => {
+    setEditLines(prev => prev.map(l => l.id === id ? { ...l, description: val } : l));
+  };
+
+  const handleSaveEdit = () => {
+    if (editLines.some(l => !l.description)) { toast.error('품목명을 모두 입력해주세요'); return; }
+    store.updateTradeStatement(statement.id, { lines: editLines });
+    toast.success('거래명세표가 수정되었습니다');
+    onSaved();
+  };
+
+  const displayLines = isEditing ? editLines : statement.lines;
+  const calc = calcStatement(displayLines);
+  const vendor = vendors.find(v => v.id === statement.vendorId);
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-amber-700" />
+            거래명세표 상세
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          {/* 헤더 정보 */}
+          <div className="grid grid-cols-2 gap-3 text-sm bg-stone-50 rounded-lg p-3">
+            <div>
+              <span className="text-stone-500 text-xs">전표번호</span>
+              <p className="font-mono font-bold text-amber-700">{statement.statementNo}</p>
+            </div>
+            <div>
+              <span className="text-stone-500 text-xs">발행일</span>
+              <p className="font-medium text-stone-800">{statement.issueDate}</p>
+            </div>
+            <div>
+              <span className="text-stone-500 text-xs">거래처</span>
+              <p className="font-medium text-stone-800">{statement.vendorName}</p>
+              {vendor?.bizRegNo && <p className="text-xs text-stone-500">사업자번호: {vendor.bizRegNo}</p>}
+            </div>
+            <div>
+              <span className="text-stone-500 text-xs">상태</span>
+              <p className="font-medium text-stone-800">{statement.status}</p>
+            </div>
+          </div>
+
+          {/* 품목 테이블 */}
+          <div className="border border-stone-200 rounded-lg overflow-hidden">
+            <div className="bg-stone-50 px-4 py-2 flex items-center justify-between border-b border-stone-200">
+              <p className="text-xs font-medium text-stone-600">품목 명세</p>
+              <div className="flex items-center gap-2">
+                {isEditing && (
+                  <Button size="sm" variant="outline" onClick={addItem} className="h-7 text-xs gap-1">
+                    <Plus className="w-3.5 h-3.5" />항목 추가
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant={isEditing ? 'default' : 'outline'}
+                  className={`h-7 text-xs gap-1 ${isEditing ? 'bg-amber-700 hover:bg-amber-800 text-white' : ''}`}
+                  onClick={() => setIsEditing(!isEditing)}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  {isEditing ? '편집 중' : '수정'}
+                </Button>
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-stone-50 border-b border-stone-100">
+                  <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">품목/내역</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-16">수량</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-28">단가</th>
+                  <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-16">세율</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">공급가</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">합계</th>
+                  {isEditing && <th className="w-8 px-2"></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {displayLines.map((line) => {
+                  const lCalc = calcLine(line);
+                  return (
+                    <tr key={line.id} className="border-b border-stone-50">
+                      <td className="px-2 py-1.5">
+                        {isEditing ? (
+                          <input
+                            value={line.description}
+                            onChange={e => updateItemDesc(line.id, e.target.value)}
+                            className="h-8 text-sm border border-stone-200 rounded px-2 w-full"
+                            placeholder="품목명"
+                          />
+                        ) : (
+                          <span className="text-stone-800">{line.description}</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={line.qty}
+                            onChange={e => updateItemPrice(line.id, 'qty', parseInt(e.target.value) || 1)}
+                            className="h-8 text-sm text-right border border-stone-200 rounded px-2 w-16"
+                            min={1}
+                          />
+                        ) : (
+                          <span className="text-right block text-stone-700">{formatNumber(line.qty)}</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={line.unitPrice}
+                            onChange={e => updateItemPrice(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                            className="h-8 text-sm text-right border border-stone-200 rounded px-2 w-28"
+                            min={0}
+                          />
+                        ) : (
+                          <span className={`text-right block ${line.unitPrice === 0 ? 'text-red-400 italic' : 'text-stone-700'}`}>
+                            {line.unitPrice === 0 ? '0 (미입력)' : formatKRW(line.unitPrice)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5 text-center text-xs text-stone-500">{line.taxType}</td>
+                      <td className="px-3 py-1.5 text-right text-sm text-stone-700 font-mono">{formatKRW(lCalc.supply)}</td>
+                      <td className="px-3 py-1.5 text-right text-sm font-semibold text-stone-800 font-mono">{formatKRW(lCalc.total)}</td>
+                      {isEditing && (
+                        <td className="px-2 py-1.5">
+                          <button
+                            className="text-stone-400 hover:text-red-500"
+                            onClick={() => removeItem(line.id)}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 합계 */}
+          <div className="bg-amber-50 rounded-lg p-3 space-y-1.5 text-sm">
+            <div className="flex justify-between text-stone-600">
+              <span>과세 공급가액</span>
+              <span className="font-mono">{formatKRW(calc.taxableSupply)}</span>
+            </div>
+            {calc.exemptAmount > 0 && (
+              <div className="flex justify-between text-stone-600">
+                <span>면세 공급가액</span>
+                <span className="font-mono">{formatKRW(calc.exemptAmount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-stone-600">
+              <span>부가세 (10%)</span>
+              <span className="font-mono">{formatKRW(calc.taxableVat)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-stone-800 text-base pt-1 border-t border-amber-200">
+              <span>합계</span>
+              <span className="font-mono text-amber-900">{formatKRW(calc.grandTotal)}</span>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 flex-wrap">
+          <Button variant="outline" onClick={onClose}>닫기</Button>
+          <Button
+            variant="outline"
+            className="gap-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+            onClick={() => onPrint(statement)}
+          >
+            <Printer className="w-4 h-4" />PDF 출력
+          </Button>
+          {isEditing ? (
+            <>
+              <Button variant="outline" onClick={() => { setIsEditing(false); setEditLines([...statement.lines]); }}>
+                취소
+              </Button>
+              <Button onClick={handleSaveEdit} className="bg-amber-700 hover:bg-amber-800 text-white">
+                수정 저장
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="outline"
+              className="gap-1"
+              onClick={() => onEdit(statement)}
+            >
+              <Pencil className="w-4 h-4" />전체 수정
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Plus, Trash2, CreditCard, Banknote, Building2, FileText } from 'lucide-react';
+import { Plus, Trash2, CreditCard, Banknote, Building2, FileText, Eye, Printer } from 'lucide-react';
 
 const EXPENSE_TYPES: ExpenseType[] = ['법인카드', '계좌이체', '현금'];
 const EXPENSE_CATEGORIES: ExpenseCategory[] = ['자재구매', '물류비', '샘플비', '임가공비', '기타제조원가', '판관비', '기타'];
@@ -52,6 +52,317 @@ const newLine = (): ExpenseLine => ({
   amountKrw: 0,
 });
 
+// 지출전표 상세 모달 컴포넌트
+function ExpenseDetailModal({
+  expense,
+  onClose,
+  onSaved,
+  onPrintTradeStatement,
+}: {
+  expense: Expense;
+  onClose: () => void;
+  onSaved: () => void;
+  onPrintTradeStatement: (expense: Expense) => void;
+}) {
+  const getInitialLines = (e: Expense): ExpenseLine[] => {
+    if (e.lines && e.lines.length > 0) return [...e.lines];
+    // lines 없는 기존 전표: description/amountKrw를 첫 번째 line으로 변환
+    return [{
+      id: genId(),
+      description: e.description,
+      qty: 1,
+      unit: '개',
+      unitPrice: e.amountKrw,
+      amountKrw: e.amountKrw,
+    }];
+  };
+
+  const [detailLines, setDetailLines] = useState<ExpenseLine[]>(() => getInitialLines(expense));
+
+  const updateDetailLine = (id: string, field: keyof ExpenseLine, value: string | number) => {
+    setDetailLines(prev => prev.map(l => {
+      if (l.id !== id) return l;
+      const updated = { ...l, [field]: value };
+      if (field === 'qty' || field === 'unitPrice') {
+        updated.amountKrw = updated.qty * updated.unitPrice;
+      }
+      if (field === 'amountKrw') {
+        updated.amountKrw = Number(value);
+      }
+      return updated;
+    }));
+  };
+
+  const addDetailLine = () => setDetailLines(prev => [...prev, newLine()]);
+  const removeDetailLine = (id: string) => {
+    if (detailLines.length <= 1) { toast.error('항목은 최소 1개 이상이어야 합니다'); return; }
+    setDetailLines(prev => prev.filter(l => l.id !== id));
+  };
+
+  const detailTotal = useMemo(() => detailLines.reduce((s, l) => s + l.amountKrw, 0), [detailLines]);
+  const supplyAmount = Math.round(detailTotal / 1.1);
+  const taxAmount = detailTotal - supplyAmount;
+
+  const handleDetailSave = () => {
+    if (detailLines.some(l => !l.description)) {
+      toast.error('품목명을 모두 입력해주세요');
+      return;
+    }
+    store.updateExpense(expense.id, {
+      lines: detailLines,
+      description: detailLines[0].description,
+      amountKrw: detailTotal,
+    });
+    onSaved();
+    toast.success('전표가 수정되었습니다');
+    onClose();
+  };
+
+  // 전표번호 생성 (간단 포맷)
+  const expenseNo = `EXP-${expense.expenseDate.replace(/-/g, '')}-${expense.id.slice(-3).toUpperCase()}`;
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-amber-700" />
+            지출전표 상세
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* 헤더 정보 */}
+        <div className="space-y-3 py-2">
+          <div className="grid grid-cols-2 gap-3 text-sm bg-stone-50 rounded-lg p-3">
+            <div>
+              <span className="text-stone-500 text-xs">전표번호</span>
+              <p className="font-mono font-bold text-amber-700">{expenseNo}</p>
+            </div>
+            <div>
+              <span className="text-stone-500 text-xs">발주번호</span>
+              <p className="font-medium text-stone-800">{expense.orderNo || '-'}</p>
+            </div>
+            <div>
+              <span className="text-stone-500 text-xs">거래처</span>
+              <p className="font-medium text-stone-800">{expense.vendorName || '-'}</p>
+            </div>
+            <div>
+              <span className="text-stone-500 text-xs">카테고리</span>
+              <p className="font-medium text-stone-800">{expense.category}</p>
+            </div>
+            <div>
+              <span className="text-stone-500 text-xs">결제방법</span>
+              <p className="font-medium text-stone-800">{expense.expenseType}</p>
+            </div>
+            <div>
+              <span className="text-stone-500 text-xs">날짜</span>
+              <p className="font-medium text-stone-800">{expense.expenseDate}</p>
+            </div>
+          </div>
+
+          {/* 품목 테이블 - 편집 가능 */}
+          <div className="border border-stone-200 rounded-lg overflow-hidden">
+            <div className="bg-stone-50 px-4 py-2 flex items-center justify-between border-b border-stone-200">
+              <p className="text-xs font-medium text-stone-600">품목/내역</p>
+              <Button size="sm" variant="outline" onClick={addDetailLine} className="h-7 text-xs gap-1">
+                <Plus className="w-3.5 h-3.5" />항목 추가
+              </Button>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-stone-50 border-b border-stone-100">
+                  <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">품목/내역</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-16">수량</th>
+                  <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-14">단위</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">단가</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">금액</th>
+                  <th className="w-8 px-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {detailLines.map((line) => (
+                  <tr key={line.id} className="border-b border-stone-50">
+                    <td className="px-2 py-1.5">
+                      <Input
+                        value={line.description}
+                        onChange={e => updateDetailLine(line.id, 'description', e.target.value)}
+                        placeholder="품목명"
+                        className="h-8 text-sm"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <Input
+                        type="number"
+                        value={line.qty}
+                        onChange={e => updateDetailLine(line.id, 'qty', parseFloat(e.target.value) || 0)}
+                        className="h-8 text-sm text-right w-16"
+                        min={0}
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <Input
+                        value={line.unit}
+                        onChange={e => updateDetailLine(line.id, 'unit', e.target.value)}
+                        className="h-8 text-sm text-center w-14"
+                        placeholder="개"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <Input
+                        type="number"
+                        value={line.unitPrice}
+                        onChange={e => updateDetailLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                        className="h-8 text-sm text-right w-24"
+                        min={0}
+                      />
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-sm font-medium text-stone-700">
+                      {formatKRW(line.amountKrw)}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-stone-400 hover:text-red-500"
+                        onClick={() => removeDetailLine(line.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 합계 */}
+          <div className="bg-amber-50 rounded-lg p-3 space-y-1.5 text-sm">
+            <div className="flex justify-between text-stone-600">
+              <span>공급가액</span>
+              <span className="font-mono">{formatKRW(supplyAmount)}</span>
+            </div>
+            <div className="flex justify-between text-stone-600">
+              <span>세액 (10%)</span>
+              <span className="font-mono">{formatKRW(taxAmount)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-stone-800 text-base pt-1 border-t border-amber-200">
+              <span>합계</span>
+              <span className="font-mono text-amber-900">{formatKRW(detailTotal)}</span>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose}>닫기</Button>
+          <Button
+            variant="outline"
+            className="gap-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+            onClick={() => onPrintTradeStatement(expense)}
+          >
+            <Printer className="w-4 h-4" />거래명세표 출력
+          </Button>
+          <Button onClick={handleDetailSave} className="bg-amber-700 hover:bg-amber-800 text-white">
+            수정 저장
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// 거래명세표 출력 (지출전표 기반)
+function printExpenseTradeStatement(expense: Expense) {
+  const printWin = window.open('', '_blank', 'width=800,height=900');
+  if (!printWin) { toast.error('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.'); return; }
+
+  const lines = expense.lines && expense.lines.length > 0
+    ? expense.lines
+    : [{ id: '', description: expense.description, qty: 1, unit: '식', unitPrice: expense.amountKrw, amountKrw: expense.amountKrw }];
+
+  const total = lines.reduce((s, l) => s + l.amountKrw, 0);
+  const supplyAmount = Math.round(total / 1.1);
+  const taxAmount = total - supplyAmount;
+
+  const rows = lines.map(l => `
+    <tr>
+      <td>${l.description}</td>
+      <td style="text-align:center">${l.qty}</td>
+      <td style="text-align:center">${l.unit}</td>
+      <td style="text-align:right">${l.unitPrice.toLocaleString()}</td>
+      <td style="text-align:right">${l.amountKrw.toLocaleString()}</td>
+    </tr>
+  `).join('');
+
+  const expenseNo = `EXP-${expense.expenseDate.replace(/-/g, '')}-${expense.id.slice(-3).toUpperCase()}`;
+
+  printWin.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>거래명세표 ${expenseNo}</title>
+      <style>
+        body { font-family: 'Malgun Gothic', sans-serif; font-size: 12px; padding: 20px; }
+        h2 { text-align: center; font-size: 20px; margin-bottom: 20px; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .info-box { border: 1px solid #ddd; padding: 10px; border-radius: 4px; }
+        .info-box h4 { margin: 0 0 8px; font-size: 11px; color: #666; }
+        .info-box p { margin: 2px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
+        th { background: #f5f5f5; text-align: center; }
+        .total-section { margin-top: 16px; text-align: right; }
+        .total-section table { width: 300px; margin-left: auto; }
+        @media print { body { margin: 0; } }
+      </style>
+    </head>
+    <body>
+      <h2>거래명세표 (지출전표)</h2>
+      <div style="text-align:right; margin-bottom:8px; color:#666; font-size:11px;">
+        전표번호: <strong>${expenseNo}</strong> &nbsp;|&nbsp; 날짜: ${expense.expenseDate}
+      </div>
+      <div class="info-grid">
+        <div class="info-box">
+          <h4>공급자</h4>
+          <p><strong>(주)아메스코테스</strong></p>
+          <p>사업자번호: 343-88-01791</p>
+          <p>대표자: 이원영</p>
+        </div>
+        <div class="info-box">
+          <h4>공급받는자 (거래처)</h4>
+          <p><strong>${expense.vendorName || '-'}</strong></p>
+          <p>발주번호: ${expense.orderNo || '-'}</p>
+          <p>결제방법: ${expense.expenseType}</p>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>품목/내역</th>
+            <th>수량</th>
+            <th>단위</th>
+            <th>단가</th>
+            <th>금액</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+      <div class="total-section">
+        <table>
+          <tr><td>공급가액</td><td style="text-align:right">${supplyAmount.toLocaleString()}원</td></tr>
+          <tr><td>세액(10%)</td><td style="text-align:right">${taxAmount.toLocaleString()}원</td></tr>
+          <tr style="font-weight:bold;background:#fef3c7"><td>합계</td><td style="text-align:right">${total.toLocaleString()}원</td></tr>
+        </table>
+      </div>
+      <script>window.onload = function() { window.print(); };</script>
+    </body>
+    </html>
+  `);
+  printWin.document.close();
+}
+
 export default function ExpenseEntry() {
   const [expenses, setExpenses] = useState<Expense[]>(() => store.getExpenses());
   const [showModal, setShowModal] = useState(false);
@@ -59,6 +370,9 @@ export default function ExpenseEntry() {
   const [lines, setLines] = useState<ExpenseLine[]>([newLine()]);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterCat, setFilterCat] = useState<string>('all');
+
+  // 상세보기 모달 상태
+  const [detailExpense, setDetailExpense] = useState<Expense | null>(null);
 
   const refresh = () => setExpenses(store.getExpenses());
 
@@ -213,7 +527,11 @@ export default function ExpenseEntry() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={10} className="text-center py-12 text-stone-400 text-sm">등록된 전표가 없습니다</td></tr>
               ) : filtered.map(e => (
-                <tr key={e.id} className="border-b border-stone-50 hover:bg-stone-50/50">
+                <tr
+                  key={e.id}
+                  className="border-b border-stone-50 hover:bg-stone-50/50 cursor-pointer"
+                  onClick={() => setDetailExpense(e)}
+                >
                   <td className="px-4 py-3 text-stone-600">{e.expenseDate}</td>
                   <td className="px-4 py-3">
                     <Badge variant="outline" className={`text-xs gap-1 ${TYPE_COLOR[e.expenseType]}`}>
@@ -237,10 +555,21 @@ export default function ExpenseEntry() {
                       : <span className="text-stone-300 text-xs">-</span>}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-stone-800">{formatKRW(e.amountKrw)}</td>
-                  <td className="px-4 py-3">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(e.id)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                  <td className="px-4 py-3" onClick={ev => ev.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-amber-700 hover:text-amber-900"
+                        onClick={() => setDetailExpense(e)}
+                        title="상세보기"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(e.id)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -248,6 +577,16 @@ export default function ExpenseEntry() {
           </table>
         </div>
       </div>
+
+      {/* 전표 상세 모달 */}
+      {detailExpense && (
+        <ExpenseDetailModal
+          expense={detailExpense}
+          onClose={() => setDetailExpense(null)}
+          onSaved={() => { refresh(); setDetailExpense(null); }}
+          onPrintTradeStatement={printExpenseTradeStatement}
+        />
+      )}
 
       {/* 전표 등록 모달 */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
