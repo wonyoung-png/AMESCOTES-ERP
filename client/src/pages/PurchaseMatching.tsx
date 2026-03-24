@@ -65,7 +65,7 @@ export default function PurchaseMatching() {
     queryKey: ['purchaseItems'],
     queryFn: fetchPurchaseItems,
   });
-  const orders = store.getOrders();
+  const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
   const vendors = store.getVendors().filter(v => v.type === '자재거래처');
   const allVendors = store.getVendors();
   const settings = store.getSettings();
