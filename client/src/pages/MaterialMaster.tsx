@@ -279,6 +279,9 @@ export default function MaterialMaster() {
                       {m.category}
                     </span>
                   </td>
+                  <td className="px-3 py-2.5 w-16">
+                    <span className="font-mono text-xs bg-stone-100 px-2 py-0.5 rounded text-stone-600">{(m as any).itemCode || '—'}</span>
+                  </td>
                   <td className="px-3 py-2.5">
                     <p className="font-medium text-stone-800">{m.name}</p>
                     {m.nameEn && <p className="text-xs text-stone-400">{m.nameEn}</p>}
@@ -382,7 +385,10 @@ export default function MaterialMaster() {
             {/* 카테고리 */}
             <div className="space-y-1.5">
               <Label>카테고리 *</Label>
-              <Select value={form.category || '원자재'} onValueChange={v => setForm(prev => ({ ...prev, category: v as MaterialCategory }))}>
+              <Select value={form.category || '원자재'} onValueChange={v => {
+                const newCode = !editId ? store.getNextItemCode(v as MaterialCategory) : form.itemCode;
+                setForm(prev => ({ ...prev, category: v as MaterialCategory, itemCode: newCode || prev.itemCode }));
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {MATERIAL_CATEGORIES.map(c => (
@@ -394,6 +400,15 @@ export default function MaterialMaster() {
               </Select>
             </div>
 
+            {/* 품번 */}
+            <div className="space-y-1.5">
+              <Label>품번</Label>
+              <div className="flex gap-2">
+                <Input value={form.itemCode || ''} onChange={e => setForm(prev => ({ ...prev, itemCode: e.target.value }))} placeholder="M01" className="w-24 font-mono" />
+                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setForm(prev => ({ ...prev, itemCode: store.getNextItemCode(prev.category as any || '원자재') }))}>자동생성</Button>
+                <span className="text-xs text-stone-400 self-center">카테고리별 자동: M01, Z01, H01...</span>
+              </div>
+            </div>
             {/* 자재명 */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
