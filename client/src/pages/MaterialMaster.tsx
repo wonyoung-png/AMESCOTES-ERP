@@ -1,8 +1,8 @@
 // AMESCOTES ERP — 자재 마스터
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { store, genId, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
-import { fetchMaterials, upsertMaterial, deleteMaterial as deleteMaterialSB, fetchVendors } from '@/lib/supabaseQueries';
+import { fetchVendors } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,9 +44,7 @@ const emptyForm: Partial<Material> = {
 };
 
 export default function MaterialMaster() {
-  const queryClient = useQueryClient();
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
-  const setMaterials = (_v: Material[]) => {}; // no-op
+  const [materials, setMaterials] = useState<Material[]>(() => store.getMaterials());
   const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const vendors = allVendors.filter((v: Vendor) => v.type === '자재거래처');
   const [search, setSearch] = useState('');
@@ -57,7 +55,7 @@ export default function MaterialMaster() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['materials'] });
+  const refresh = () => setMaterials([...store.getMaterials()]);
 
   // 마운트 시 + 발주 확정 이벤트 시 자동 갱신
   useEffect(() => {
@@ -129,20 +127,25 @@ export default function MaterialMaster() {
           memo: form.memo,
           createdAt: new Date().toISOString(),
         };
-    upsertMaterial(matData)
-      .then(() => {
-        toast.success(editId ? '자재가 수정되었습니다' : '자재가 등록되었습니다');
-        setShowModal(false);
-        refresh();
-      })
-      .catch((e: Error) => toast.error(`저장 실패: ${e.message}`));
+    try {
+      if (editId) {
+        store.updateMaterial(editId, matData as Partial<Material>);
+      } else {
+        store.addMaterial(matData as Material);
+      }
+      toast.success(editId ? '자재가 수정되었습니다' : '자재가 등록되었습니다');
+      setShowModal(false);
+      refresh();
+    } catch (e: any) {
+      toast.error(`저장 실패: ${e.message}`);
+    }
   };
 
   const handleDelete = (id: string) => {
     if (!confirm('삭제하시겠습니까?')) return;
-    deleteMaterialSB(id)
-      .then(() => { refresh(); toast.success('삭제되었습니다'); })
-      .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
+    store.deleteMaterial(id);
+    refresh();
+    toast.success('삭제되었습니다');
   };
 
   // 체크박스 다중 선택 관련
@@ -171,9 +174,10 @@ export default function MaterialMaster() {
     if (selectedIds.size === 0) return;
     if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
       const count = selectedIds.size;
-      Promise.all([...selectedIds].map(id => deleteMaterialSB(id)))
-        .then(() => { setSelectedIds(new Set()); refresh(); toast.success(`${count}개 항목이 삭제되었습니다`); })
-        .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
+      [...selectedIds].forEach(id => store.deleteMaterial(id));
+      setSelectedIds(new Set());
+      refresh();
+      toast.success(`${count}개 항목이 삭제되었습니다`);
     }
   };
 
