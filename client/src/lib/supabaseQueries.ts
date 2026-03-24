@@ -164,8 +164,10 @@ const TABLE_COLUMNS: Record<string, string[]> = {
                       'order_no', 'vendor_name', 'factory_unit_price_krw', 'color_qtys',
                       'delivery_date', 'style_id', 'revision',
                       'created_at', 'updated_at'],
-  materials: ['id', 'name', 'spec', 'unit', 'unit_price', 'currency', 'vendor_id',
-              'category', 'stock_qty', 'memo', 'created_at', 'updated_at'],
+  materials: ['id', 'name', 'name_en', 'spec', 'unit', 'unit_price', 'unit_price_cny', 'unit_price_krw',
+              'currency', 'vendor_id', 'category', 'stock_qty', 'memo',
+              'order_status', 'order_date', 'order_qty', 'order_vendor_name',
+              'created_at', 'updated_at'],
 };
 
 function filterForTable(table: string, row: Record<string, any>): Record<string, any> {
@@ -513,39 +515,52 @@ export async function fetchMaterials() {
   return (data || []).map((row: any) => ({
     id: row.id,
     name: row.name ?? '',
-    nameEn: row.name_en,
-    category: row.category ?? '원자재',
-    spec: row.spec,
-    unit: row.unit ?? 'EA',
+    nameEn: row.name_en || '',
+    category: row.category || '원자재',
+    spec: row.spec || '',
+    unit: row.unit || 'YD',
     unitPriceCny: row.unit_price_cny,
-    unitPriceUsd: row.unit_price_usd,
-    unitPriceKrw: row.unit_price_krw ?? row.unit_price,
-    priceCurrency: row.price_currency ?? 'CNY',
-    vendorId: row.vendor_id,
-    imageUrl: row.image_url,
-    memo: row.memo,
-    orderStatus: row.order_status,
-    orderDate: row.order_date,
-    orderQty: row.order_qty,
-    orderVendorName: row.order_vendor_name,
+    unitPriceKrw: row.unit_price_krw,
+    stockQty: row.stock_qty || 0,
+    vendorId: row.vendor_id || '',
+    memo: row.memo || '',
+    orderStatus: row.order_status || undefined,
+    orderDate: row.order_date || undefined,
+    orderQty: row.order_qty || undefined,
+    orderVendorName: row.order_vendor_name || undefined,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
   }));
 }
 
-export async function upsertMaterial(material: Record<string, any>) {
-  const row = filterForTable('materials', {
-    id: material.id,
-    name: material.name,
-    spec: material.spec,
-    unit: material.unit,
-    unit_price: material.unitPriceKrw ?? material.unitPriceCny ?? 0,
-    currency: material.priceCurrency ?? 'CNY',
-    vendor_id: material.vendorId,
-    category: material.category,
-    stock_qty: material.stockQty,
-    memo: material.memo,
-  });
-  const { error } = await supabase.from('materials').upsert(row);
+export async function upsertMaterial(mat: Record<string, any>): Promise<void> {
+  const row: Record<string, any> = {
+    id: mat.id,
+    name: mat.name,
+    unit: mat.unit,
+    category: mat.category || '원자재',
+    updated_at: new Date().toISOString(),
+  };
+  if (mat.spec !== undefined) row.spec = mat.spec || null;
+  if (mat.nameEn !== undefined) row.name_en = mat.nameEn || null;
+  if (mat.unitPriceCny !== undefined) row.unit_price_cny = mat.unitPriceCny;
+  if (mat.unitPriceKrw !== undefined) row.unit_price_krw = mat.unitPriceKrw;
+  if (mat.stockQty !== undefined) row.stock_qty = mat.stockQty;
+  if (mat.vendorId !== undefined) row.vendor_id = mat.vendorId || null;
+  if (mat.memo !== undefined) row.memo = mat.memo || null;
+  if (mat.orderStatus !== undefined) row.order_status = mat.orderStatus || null;
+  if (mat.orderDate !== undefined) row.order_date = mat.orderDate || null;
+  if (mat.orderQty !== undefined) row.order_qty = mat.orderQty;
+  if (mat.orderVendorName !== undefined) row.order_vendor_name = mat.orderVendorName || null;
+  if (!mat.id) row.created_at = mat.createdAt || new Date().toISOString();
+
+  const { error } = await supabase.from('materials').upsert(row, { onConflict: 'id' });
+  if (error) throw error;
+}
+
+export async function updateMaterialStatus(id: string, status: '발주중' | '입고완료', extra?: Record<string, any>): Promise<void> {
+  const update: Record<string, any> = { order_status: status, updated_at: new Date().toISOString(), ...extra };
+  const { error } = await supabase.from('materials').update(update).eq('id', id);
   if (error) throw error;
 }
 

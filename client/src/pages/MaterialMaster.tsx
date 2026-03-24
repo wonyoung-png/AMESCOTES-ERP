@@ -1,15 +1,14 @@
-// AMESCOTES ERP — 자재 마스터
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { store, genId, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
-import { fetchVendors } from '@/lib/supabaseQueries';
+// AMESCOTES ERP — 자재 마스터 (Supabase 전환 완료)
+import { useState, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { genId, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
+import { fetchMaterials, upsertMaterial, deleteMaterial as deleteMaterialSB, fetchVendors, updateMaterialStatus } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Search, Pencil, Trash2, Package } from 'lucide-react';
 
@@ -40,11 +39,12 @@ const CATEGORY_COLOR: Record<MaterialCategory, string> = {
 
 const emptyForm: Partial<Material> = {
   name: '', nameEn: '', category: '원자재', spec: '', unit: 'YD',
-  unitPriceCny: undefined, unitPriceUsd: undefined, unitPriceKrw: undefined, priceCurrency: 'CNY' as 'CNY'|'USD'|'KRW', vendorId: '', memo: '',
+  unitPriceCny: undefined, unitPriceKrw: undefined, vendorId: '', memo: '',
 };
 
 export default function MaterialMaster() {
-  const [materials, setMaterials] = useState<Material[]>(() => store.getMaterials());
+  const queryClient = useQueryClient();
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
   const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const vendors = allVendors.filter((v: Vendor) => v.type === '자재거래처');
   const [search, setSearch] = useState('');
@@ -55,28 +55,15 @@ export default function MaterialMaster() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const refresh = () => setMaterials([...store.getMaterials()]);
-
-  // 마운트 시 + 발주 확정 이벤트 시 자동 갱신
-  useEffect(() => {
-    const handler = () => refresh();
-    window.addEventListener('materials-updated', handler);
-    window.addEventListener('focus', handler);
-    return () => {
-      window.removeEventListener('materials-updated', handler);
-      window.removeEventListener('focus', handler);
-    };
-  }, []);
-
   const filtered = useMemo(() => {
-    let list = materials;
-    if (filterCat !== 'all') list = list.filter(m => m.category === filterCat);
-    if (search) list = list.filter(m =>
+    let list = materials as any[];
+    if (filterCat !== 'all') list = list.filter((m: any) => m.category === filterCat);
+    if (search) list = list.filter((m: any) =>
       m.name.toLowerCase().includes(search.toLowerCase()) ||
       (m.nameEn || '').toLowerCase().includes(search.toLowerCase()) ||
       (m.spec || '').toLowerCase().includes(search.toLowerCase())
     );
-    return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return list;
   }, [materials, filterCat, search]);
 
   const openNew = () => {
@@ -86,7 +73,7 @@ export default function MaterialMaster() {
     setShowModal(true);
   };
 
-  const openEdit = (m: Material) => {
+  const openEdit = (m: any) => {
     setForm({ ...m });
     setPreviewImage(m.imageUrl || null);
     setEditId(m.id);
@@ -105,59 +92,47 @@ export default function MaterialMaster() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name?.trim()) { toast.error('자재명을 입력하세요'); return; }
     if (!form.unit) { toast.error('단위를 입력하세요'); return; }
 
-    const matData = editId
-      ? { id: editId, ...form }
-      : {
-          id: genId(),
-          name: form.name!,
-          nameEn: form.nameEn,
-          category: form.category || '원자재',
-          spec: form.spec,
-          unit: form.unit!,
-          unitPriceCny: form.unitPriceCny,
-          unitPriceUsd: form.unitPriceUsd,
-          unitPriceKrw: form.unitPriceKrw,
-          priceCurrency: form.priceCurrency,
-          vendorId: form.vendorId,
-          imageUrl: form.imageUrl,
-          memo: form.memo,
-          createdAt: new Date().toISOString(),
-        };
+    const mat = {
+      ...form,
+      id: editId || genId(),
+      createdAt: new Date().toISOString(),
+    };
+
     try {
-      if (editId) {
-        store.updateMaterial(editId, matData as Partial<Material>);
-      } else {
-        store.addMaterial(matData as Material);
-      }
+      await upsertMaterial(mat);
+      queryClient.invalidateQueries({ queryKey: ['materials'] });
       toast.success(editId ? '자재가 수정되었습니다' : '자재가 등록되었습니다');
       setShowModal(false);
-      refresh();
     } catch (e: any) {
       toast.error(`저장 실패: ${e.message}`);
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('삭제하시겠습니까?')) return;
-    store.deleteMaterial(id);
-    refresh();
-    toast.success('삭제되었습니다');
+    try {
+      await deleteMaterialSB(id);
+      queryClient.invalidateQueries({ queryKey: ['materials'] });
+      toast.success('삭제되었습니다');
+    } catch (e: any) {
+      toast.error(`삭제 실패: ${e.message}`);
+    }
   };
 
   // 체크박스 다중 선택 관련
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const isAllSelected = filtered.length > 0 && filtered.every(m => selectedIds.has(m.id));
-  const isIndeterminate = filtered.some(m => selectedIds.has(m.id)) && !isAllSelected;
+  const isAllSelected = filtered.length > 0 && filtered.every((m: any) => selectedIds.has(m.id));
+  const isIndeterminate = filtered.some((m: any) => selectedIds.has(m.id)) && !isAllSelected;
 
   const toggleSelectAll = () => {
     if (isAllSelected) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filtered.map(m => m.id)));
+      setSelectedIds(new Set(filtered.map((m: any) => m.id)));
     }
   };
 
@@ -170,20 +145,24 @@ export default function MaterialMaster() {
     });
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
       const count = selectedIds.size;
-      [...selectedIds].forEach(id => store.deleteMaterial(id));
-      setSelectedIds(new Set());
-      refresh();
-      toast.success(`${count}개 항목이 삭제되었습니다`);
+      try {
+        await Promise.all([...selectedIds].map(id => deleteMaterialSB(id)));
+        setSelectedIds(new Set());
+        queryClient.invalidateQueries({ queryKey: ['materials'] });
+        toast.success(`${count}개 항목이 삭제되었습니다`);
+      } catch (e: any) {
+        toast.error(`삭제 실패: ${e.message}`);
+      }
     }
   };
 
   const catCounts = useMemo(() => {
     const map: Record<string, number> = {};
-    materials.forEach(m => { map[m.category] = (map[m.category] || 0) + 1; });
+    (materials as any[]).forEach((m: any) => { map[m.category] = (map[m.category] || 0) + 1; });
     return map;
   }, [materials]);
 
@@ -205,7 +184,7 @@ export default function MaterialMaster() {
           onClick={() => setFilterCat('all')}
           className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${filterCat === 'all' ? 'bg-stone-800 text-white border-stone-800' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'}`}
         >
-          전체 ({materials.length})
+          전체 ({(materials as any[]).length})
         </button>
         {MATERIAL_CATEGORIES.map(cat => (
           <button
@@ -257,12 +236,10 @@ export default function MaterialMaster() {
                   className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
                 />
               </th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-stone-500 w-12">이미지</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">카테고리</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">자재명</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">스펙</th>
               <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (CNY)</th>
-              <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (USD)</th>
               <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (KRW)</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">단위</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">발주상태</th>
@@ -272,95 +249,87 @@ export default function MaterialMaster() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center py-12 text-stone-400">
+                <td colSpan={9} className="text-center py-12 text-stone-400">
                   <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">등록된 자재가 없습니다</p>
                 </td>
               </tr>
-            ) : filtered.map(m => {
-  const isChecked = selectedIds.has(m.id);
-  return (
-              <tr key={m.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${isChecked ? 'bg-amber-50/60' : ''}`}>
-                <td className="px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => toggleSelect(m.id)}
-                    className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
-                  />
-                </td>
-                <td className="px-3 py-2.5">
-                  {m.imageUrl ? (
-                    <img src={m.imageUrl} alt={m.name} className="w-10 h-10 object-cover rounded-lg border border-stone-200" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center text-lg">
-                      {CATEGORY_ICON[m.category]}
+            ) : filtered.map((m: any) => {
+              const isChecked = selectedIds.has(m.id);
+              return (
+                <tr key={m.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${isChecked ? 'bg-amber-50/60' : ''}`}>
+                  <td className="px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleSelect(m.id)}
+                      className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
+                    />
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${CATEGORY_COLOR[m.category as MaterialCategory] || 'bg-stone-50 text-stone-600 border-stone-200'}`}>
+                      {m.category}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <p className="font-medium text-stone-800">{m.name}</p>
+                    {m.nameEn && <p className="text-xs text-stone-400">{m.nameEn}</p>}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-stone-500">{m.spec || '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-xs text-stone-700">
+                    {m.unitPriceCny != null ? `¥${Number(m.unitPriceCny).toFixed(2)}` : '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-mono text-xs text-stone-700">
+                    {m.unitPriceKrw != null ? `₩${Number(m.unitPriceKrw).toLocaleString()}` : '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-stone-600">{m.unit}</td>
+                  <td className="px-3 py-2.5">
+                    {m.orderStatus ? (
+                      <div className="space-y-0.5">
+                        <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+                          m.orderStatus === '발주중'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-green-50 text-green-700 border-green-200'
+                        }`}>
+                          {m.orderStatus === '발주중' ? '📦 발주중' : '✅ 입고완료'}
+                        </span>
+                        {m.orderStatus === '발주중' && m.orderQty && (
+                          <p className="text-[10px] text-stone-400 font-mono">{Number(m.orderQty).toLocaleString()} {m.unit}</p>
+                        )}
+                        {m.orderStatus === '발주중' && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await updateMaterialStatus(m.id, '입고완료');
+                                queryClient.invalidateQueries({ queryKey: ['materials'] });
+                                toast.success(`${m.name} 입고 완료 처리됐습니다`);
+                              } catch (e: any) {
+                                toast.error(`처리 실패: ${e.message}`);
+                              }
+                            }}
+                            className="text-[10px] text-green-600 underline hover:text-green-700"
+                          >
+                            입고완료 처리
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-stone-300 text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-stone-100 text-stone-500">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => handleDelete(m.id)} className="p-1.5 rounded hover:bg-red-50 text-stone-400 hover:text-red-500">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                  )}
-                </td>
-                <td className="px-3 py-2.5">
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${CATEGORY_COLOR[m.category]}`}>
-                    {m.category}
-                  </span>
-                </td>
-                <td className="px-3 py-2.5">
-                  <p className="font-medium text-stone-800">{m.name}</p>
-                  {m.nameEn && <p className="text-xs text-stone-400">{m.nameEn}</p>}
-                </td>
-                <td className="px-3 py-2.5 text-xs text-stone-500">{m.spec || '—'}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-xs text-stone-700">
-                  {m.unitPriceCny != null ? `¥${m.unitPriceCny.toFixed(2)}` : '—'}
-                </td>
-                <td className="text-right px-3 py-2.5 text-sm text-stone-600">
-                  {m.unitPriceUsd != null ? `$${m.unitPriceUsd.toFixed(2)}` : '—'}
-                </td>
-                <td className="px-3 py-2.5 text-right font-mono text-xs text-stone-700">
-                  {m.unitPriceKrw != null ? `₩${m.unitPriceKrw.toLocaleString()}` : '—'}
-                </td>
-                <td className="px-3 py-2.5 text-xs text-stone-600">{m.unit}</td>
-                <td className="px-3 py-2.5">
-                  {m.orderStatus ? (
-                    <div className="space-y-0.5">
-                      <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full border font-medium ${
-                        m.orderStatus === '발주중'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                          : 'bg-green-50 text-green-700 border-green-200'
-                      }`}>
-                        {m.orderStatus === '발주중' ? '📦 발주중' : '✅ 입고완료'}
-                      </span>
-                      {m.orderStatus === '발주중' && m.orderQty && (
-                        <p className="text-[10px] text-stone-400 font-mono">{m.orderQty.toLocaleString()} {m.unit}</p>
-                      )}
-                      {m.orderStatus === '발주중' && (
-                        <button
-                          onClick={() => {
-                            store.updateMaterial(m.id, { orderStatus: '입고완료' });
-                            refresh();
-                            toast.success(`${m.name} 입고 완료 처리됐습니다`);
-                          }}
-                          className="text-[10px] text-green-600 underline hover:text-green-700"
-                        >
-                          입고완료 처리
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-stone-300 text-xs">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center justify-center gap-1">
-                    <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-stone-100 text-stone-500">
-                      <Pencil size={14} />
-                    </button>
-                    <button onClick={() => handleDelete(m.id)} className="p-1.5 rounded hover:bg-red-50 text-stone-400 hover:text-red-500">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-  );
-})}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -384,7 +353,7 @@ export default function MaterialMaster() {
                   {previewImage ? (
                     <img src={previewImage} alt="미리보기" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-3xl">{CATEGORY_ICON[form.category || '원자재']}</span>
+                    <span className="text-3xl">{CATEGORY_ICON[form.category as MaterialCategory || '원자재']}</span>
                   )}
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -463,7 +432,7 @@ export default function MaterialMaster() {
                 <SelectTrigger><SelectValue placeholder="공급업체 선택" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">선택 없음</SelectItem>
-                  {vendors.filter(v => v.id && v.id.trim() !== '').map(v => (
+                  {vendors.filter((v: any) => v.id && v.id.trim() !== '').map((v: any) => (
                     <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                   ))}
                 </SelectContent>

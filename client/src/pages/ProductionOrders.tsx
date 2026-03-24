@@ -1,7 +1,7 @@
 // AMESCOTES ERP — 생산 발주 관리 (BOM 연동)
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems } from '@/lib/supabaseQueries';
+import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems, fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
 import {
   store, genId, calcDDay, dDayLabel, dDayColor, formatNumber, formatKRW, normalizeColors,
   getBomForOrderFromList,
@@ -2968,52 +2968,38 @@ export default function ProductionOrders() {
               {/* 발주 확정 버튼 */}
               <Button
                 className="h-8 text-xs bg-green-700 hover:bg-green-800 text-white"
-                onClick={() => {
-                  const grouped = new Map<string, Array<CartItem & { orderQty: number }>>();
+                onClick={async () => {
+                  const existingMaterials = await fetchMaterials();
+                  let savedCount = 0;
+                  const today = new Date().toISOString().split('T')[0];
+
                   for (const item of cartItems) {
                     const stockQty = item.stockQty ?? 0;
                     const orderQty = Math.max(0, item.qty - stockQty);
                     if (orderQty === 0) continue;
                     const vendor = item.vendorName || '미지정';
-                    if (!grouped.has(vendor)) grouped.set(vendor, []);
-                    grouped.get(vendor)!.push({ ...item, orderQty });
+
+                    const existing = existingMaterials.find((m: any) =>
+                      m.name === item.materialName && m.unit === item.unit
+                    );
+                    await upsertMaterial({
+                      id: existing?.id || genId(),
+                      name: item.materialName,
+                      spec: item.spec || '',
+                      unit: item.unit,
+                      category: '원자재',
+                      orderStatus: '발주중',
+                      orderDate: today,
+                      orderQty: orderQty,
+                      orderVendorName: vendor,
+                      vendorId: allVendors.find((v: any) => v.name === vendor && v.type === '자재거래처')?.id,
+                      createdAt: (existing as any)?.createdAt || new Date().toISOString(),
+                    });
+                    savedCount++;
                   }
-                  let savedCount = 0;
-                  const today = new Date().toISOString().split('T')[0];
-                  for (const [vendor, items] of grouped.entries()) {
-                    for (const item of items) {
-                      const existingMaterials = store.getMaterials();
-                      const existing = existingMaterials.find(m =>
-                        m.name === item.materialName && m.unit === item.unit
-                      );
-                      if (existing) {
-                        store.updateMaterial(existing.id, {
-                          orderStatus: '발주중',
-                          orderDate: today,
-                          orderQty: item.orderQty,
-                          orderVendorName: vendor,
-                        });
-                      } else {
-                        store.addMaterial({
-                          id: genId(),
-                          name: item.materialName,
-                          spec: item.spec,
-                          unit: item.unit,
-                          category: '원자재',
-                          orderStatus: '발주중',
-                          orderDate: today,
-                          orderQty: item.orderQty,
-                          orderVendorName: vendor,
-                          vendorId: allVendors.find(v => v.name === vendor && v.type === '자재거래처')?.id,
-                          createdAt: new Date().toISOString(),
-                        });
-                      }
-                      savedCount++;
-                    }
-                  }
+
+                  queryClient.invalidateQueries({ queryKey: ['materials'] });
                   toast.success(`✅ ${savedCount}종 자재가 자재구매 탭에 저장되었습니다`);
-                  // 자재구매 탭 갱신 이벤트
-                  window.dispatchEvent(new Event('materials-updated'));
                   setVendorOrderModal(false);
                 }}
               >
