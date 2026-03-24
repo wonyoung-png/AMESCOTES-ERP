@@ -1,5 +1,5 @@
 // AMESCOTES ERP — 자재 구매 매칭
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   store, genId, formatKRW, formatNumber,
   type PurchaseItem, type Currency, type ExpenseType, type Expense, type ExpenseCategory,
@@ -163,6 +163,23 @@ export default function PurchaseMatching() {
 
   const refreshCart = () => setCartItems(store.getMaterialCart());
   const refresh = () => setPurchases(store.getPurchaseItems());
+
+  // 마운트 시 발주번호 동기화: orderId가 있지만 orderNo가 없는 항목에 orderNo 채우기
+  useEffect(() => {
+    const allOrders = store.getOrders();
+    const purchaseItems = store.getPurchaseItems();
+    let updated = false;
+    purchaseItems.forEach(p => {
+      if (p.orderId && !p.orderNo) {
+        const order = allOrders.find(o => o.id === p.orderId);
+        if (order) {
+          store.updatePurchaseItem(p.id, { orderNo: order.orderNo });
+          updated = true;
+        }
+      }
+    });
+    if (updated) refresh();
+  }, []);
 
   const filtered = useMemo(() => {
     let list = purchases;
@@ -487,6 +504,7 @@ export default function PurchaseMatching() {
                   className="cursor-pointer"
                 />
               </th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">발주번호</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">품목명</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">공급업체</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">구매일</th>
@@ -501,7 +519,7 @@ export default function PurchaseMatching() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={10} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={11} className="text-center py-12 text-stone-400">
                 <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 구매 내역이 없습니다</p>
               </td></tr>
@@ -535,7 +553,7 @@ export default function PurchaseMatching() {
                           className="cursor-pointer"
                         />
                       </td>
-                      <td colSpan={9} className="px-4 py-2.5">
+                      <td colSpan={10} className="px-4 py-2.5">
                         <div className="flex items-center gap-3 flex-wrap">
                           <span className="text-stone-400 text-xs w-3">{isOpen ? '▼' : '▶'}</span>
                           <span className="font-mono font-semibold text-stone-700">{orderNo}</span>
@@ -572,6 +590,7 @@ export default function PurchaseMatching() {
                             className="cursor-pointer"
                           />
                         </td>
+                        <td className="px-4 py-3 font-mono text-xs text-stone-500">{p.orderNo || '-'}</td>
                         <td className="px-4 py-3 font-medium text-stone-800">{p.itemName}</td>
                         <td className="px-4 py-3 text-stone-600">{p.vendorName || '-'}</td>
                         <td className="px-4 py-3 text-stone-600">{p.purchaseDate}</td>

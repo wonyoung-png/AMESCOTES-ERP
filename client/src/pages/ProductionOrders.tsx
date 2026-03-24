@@ -3246,7 +3246,10 @@ export default function ProductionOrders() {
                   queryClient.invalidateQueries({ queryKey: ['materials'] });
                   // PurchaseMatching 탭에도 저장 (자재 구매 이력) - 중복 방지
                   const settings = store.getSettings();
-                  const currentOrderNo = postOrderInfo?.order?.orderNo || '';
+                  // 최신 발주번호 가져오기 (postOrderInfo가 오래된 정보를 참조할 수 있으므로)
+                  const latestOrders = await fetchOrders();
+                  const currentOrder = latestOrders.find((o: any) => o.id === postOrderInfo?.order?.id);
+                  const currentOrderNo = currentOrder?.orderNo || postOrderInfo?.order?.orderNo || '';
                   const existingPurchases = store.getPurchaseItems();
                   // 같은 발주번호+자재명으로 이미 등록된 항목 확인
                   const existingKeys = new Set(
