@@ -7,7 +7,7 @@ import { useLocation, Link } from 'wouter';
 import { store } from '@/lib/store';
 import { getCurrentUser, logout } from '@/lib/auth';
 import {
-  BarChart3, Package, ClipboardList, FlaskConical, Factory, CalendarClock,
+  BarChart3, Package, ClipboardList, FlaskConical, Factory,
   ShoppingCart, Building2, FileText, Receipt, CreditCard, Settings,
   ChevronLeft, ChevronRight, TrendingUp, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal,
@@ -45,7 +45,6 @@ const navGroups: NavGroup[] = [
       { path: '/materials', label: '자재 마스터', icon: <Layers size={17} /> },
       { path: '/bom', label: 'BOM / 원가 관리', icon: <ClipboardList size={17} /> },
       { path: '/orders', label: '생산 발주', icon: <Factory size={17} /> },
-      { path: '/deadline', label: '납기 관리', icon: <CalendarClock size={17} /> },
     ]
   },
   {

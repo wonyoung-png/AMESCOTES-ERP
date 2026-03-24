@@ -8,6 +8,7 @@ import {
   type ProductionOrder, type OrderStatus, type Season, type Item, type Bom,
   type HqSupplyItem, type ColorQty, type CartItem,
   type TradeStatement, type TradeStatementLine,
+  type ExpenseType, type ExpenseCategory, type Expense,
 } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 const ORDER_STATUSES: OrderStatus[] = ['발주생성', '생산중', '입고완료'];
@@ -53,6 +54,7 @@ export default function ProductionOrders() {
   const [filterBuyer, setFilterBuyer] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterSeason, setFilterSeason] = useState('all');
+  const [filterUrgent, setFilterUrgent] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editOrderId, setEditOrderId] = useState<string | null>(null);
@@ -130,6 +132,64 @@ export default function ProductionOrders() {
   const [pendingEmailVendor, setPendingEmailVendor] = useState<string>('');
   const [pendingEmailItems, setPendingEmailItems] = useState<Array<CartItem & { orderQty: number }>>([]);
 
+  // 입고완료 전표생성 모달 상태
+  const [expenseModal, setExpenseModal] = useState(false);
+  const [expenseForm, setExpenseForm] = useState<{
+    orderId: string; orderNo: string; styleNo: string;
+    description: string; amountKrw: number; expenseDate: string;
+    expenseType: ExpenseType; category: ExpenseCategory;
+    vendorName: string; hasTaxInvoice: boolean; memo: string;
+  }>({
+    orderId: '', orderNo: '', styleNo: '',
+    description: '', amountKrw: 0,
+    expenseDate: new Date().toISOString().split('T')[0],
+    expenseType: '계좌이체', category: '임가공비',
+    vendorName: '', hasTaxInvoice: false, memo: '',
+  });
+
+  const openExpenseModal = (order: ProductionOrder) => {
+    const totalAmt = (order.factoryUnitPriceKrw || 0) * order.qty;
+    setExpenseForm({
+      orderId: order.id,
+      orderNo: order.orderNo,
+      styleNo: order.styleNo,
+      description: `[생산발주] ${order.orderNo} — ${order.styleName || order.styleNo} ${order.qty.toLocaleString()}PCS`,
+      amountKrw: totalAmt,
+      expenseDate: order.receivedDate || new Date().toISOString().split('T')[0],
+      expenseType: '계좌이체',
+      category: '임가공비',
+      vendorName: order.vendorName || '',
+      hasTaxInvoice: false,
+      memo: `스타일: ${order.styleNo} / 수량: ${order.qty.toLocaleString()}PCS / 단가: ${order.factoryUnitPriceKrw ? formatKRW(order.factoryUnitPriceKrw) : '-'}`,
+    });
+    setExpenseModal(true);
+  };
+
+  const handleSaveExpense = () => {
+    if (!expenseForm.description) { toast.error('내용을 입력해주세요'); return; }
+    if (!expenseForm.amountKrw) { toast.error('금액을 입력해주세요'); return; }
+    const expenseId = genId();
+    const expense: Expense = {
+      id: expenseId,
+      expenseDate: expenseForm.expenseDate,
+      expenseType: expenseForm.expenseType,
+      category: expenseForm.category,
+      description: expenseForm.description,
+      amountKrw: expenseForm.amountKrw,
+      orderId: expenseForm.orderId || undefined,
+      orderNo: expenseForm.orderNo || undefined,
+      vendorName: expenseForm.vendorName || undefined,
+      hasTaxInvoice: expenseForm.hasTaxInvoice,
+      memo: expenseForm.memo || undefined,
+      createdAt: new Date().toISOString(),
+    };
+    store.addExpense(expense);
+    toast.success('지출전표가 생성되었습니다');
+    setExpenseModal(false);
+  };
+
+  const EXPENSE_PAYMENT_METHODS: ExpenseType[] = ['법인카드', '계좌이체', '현금'];
+
   const refreshCart = () => setCartItems(store.getMaterialCart());
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['orders'] });
 
@@ -196,13 +256,16 @@ export default function ProductionOrders() {
       const buyerStyleIds = items.filter(i => i.buyerId === filterBuyer).map(i => i.id);
       list = list.filter(o => buyerStyleIds.includes(o.styleId));
     }
+    if (filterUrgent) {
+      list = list.filter(o => o.deliveryDate && calcDDay(o.deliveryDate) <= 7 && o.status !== '입고완료');
+    }
     if (search) list = list.filter(o =>
       o.orderNo.toLowerCase().includes(search.toLowerCase()) ||
       o.styleNo.toLowerCase().includes(search.toLowerCase()) ||
       o.styleName.toLowerCase().includes(search.toLowerCase())
     );
     return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [orders, filterStatus, filterSeason, filterBuyer, items, search]);
+  }, [orders, filterStatus, filterSeason, filterBuyer, filterUrgent, items, search]);
 
   const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const isAllSelected = filtered.length > 0 && filtered.every(o => selectedIds.has(o.id));
@@ -613,8 +676,14 @@ export default function ProductionOrders() {
     setPostOrderInfo({ order, bomMaterials });
     setPostOrderModal(true);
 
-    if (newColorCount > 0) {
-      toast.success(`발주 등록 완료 · 새 컬러 ${newColorCount}개가 품목 마스터에 추가됨`);
+    {
+      // 새 컬러 개수 계산 후 토스트
+      const _currentItem = (items as Item[]).find((i: any) => i.id === form.styleId);
+      const _existingColorNames = normalizeColors(_currentItem?.colors || []).map(c => c.name);
+      const _newColorCount = colorQtys.filter(cq => cq.color.trim() && !_existingColorNames.includes(cq.color.trim())).length;
+      if (_newColorCount > 0) {
+        toast.success(`발주 등록 완료 · 새 컬러 ${_newColorCount}개가 품목 마스터에 추가됨`);
+      }
     }
   };
 
@@ -791,6 +860,16 @@ export default function ProductionOrders() {
     return factories;
   }, [factories, bomCalc.manufacturingCountry]);
 
+  // 브랜드명 가져오기 (items → buyerId → vendors)
+  const getBrandName = (order: ProductionOrder) => {
+    const item = items.find(i => i.styleNo === order.styleNo || i.id === order.styleId);
+    if (item?.buyerId) {
+      const vendor = allVendors.find(v => v.id === item.buyerId);
+      return vendor?.name || '';
+    }
+    return '';
+  };
+
   // 현재 발주 수량 (컬러별 합계 또는 직접 입력)
   const currentQty = colorQtys.length > 0
     ? colorQtys.reduce((s, c) => s + c.qty, 0)
@@ -910,6 +989,12 @@ export default function ProductionOrders() {
             {buyers.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
           </SelectContent>
         </Select>
+        <button
+          onClick={() => setFilterUrgent(v => !v)}
+          className={`h-9 px-3 rounded-lg border text-xs font-medium transition-colors ${filterUrgent ? 'bg-red-50 border-red-300 text-red-700' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
+        >
+          🔴 납기임박
+        </button>
         {selectedIds.size > 0 && (
           <Button
             variant="destructive"
@@ -933,6 +1018,7 @@ export default function ProductionOrders() {
               </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">발주번호</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">스타일</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">브랜드</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">시즌</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">수량</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">공장 / 공장단가</th>
@@ -945,7 +1031,7 @@ export default function ProductionOrders() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={11} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={12} className="text-center py-12 text-stone-400">
                 <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 발주가 없습니다</p>
               </td></tr>
@@ -974,14 +1060,21 @@ export default function ProductionOrders() {
                       </span>
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs text-stone-600 font-medium">{getBrandName(o) || <span className="text-stone-300">-</span>}</span>
+                  </td>
                   <td className="px-4 py-3"><Badge variant="outline" className="text-xs">{o.season}</Badge></td>
                   <td className="px-4 py-3 text-right">
                     <p className="font-mono text-stone-700">{formatNumber(o.qty)}</p>
                     {(o.colorQtys || []).length > 0 && (
                       <div className="flex flex-wrap gap-1 justify-end mt-1">
                         {(o.colorQtys || []).map((cq, i) => (
-                          <span key={i} className="text-[10px] px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded">
-                            {cq.color} {cq.qty}
+                          <span
+                            key={i}
+                            className={`text-[10px] px-1.5 py-0.5 rounded cursor-default ${cq.memo ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-stone-100 text-stone-600'}`}
+                            title={cq.memo ? `📝 ${cq.memo}` : undefined}
+                          >
+                            {cq.color} {cq.qty}{cq.memo ? ' 📝' : ''}
                           </span>
                         ))}
                       </div>
@@ -1045,6 +1138,17 @@ export default function ProductionOrders() {
                           onClick={() => openBillingModal(o)}
                         >
                           <FileText className="w-3 h-3 mr-1" />명세표 발행
+                        </Button>
+                      )}
+                      {o.status === '입고완료' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                          onClick={() => openExpenseModal(o)}
+                          title="지출전표 생성"
+                        >
+                          <Receipt className="w-3 h-3 mr-1" />전표생성
                         </Button>
                       )}
                       <Button
@@ -1146,6 +1250,16 @@ export default function ProductionOrders() {
                 </SelectContent>
               </Select>
               {isEditMode && <p className="text-xs text-stone-400">※ 수정 모드에서는 스타일 변경 불가 (납기일, 수량, 공장단가, 메모 수정 가능)</p>}
+              {form.styleId && (() => {
+                const existingOrdersForStyle = (orders as ProductionOrder[]).filter(o => o.styleNo === form.styleNo && (!isEditMode || o.id !== editOrderId));
+                const existingCount = existingOrdersForStyle.length;
+                return existingCount > 0 ? (
+                  <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700 flex items-center gap-1.5">
+                    <span>🔄</span>
+                    <span>이 스타일 기존 발주 <strong>{existingCount}건</strong> 있음 (리오더)</span>
+                  </div>
+                ) : null;
+              })()}
               {form.orderNo && (
                 <div className={`p-3 rounded-lg border ${bomCalc.hasBomWarning ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
                   <div className="flex items-center justify-between">
@@ -1335,6 +1449,16 @@ export default function ProductionOrders() {
                             >
                               <Trash2 className="w-3 h-3" />
                             </Button>
+                          </div>
+                          {/* 컬러별 메모/상세 입력 */}
+                          <div className="ml-2 flex items-center gap-1.5">
+                            <span className="text-[10px] text-stone-400 shrink-0">메모:</span>
+                            <Input
+                              className="flex-1 h-7 text-xs text-stone-600"
+                              placeholder="주의사항/특이사항 (선택)"
+                              value={cq.memo || ''}
+                              onChange={e => setColorQtys(prev => prev.map((c, i) => i === idx ? { ...c, memo: e.target.value } : c))}
+                            />
                           </div>
                           {/* 컬러 상세정보 (품목 마스터 연동) */}
                           {masterColor2 && (masterColor2.leatherColor || masterColor2.decorColor || masterColor2.threadColor || masterColor2.girimaeColor) && (
@@ -3061,6 +3185,112 @@ export default function ProductionOrders() {
               </Button>
               <Button variant="outline" onClick={() => setVendorOrderModal(false)}>닫기</Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 입고완료 전표생성 모달 ── */}
+      <Dialog open={expenseModal} onOpenChange={setExpenseModal}>
+        <DialogContent className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-green-700" />
+              지출전표 생성 — 입고완료
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5 col-span-2">
+                <Label>내용 *</Label>
+                <Input
+                  value={expenseForm.description}
+                  onChange={e => setExpenseForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="지출 내용"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>날짜</Label>
+                <Input
+                  type="date"
+                  value={expenseForm.expenseDate}
+                  onChange={e => setExpenseForm(f => ({ ...f, expenseDate: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>카테고리</Label>
+                <Select value={expenseForm.category} onValueChange={v => setExpenseForm(f => ({ ...f, category: v as ExpenseCategory }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(['임가공비', '자재구매', '물류비', '샘플비', '기타제조원가', '판관비', '기타'] as ExpenseCategory[]).map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>금액 (KRW) *</Label>
+                <Input
+                  type="number"
+                  value={expenseForm.amountKrw || ''}
+                  onChange={e => setExpenseForm(f => ({ ...f, amountKrw: parseInt(e.target.value) || 0 }))}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>결제 방법</Label>
+                <Select value={expenseForm.expenseType} onValueChange={v => setExpenseForm(f => ({ ...f, expenseType: v as ExpenseType }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {EXPENSE_PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>발주번호</Label>
+                <div className="h-9 flex items-center px-3 bg-stone-50 rounded border border-stone-200 text-sm font-mono text-stone-600">
+                  {expenseForm.orderNo || '-'}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>거래처명 (공장)</Label>
+                <Input
+                  value={expenseForm.vendorName}
+                  onChange={e => setExpenseForm(f => ({ ...f, vendorName: e.target.value }))}
+                  placeholder="공장명"
+                />
+              </div>
+              <div className="space-y-1.5 col-span-2">
+                <Label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={expenseForm.hasTaxInvoice}
+                    onChange={e => setExpenseForm(f => ({ ...f, hasTaxInvoice: e.target.checked }))}
+                    className="w-4 h-4"
+                  />
+                  세금계산서 수취
+                </Label>
+              </div>
+              <div className="space-y-1.5 col-span-2">
+                <Label>메모</Label>
+                <Input
+                  value={expenseForm.memo}
+                  onChange={e => setExpenseForm(f => ({ ...f, memo: e.target.value }))}
+                  placeholder="비고"
+                />
+              </div>
+            </div>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-1">
+              <p className="text-xs font-medium text-green-800">전표 미리보기</p>
+              <p className="text-xs text-green-700">{expenseForm.description}</p>
+              <p className="text-sm font-bold text-green-900">{formatKRW(expenseForm.amountKrw)}</p>
+              <p className="text-xs text-green-600">{expenseForm.expenseDate} · {expenseForm.expenseType} · {expenseForm.vendorName || '공장 미지정'}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExpenseModal(false)}>취소</Button>
+            <Button onClick={handleSaveExpense} className="bg-green-700 hover:bg-green-800 text-white gap-2">
+              <Receipt className="w-4 h-4" />전표 저장
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

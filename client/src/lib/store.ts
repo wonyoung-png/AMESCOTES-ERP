@@ -321,6 +321,7 @@ export interface OrderAttachment {
 export interface ColorQty {
   color: string;
   qty: number;
+  memo?: string;  // 컬러별 주의사항/특이사항
 }
 
 export type MilestoneStage = '발주생성' | '샘플승인' | '생산중' | '선적중' | '통관중' | '입고완료' | '샘플1차' | '생산시작' | '선적' | '통관';

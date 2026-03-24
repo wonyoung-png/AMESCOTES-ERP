@@ -138,13 +138,21 @@ export default function DeadlineManagement() {
             const item = items.find(i => i.styleNo === order.styleNo);
             const milestones = order.milestones || [];
             const nextMilestone = milestones.find(m => !m.actualDate && m.plannedDate);
-            const d = nextMilestone ? calcDDay(nextMilestone.plannedDate!) : 0;
+            // D-Day: deliveryDate 우선, 없으면 다음 마일스톤 날짜 사용
+            const dDaySource = order.deliveryDate || nextMilestone?.plannedDate;
+            const d = dDaySource ? Math.ceil((new Date(dDaySource).getTime() - Date.now()) / 86400000) : null;
             return (
               <Card key={order.id} className="border-border/60 shadow-sm">
                 <CardContent className="p-4 flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-lg flex flex-col items-center justify-center text-xs font-medium shrink-0 ${dDayColor(d)}`}>
-                    <span className="text-lg font-number font-bold">{d < 0 ? `+${Math.abs(d)}` : d}</span>
-                    <span className="text-[10px]">{d < 0 ? '지연' : 'D-day'}</span>
+                  <div className={`w-14 h-14 rounded-lg flex flex-col items-center justify-center text-xs font-medium shrink-0 ${d !== null ? dDayColor(d) : 'bg-stone-100 text-stone-400'}`}>
+                    {d !== null ? (
+                      <>
+                        <span className="text-lg font-number font-bold">{d < 0 ? `+${Math.abs(d)}` : d}</span>
+                        <span className="text-[10px]">{d < 0 ? '지연' : 'D-day'}</span>
+                      </>
+                    ) : (
+                      <span className="text-[9px] text-center px-1">납기일<br/>미설정</span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">

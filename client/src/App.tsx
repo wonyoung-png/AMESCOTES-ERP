@@ -14,7 +14,6 @@ import ItemMaster from "./pages/ItemMaster";
 import BomManagement from "./pages/BomManagement";
 import SampleManagement from "./pages/SampleManagement";
 import ProductionOrders from "./pages/ProductionOrders";
-import DeadlineManagement from "./pages/DeadlineManagement";
 import PurchaseMatching from "./pages/PurchaseMatching";
 import VendorMaster from "./pages/VendorMaster";
 import TradeStatement from "./pages/TradeStatement";
@@ -46,7 +45,6 @@ function Router() {
         <Route path="/bom" component={BomManagement} />
         <Route path="/samples" component={SampleManagement} />
         <Route path="/orders" component={ProductionOrders} />
-        <Route path="/deadline" component={DeadlineManagement} />
         <Route path="/purchase" component={PurchaseMatching} />
         <Route path="/vendors" component={VendorMaster} />
         <Route path="/trade-statement" component={TradeStatement} />
