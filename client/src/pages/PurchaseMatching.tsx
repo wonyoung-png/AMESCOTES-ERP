@@ -683,7 +683,7 @@ export default function PurchaseMatching() {
                 <Select value={form.orderId || ''} onValueChange={handleOrderSelect}>
                   <SelectTrigger><SelectValue placeholder="발주 선택" /></SelectTrigger>
                   <SelectContent>
-                    {orders.map(o => <SelectItem key={o.id} value={o.id}>{o.orderNo} — {o.styleName}</SelectItem>)}
+                    {(orders as any[]).filter(o => o.id && o.id.trim() !== '').map((o: any) => <SelectItem key={o.id} value={o.id}>{o.orderNo} — {o.styleName}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -699,7 +699,7 @@ export default function PurchaseMatching() {
                 }}>
                   <SelectTrigger><SelectValue placeholder="업체 선택" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">직접 입력</SelectItem>
+                    <SelectItem value="direct">직접 입력</SelectItem>
                     {vendors.filter((v: any) => v.id && v.id.trim() !== '').map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
