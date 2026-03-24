@@ -66,7 +66,8 @@ export default function PurchaseMatching() {
     queryFn: fetchPurchaseItems,
   });
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
-  const vendors = store.getVendors().filter(v => v.type === '자재거래처');
+  const { data: allVendorsData = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
+  const vendors = allVendorsData.filter((v: any) => v.type === '자재거래처');
   const allVendors = store.getVendors();
   const settings = store.getSettings();
   const [filterOrder, setFilterOrder] = useState('all');
@@ -699,7 +700,7 @@ export default function PurchaseMatching() {
                   <SelectTrigger><SelectValue placeholder="업체 선택" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">직접 입력</SelectItem>
-                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                    {vendors.filter((v: any) => v.id && v.id.trim() !== '').map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
