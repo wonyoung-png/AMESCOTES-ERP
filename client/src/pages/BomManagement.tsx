@@ -402,6 +402,7 @@ function syncBomToSupabase(bom: ExtBom) {
       color_boms: bom.colorBoms ?? [],
       post_color_boms: bom.postColorBoms ?? [],
       post_process_lines: bom.postProcessLines ?? [],
+      post_delivery_price: bom.postDeliveryPrice ?? null,
       pre_currency: bom.preCurrency ?? bom.currency ?? 'CNY',
       post_currency: bom.currency ?? 'CNY',
       pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
