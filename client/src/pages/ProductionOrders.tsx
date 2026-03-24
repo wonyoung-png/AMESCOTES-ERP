@@ -547,8 +547,9 @@ export default function ProductionOrders() {
       if (bom) {
         // postColorBoms 우선 → 선택된 컬러만 → postMaterials → lines 순서로 확인
         const postColorBoms = (bom as any).postColorBoms || [];
-        // 선택된 컬러 목록
-        const selectedColors = colorQtys.filter(cq => cq.qty > 0).map(cq => cq.color.trim());
+        // 선택된 컬러 목록 - 저장된 order의 colorQtys 사용 (폼 초기화 후에도 유지)
+        const orderColorQtys = order.colorQtys || [];
+        const selectedColors = orderColorQtys.filter(cq => cq.qty > 0).map(cq => cq.color.trim());
         let allLines: any[] = [];
         if (postColorBoms.length > 0) {
           if (selectedColors.length > 0) {
@@ -3015,6 +3016,8 @@ export default function ProductionOrders() {
                   }
 
                   queryClient.invalidateQueries({ queryKey: ['materials'] });
+                  store.clearMaterialCart();  // 장바구니 비우기
+                  refreshCart();
                   toast.success(`✅ ${savedCount}종 자재가 자재구매 탭에 저장되었습니다`);
                   setVendorOrderModal(false);
                 }}
