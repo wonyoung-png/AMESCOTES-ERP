@@ -589,7 +589,8 @@ export default function PurchaseMatching() {
                                 {PURCHASE_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                               </SelectContent>
                             </Select>
-                          </td>
+                          </div>
+                        </td>
                         <td className="px-3 py-3 text-center w-20">
                           {p.statementNo ? (
                             <span title="지출전표 연결됨" className="text-emerald-600 text-sm">📄</span>
