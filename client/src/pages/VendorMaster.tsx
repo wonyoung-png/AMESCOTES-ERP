@@ -99,6 +99,12 @@ export default function VendorMaster() {
     if (!editVendor.name) { toast.error('거래처명을 입력해주세요'); return; }
     if (!editVendor.type) { toast.error('거래처 유형을 선택해주세요'); return; }
 
+    // 거래처명 중복 검사 (신규 등록 시)
+    if (!isEdit || !editVendor.id) {
+      const dupName = vendors.find((v: Vendor) => v.name === editVendor.name);
+      if (dupName) { toast.error(`'${editVendor.name}'은(는) 이미 등록된 거래처입니다`); return; }
+    }
+
     // 코드 중복 검사
     if (editVendor.code) {
       const code = editVendor.code.toUpperCase();

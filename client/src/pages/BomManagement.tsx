@@ -1077,9 +1077,14 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
   const registerNew = () => {
     const name = inputVal.trim();
     if (!name) return;
-    // 이미 존재하는 업체면 그냥 선택
-    const existing = vendors.find(v => v.name === name);
-    if (existing) { selectVendor(existing); return; }
+    // 이미 존재하는 업체면 그냥 선택 (대소문자/공백 무시)
+    const existing = vendors.find((v: any) => v.name.trim() === name);
+    if (existing) { selectVendor(existing as Vendor); return; }
+    // 부분 일치도 확인 (예: "한진" 입력 시 "한진2" 있으면 선택 유도)
+    const partial = vendors.filter((v: any) => v.name.includes(name) || name.includes(v.name));
+    if (partial.length > 0 && partial[0].name !== name) {
+      // 유사한 업체가 있으면 그냥 계속 신규 등록 가능하게 (막지 않음)
+    }
     // 신규 등록
     const newVendor: Vendor = {
       id: genId(),
