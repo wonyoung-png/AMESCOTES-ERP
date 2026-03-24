@@ -19,16 +19,12 @@ import { toast } from 'sonner';
 import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
-const ORDER_STATUSES: OrderStatus[] = ['발주생성', '샘플승인', '생산중', '선적중', '통관중', '입고완료', '지연'];
+const ORDER_STATUSES: OrderStatus[] = ['발주생성', '생산중', '입고완료'];
 
 const STATUS_COLOR: Record<OrderStatus, string> = {
   '발주생성': 'bg-stone-50 text-stone-600 border-stone-200',
-  '샘플승인': 'bg-blue-50 text-blue-700 border-blue-200',
   '생산중': 'bg-amber-50 text-amber-700 border-amber-200',
-  '선적중': 'bg-purple-50 text-purple-700 border-purple-200',
-  '통관중': 'bg-orange-50 text-orange-700 border-orange-200',
   '입고완료': 'bg-green-50 text-green-700 border-green-200',
-  '지연': 'bg-red-50 text-red-600 border-red-200',
 };
 
 // BOM 연동 계산 결과 타입
@@ -747,7 +743,7 @@ export default function ProductionOrders() {
 
   const stats = useMemo(() => ({
     total: orders.length,
-    inProgress: orders.filter(o => ['샘플승인', '생산중'].includes(o.status)).length,
+    inProgress: orders.filter(o => o.status === '생산중').length,
     reorders: orders.filter(o => o.isReorder).length,
     urgent: orders.filter(o => o.deliveryDate && calcDDay(o.deliveryDate) <= 7 && o.status !== '입고완료').length,
   }), [orders]);
