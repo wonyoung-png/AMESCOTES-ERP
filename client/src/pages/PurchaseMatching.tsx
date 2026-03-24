@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Trash2, ShoppingCart, FileText, Receipt, Printer, X, Mail } from 'lucide-react';
@@ -476,31 +477,35 @@ export default function PurchaseMatching() {
                                 size="sm"
                                 className="h-7 text-xs px-2 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
                                 onClick={() => viewLinkedExpense(p.statementNo!)}
-                                title="연결된 지출전표 보기"
                               >
                                 <FileText className="w-3.5 h-3.5 mr-1" />📄 전표 보기
                               </Button>
                             ) : (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-xs px-2 text-blue-700 hover:text-blue-800 hover:bg-blue-50"
-                                  onClick={() => openLinkExpenseModal(p.id)}
-                                  title="기존 지출전표 연결"
-                                >
-                                  📄 기존전표 연결
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-xs px-2 text-amber-700 hover:text-amber-800 hover:bg-amber-50"
-                                  onClick={() => openExpenseModal(p)}
-                                  title="새 지출전표 생성"
-                                >
-                                  🧾 새전표 생성
-                                </Button>
-                              </>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs px-2 text-stone-600 hover:text-stone-800 hover:bg-stone-100"
+                                  >
+                                    📋 전표 ▾
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40">
+                                  <DropdownMenuItem
+                                    className="text-xs cursor-pointer"
+                                    onClick={() => openLinkExpenseModal(p.id)}
+                                  >
+                                    📄 기존전표 연결
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-xs cursor-pointer"
+                                    onClick={() => openExpenseModal(p)}
+                                  >
+                                    🧾 새전표 생성
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(p.id)}>
                               <Trash2 className="w-3.5 h-3.5" />
