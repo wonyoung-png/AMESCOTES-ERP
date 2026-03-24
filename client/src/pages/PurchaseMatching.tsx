@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import {
   store, genId, formatKRW, formatNumber,
-  type PurchaseItem, type Currency, type ExpenseType,
+  type PurchaseItem, type Currency, type ExpenseType, type Expense, type ExpenseCategory,
 } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Trash2, ShoppingCart } from 'lucide-react';
+import { Plus, Trash2, ShoppingCart, FileText, Receipt } from 'lucide-react';
 
 const CURRENCIES: Currency[] = ['KRW', 'USD', 'CNY'];
 const PAYMENT_METHODS: ExpenseType[] = ['법인카드', '계좌이체', '현금'];
@@ -21,6 +21,34 @@ const STATUS_COLOR: Record<string, string> = {
   '미구매': 'bg-stone-50 text-stone-500 border-stone-200',
   '구매완료': 'bg-blue-50 text-blue-700 border-blue-200',
   '발송완료': 'bg-green-50 text-green-700 border-green-200',
+};
+
+interface ExpenseFormState {
+  purchaseItemId: string;
+  expenseDate: string;
+  category: ExpenseCategory;
+  description: string;
+  amountKrw: number;
+  orderNo: string;
+  orderId: string;
+  vendorName: string;
+  expenseType: ExpenseType;
+  hasTaxInvoice: boolean;
+  memo: string;
+}
+
+const DEFAULT_EXPENSE_FORM: ExpenseFormState = {
+  purchaseItemId: '',
+  expenseDate: new Date().toISOString().split('T')[0],
+  category: '자재구매',
+  description: '',
+  amountKrw: 0,
+  orderNo: '',
+  orderId: '',
+  vendorName: '',
+  expenseType: '계좌이체',
+  hasTaxInvoice: false,
+  memo: '',
 };
 
 export default function PurchaseMatching() {
@@ -34,6 +62,10 @@ export default function PurchaseMatching() {
   const [form, setForm] = useState<Partial<PurchaseItem>>({});
   const [editId, setEditId] = useState<string | null>(null);
 
+  // 지출전표 모달 상태
+  const [expenseModal, setExpenseModal] = useState(false);
+  const [expenseForm, setExpenseForm] = useState<ExpenseFormState>(DEFAULT_EXPENSE_FORM);
+
   const refresh = () => setPurchases(store.getPurchaseItems());
 
   const filtered = useMemo(() => {
@@ -46,7 +78,8 @@ export default function PurchaseMatching() {
   const stats = useMemo(() => {
     const unpurchased = purchases.filter(p => p.purchaseStatus === '미구매').length;
     const totalKrw = purchases.reduce((s, p) => s + p.amountKrw, 0);
-    return { total: purchases.length, unpurchased, totalKrw };
+    const linked = purchases.filter(p => !!p.statementNo).length;
+    return { total: purchases.length, unpurchased, totalKrw, linked };
   }, [purchases]);
 
   const calcAmountKrw = (qty: number, unitPriceCny: number, currency: Currency): number => {
@@ -125,6 +158,61 @@ export default function PurchaseMatching() {
     refresh();
   };
 
+  // ── 지출전표 생성 ──────────────────────────────────────────
+  const openExpenseModal = (item: PurchaseItem) => {
+    setExpenseForm({
+      purchaseItemId: item.id,
+      expenseDate: item.purchaseDate || new Date().toISOString().split('T')[0],
+      category: '자재구매',
+      description: `[${item.orderNo}] ${item.itemName} ${item.qty}${item.unit}`,
+      amountKrw: item.amountKrw || 0,
+      orderNo: item.orderNo,
+      orderId: item.orderId,
+      vendorName: item.vendorName || '',
+      expenseType: (item.paymentMethod as ExpenseType) || '계좌이체',
+      hasTaxInvoice: false,
+      memo: '',
+    });
+    setExpenseModal(true);
+  };
+
+  const handleSaveExpense = () => {
+    if (!expenseForm.description) { toast.error('내용을 입력해주세요'); return; }
+    if (!expenseForm.amountKrw) { toast.error('금액을 입력해주세요'); return; }
+
+    const expenseId = genId();
+    const expense: Expense = {
+      id: expenseId,
+      expenseDate: expenseForm.expenseDate,
+      expenseType: expenseForm.expenseType,
+      category: expenseForm.category,
+      description: expenseForm.description,
+      amountKrw: expenseForm.amountKrw,
+      orderId: expenseForm.orderId || undefined,
+      orderNo: expenseForm.orderNo || undefined,
+      vendorName: expenseForm.vendorName || undefined,
+      hasTaxInvoice: expenseForm.hasTaxInvoice,
+      memo: expenseForm.memo || undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    store.addExpense(expense);
+
+    // PurchaseItem의 statementNo에 expenseId 연결
+    store.updatePurchaseItem(expenseForm.purchaseItemId, { statementNo: expenseId });
+
+    toast.success('지출전표가 생성되었습니다');
+    refresh();
+    setExpenseModal(false);
+  };
+
+  const viewLinkedExpense = (statementNo: string) => {
+    const expenses = store.getExpenses();
+    const expense = expenses.find(e => e.id === statementNo);
+    if (!expense) { toast.error('연결된 전표를 찾을 수 없습니다'); return; }
+    toast.info(`전표: ${expense.description} / ${formatKRW(expense.amountKrw)} / ${expense.expenseDate}`);
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -137,11 +225,12 @@ export default function PurchaseMatching() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         {[
           { label: '전체 구매건', value: `${stats.total}건`, color: 'text-stone-800' },
           { label: '미구매', value: `${stats.unpurchased}건`, color: 'text-amber-700' },
           { label: '총 구매금액', value: formatKRW(stats.totalKrw), color: 'text-stone-800' },
+          { label: '전표 연결됨', value: `${stats.linked}건`, color: 'text-emerald-700' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-xl border border-stone-200 p-4">
             <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
@@ -179,7 +268,7 @@ export default function PurchaseMatching() {
               <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">단가</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">금액(KRW)</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">결제</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">상태</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">상태 / 전표</th>
               <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
             </tr>
           </thead>
@@ -200,18 +289,48 @@ export default function PurchaseMatching() {
                 <td className="px-4 py-3 text-right font-mono font-semibold text-stone-800">{formatKRW(p.amountKrw)}</td>
                 <td className="px-4 py-3"><Badge variant="outline" className="text-xs">{p.paymentMethod}</Badge></td>
                 <td className="px-4 py-3">
-                  <Select value={p.purchaseStatus} onValueChange={v => handleStatusChange(p.id, v)}>
-                    <SelectTrigger className={`h-7 text-xs w-24 border ${STATUS_COLOR[p.purchaseStatus]}`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PURCHASE_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-1.5">
+                    <Select value={p.purchaseStatus} onValueChange={v => handleStatusChange(p.id, v)}>
+                      <SelectTrigger className={`h-7 text-xs w-24 border ${STATUS_COLOR[p.purchaseStatus]}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PURCHASE_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {/* 지출전표 연결 여부 아이콘 */}
+                    {p.statementNo ? (
+                      <span title="지출전표 연결됨" className="text-emerald-600 text-sm">📄</span>
+                    ) : (
+                      <span title="지출전표 미생성" className="text-stone-300 text-sm">➕</span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(p)}>수정</Button>
+                    {/* 지출전표 생성 / 전표 보기 버튼 */}
+                    {p.statementNo ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs px-2 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
+                        onClick={() => viewLinkedExpense(p.statementNo!)}
+                        title="연결된 지출전표 보기"
+                      >
+                        <FileText className="w-3.5 h-3.5 mr-1" />전표
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs px-2 text-amber-700 hover:text-amber-800 hover:bg-amber-50"
+                        onClick={() => openExpenseModal(p)}
+                        title="지출전표 생성"
+                      >
+                        <Receipt className="w-3.5 h-3.5 mr-1" />전표생성
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(p.id)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
@@ -223,6 +342,7 @@ export default function PurchaseMatching() {
         </table>
       </div>
 
+      {/* ── 구매 등록/수정 모달 ── */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editId ? '구매 수정' : '구매 등록'}</DialogTitle></DialogHeader>
@@ -312,6 +432,109 @@ export default function PurchaseMatching() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
             <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">{editId ? '수정' : '등록'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 지출전표 생성 모달 ── */}
+      <Dialog open={expenseModal} onOpenChange={setExpenseModal}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-amber-700" />
+              지출전표 생성
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5 col-span-2">
+                <Label>내용 *</Label>
+                <Input
+                  value={expenseForm.description}
+                  onChange={e => setExpenseForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="지출 내용"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>날짜</Label>
+                <Input
+                  type="date"
+                  value={expenseForm.expenseDate}
+                  onChange={e => setExpenseForm(f => ({ ...f, expenseDate: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>카테고리</Label>
+                <div className="h-9 flex items-center px-3 bg-stone-50 rounded border border-stone-200 text-sm text-stone-600">
+                  자재구매 (고정)
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>금액 (KRW) *</Label>
+                <Input
+                  type="number"
+                  value={expenseForm.amountKrw || ''}
+                  onChange={e => setExpenseForm(f => ({ ...f, amountKrw: parseInt(e.target.value) || 0 }))}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>결제 방법</Label>
+                <Select value={expenseForm.expenseType} onValueChange={v => setExpenseForm(f => ({ ...f, expenseType: v as ExpenseType }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>발주번호</Label>
+                <div className="h-9 flex items-center px-3 bg-stone-50 rounded border border-stone-200 text-sm font-mono text-stone-600">
+                  {expenseForm.orderNo || '-'}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>거래처명</Label>
+                <Input
+                  value={expenseForm.vendorName}
+                  onChange={e => setExpenseForm(f => ({ ...f, vendorName: e.target.value }))}
+                  placeholder="거래처명"
+                />
+              </div>
+              <div className="space-y-1.5 col-span-2">
+                <Label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={expenseForm.hasTaxInvoice}
+                    onChange={e => setExpenseForm(f => ({ ...f, hasTaxInvoice: e.target.checked }))}
+                    className="w-4 h-4"
+                  />
+                  세금계산서 수취
+                </Label>
+              </div>
+              <div className="space-y-1.5 col-span-2">
+                <Label>메모</Label>
+                <Input
+                  value={expenseForm.memo}
+                  onChange={e => setExpenseForm(f => ({ ...f, memo: e.target.value }))}
+                  placeholder="비고"
+                />
+              </div>
+            </div>
+
+            {/* 미리보기 */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+              <p className="text-xs font-medium text-amber-800">전표 미리보기</p>
+              <p className="text-xs text-amber-700">{expenseForm.description}</p>
+              <p className="text-sm font-bold text-amber-900">{formatKRW(expenseForm.amountKrw)}</p>
+              <p className="text-xs text-amber-600">{expenseForm.expenseDate} · {expenseForm.expenseType} · {expenseForm.vendorName || '거래처 미지정'}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExpenseModal(false)}>취소</Button>
+            <Button onClick={handleSaveExpense} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">
+              <FileText className="w-4 h-4" />전표 저장
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
