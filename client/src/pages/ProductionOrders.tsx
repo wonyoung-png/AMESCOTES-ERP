@@ -3016,6 +3016,30 @@ export default function ProductionOrders() {
                   }
 
                   queryClient.invalidateQueries({ queryKey: ['materials'] });
+                  // PurchaseMatching 탭에도 저장 (자재 구매 이력)
+                  const settings = store.getSettings();
+                  for (const item of cartItems) {
+                    const stockQty = item.stockQty ?? 0;
+                    const orderQty = Math.max(0, item.qty - stockQty);
+                    if (orderQty === 0) continue;
+                    store.addPurchaseItem({
+                      id: genId(),
+                      orderId: postOrderInfo?.order?.id || '',
+                      orderNo: postOrderInfo?.order?.orderNo || '',
+                      purchaseDate: today,
+                      itemName: item.materialName,
+                      qty: orderQty,
+                      unit: item.unit,
+                      unitPriceCny: 0,
+                      currency: 'CNY',
+                      appliedRate: settings.cnyKrw || 191,
+                      amountKrw: 0,
+                      vendorName: item.vendorName || '미지정',
+                      paymentMethod: '기타',
+                      purchaseStatus: '미구매',
+                      createdAt: new Date().toISOString(),
+                    });
+                  }
                   store.clearMaterialCart();  // 장바구니 비우기
                   refreshCart();
                   toast.success(`✅ ${savedCount}종 자재가 자재구매 탭에 저장되었습니다`);
