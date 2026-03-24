@@ -615,9 +615,20 @@ export default function ProductionOrders() {
       return;
     }
 
+    // 신규 발주 시 실제 저장될 orderNo를 명시적으로 계산 (form.orderNo가 오래된 값일 수 있음)
+    const finalOrderNo = (() => {
+      const existingForStyle = (orders as any[]).filter(o => o.styleNo === form.styleNo);
+      const existingRevisions = existingForStyle.map((o: any) => {
+        const match = (o.orderNo || '').match(/-R(\d+)$/);
+        return match ? parseInt(match[1]) : 0;
+      });
+      const nextRevision = existingRevisions.length > 0 ? Math.max(...existingRevisions) + 1 : 1;
+      return `${form.styleNo}-R${nextRevision}`;
+    })();
+
     const order: ProductionOrder = {
       id: genId(),
-      orderNo: form.orderNo || '',
+      orderNo: finalOrderNo,
       styleId: form.styleId || '',
       styleNo: form.styleNo || '',
       styleName: form.styleName || '',

@@ -164,21 +164,41 @@ export default function PurchaseMatching() {
   const refreshCart = () => setCartItems(store.getMaterialCart());
   const refresh = () => setPurchases(store.getPurchaseItems());
 
-  // 마운트 시 발주번호 동기화: orderId가 있지만 orderNo가 없는 항목에 orderNo 채우기
+  // 마운트 시 발주번호 동기화: Supabase 최신 발주 목록과 비교해서 orderNo 불일치 항목 업데이트
   useEffect(() => {
-    const allOrders = store.getOrders();
-    const purchaseItems = store.getPurchaseItems();
-    let updated = false;
-    purchaseItems.forEach(p => {
-      if (p.orderId && !p.orderNo) {
-        const order = allOrders.find(o => o.id === p.orderId);
-        if (order) {
-          store.updatePurchaseItem(p.id, { orderNo: order.orderNo });
-          updated = true;
+    import('@/lib/supabaseQueries').then(m => m.fetchOrders()).then((latestOrders: any[]) => {
+      const purchaseItems = store.getPurchaseItems();
+      let updated = false;
+      purchaseItems.forEach(p => {
+        if (p.orderId) {
+          const order = latestOrders.find((o: any) => o.id === p.orderId);
+          if (order && order.orderNo !== p.orderNo) {
+            store.updatePurchaseItem(p.id, { orderNo: order.orderNo });
+            updated = true;
+          }
         }
-      }
+        // orderId가 있지만 orderNo가 없는 경우도 처리 (기존 로직 유지)
+        else if (!p.orderId && !p.orderNo) {
+          // orderId 없이 orderNo도 없는 항목은 스킵
+        }
+      });
+      if (updated) refresh();
+    }).catch(() => {
+      // Supabase 연결 실패 시 로컬 스토어로 폴백
+      const allOrders = store.getOrders();
+      const purchaseItems = store.getPurchaseItems();
+      let updated = false;
+      purchaseItems.forEach(p => {
+        if (p.orderId && !p.orderNo) {
+          const order = allOrders.find(o => o.id === p.orderId);
+          if (order) {
+            store.updatePurchaseItem(p.id, { orderNo: order.orderNo });
+            updated = true;
+          }
+        }
+      });
+      if (updated) refresh();
     });
-    if (updated) refresh();
   }, []);
 
   const filtered = useMemo(() => {
