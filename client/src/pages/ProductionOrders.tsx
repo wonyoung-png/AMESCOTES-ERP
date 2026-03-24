@@ -295,8 +295,10 @@ export default function ProductionOrders() {
     // 스타일 필터
     if (filterStyle !== 'all') list = list.filter(o => o.styleNo === filterStyle);
     // 납기일 상세 필터
-    if (filterDeadline === 'urgent') list = list.filter(o => { if (!o.deliveryDate) return false; const d = calcDDay(o.deliveryDate); return d >= 0 && d <= 3; });
-    if (filterDeadline === 'week') list = list.filter(o => { if (!o.deliveryDate) return false; const d = calcDDay(o.deliveryDate); return d >= 0 && d <= 7; });
+    if (filterDeadline === 'd20') list = list.filter(o => { if (!o.deliveryDate) return false; const d = calcDDay(o.deliveryDate); return d >= 0 && d <= 20; });
+    if (filterDeadline === 'd10') list = list.filter(o => { if (!o.deliveryDate) return false; const d = calcDDay(o.deliveryDate); return d >= 0 && d <= 10; });
+    if (filterDeadline === 'd7') list = list.filter(o => { if (!o.deliveryDate) return false; const d = calcDDay(o.deliveryDate); return d >= 0 && d <= 7; });
+    if (filterDeadline === 'd3') list = list.filter(o => { if (!o.deliveryDate) return false; const d = calcDDay(o.deliveryDate); return d >= 0 && d <= 3; });
     if (filterDeadline === 'overdue') list = list.filter(o => o.deliveryDate ? calcDDay(o.deliveryDate) < 0 : false);
     // 전표 필터
     if (filterExpense === 'done') list = list.filter(o => !!(o as any).expenseId);
@@ -1045,11 +1047,13 @@ export default function ProductionOrders() {
         </Select>
         {/* 납기일 필터 */}
         <Select value={filterDeadline} onValueChange={setFilterDeadline}>
-          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="납기" /></SelectTrigger>
+          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="납기일 필터" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">전체 납기</SelectItem>
-            <SelectItem value="urgent">🔴 D-3 이내</SelectItem>
-            <SelectItem value="week">🟡 D-7 이내</SelectItem>
+            <SelectItem value="d20">📅 20일 이내</SelectItem>
+            <SelectItem value="d10">🟡 10일 이내</SelectItem>
+            <SelectItem value="d7">🟠 7일 이내</SelectItem>
+            <SelectItem value="d3">🔴 3일 이내</SelectItem>
             <SelectItem value="overdue">⚫ 납기 초과</SelectItem>
           </SelectContent>
         </Select>
