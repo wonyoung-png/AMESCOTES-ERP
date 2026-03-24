@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type ProductionOrder, type ColorQty } from '@/lib/store';
-import { fetchItems, upsertItem, deleteItem as deleteItemSB, fetchVendors } from '@/lib/supabaseQueries';
+import { fetchItems, upsertItem, deleteItem as deleteItemSB, fetchVendors, fetchBoms } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -111,6 +111,7 @@ export default function ItemMaster() {
   };
 
   const refresh = () => { queryClient.invalidateQueries({ queryKey: ['items'] }); queryClient.invalidateQueries({ queryKey: ['boms'] }); };
+  const { data: boms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
 
   // 현재 선택된 erpCategory에 따른 세부 카테고리 옵션
   const subCategories = editItem.erpCategory === 'SLG' ? SLG_CATEGORIES : HB_CATEGORIES;
