@@ -3244,27 +3244,38 @@ export default function ProductionOrders() {
                   }
 
                   queryClient.invalidateQueries({ queryKey: ['materials'] });
-                  // PurchaseMatching 탭에도 저장 (자재 구매 이력)
+                  // PurchaseMatching 탭에도 저장 (자재 구매 이력) - 중복 방지
                   const settings = store.getSettings();
+                  const currentOrderNo = postOrderInfo?.order?.orderNo || '';
+                  const existingPurchases = store.getPurchaseItems();
+                  // 같은 발주번호+자재명으로 이미 등록된 항목 확인
+                  const existingKeys = new Set(
+                    existingPurchases
+                      .filter(p => p.orderNo === currentOrderNo)
+                      .map(p => p.itemName + '||' + p.unit)
+                  );
                   for (const item of cartItems) {
                     const stockQty = item.stockQty ?? 0;
                     const orderQty = Math.max(0, item.qty - stockQty);
                     if (orderQty === 0) continue;
+                    // 이미 같은 발주번호+자재명으로 등록됐으면 스킵
+                    const key = item.materialName + '||' + item.unit;
+                    if (existingKeys.has(key)) continue;
                     store.addPurchaseItem({
                       id: genId(),
                       orderId: postOrderInfo?.order?.id || '',
-                      orderNo: postOrderInfo?.order?.orderNo || '',
+                      orderNo: currentOrderNo,
                       purchaseDate: today,
                       itemName: item.materialName,
                       qty: orderQty,
                       unit: item.unit,
-                      unitPriceCny: 0,
+                      unitPriceCny: (item as any).unitPriceCny ?? 0,
                       currency: 'CNY',
                       appliedRate: settings.cnyKrw || 191,
-                      amountKrw: 0,
+                      amountKrw: Math.round(((item as any).unitPriceCny ?? 0) * orderQty * (settings.cnyKrw || 191)),
                       vendorName: item.vendorName || '미지정',
                       paymentMethod: '기타',
-                      purchaseStatus: '미구매',
+                      purchaseStatus: '미발주',
                       createdAt: new Date().toISOString(),
                     });
                   }
