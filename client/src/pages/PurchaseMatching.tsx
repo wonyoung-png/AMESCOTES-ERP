@@ -17,11 +17,12 @@ import { Plus, Trash2, ShoppingCart, FileText, Receipt, Printer, X, Mail, Eye } 
 
 const CURRENCIES: Currency[] = ['KRW', 'USD', 'CNY'];
 const PAYMENT_METHODS: ExpenseType[] = ['법인카드', '계좌이체', '현금'];
-const PURCHASE_STATUSES = ['미구매', '구매완료', '발송완료'] as const;
+const PURCHASE_STATUSES = ['미발주', '발주완료', '입고완료', '발송완료'] as const;
 
 const STATUS_COLOR: Record<string, string> = {
-  '미구매': 'bg-stone-50 text-stone-500 border-stone-200',
-  '구매완료': 'bg-blue-50 text-blue-700 border-blue-200',
+  '미발주': 'bg-stone-50 text-stone-500 border-stone-200',
+  '발주완료': 'bg-blue-50 text-blue-700 border-blue-200',
+  '입고완료': 'bg-amber-50 text-amber-700 border-amber-200',
   '발송완료': 'bg-green-50 text-green-700 border-green-200',
 };
 
@@ -171,7 +172,7 @@ export default function PurchaseMatching() {
   }, [purchases, filterOrder, filterStatus]);
 
   const stats = useMemo(() => {
-    const unpurchased = purchases.filter(p => p.purchaseStatus === '미구매').length;
+    const unpurchased = purchases.filter(p => p.purchaseStatus === '미발주').length;
     const totalKrw = purchases.reduce((s, p) => s + p.amountKrw, 0);
     const linked = purchases.filter(p => !!p.statementNo).length;
     return { total: purchases.length, unpurchased, totalKrw, linked };
@@ -188,7 +189,7 @@ export default function PurchaseMatching() {
     setForm({
       purchaseDate: new Date().toISOString().split('T')[0],
       currency: 'KRW', qty: 0, unitPriceCny: 0, amountKrw: 0,
-      appliedRate: 1, purchaseStatus: '미구매', paymentMethod: '법인카드',
+      appliedRate: 1, purchaseStatus: '미발주', paymentMethod: '법인카드',
     });
     setEditId(null);
     setShowModal(true);
@@ -228,7 +229,7 @@ export default function PurchaseMatching() {
         amountKrw: form.amountKrw || 0,
         vendorId: form.vendorId,
         vendorName: form.vendorName,
-        purchaseStatus: form.purchaseStatus || '미구매',
+        purchaseStatus: form.purchaseStatus || '미발주',
         paymentMethod: form.paymentMethod || '법인카드',
         statementNo: form.statementNo,
         memo: form.memo,
@@ -445,7 +446,7 @@ export default function PurchaseMatching() {
       <div className="grid grid-cols-4 gap-4">
         {[
           { label: '전체 구매건', value: `${stats.total}건`, color: 'text-stone-800' },
-          { label: '미구매', value: `${stats.unpurchased}건`, color: 'text-amber-700' },
+          { label: '미발주', value: `${stats.unpurchased}건`, color: 'text-amber-700' },
           { label: '총 구매금액', value: formatKRW(stats.totalKrw), color: 'text-stone-800' },
           { label: '전표 연결됨', value: `${stats.linked}건`, color: 'text-emerald-700' },
         ].map(s => (
@@ -493,7 +494,8 @@ export default function PurchaseMatching() {
               <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">단가</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">금액(KRW)</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">결제</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">상태 / 전표</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 w-28">상태</th>
+              <th className="text-center px-4 py-3 text-xs font-medium text-stone-500 w-20">전표</th>
               <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
             </tr>
           </thead>
@@ -514,7 +516,7 @@ export default function PurchaseMatching() {
               return Array.from(groups.entries()).map(([orderNo, groupItems]) => {
                 const isOpen = openGroups.has(orderNo);
                 const totalKrw = groupItems.reduce((s, i) => s + i.amountKrw, 0);
-                const unpurchased = groupItems.filter(i => i.purchaseStatus === '미구매').length;
+                const unpurchased = groupItems.filter(i => i.purchaseStatus === '미발주').length;
                 return (
                   <React.Fragment key={orderNo}>
                     {/* 그룹 헤더 */}
@@ -587,13 +589,13 @@ export default function PurchaseMatching() {
                                 {PURCHASE_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                               </SelectContent>
                             </Select>
-                            {/* 지출전표 연결 여부 아이콘 */}
-                            {p.statementNo ? (
-                              <span title="지출전표 연결됨" className="text-emerald-600 text-sm">📄</span>
-                            ) : (
-                              <span title="지출전표 미생성" className="text-stone-300 text-sm">➕</span>
-                            )}
-                          </div>
+                          </td>
+                        <td className="px-3 py-3 text-center w-20">
+                          {p.statementNo ? (
+                            <span title="지출전표 연결됨" className="text-emerald-600 text-sm">📄</span>
+                          ) : (
+                            <span title="지출전표 미생성" className="text-stone-300 text-sm">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1 flex-wrap">
@@ -726,7 +728,7 @@ export default function PurchaseMatching() {
               </div>
               <div className="space-y-1.5">
                 <Label>상태</Label>
-                <Select value={form.purchaseStatus || '미구매'} onValueChange={v => setForm(f => ({ ...f, purchaseStatus: v as PurchaseItem['purchaseStatus'] }))}>
+                <Select value={form.purchaseStatus || '미발주'} onValueChange={v => setForm(f => ({ ...f, purchaseStatus: v as PurchaseItem['purchaseStatus'] }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{PURCHASE_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
@@ -1093,7 +1095,7 @@ export default function PurchaseMatching() {
                         amountKrw: amountKrw,
                         vendorName: vendor,
                         paymentMethod: '기타',
-                        purchaseStatus: '미구매',
+                        purchaseStatus: '미발주',
                         createdAt: new Date().toISOString(),
                       });
                       savedCount++;
