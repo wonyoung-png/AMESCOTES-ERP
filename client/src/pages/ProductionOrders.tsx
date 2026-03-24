@@ -187,21 +187,6 @@ export default function ProductionOrders() {
   };
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const isAllSelected = filtered.length > 0 && filtered.every(o => selectedIds.has(o.id));
-  const toggleSelectAll = () => setSelectedIds(isAllSelected ? new Set() : new Set(filtered.map(o => o.id)));
-
-  const handleBulkDelete = async () => {
-    if (selectedIds.size === 0) return;
-    if (!confirm(`선택한 ${selectedIds.size}건을 삭제하시겠습니까?`)) return;
-    for (const id of Array.from(selectedIds)) {
-      store.deleteOrder(id);
-      deleteOrderSB(id).catch(() => {});
-    }
-    setSelectedIds(new Set());
-    refresh();
-    toast.success(`${selectedIds.size}건 삭제됐어요`);
-  };
 
   const filtered = useMemo(() => {
     let list = orders;
@@ -218,6 +203,22 @@ export default function ProductionOrders() {
     );
     return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [orders, filterStatus, filterSeason, filterBuyer, items, search]);
+
+  const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const isAllSelected = filtered.length > 0 && filtered.every(o => selectedIds.has(o.id));
+  const toggleSelectAll = () => setSelectedIds(isAllSelected ? new Set() : new Set(filtered.map(o => o.id)));
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`선택한 ${selectedIds.size}건을 삭제하시겠습니까?`)) return;
+    for (const id of Array.from(selectedIds)) {
+      store.deleteOrder(id);
+      deleteOrderSB(id).catch(() => {});
+    }
+    setSelectedIds(new Set());
+    refresh();
+    toast.success(`${selectedIds.size}건 삭제됐어요`);
+  };
 
   const openNew = (prefillStyleId?: string) => {
     const prefillRaw = localStorage.getItem('ames_prefill_order');
