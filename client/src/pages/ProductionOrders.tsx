@@ -1042,7 +1042,7 @@ export default function ProductionOrders() {
           <SelectTrigger className="w-32 h-9"><SelectValue placeholder="공장" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">전체 공장</SelectItem>
-            {vendors.filter(v => v.type === '해외공장' || v.type === '공장').map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+            {allVendors.filter((v: any) => v.type === '해외공장' || v.type === '공장' || v.type === '자재거래처').map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
           </SelectContent>
         </Select>
         {/* 납기일 필터 */}
