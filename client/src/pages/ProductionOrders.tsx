@@ -545,13 +545,29 @@ export default function ProductionOrders() {
     if (form.styleNo) {
       const { bom } = getBomForOrderFromList(boms as Bom[], form.styleNo);
       if (bom) {
-        // postColorBoms 우선 → postMaterials → lines 순서로 확인
+        // postColorBoms 우선 → 선택된 컬러만 → postMaterials → lines 순서로 확인
         const postColorBoms = (bom as any).postColorBoms || [];
-        const allLines: any[] = postColorBoms.length > 0
-          ? postColorBoms.flatMap((cb: any) => cb.lines || [])
-          : (bom.postMaterials && bom.postMaterials.length > 0)
-            ? bom.postMaterials
-            : (bom.lines || []);
+        // 선택된 컬러 목록
+        const selectedColors = colorQtys.filter(cq => cq.qty > 0).map(cq => cq.color.trim());
+        let allLines: any[] = [];
+        if (postColorBoms.length > 0) {
+          if (selectedColors.length > 0) {
+            // 선택된 컬러에 해당하는 BOM lines만 가져옴
+            allLines = postColorBoms
+              .filter((cb: any) => selectedColors.includes(cb.color?.trim()))
+              .flatMap((cb: any) => cb.lines || []);
+            // 선택된 컬러 BOM 없으면 첫 번째 컬러로 폴백
+            if (allLines.length === 0) {
+              allLines = (postColorBoms[0]?.lines || []);
+            }
+          } else {
+            allLines = postColorBoms[0]?.lines || [];
+          }
+        } else if (bom.postMaterials && bom.postMaterials.length > 0) {
+          allLines = bom.postMaterials;
+        } else {
+          allLines = bom.lines || [];
+        }
         // 중복 제거 (같은 itemName)
         const seen = new Set<string>();
         for (const l of allLines) {
