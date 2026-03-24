@@ -1,5 +1,7 @@
 // AMESCOTES ERP — 납기 관리
-import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchOrders } from '@/lib/supabaseQueries';
+import { useState, useEffect, useMemo } from 'react';
 import { store, calcDDay, dDayColor, dDayLabel, formatNumber, genId, type ProductionOrder, type OrderStatus, type MilestoneStage, type OrderMilestone } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,11 +24,11 @@ const MILESTONE_LABELS: Partial<Record<MilestoneStage, string>> = {
 };
 
 export default function DeadlineManagement() {
-  const [orders, setOrders] = useState(() => store.getOrders());
+  const { data: orders = [], refetch: refetchOrders } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
   const items = store.getItems();
   const [view, setView] = useState('list');
 
-  const refresh = () => setOrders(store.getOrders());
+  const refresh = () => refetchOrders();
 
   const handleCompleteMilestone = (orderId: string, milestones: OrderMilestone[]) => {
     const today = new Date().toISOString().split('T')[0];
@@ -44,7 +46,7 @@ export default function DeadlineManagement() {
 
     // 입고완료 시 → 매출관리(SalesRecord) 자동 데이터 생성 (작업 4)
     if (updatePayload.status === '입고완료') {
-      const order = store.getOrders().find(o => o.id === orderId);
+      const order = (orders as any[]).find((o: any) => o.id === orderId);
       if (order) {
         const existingSales = store.getSalesRecords();
         const alreadyExists = existingSales.some(s => s.memo?.includes(order.orderNo));
