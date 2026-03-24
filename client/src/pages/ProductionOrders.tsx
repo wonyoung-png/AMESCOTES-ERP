@@ -484,7 +484,7 @@ export default function ProductionOrders() {
       styleNo: item.styleNo,
       styleName: item.name,
       orderNo,
-      revision,
+      revision: nextRevision,
       bomId: bom?.id,
     }));
 
