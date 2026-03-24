@@ -78,7 +78,7 @@ export default function SalesManagement() {
     return Array.from(map.entries()).sort().reverse().map(([month, data]) => ({ month, ...data }));
   }, [records]);
 
-  // 통계: 바이어별
+  // 통계: 브랜드별
   const buyerSales = useMemo(() => {
     const map = new Map<string, { name: string; total: number; qty: number; count: number }>();
     records.forEach(s => {
@@ -153,7 +153,7 @@ export default function SalesManagement() {
 
   const statTabItems: { key: StatTab; label: string; icon: React.ReactNode }[] = [
     { key: 'monthly', label: '월별', icon: <Calendar className="w-3.5 h-3.5" /> },
-    { key: 'buyer', label: '바이어별', icon: <Users className="w-3.5 h-3.5" /> },
+    { key: 'buyer', label: '브랜드별', icon: <Users className="w-3.5 h-3.5" /> },
     { key: 'factory', label: '공장별', icon: <Building2 className="w-3.5 h-3.5" /> },
     { key: 'style', label: '스타일별', icon: <Tag className="w-3.5 h-3.5" /> },
   ];
@@ -419,12 +419,12 @@ export default function SalesManagement() {
             </div>
           )}
 
-          {/* 바이어별 매출 통계 */}
+          {/* 브랜드별 매출 통계 */}
           {statTab === 'buyer' && (
             <div className="bg-white rounded-xl border border-stone-200">
               <div className="px-4 py-3 border-b border-stone-100 flex items-center gap-2">
                 <Users className="w-4 h-4 text-amber-700" />
-                <h3 className="text-sm font-semibold text-stone-700">바이어별 매출 현황</h3>
+                <h3 className="text-sm font-semibold text-stone-700">브랜드별 매출 현황</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
