@@ -250,13 +250,18 @@ function ExpenseDetailModal({
                         />
                       </td>
                       <td className="px-2 py-1.5">
-                        <Input
-                          type="number"
-                          value={line.unitPrice}
-                          onChange={e => updateDetailLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                          className="h-8 text-sm text-right w-24"
-                          min={0}
-                        />
+                        <div className="space-y-0.5">
+                          <Input
+                            type="number"
+                            value={line.unitPrice}
+                            onChange={e => updateDetailLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                            className="h-8 text-sm text-right w-24"
+                            min={0}
+                          />
+                          {line.unitPrice > 0 && (
+                            <div className="text-right text-[10px] text-stone-400">{formatKRW(line.unitPrice)}</div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-1.5 text-right text-sm font-medium text-stone-700">
                         {formatKRW(line.amountKrw)}
@@ -718,13 +723,18 @@ export default function ExpenseEntry() {
                         />
                       </td>
                       <td className="px-2 py-1.5">
-                        <Input
-                          type="number"
-                          value={line.unitPrice}
-                          onChange={e => updateLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                          className="h-8 text-sm text-right"
-                          min={0}
-                        />
+                        <div className="space-y-0.5">
+                          <Input
+                            type="number"
+                            value={line.unitPrice}
+                            onChange={e => updateLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                            className="h-8 text-sm text-right"
+                            min={0}
+                          />
+                          {line.unitPrice > 0 && (
+                            <div className="text-right text-[10px] text-stone-400">{formatKRW(line.unitPrice)}</div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-1.5 text-right text-sm font-medium text-stone-700">
                         {formatKRW(line.amountKrw)}

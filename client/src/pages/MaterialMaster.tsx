@@ -244,6 +244,7 @@ export default function MaterialMaster() {
                   className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
                 />
               </th>
+              <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">품번</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">카테고리</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">자재명</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">스펙</th>
@@ -251,13 +252,13 @@ export default function MaterialMaster() {
               <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (KRW)</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">단위</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">발주상태</th>
-              <th className="text-center px-3 py-3 text-xs font-medium text-stone-500">작업</th>
+              <th className="text-center px-3 py-3 text-xs font-medium text-stone-500">편집</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-12 text-stone-400">
+                <td colSpan={10} className="text-center py-12 text-stone-400">
                   <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">등록된 자재가 없습니다</p>
                 </td>
@@ -274,13 +275,13 @@ export default function MaterialMaster() {
                       className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
                     />
                   </td>
+                  <td className="px-3 py-2.5 w-16">
+                    <span className="font-mono text-xs bg-stone-100 px-2 py-0.5 rounded text-stone-600">{m.itemCode || '—'}</span>
+                  </td>
                   <td className="px-3 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full border ${CATEGORY_COLOR[m.category as MaterialCategory] || 'bg-stone-50 text-stone-600 border-stone-200'}`}>
                       {m.category}
                     </span>
-                  </td>
-                  <td className="px-3 py-2.5 w-16">
-                    <span className="font-mono text-xs bg-stone-100 px-2 py-0.5 rounded text-stone-600">{(m as any).itemCode || '—'}</span>
                   </td>
                   <td className="px-3 py-2.5">
                     <p className="font-medium text-stone-800">{m.name}</p>

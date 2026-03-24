@@ -14,7 +14,7 @@ import {
   store, genId, normalizeColors,
   type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material, type Vendor,
 } from '@/lib/store';
-import { fetchBoms, upsertBom, deleteBom as deleteBomSB, fetchItems, fetchVendors, fetchMaterials } from '@/lib/supabaseQueries';
+import { fetchBoms, upsertBom, deleteBom as deleteBomSB, fetchItems, fetchVendors, fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -2171,7 +2171,29 @@ export default function BomManagement() {
     setExtBoms(newBoms);
     // Supabase에 직접 저장
     upsertBom(updated)
-      .then(() => { queryClient.invalidateQueries({ queryKey: ['boms'] }); })
+      .then(async () => {
+        queryClient.invalidateQueries({ queryKey: ['boms'] });
+        // BOM 라인 단가를 자재마스터에 자동 동기화
+        try {
+          const allMaterials = await fetchMaterials();
+          const allBomLines = [
+            ...(updated.colorBoms || []).flatMap((cb: any) => cb.lines || []),
+            ...(updated.postColorBoms || []).flatMap((cb: any) => cb.lines || []),
+            ...(updated.lines || []),
+          ];
+          for (const line of allBomLines) {
+            if (line.unitPriceCny && line.itemName) {
+              const existing = allMaterials.find((m: any) => m.name === line.itemName || m.name === line.itemName?.trim());
+              if (existing && existing.unitPriceCny !== line.unitPriceCny) {
+                await upsertMaterial({ ...existing, unitPriceCny: line.unitPriceCny });
+              }
+            }
+          }
+          queryClient.invalidateQueries({ queryKey: ['materials'] });
+        } catch (e) {
+          console.warn('[BomManagement] 자재마스터 단가 동기화 실패:', e);
+        }
+      })
       .catch((e: Error) => console.warn('[BomManagement] BOM 저장 실패:', e.message));
     // 첫 번째 컬러 BOM 기준으로 원가 업데이트 (없으면 lines 기준)
     const firstColor = (updated.colorBoms || [])[0];

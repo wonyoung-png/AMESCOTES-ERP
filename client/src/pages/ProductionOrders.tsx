@@ -788,8 +788,8 @@ export default function ProductionOrders() {
         const existingSales = store.getSalesRecords();
         const alreadyExists = existingSales.some(s => s.orderId === existing.id);
         if (!alreadyExists) {
-          const vendorObj = allVendors.find(v => v.id === existing.buyerId);
-          const buyerName = vendorObj?.name || existing.vendorName || '미지정';
+          const vendorObj = allVendors.find((v: any) => v.id === existing.buyerId && (v.type === '바이어' || v.type === '브랜드'));
+          const buyerName = vendorObj?.name || (existing as any).buyerName || '미지정';
           const salesRecord: SalesRecord = {
             id: genId(),
             saleDate: receiveForm.receivedDate || new Date().toISOString().split('T')[0],

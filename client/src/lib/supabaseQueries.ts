@@ -165,9 +165,9 @@ const TABLE_COLUMNS: Record<string, string[]> = {
                       'factory_currency', 'color_qtys', 'delivery_date', 'style_id', 'revision',
                       'is_reorder', 'season', 'bom_id', 'bom_type', 'hq_supply_items',
                       'nego_history', 'received_qty', 'defect_qty', 'defect_note', 'received_date',
-                      'trade_statement_id',
+                      'trade_statement_id', 'expense_id',
                       'created_at', 'updated_at'],
-  materials: ['id', 'name', 'name_en', 'spec', 'unit', 'unit_price', 'unit_price_cny', 'unit_price_krw',
+  materials: ['id', 'item_code', 'name', 'name_en', 'spec', 'unit', 'unit_price', 'unit_price_cny', 'unit_price_krw',
               'currency', 'vendor_id', 'category', 'stock_qty', 'memo',
               'order_status', 'order_date', 'order_qty', 'order_vendor_name',
               'created_at', 'updated_at'],
@@ -459,6 +459,7 @@ export async function fetchOrders() {
     postCostId: row.post_cost_id,
     logisticsCostId: row.logistics_cost_id,
     tradeStatementId: row.trade_statement_id,
+    expenseId: row.expense_id || undefined,
     deliveryDate: row.delivery_date,
     factoryUnitPriceCny: row.factory_unit_price_cny,
     factoryUnitPriceKrw: row.factory_unit_price_krw ?? row.unit_price,
@@ -503,6 +504,8 @@ export async function upsertOrder(order: Record<string, any>) {
     factory_currency: order.factoryCurrency ?? 'CNY',
     hq_supply_items: order.hqSupplyItems ?? [],
     nego_history: order.negoHistory ?? [],
+    trade_statement_id: order.tradeStatementId || null,
+    expense_id: order.expenseId || null,
     updated_at: order.updatedAt ?? new Date().toISOString(),
     created_at: order.createdAt ?? new Date().toISOString(),
   });
@@ -527,6 +530,7 @@ export async function fetchMaterials() {
   if (error) throw error;
   return (data || []).map((row: any) => ({
     id: row.id,
+    itemCode: row.item_code || undefined,
     name: row.name ?? '',
     nameEn: row.name_en || '',
     category: row.category || '원자재',
@@ -554,6 +558,7 @@ export async function upsertMaterial(mat: Record<string, any>): Promise<void> {
     category: mat.category || '원자재',
     updated_at: new Date().toISOString(),
   };
+  if (mat.itemCode !== undefined) row.item_code = mat.itemCode || null;
   if (mat.spec !== undefined) row.spec = mat.spec || null;
   if (mat.nameEn !== undefined) row.name_en = mat.nameEn || null;
   if (mat.unitPriceCny !== undefined) row.unit_price_cny = mat.unitPriceCny;

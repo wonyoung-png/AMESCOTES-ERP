@@ -164,24 +164,37 @@ export default function PurchaseMatching() {
   const [bulkEditModal, setBulkEditModal] = useState(false);
   const [bulkEditOrderNo, setBulkEditOrderNo] = useState('');
   const [bulkEditItems, setBulkEditItems] = useState<PurchaseItem[]>([]);
-  const [bulkEditForm, setBulkEditForm] = useState<{
-    purchaseDate: string; purchaseStatus: string; unitPriceCny: number; applyPrice: boolean; applyDate: boolean; applyStatus: boolean;
-  }>({ purchaseDate: '', purchaseStatus: '', unitPriceCny: 0, applyPrice: false, applyDate: false, applyStatus: false });
+  const [bulkEditDate, setBulkEditDate] = useState('');
 
   const openBulkEditModal = (orderNo: string, items: PurchaseItem[]) => {
     setBulkEditOrderNo(orderNo);
-    setBulkEditItems(items);
-    setBulkEditForm({ purchaseDate: new Date().toISOString().split('T')[0], purchaseStatus: '', unitPriceCny: 0, applyPrice: false, applyDate: false, applyStatus: false });
+    setBulkEditItems(items.map(i => ({ ...i })));
+    setBulkEditDate(new Date().toISOString().split('T')[0]);
     setBulkEditModal(true);
+  };
+
+  const updateBulkItem = (idx: number, field: 'qty' | 'unitPriceCny' | 'purchaseStatus', value: string) => {
+    setBulkEditItems(prev => {
+      const next = [...prev];
+      const item = { ...next[idx] };
+      if (field === 'qty') item.qty = parseFloat(value) || 0;
+      else if (field === 'unitPriceCny') item.unitPriceCny = parseFloat(value) || 0;
+      else if (field === 'purchaseStatus') item.purchaseStatus = value as PurchaseItem['purchaseStatus'];
+      item.amountKrw = calcAmountKrw(item.qty, item.unitPriceCny, item.currency);
+      next[idx] = item;
+      return next;
+    });
   };
 
   const handleBulkEdit = async () => {
     for (const item of bulkEditItems) {
-      const extra: Record<string, any> = {};
-      if (bulkEditForm.applyDate && bulkEditForm.purchaseDate) extra.purchase_date = bulkEditForm.purchaseDate;
-      if (bulkEditForm.applyPrice && bulkEditForm.unitPriceCny > 0) extra.unit_price_cny = bulkEditForm.unitPriceCny;
-      const status = bulkEditForm.applyStatus && bulkEditForm.purchaseStatus ? bulkEditForm.purchaseStatus : item.purchaseStatus;
-      await updatePurchaseItemStatus(item.id, status, extra);
+      const extra: Record<string, any> = {
+        unit_price_cny: item.unitPriceCny,
+        amount_krw: item.amountKrw,
+        qty: item.qty,
+      };
+      if (bulkEditDate) extra.purchase_date = bulkEditDate;
+      await updatePurchaseItemStatus(item.id, item.purchaseStatus, extra);
     }
     refresh();
     setBulkEditModal(false);
@@ -1335,6 +1348,9 @@ export default function PurchaseMatching() {
                   onChange={e => setExpenseForm(f => ({ ...f, amountKrw: parseInt(e.target.value) || 0 }))}
                   placeholder="0"
                 />
+                {expenseForm.amountKrw > 0 && (
+                  <div className="text-right text-xs text-stone-400">{formatKRW(expenseForm.amountKrw)}</div>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>결제 방법</Label>
@@ -1448,72 +1464,71 @@ export default function PurchaseMatching() {
 
       {/* ── 일괄수정 모달 (작업 6) ── */}
       <Dialog open={bulkEditModal} onOpenChange={setBulkEditModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>✏ 일괄수정 — [{bulkEditOrderNo}] {bulkEditItems.length}종</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-xs text-stone-500">수정할 항목을 선택하고 값을 입력해주세요. 체크된 항목만 변경됩니다.</p>
-            {/* 구매일 */}
+          <div className="space-y-3 py-2">
             <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={bulkEditForm.applyDate}
-                onChange={e => setBulkEditForm(f => ({ ...f, applyDate: e.target.checked }))}
-                className="w-4 h-4 cursor-pointer"
+              <Label className="text-xs whitespace-nowrap">구매일 (전체 적용)</Label>
+              <Input
+                type="date"
+                value={bulkEditDate}
+                onChange={e => setBulkEditDate(e.target.value)}
+                className="h-8 w-48"
               />
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs">구매일</Label>
-                <Input
-                  type="date"
-                  value={bulkEditForm.purchaseDate}
-                  onChange={e => setBulkEditForm(f => ({ ...f, purchaseDate: e.target.value, applyDate: true }))}
-                  className="h-8"
-                />
-              </div>
             </div>
-            {/* 단가 */}
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={bulkEditForm.applyPrice}
-                onChange={e => setBulkEditForm(f => ({ ...f, applyPrice: e.target.checked }))}
-                className="w-4 h-4 cursor-pointer"
-              />
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs">단가 (원화 기준)</Label>
-                <Input
-                  type="number"
-                  value={bulkEditForm.unitPriceCny || ''}
-                  onChange={e => setBulkEditForm(f => ({ ...f, unitPriceCny: parseFloat(e.target.value) || 0, applyPrice: true }))}
-                  placeholder="0"
-                  className="h-8"
-                />
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-stone-100">
+                    <th className="text-left px-2 py-2 border border-stone-200">품목명</th>
+                    <th className="text-center px-2 py-2 border border-stone-200 w-20">수량</th>
+                    <th className="text-center px-2 py-2 border border-stone-200 w-28">단가({bulkEditItems[0]?.currency || 'CNY'})</th>
+                    <th className="text-right px-2 py-2 border border-stone-200 w-28">금액(KRW)</th>
+                    <th className="text-center px-2 py-2 border border-stone-200 w-28">상태</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bulkEditItems.map((item, idx) => (
+                    <tr key={item.id} className="hover:bg-stone-50">
+                      <td className="px-2 py-1 border border-stone-200 font-medium">{item.itemName}</td>
+                      <td className="px-1 py-1 border border-stone-200">
+                        <input
+                          type="number"
+                          value={item.qty}
+                          onChange={e => updateBulkItem(idx, 'qty', e.target.value)}
+                          className="w-full text-center border border-stone-200 rounded px-1 py-0.5 text-xs"
+                        />
+                      </td>
+                      <td className="px-1 py-1 border border-stone-200">
+                        <input
+                          type="number"
+                          value={item.unitPriceCny}
+                          onChange={e => updateBulkItem(idx, 'unitPriceCny', e.target.value)}
+                          className="w-full text-center border border-stone-200 rounded px-1 py-0.5 text-xs"
+                          step="0.01"
+                        />
+                      </td>
+                      <td className="px-2 py-1 border border-stone-200 text-right text-amber-700 font-medium">
+                        {formatKRW(item.amountKrw)}
+                      </td>
+                      <td className="px-1 py-1 border border-stone-200">
+                        <select
+                          value={item.purchaseStatus}
+                          onChange={e => updateBulkItem(idx, 'purchaseStatus', e.target.value)}
+                          className="w-full border border-stone-200 rounded px-1 py-0.5 text-xs bg-white"
+                        >
+                          {PURCHASE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            {/* 상태 */}
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={bulkEditForm.applyStatus}
-                onChange={e => setBulkEditForm(f => ({ ...f, applyStatus: e.target.checked }))}
-                className="w-4 h-4 cursor-pointer"
-              />
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs">구매 상태</Label>
-                <Select
-                  value={bulkEditForm.purchaseStatus}
-                  onValueChange={v => setBulkEditForm(f => ({ ...f, purchaseStatus: v, applyStatus: true }))}
-                >
-                  <SelectTrigger className="h-8"><SelectValue placeholder="상태 선택" /></SelectTrigger>
-                  <SelectContent>
-                    {PURCHASE_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="p-3 bg-blue-50 rounded-lg text-xs text-blue-700">
-              {bulkEditItems.length}종에 대해 선택된 필드를 일괄 변경합니다.
+            <div className="p-2 bg-blue-50 rounded-lg text-xs text-blue-700">
+              총 {bulkEditItems.length}종 · 합계 {formatKRW(bulkEditItems.reduce((s, i) => s + i.amountKrw, 0))}
             </div>
           </div>
           <DialogFooter>
@@ -1521,9 +1536,8 @@ export default function PurchaseMatching() {
             <Button
               className="bg-blue-700 hover:bg-blue-800 text-white"
               onClick={handleBulkEdit}
-              disabled={!bulkEditForm.applyDate && !bulkEditForm.applyPrice && !bulkEditForm.applyStatus}
             >
-              일괄 수정 적용
+              일괄 수정 저장
             </Button>
           </DialogFooter>
         </DialogContent>
