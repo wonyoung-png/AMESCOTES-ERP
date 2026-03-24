@@ -3231,6 +3231,7 @@ export default function ProductionOrders() {
               <Button
                 className="h-8 text-xs bg-green-700 hover:bg-green-800 text-white"
                 onClick={async () => {
+                  try {
                   const existingMaterials = await fetchMaterials();
                   let savedCount = 0;
                   const today = new Date().toISOString().split('T')[0];
@@ -3302,6 +3303,10 @@ export default function ProductionOrders() {
                   refreshCart();
                   toast.success(`✅ ${savedCount}종 자재가 자재구매 탭에 저장되었습니다`);
                   setVendorOrderModal(false);
+                  } catch(e: any) {
+                    console.error('발주 확정 오류:', e);
+                    toast.error(`발주 확정 실패: ${e?.message || '알 수 없는 오류'}`);
+                  }
                 }}
               >
                 ✅ 발주 확정
