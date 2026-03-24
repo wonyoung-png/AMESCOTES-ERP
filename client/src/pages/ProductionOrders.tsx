@@ -583,10 +583,17 @@ export default function ProductionOrders() {
               vendorName: l.vendorName,
               isHqProvided: true,
               imageUrl: l.imageUrl,
+              unitPriceCny: (l as any).unitPriceCny ?? (l as any).unitPrice ?? 0,
             });
           }
         }
       }
+    }
+
+    // 본사제공 자재 자동 장바구니 저장 (발주 등록 시 자동으로 담김)
+    if (bomMaterials.length > 0) {
+      store.addToMaterialCart(order.styleNo, order.styleName, bomMaterials, totalQty);
+      refreshCart();
     }
 
     setPostOrderInfo({ order, bomMaterials });
@@ -803,19 +810,6 @@ export default function ProductionOrders() {
             className={`hidden sm:block px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${showFactoryView ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
           >
             공장별 현황
-          </button>
-          {/* 자재 장바구니 버튼 */}
-          <button
-            onClick={() => { refreshCart(); setCartModal(true); }}
-            className="relative px-3 py-2 rounded-lg border border-blue-300 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors flex items-center gap-1.5"
-          >
-            <ShoppingCart className="w-3.5 h-3.5" />
-            자재 장바구니
-            {cartItems.length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
-                {cartItems.length}
-              </span>
-            )}
           </button>
           <Button onClick={() => openNew()} className="bg-amber-700 hover:bg-amber-800 text-white gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
             <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />발주 등록
@@ -2643,34 +2637,20 @@ export default function ProductionOrders() {
                     <p className="text-xs text-stone-500">작업지시서 모달 바로 오픈</p>
                   </div>
                 </button>
-                {/* 자재 장바구니 담기 */}
+                {/* 자재 장바구니 자동 저장 안내 */}
                 {postOrderInfo.bomMaterials.length > 0 ? (
-                  <button
-                    className="w-full flex items-center gap-3 p-3 rounded-lg border border-blue-200 hover:bg-blue-50 text-left transition-colors"
-                    onClick={() => {
-                      store.addToMaterialCart(
-                        postOrderInfo.order.styleNo,
-                        postOrderInfo.order.styleName,
-                        postOrderInfo.bomMaterials,
-                        postOrderInfo.order.qty
-                      );
-                      refreshCart();
-                      setPostOrderModal(false);
-                      toast.success(`🛒 본사제공 자재 ${postOrderInfo.bomMaterials.length}종을 장바구니에 담았습니다`);
-                      setCartModal(true);
-                    }}
-                  >
-                    <span className="text-xl">📦</span>
+                  <div className="w-full flex items-center gap-3 p-3 rounded-lg border border-blue-100 bg-blue-50 text-left">
+                    <span className="text-xl">✅</span>
                     <div>
-                      <p className="text-sm font-semibold text-blue-800">자재 장바구니 담기</p>
-                      <p className="text-xs text-blue-600">본사제공 자재 {postOrderInfo.bomMaterials.length}종을 장바구니에 추가</p>
+                      <p className="text-sm font-semibold text-blue-800">자재 장바구니 자동 저장 완료</p>
+                      <p className="text-xs text-blue-600">본사제공 자재 {postOrderInfo.bomMaterials.length}종이 자재구매 탭 장바구니에 추가됐습니다</p>
                     </div>
-                  </button>
+                  </div>
                 ) : (
                   <div className="w-full flex items-center gap-3 p-3 rounded-lg border border-stone-100 bg-stone-50 text-left opacity-60">
                     <span className="text-xl">📦</span>
                     <div>
-                      <p className="text-sm font-semibold text-stone-500">자재 장바구니 담기</p>
+                      <p className="text-sm font-semibold text-stone-500">자재 없음</p>
                       <p className="text-xs text-stone-400">본사제공 자재 없음 (BOM 미등록 또는 전량 공장구매)</p>
                     </div>
                   </div>

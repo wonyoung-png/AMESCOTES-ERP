@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import {
   store, genId, formatKRW, formatNumber,
   type PurchaseItem, type Currency, type ExpenseType, type Expense, type ExpenseCategory,
+  type CartItem,
 } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Trash2, ShoppingCart, FileText, Receipt } from 'lucide-react';
+import { Plus, Trash2, ShoppingCart, FileText, Receipt, Printer, X, Mail } from 'lucide-react';
 
 const CURRENCIES: Currency[] = ['KRW', 'USD', 'CNY'];
 const PAYMENT_METHODS: ExpenseType[] = ['법인카드', '계좌이체', '현금'];
@@ -55,6 +56,7 @@ export default function PurchaseMatching() {
   const [purchases, setPurchases] = useState<PurchaseItem[]>(() => store.getPurchaseItems());
   const orders = store.getOrders();
   const vendors = store.getVendors().filter(v => v.type === '자재거래처');
+  const allVendors = store.getVendors();
   const settings = store.getSettings();
   const [filterOrder, setFilterOrder] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -75,6 +77,18 @@ export default function PurchaseMatching() {
   const [expenseModal, setExpenseModal] = useState(false);
   const [expenseForm, setExpenseForm] = useState<ExpenseFormState>(DEFAULT_EXPENSE_FORM);
 
+  // 자재 장바구니 모달 상태
+  const [cartModal, setCartModal] = useState(false);
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => store.getMaterialCart());
+  // 거래처별 발주서 모달 상태
+  const [vendorOrderModal, setVendorOrderModal] = useState(false);
+  // 이메일 입력 모달 상태
+  const [emailInputModal, setEmailInputModal] = useState(false);
+  const [emailInputValue, setEmailInputValue] = useState('');
+  const [pendingEmailVendor, setPendingEmailVendor] = useState<string>('');
+  const [pendingEmailItems, setPendingEmailItems] = useState<Array<CartItem & { orderQty: number }>>([]);
+
+  const refreshCart = () => setCartItems(store.getMaterialCart());
   const refresh = () => setPurchases(store.getPurchaseItems());
 
   const filtered = useMemo(() => {
@@ -222,6 +236,52 @@ export default function PurchaseMatching() {
     toast.info(`전표: ${expense.description} / ${formatKRW(expense.amountKrw)} / ${expense.expenseDate}`);
   };
 
+  // 이메일 발송
+  const sendVendorEmail = async (vendor: string, email: string, items: Array<CartItem & { orderQty: number }>) => {
+    const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const subject = `[AMESCOTES] 자재 발주서 - ${vendor} ${today}`;
+    const bodyLines = [
+      `안녕하세요, ${vendor} 담당자님.`,
+      ``,
+      `아래와 같이 자재 발주 드립니다. 확인 및 납기 일정 회신 부탁드립니다.`,
+      ``,
+      `[발주 일자] ${today}`,
+      `[거래처] ${vendor}`,
+      ``,
+      `─────────────────────────────`,
+      `No. | 자재명 | 규격 | 단위 | 발주수량`,
+      `─────────────────────────────`,
+      ...items.map((item, i) =>
+        `${i + 1}. ${item.materialName}${item.spec ? ` (${item.spec})` : ''} | ${item.unit} | ${item.orderQty % 1 === 0 ? item.orderQty.toLocaleString() : item.orderQty.toFixed(3)}`
+      ),
+      `─────────────────────────────`,
+      `총 ${items.length}종`,
+      ``,
+      `담긴 발주: ${[...new Set(items.flatMap(item => item.orders.map(o => o.styleNo)))].join(', ')}`,
+      ``,
+      `문의사항은 회신 주시기 바랍니다.`,
+      ``,
+      `감사합니다.`,
+      `AMESCOTES Co., Ltd`,
+    ];
+    const body = bodyLines.join('\n');
+    try {
+      const resp = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: email, subject, body, account: 'info@atlm.kr' }),
+      });
+      if (resp.ok) { toast.success(`📧 ${vendor} 발주서를 ${email}로 발송했습니다`); return; }
+    } catch { /* API 없음 */ }
+    const gogCmd = `gog gmail send --to "${email}" --subject "${subject}" --body "${body.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}" --account info@atlm.kr`;
+    try {
+      await navigator.clipboard.writeText(gogCmd);
+      toast.success(`📋 ${vendor} 발주서 이메일 명령어가 클립보드에 복사됐습니다!\n터미널에 붙여넣기해서 실행하세요`);
+    } catch {
+      toast.info(`📧 ${vendor} 발주서\n수신: ${email}\n수동으로 gog 명령어를 실행해주세요`);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -229,9 +289,24 @@ export default function PurchaseMatching() {
           <h1 className="text-2xl font-bold text-stone-800">자재 구매</h1>
           <p className="text-sm text-stone-500 mt-0.5">발주번호 매칭 · 본사제공 자재 구매 이력 관리</p>
         </div>
-        <Button onClick={openNew} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">
-          <Plus className="w-4 h-4" />구매 등록
-        </Button>
+        <div className="flex gap-2">
+          {/* 자재 장바구니 버튼 */}
+          <button
+            onClick={() => { refreshCart(); setCartModal(true); }}
+            className="relative px-3 py-2 rounded-lg border border-blue-300 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors flex items-center gap-1.5"
+          >
+            <ShoppingCart className="w-3.5 h-3.5" />
+            자재 장바구니
+            {cartItems.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+                {cartItems.length}
+              </span>
+            )}
+          </button>
+          <Button onClick={openNew} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">
+            <Plus className="w-4 h-4" />구매 등록
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
@@ -299,14 +374,18 @@ export default function PurchaseMatching() {
                       onClick={() => toggleGroup(orderNo)}
                     >
                       <td colSpan={9} className="px-4 py-2.5">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <span className="text-stone-400 text-xs w-3">{isOpen ? '▼' : '▶'}</span>
                           <span className="font-mono font-semibold text-stone-700">{orderNo}</span>
                           <span className="text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{groupItems.length}종</span>
                           {unpurchased > 0 && (
                             <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">미구매 {unpurchased}건</span>
                           )}
-                          <span className="text-xs text-stone-500 ml-auto">{formatKRW(totalKrw)}</span>
+                          <span className="ml-auto flex items-center gap-2">
+                            <span className="text-xs text-stone-500">공급가액 {formatKRW(totalKrw)}</span>
+                            <span className="text-xs text-stone-400">+ 세액 {formatKRW(Math.round(totalKrw * 0.1))}</span>
+                            <span className="text-xs font-semibold text-stone-700">= {formatKRW(totalKrw + Math.round(totalKrw * 0.1))}</span>
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -468,6 +547,418 @@ export default function PurchaseMatching() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
             <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">{editId ? '수정' : '등록'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 자재 장바구니 모달 ── */}
+      <Dialog open={cartModal} onOpenChange={setCartModal}>
+        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4 text-blue-700" />
+              자재 통합 발주 장바구니
+              {cartItems.length > 0 && (
+                <span className="ml-1 text-sm font-normal text-stone-500">({cartItems.length}종)</span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {cartItems.length === 0 ? (
+            <div className="py-12 text-center text-stone-400">
+              <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-20" />
+              <p className="text-sm">장바구니가 비어 있습니다</p>
+              <p className="text-xs mt-1">생산발주 탭에서 발주 등록 시 자동으로 담깁니다</p>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-stone-200 bg-stone-50">
+                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">자재명</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">규격</th>
+                      <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">단위</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">단가(CNY)</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">소요수량</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">보유재고</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">발주수량</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">금액(KRW)</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">담긴 발주</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">구매처</th>
+                      <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">삭제</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cartItems.map((item, idx) => {
+                      const stockQty = item.stockQty ?? 0;
+                      const orderQty = Math.max(0, item.qty - stockQty);
+                      const isSufficient = orderQty === 0;
+                      const unitPriceCny = item.unitPriceCny ?? 0;
+                      const amountKrw = Math.round(orderQty * unitPriceCny * settings.cnyKrw);
+                      return (
+                      <tr key={idx} className="border-b border-stone-100 hover:bg-stone-50">
+                        <td className="px-3 py-2 font-medium text-stone-800">{item.materialName}</td>
+                        <td className="px-3 py-2 text-stone-500 text-xs">{item.spec || '-'}</td>
+                        <td className="px-3 py-2 text-center text-stone-600">{item.unit}</td>
+                        <td className="px-3 py-2 text-right font-mono text-stone-600 text-xs">
+                          {unitPriceCny > 0 ? formatNumber(unitPriceCny, 2) : <span className="text-stone-300">-</span>}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono text-stone-600 text-sm">
+                          {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            value={stockQty === 0 ? '' : stockQty}
+                            placeholder="0"
+                            onChange={e => {
+                              const val = parseFloat(e.target.value) || 0;
+                              store.updateCartItemStock(item.materialName, item.unit, val);
+                              refreshCart();
+                            }}
+                            className="w-20 h-7 text-right font-mono text-sm border border-stone-200 rounded px-2 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            value={orderQty}
+                            onChange={e => {
+                              const newQty = parseFloat(e.target.value) || 0;
+                              const newStock = Math.max(0, item.qty - newQty);
+                              store.updateCartItemStock(item.materialName, item.unit, newStock);
+                              refreshCart();
+                            }}
+                            className={`w-24 h-7 text-right font-mono text-sm border rounded px-2 focus:outline-none focus:ring-1 ${
+                              isSufficient
+                                ? 'border-green-300 text-green-700 bg-green-50 focus:ring-green-300'
+                                : 'border-amber-300 text-amber-700 bg-amber-50 focus:ring-amber-300'
+                            }`}
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono text-xs text-stone-600">
+                          {amountKrw > 0 ? formatKRW(amountKrw) : <span className="text-stone-300">-</span>}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-stone-500">
+                          {item.orders.map((o, i) => (
+                            <span key={i}>
+                              {i > 0 && <span className="mx-1 text-stone-300">+</span>}
+                              <span className="text-stone-600 font-medium">{o.styleNo}</span>
+                              <span className="text-stone-400">({o.qty % 1 === 0 ? o.qty.toLocaleString() : o.qty.toFixed(3)})</span>
+                            </span>
+                          ))}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-stone-500">{item.vendorName || <span className="text-stone-300">-</span>}</td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            className="text-stone-300 hover:text-red-500 transition-colors"
+                            onClick={() => {
+                              store.removeCartItem(item.materialName, item.unit);
+                              refreshCart();
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-stone-400">💡 보유재고 입력 시 발주수량이 자동으로 차감됩니다. 발주수량도 직접 조정 가능합니다.</p>
+            </div>
+          )}
+          <DialogFooter className="gap-2 flex-wrap">
+            {cartItems.length > 0 && (
+              <>
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => {
+                    if (confirm('장바구니를 전체 비우시겠습니까?')) {
+                      store.clearMaterialCart();
+                      refreshCart();
+                    }
+                  }}
+                >
+                  전체 비우기
+                </Button>
+                <Button
+                  className="bg-blue-700 hover:bg-blue-800 text-white"
+                  onClick={() => { setCartModal(false); setVendorOrderModal(true); }}
+                >
+                  <Printer className="w-4 h-4 mr-1.5" />
+                  거래처별 발주서 출력
+                </Button>
+              </>
+            )}
+            <Button variant="outline" onClick={() => setCartModal(false)}>닫기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 거래처별 발주서 모달 ── */}
+      <Dialog open={vendorOrderModal} onOpenChange={setVendorOrderModal}>
+        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="w-4 h-4" />
+              거래처별 발주서
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-2">
+            {(() => {
+              const grouped = new Map<string, Array<CartItem & { orderQty: number }>>();
+              for (const item of cartItems) {
+                const stockQty = item.stockQty ?? 0;
+                const orderQty = Math.max(0, item.qty - stockQty);
+                if (orderQty === 0) continue;
+                const vendor = item.vendorName || '미지정';
+                if (!grouped.has(vendor)) grouped.set(vendor, []);
+                grouped.get(vendor)!.push({ ...item, orderQty });
+              }
+              const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+              if (grouped.size === 0) {
+                return <p className="text-center text-stone-400 py-8">발주가 필요한 자재가 없습니다 (보유재고로 충당 가능)</p>;
+              }
+              return Array.from(grouped.entries()).map(([vendor, items]) => (
+                <div key={vendor} className="border border-stone-200 rounded-lg overflow-hidden">
+                  <div className="bg-stone-800 text-white px-4 py-3 flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-base">{vendor === '미지정' ? '구매처 미지정' : vendor}</p>
+                      <p className="text-xs text-stone-300 mt-0.5">발주일: {today} · {items.length}종</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs text-stone-800 border-stone-200 bg-white hover:bg-stone-100"
+                      onClick={() => window.print()}
+                    >
+                      <Printer className="w-3 h-3 mr-1" />인쇄
+                    </Button>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-stone-50 border-b border-stone-200">
+                        <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-8">No.</th>
+                        <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-10">이미지</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">자재명</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">규격</th>
+                        <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">단위</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">단가(CNY)</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">소요수량</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">보유재고</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">발주수량</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">금액(KRW)</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">비고</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item, i) => {
+                        const unitPriceCny = item.unitPriceCny ?? 0;
+                        const amountKrw = Math.round(item.orderQty * unitPriceCny * settings.cnyKrw);
+                        return (
+                        <tr key={i} className="border-b border-stone-100">
+                          <td className="px-3 py-2 text-center text-stone-400 text-xs">{i + 1}</td>
+                          <td className="px-2 py-1 text-center">
+                            {item.imageUrl ? (
+                              <img src={item.imageUrl} alt={item.materialName} className="w-14 h-14 object-cover rounded cursor-pointer border border-stone-200 hover:scale-110 transition-transform" onClick={() => window.open(item.imageUrl, '_blank')} />
+                            ) : (
+                              <span className="text-stone-300 text-base">📷</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 font-medium text-stone-800">{item.materialName}</td>
+                          <td className="px-3 py-2 text-stone-500 text-xs">{item.spec || '-'}</td>
+                          <td className="px-3 py-2 text-center text-stone-600">{item.unit}</td>
+                          <td className="px-3 py-2 text-right font-mono text-stone-600 text-xs">
+                            {unitPriceCny > 0 ? formatNumber(unitPriceCny, 2) : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-stone-500 text-xs">
+                            {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-stone-500 text-xs">
+                            {(item.stockQty ?? 0) % 1 === 0 ? (item.stockQty ?? 0).toLocaleString() : (item.stockQty ?? 0).toFixed(3)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-amber-700">
+                            {item.orderQty % 1 === 0 ? item.orderQty.toLocaleString() : item.orderQty.toFixed(3)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-xs text-stone-600">
+                            {amountKrw > 0 ? formatKRW(amountKrw) : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-stone-400">
+                            {item.orders.map((o, j) => (
+                              <span key={j}>
+                                {j > 0 && ' + '}
+                                {o.styleNo}({o.qty % 1 === 0 ? o.qty.toLocaleString() : o.qty.toFixed(3)})
+                              </span>
+                            ))}
+                          </td>
+                        </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-stone-50 border-t border-stone-200">
+                        <td colSpan={8} className="px-3 py-2 text-xs font-medium text-stone-600 text-right">합계 {items.length}종</td>
+                        <td className="px-3 py-2 text-right text-xs font-bold text-amber-700">
+                          {items.reduce((s, i) => s + i.orderQty, 0).toFixed(0)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-xs font-bold text-stone-700">
+                          {formatKRW(items.reduce((s, i) => s + Math.round(i.orderQty * (i.unitPriceCny ?? 0) * settings.cnyKrw), 0))}
+                        </td>
+                        <td className="px-3 py-2"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                  <div className="px-4 py-3 border-t border-stone-100 grid grid-cols-3 gap-4 text-xs text-stone-500">
+                    <div>발주담당: ___________</div>
+                    <div>확인: ___________</div>
+                    <div>수령: ___________</div>
+                  </div>
+                </div>
+              ));
+            })()}
+            {cartItems.length === 0 && (
+              <p className="text-center text-stone-400 py-8">장바구니에 담긴 자재가 없습니다</p>
+            )}
+          </div>
+          <DialogFooter className="flex flex-wrap gap-2 justify-between">
+            <Button variant="outline" onClick={() => { setVendorOrderModal(false); setCartModal(true); }}>
+              뒤로
+            </Button>
+            <div className="flex gap-2 flex-wrap">
+              {/* 이메일 발송 버튼 */}
+              {(() => {
+                const grouped = new Map<string, Array<CartItem & { orderQty: number }>>();
+                for (const item of cartItems) {
+                  const stockQty = item.stockQty ?? 0;
+                  const orderQty = Math.max(0, item.qty - stockQty);
+                  if (orderQty === 0) continue;
+                  const vendor = item.vendorName || '미지정';
+                  if (!grouped.has(vendor)) grouped.set(vendor, []);
+                  grouped.get(vendor)!.push({ ...item, orderQty });
+                }
+                return Array.from(grouped.entries()).map(([vendor, items]) => {
+                  const handleSendEmail = async () => {
+                    const vendorRecord = allVendors.find(v => v.name === vendor && v.type === '자재거래처');
+                    const vendorEmail = vendorRecord?.contactEmail || '';
+                    if (!vendorEmail) {
+                      setPendingEmailVendor(vendor);
+                      setPendingEmailItems(items);
+                      setEmailInputValue('');
+                      setEmailInputModal(true);
+                      return;
+                    }
+                    await sendVendorEmail(vendor, vendorEmail, items);
+                  };
+                  return (
+                    <Button
+                      key={`email-${vendor}`}
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs text-blue-700 border-blue-300 hover:bg-blue-50"
+                      onClick={handleSendEmail}
+                    >
+                      <Mail className="w-3.5 h-3.5 mr-1" />📧 {vendor} 이메일
+                    </Button>
+                  );
+                });
+              })()}
+              {/* 발주 확정 버튼 */}
+              <Button
+                className="h-8 text-xs bg-green-700 hover:bg-green-800 text-white"
+                onClick={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  let savedCount = 0;
+                  for (const item of cartItems) {
+                    const stockQty = item.stockQty ?? 0;
+                    const orderQty = Math.max(0, item.qty - stockQty);
+                    if (orderQty === 0) continue;
+                    const vendor = item.vendorName || '미지정';
+                    const unitPriceCny = item.unitPriceCny ?? 0;
+                    const amountKrw = Math.round(orderQty * unitPriceCny * settings.cnyKrw);
+                    // 발주별로 구매 이력 저장 (발주번호별로 분리)
+                    const orderNos = [...new Set(item.orders.map(o => o.styleNo))];
+                    for (const styleNo of orderNos) {
+                      const matchOrder = orders.find(o => o.styleNo === styleNo);
+                      store.addPurchaseItem({
+                        id: genId(),
+                        orderId: matchOrder?.id || '',
+                        orderNo: matchOrder?.orderNo || styleNo,
+                        purchaseDate: today,
+                        itemName: item.materialName,
+                        qty: orderQty,
+                        unit: item.unit,
+                        unitPriceCny: unitPriceCny,
+                        currency: 'CNY',
+                        appliedRate: settings.cnyKrw || 191,
+                        amountKrw: amountKrw,
+                        vendorName: vendor,
+                        paymentMethod: '기타',
+                        purchaseStatus: '미구매',
+                        createdAt: new Date().toISOString(),
+                      });
+                      savedCount++;
+                    }
+                  }
+                  store.clearMaterialCart();
+                  refreshCart();
+                  refresh();
+                  toast.success(`✅ ${savedCount}건이 자재구매 목록에 저장되었습니다`);
+                  setVendorOrderModal(false);
+                }}
+              >
+                ✅ 발주 확정
+              </Button>
+              <Button variant="outline" onClick={() => setVendorOrderModal(false)}>닫기</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 이메일 입력 모달 ── */}
+      <Dialog open={emailInputModal} onOpenChange={setEmailInputModal}>
+        <DialogContent className="w-full rounded-none sm:w-[95vw] sm:max-w-sm sm:rounded-lg">
+          <DialogHeader>
+            <DialogTitle>이메일 주소 입력</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-stone-600">
+              <span className="font-semibold">{pendingEmailVendor}</span> 거래처의 이메일 주소가 등록되어 있지 않습니다.
+            </p>
+            <div className="space-y-1.5">
+              <Label>이메일 주소</Label>
+              <Input
+                type="email"
+                placeholder="example@company.com"
+                value={emailInputValue}
+                onChange={e => setEmailInputValue(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && emailInputValue.trim()) {
+                    setEmailInputModal(false);
+                    sendVendorEmail(pendingEmailVendor, emailInputValue.trim(), pendingEmailItems);
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailInputModal(false)}>취소</Button>
+            <Button
+              className="bg-blue-700 hover:bg-blue-800 text-white"
+              disabled={!emailInputValue.trim()}
+              onClick={() => {
+                setEmailInputModal(false);
+                sendVendorEmail(pendingEmailVendor, emailInputValue.trim(), pendingEmailItems);
+              }}
+            >
+              <Mail className="w-4 h-4 mr-1" />발송
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -644,6 +644,7 @@ export interface CartItem {
   vendorName?: string     // 구매업체
   isHqProvided: boolean   // 본사제공 여부
   imageUrl?: string       // BOM 자재 이미지
+  unitPriceCny?: number   // BOM 단가 (CNY)
   orders: { styleNo: string; styleName: string; qty: number }[] // 담긴 발주 목록
 }
 
@@ -1305,7 +1306,7 @@ export const store = {
   addToMaterialCart: (
     styleNo: string,
     styleName: string,
-    bomMaterials: Array<{ itemName: string; spec?: string; unit: string; netQty: number; lossRate: number; vendorName?: string; isHqProvided: boolean; imageUrl?: string }>,
+    bomMaterials: Array<{ itemName: string; spec?: string; unit: string; netQty: number; lossRate: number; vendorName?: string; isHqProvided: boolean; imageUrl?: string; unitPriceCny?: number }>,
     orderQty: number
   ) => {
     const cart = getAll<CartItem>(KEYS.materialCart);
@@ -1325,6 +1326,10 @@ export const store = {
         }
         cart[idx].qty = Math.round((cart[idx].qty + totalQty) * 1000) / 1000;
         if (!cart[idx].imageUrl && mat.imageUrl) cart[idx].imageUrl = mat.imageUrl;
+        // 단가 업데이트 (BOM에 단가 있으면 갱신)
+        if (mat.unitPriceCny !== undefined && mat.unitPriceCny > 0) {
+          cart[idx].unitPriceCny = mat.unitPriceCny;
+        }
       } else {
         cart.push({
           materialName: mat.itemName,
@@ -1334,6 +1339,7 @@ export const store = {
           vendorName: mat.vendorName,
           isHqProvided: mat.isHqProvided,
           imageUrl: mat.imageUrl,
+          unitPriceCny: (mat as any).unitPriceCny ?? 0,
           orders: [{ styleNo, styleName, qty: totalQty }],
         });
       }
