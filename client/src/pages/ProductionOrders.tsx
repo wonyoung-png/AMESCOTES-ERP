@@ -8,7 +8,7 @@ import {
   type ProductionOrder, type OrderStatus, type Season, type Item, type Bom,
   type HqSupplyItem, type ColorQty, type CartItem,
   type TradeStatement, type TradeStatementLine,
-  type ExpenseType, type ExpenseCategory, type Expense,
+  type ExpenseType, type ExpenseCategory, type Expense, type SalesRecord,
 } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -301,8 +301,8 @@ export default function ProductionOrders() {
     if (filterDeadline === 'd3') list = list.filter(o => { if (!o.deliveryDate) return false; const d = calcDDay(o.deliveryDate); return d >= 0 && d <= 3; });
     if (filterDeadline === 'overdue') list = list.filter(o => o.deliveryDate ? calcDDay(o.deliveryDate) < 0 : false);
     // 전표 필터
-    if (filterExpense === 'done') list = list.filter(o => !!(o as any).expenseId);
-    if (filterExpense === 'none') list = list.filter(o => !(o as any).expenseId);
+    if (filterExpense === 'done') list = list.filter(o => !!(o as any).expenseId || !!o.tradeStatementId);
+    if (filterExpense === 'none') list = list.filter(o => !(o as any).expenseId && !o.tradeStatementId);
     // 정렬
     if (sortBy === 'deliveryDate') return list.sort((a, b) => (a.deliveryDate || '9999').localeCompare(b.deliveryDate || '9999'));
     if (sortBy === 'orderNo') return list.sort((a, b) => a.orderNo.localeCompare(b.orderNo));
@@ -783,8 +783,38 @@ export default function ProductionOrders() {
         defectNote: receiveForm.defectNote,
         receivedDate: receiveForm.receivedDate,
         updatedAt: new Date().toISOString(),
-      }).then(() => { setShowReceiveModal(false); refresh(); toast.success('입고 처리 완료'); })
-        .catch((e: Error) => toast.error(`처리 실패: ${e.message}`));
+      }).then(() => {
+        // 매출관리 자동 등록 (중복 방지)
+        const existingSales = store.getSalesRecords();
+        const alreadyExists = existingSales.some(s => s.orderId === existing.id);
+        if (!alreadyExists) {
+          const vendorObj = allVendors.find(v => v.id === existing.buyerId);
+          const buyerName = vendorObj?.name || existing.vendorName || '미지정';
+          const salesRecord: SalesRecord = {
+            id: genId(),
+            saleDate: receiveForm.receivedDate || new Date().toISOString().split('T')[0],
+            channel: 'B2B직납',
+            buyerName,
+            styleNo: existing.styleNo,
+            styleName: existing.styleName,
+            qty: receiveForm.receivedQty || existing.qty,
+            unitPriceKrw: existing.factoryUnitPriceKrw || 0,
+            totalKrw: (existing.factoryUnitPriceKrw || 0) * (receiveForm.receivedQty || existing.qty),
+            season: existing.season,
+            memo: `발주번호 ${existing.orderNo} 입고완료 자동 등록`,
+            createdAt: new Date().toISOString(),
+            orderId: existing.id,
+            orderNo: existing.orderNo,
+            vendorId: existing.vendorId,
+            vendorName: existing.vendorName,
+            source: 'production',
+          };
+          store.addSalesRecord(salesRecord);
+        }
+        setShowReceiveModal(false);
+        refresh();
+        toast.success('입고 처리 완료 — 매출관리에 자동 등록되었습니다');
+      }).catch((e: Error) => toast.error(`처리 실패: ${e.message}`));
     }
   };
 
@@ -1227,9 +1257,9 @@ export default function ProductionOrders() {
                       {/* 첫 번째 행: 명세표 + 전표 드롭다운 */}
                       <div className="flex gap-1">
                         {o.tradeStatementId ? (
-                          <Badge variant="outline" className="text-[10px] h-7 px-2 text-amber-700 border-amber-300 bg-amber-50 cursor-pointer" title={`연결된 전표: ${store.getTradeStatements().find(t => t.id === o.tradeStatementId)?.statementNo || ''}`}>
-                            <FileText className="w-3 h-3 mr-1" />명세표 발행됨
-                          </Badge>
+                          <Button variant="outline" size="sm" className="h-7 text-xs px-2 text-stone-400 cursor-not-allowed" disabled>
+                            📋 명세완료
+                          </Button>
                         ) : (
                           <Button
                             variant="outline"
@@ -1241,21 +1271,27 @@ export default function ProductionOrders() {
                           </Button>
                         )}
                         {o.status === '입고완료' && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm" className="h-7 text-xs px-2 text-emerald-700 border-emerald-200 hover:bg-emerald-50">
-                                📋 전표 ▾
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openLinkExpenseForOrder(o)}>
-                                📄 기존전표 연결
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openExpenseModal(o)}>
-                                🧾 새전표 생성
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          (o as any).expenseId ? (
+                            <Button variant="outline" size="sm" className="h-7 text-xs px-2 text-stone-400 cursor-not-allowed" disabled>
+                              📄 전표완료
+                            </Button>
+                          ) : (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs px-2 text-emerald-700 border-emerald-200 hover:bg-emerald-50">
+                                  📋 전표 ▾
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openLinkExpenseForOrder(o)}>
+                                  📄 기존전표 연결
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openExpenseModal(o)}>
+                                  🧾 새전표 생성
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )
                         )}
                       </div>
                       {/* 두 번째 행: 작업지시서 + 아이콘 버튼들 */}
@@ -1343,7 +1379,7 @@ export default function ProductionOrders() {
 
       {/* ─── 발주 등록 모달 (BOM 연동) ─── */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{isEditMode ? '발주 수정' : '발주 등록 — BOM 연동'}</DialogTitle></DialogHeader>
           <div className="space-y-5 py-2">
 
@@ -2002,7 +2038,7 @@ export default function ProductionOrders() {
                       {/* 이미지 미리보기 모달 */}
                       {materialImagePreview && (
                         <Dialog open onOpenChange={() => setMaterialImagePreview(null)}>
-                          <DialogContent className="max-w-2xl p-0 overflow-hidden">
+                          <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl p-0 overflow-hidden">
                             <div className="relative">
                               <button
                                 onClick={() => setMaterialImagePreview(null)}
@@ -2260,7 +2296,7 @@ export default function ProductionOrders() {
 
       {/* 입고 처리 팝업 */}
       <Dialog open={showReceiveModal} onOpenChange={setShowReceiveModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-md sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-md sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>입고 처리</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-stone-600">입고 수량과 불량 수량을 입력해주세요.</p>
@@ -2296,7 +2332,7 @@ export default function ProductionOrders() {
       {/* 발주 상세 모달 */}
       {showDetail && (
         <Dialog open={!!showDetail} onOpenChange={() => setShowDetail(null)}>
-          <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-lg sm:max-h-[85vh] overflow-y-auto">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-lg sm:max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <span className="font-mono">{showDetail.orderNo}</span>
@@ -2406,7 +2442,7 @@ export default function ProductionOrders() {
       {/* ── 명세표 발행 모달 ── */}
       {billingTarget && (
         <Dialog open={billingModal} onOpenChange={setBillingModal}>
-          <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>명세표 발행 — {billingTarget.orderNo}</DialogTitle>
               <div className="text-xs text-stone-500 mt-1">
@@ -2502,7 +2538,7 @@ export default function ProductionOrders() {
       {/* ── 작업지시서 모달 (가로 A4 실제 양식) ── */}
       {workOrderTarget && (
         <Dialog open={workOrderModal} onOpenChange={setWorkOrderModal}>
-          <DialogContent className="w-full h-full rounded-none sm:w-[98vw] sm:h-auto sm:max-w-6xl sm:rounded-lg sm:max-h-[95vh] overflow-y-auto p-4">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[98vw] sm:h-auto sm:max-w-6xl sm:rounded-lg sm:max-h-[95vh] overflow-y-auto p-4">
             {/* 인쇄 전용 스타일 */}
             <style>{`
               @media print {
@@ -2869,7 +2905,7 @@ export default function ProductionOrders() {
       {/* ── 발주 완료 후 액션 팝업 ── */}
       {postOrderInfo && (
         <Dialog open={postOrderModal} onOpenChange={setPostOrderModal}>
-          <DialogContent className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-lg">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-green-700">
                 <CheckCircle2 className="w-5 h-5" />
@@ -2931,7 +2967,7 @@ export default function ProductionOrders() {
 
       {/* ── 자재 통합 발주 장바구니 모달 ── */}
       <Dialog open={cartModal} onOpenChange={setCartModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4 text-blue-700" />
@@ -3073,7 +3109,7 @@ export default function ProductionOrders() {
 
       {/* ── 거래처별 발주서 출력 모달 ── */}
       <Dialog open={vendorOrderModal} onOpenChange={setVendorOrderModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Printer className="w-4 h-4" />
@@ -3319,7 +3355,7 @@ export default function ProductionOrders() {
 
       {/* ── 기존전표 연결 모달 ── */}
       <Dialog open={linkExpenseModal} onOpenChange={setLinkExpenseModal}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               📄 기존 지출전표 연결
@@ -3368,7 +3404,7 @@ export default function ProductionOrders() {
 
       {/* ── 입고완료 전표생성 모달 ── */}
       <Dialog open={expenseModal} onOpenChange={setExpenseModal}>
-        <DialogContent className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-green-700" />
@@ -3474,7 +3510,7 @@ export default function ProductionOrders() {
 
       {/* ── 이메일 입력 모달 ── */}
       <Dialog open={emailInputModal} onOpenChange={setEmailInputModal}>
-        <DialogContent className="w-full rounded-none sm:w-[95vw] sm:max-w-sm sm:rounded-lg">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-sm sm:rounded-lg">
           <DialogHeader>
             <DialogTitle>이메일 주소 입력</DialogTitle>
           </DialogHeader>

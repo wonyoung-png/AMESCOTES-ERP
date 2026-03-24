@@ -160,6 +160,34 @@ export default function PurchaseMatching() {
   const [linkTargetItemId, setLinkTargetItemId] = useState<string | null>(null);
   const [linkSearchText, setLinkSearchText] = useState('');
 
+  // 일괄수정 모달 상태 (작업 6)
+  const [bulkEditModal, setBulkEditModal] = useState(false);
+  const [bulkEditOrderNo, setBulkEditOrderNo] = useState('');
+  const [bulkEditItems, setBulkEditItems] = useState<PurchaseItem[]>([]);
+  const [bulkEditForm, setBulkEditForm] = useState<{
+    purchaseDate: string; purchaseStatus: string; unitPriceCny: number; applyPrice: boolean; applyDate: boolean; applyStatus: boolean;
+  }>({ purchaseDate: '', purchaseStatus: '', unitPriceCny: 0, applyPrice: false, applyDate: false, applyStatus: false });
+
+  const openBulkEditModal = (orderNo: string, items: PurchaseItem[]) => {
+    setBulkEditOrderNo(orderNo);
+    setBulkEditItems(items);
+    setBulkEditForm({ purchaseDate: new Date().toISOString().split('T')[0], purchaseStatus: '', unitPriceCny: 0, applyPrice: false, applyDate: false, applyStatus: false });
+    setBulkEditModal(true);
+  };
+
+  const handleBulkEdit = async () => {
+    for (const item of bulkEditItems) {
+      const extra: Record<string, any> = {};
+      if (bulkEditForm.applyDate && bulkEditForm.purchaseDate) extra.purchase_date = bulkEditForm.purchaseDate;
+      if (bulkEditForm.applyPrice && bulkEditForm.unitPriceCny > 0) extra.unit_price_cny = bulkEditForm.unitPriceCny;
+      const status = bulkEditForm.applyStatus && bulkEditForm.purchaseStatus ? bulkEditForm.purchaseStatus : item.purchaseStatus;
+      await updatePurchaseItemStatus(item.id, status, extra);
+    }
+    refresh();
+    setBulkEditModal(false);
+    toast.success(`${bulkEditItems.length}종 일괄 수정 완료`);
+  };
+
   // 자재 장바구니 모달 상태
   const [cartModal, setCartModal] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>(() => store.getMaterialCart());
@@ -377,14 +405,50 @@ export default function PurchaseMatching() {
 
   const handleLinkExpense = async (expenseId: string) => {
     if (!linkTargetItemId) return;
-    const item = purchases.find(p => p.id === linkTargetItemId);
-    if (item) {
-      await upsertPurchaseItem({ ...item, statementNo: expenseId });
-    }
-    toast.success('기존 지출전표가 연결되었습니다');
+    // statementNo만 업데이트, orderNo 변경 없이
+    await updatePurchaseItemStatus(linkTargetItemId, purchases.find(p => p.id === linkTargetItemId)?.purchaseStatus || '미발주', {
+      statement_no: expenseId,
+    });
     refresh();
     setLinkExpenseModal(false);
     setLinkTargetItemId(null);
+    toast.success('전표 연결 완료');
+  };
+
+  // 그룹 전표 일괄발행 (작업 4)
+  const handleGroupBulkExpense = async (orderNo: string, groupItems: PurchaseItem[]) => {
+    const unpaidItems = groupItems.filter(i => !i.statementNo);
+    if (unpaidItems.length === 0) { toast.error('이미 모든 항목에 전표가 있습니다'); return; }
+    const totalKrw = unpaidItems.reduce((s, i) => s + i.amountKrw, 0);
+    const vendorName = unpaidItems[0]?.vendorName || '';
+    const expenseId = genId();
+    const expenseLines = unpaidItems.map(item => ({
+      id: genId(),
+      description: item.itemName,
+      qty: item.qty,
+      unit: item.unit,
+      unitPrice: item.amountKrw && item.qty ? Math.round(item.amountKrw / item.qty) : 0,
+      amountKrw: item.amountKrw || 0,
+    }));
+    const expense: import('@/lib/store').Expense = {
+      id: expenseId,
+      expenseDate: new Date().toISOString().split('T')[0],
+      expenseType: '계좌이체',
+      category: '자재구매',
+      lines: expenseLines,
+      description: `[${orderNo}] 자재구매 일괄 ${unpaidItems.length}종`,
+      amountKrw: totalKrw,
+      orderNo,
+      vendorName: vendorName || undefined,
+      hasTaxInvoice: false,
+      createdAt: new Date().toISOString(),
+    };
+    store.addExpense(expense);
+    for (const item of unpaidItems) {
+      await updatePurchaseItemStatus(item.id, item.purchaseStatus, { statement_no: expenseId });
+    }
+    refresh();
+    toast.success(`[${orderNo}] 전표 일괄발행 완료 — ${unpaidItems.length}종 / ${formatKRW(totalKrw)}`);
   };
 
   // 이메일 발송
@@ -561,10 +625,51 @@ export default function PurchaseMatching() {
                           {unpurchased > 0 && (
                             <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">미구매 {unpurchased}건</span>
                           )}
-                          <span className="ml-auto flex items-center gap-2">
+                          <span className="ml-auto flex items-center gap-2 flex-wrap">
                             <span className="text-xs text-stone-500">공급가액 {formatKRW(totalKrw)}</span>
                             <span className="text-xs text-stone-400">+ 세액 {formatKRW(Math.round(totalKrw * 0.1))}</span>
                             <span className="text-xs font-semibold text-stone-700">= {formatKRW(totalKrw + Math.round(totalKrw * 0.1))}</span>
+                            {/* 전표 일괄발행 버튼 (작업 4) */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await handleGroupBulkExpense(orderNo, groupItems);
+                              }}
+                            >
+                              📄 전표 일괄발행
+                            </Button>
+                            {/* 일괄수정 버튼 (작업 6) */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs text-blue-600 border-blue-300 hover:bg-blue-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openBulkEditModal(orderNo, groupItems);
+                              }}
+                            >
+                              ✏ 일괄수정
+                            </Button>
+                            {/* 일괄삭제 버튼 (작업 5) */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs text-red-500"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!confirm(`[${orderNo}] 발주의 자재 ${groupItems.length}종을 모두 삭제하시겠습니까?`)) return;
+                                for (const item of groupItems) {
+                                  await deletePurchaseItemSB(item.id);
+                                }
+                                refresh();
+                                toast.success(`${groupItems.length}종 삭제 완료`);
+                              }}
+                            >
+                              🗑 일괄삭제
+                            </Button>
                             <div onClick={e => e.stopPropagation()}>
                               <Select onValueChange={(v) => handleGroupStatusChange(orderNo, groupItems, v)}>
                                 <SelectTrigger className="w-28 h-7 text-xs" onClick={e => e.stopPropagation()}>
@@ -674,7 +779,7 @@ export default function PurchaseMatching() {
 
       {/* ── 구매 등록/수정 모달 ── */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editId ? '구매 수정' : '구매 등록'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-3">
@@ -768,7 +873,7 @@ export default function PurchaseMatching() {
 
       {/* ── 자재 장바구니 모달 ── */}
       <Dialog open={cartModal} onOpenChange={setCartModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4 text-blue-700" />
@@ -919,7 +1024,7 @@ export default function PurchaseMatching() {
 
       {/* ── 거래처별 발주서 모달 ── */}
       <Dialog open={vendorOrderModal} onOpenChange={setVendorOrderModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Printer className="w-4 h-4" />
@@ -1149,7 +1254,7 @@ export default function PurchaseMatching() {
 
       {/* ── 이메일 입력 모달 ── */}
       <Dialog open={emailInputModal} onOpenChange={setEmailInputModal}>
-        <DialogContent className="w-full rounded-none sm:w-[95vw] sm:max-w-sm sm:rounded-lg">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-sm sm:rounded-lg">
           <DialogHeader>
             <DialogTitle>이메일 주소 입력</DialogTitle>
           </DialogHeader>
@@ -1191,7 +1296,7 @@ export default function PurchaseMatching() {
 
       {/* ── 지출전표 생성 모달 ── */}
       <Dialog open={expenseModal} onOpenChange={setExpenseModal}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-amber-700" />
@@ -1294,7 +1399,7 @@ export default function PurchaseMatching() {
 
       {/* ── 기존전표 연결 모달 (작업 2) ── */}
       <Dialog open={linkExpenseModal} onOpenChange={setLinkExpenseModal}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               📄 기존 지출전표 연결
@@ -1341,9 +1446,92 @@ export default function PurchaseMatching() {
         </DialogContent>
       </Dialog>
 
+      {/* ── 일괄수정 모달 (작업 6) ── */}
+      <Dialog open={bulkEditModal} onOpenChange={setBulkEditModal}>
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>✏ 일괄수정 — [{bulkEditOrderNo}] {bulkEditItems.length}종</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-xs text-stone-500">수정할 항목을 선택하고 값을 입력해주세요. 체크된 항목만 변경됩니다.</p>
+            {/* 구매일 */}
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={bulkEditForm.applyDate}
+                onChange={e => setBulkEditForm(f => ({ ...f, applyDate: e.target.checked }))}
+                className="w-4 h-4 cursor-pointer"
+              />
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs">구매일</Label>
+                <Input
+                  type="date"
+                  value={bulkEditForm.purchaseDate}
+                  onChange={e => setBulkEditForm(f => ({ ...f, purchaseDate: e.target.value, applyDate: true }))}
+                  className="h-8"
+                />
+              </div>
+            </div>
+            {/* 단가 */}
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={bulkEditForm.applyPrice}
+                onChange={e => setBulkEditForm(f => ({ ...f, applyPrice: e.target.checked }))}
+                className="w-4 h-4 cursor-pointer"
+              />
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs">단가 (원화 기준)</Label>
+                <Input
+                  type="number"
+                  value={bulkEditForm.unitPriceCny || ''}
+                  onChange={e => setBulkEditForm(f => ({ ...f, unitPriceCny: parseFloat(e.target.value) || 0, applyPrice: true }))}
+                  placeholder="0"
+                  className="h-8"
+                />
+              </div>
+            </div>
+            {/* 상태 */}
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={bulkEditForm.applyStatus}
+                onChange={e => setBulkEditForm(f => ({ ...f, applyStatus: e.target.checked }))}
+                className="w-4 h-4 cursor-pointer"
+              />
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs">구매 상태</Label>
+                <Select
+                  value={bulkEditForm.purchaseStatus}
+                  onValueChange={v => setBulkEditForm(f => ({ ...f, purchaseStatus: v, applyStatus: true }))}
+                >
+                  <SelectTrigger className="h-8"><SelectValue placeholder="상태 선택" /></SelectTrigger>
+                  <SelectContent>
+                    {PURCHASE_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="p-3 bg-blue-50 rounded-lg text-xs text-blue-700">
+              {bulkEditItems.length}종에 대해 선택된 필드를 일괄 변경합니다.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkEditModal(false)}>취소</Button>
+            <Button
+              className="bg-blue-700 hover:bg-blue-800 text-white"
+              onClick={handleBulkEdit}
+              disabled={!bulkEditForm.applyDate && !bulkEditForm.applyPrice && !bulkEditForm.applyStatus}
+            >
+              일괄 수정 적용
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* 생성된 전표 바로보기 알림 */}
       <Dialog open={!!justCreatedExpense} onOpenChange={() => setJustCreatedExpense(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-green-600" />
@@ -1447,7 +1635,7 @@ function ExpenseDetailInlineModal({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-amber-700" />

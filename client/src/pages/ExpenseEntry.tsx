@@ -52,6 +52,15 @@ const newLine = (): ExpenseLine => ({
   amountKrw: 0,
 });
 
+// description 파싱: "[생산발주] AT2603HB01-R12 — 체인백 222PCS" 형식
+function parseDescription(desc: string): { styleNo: string; itemName: string; qty: number; unit: string } {
+  const match = desc.match(/\[생산발주\]\s*(\S+)\s*[—\-]+\s*(.+?)\s*(\d+)PCS/);
+  if (match) {
+    return { styleNo: match[1], itemName: match[2].trim(), qty: parseInt(match[3]), unit: 'PCS' };
+  }
+  return { styleNo: '', itemName: desc, qty: 1, unit: '' };
+}
+
 // 지출전표 상세 모달 컴포넌트
 function ExpenseDetailModal({
   expense,
@@ -67,12 +76,13 @@ function ExpenseDetailModal({
   const getInitialLines = (e: Expense): ExpenseLine[] => {
     if (e.lines && e.lines.length > 0) return [...e.lines];
     // lines 없는 기존 전표: description/amountKrw를 첫 번째 line으로 변환
+    const parsed = parseDescription(e.description);
     return [{
       id: genId(),
       description: e.description,
-      qty: 1,
-      unit: '개',
-      unitPrice: e.amountKrw,
+      qty: parsed.qty,
+      unit: parsed.unit || '개',
+      unitPrice: parsed.qty > 1 ? Math.round(e.amountKrw / parsed.qty) : e.amountKrw,
       amountKrw: e.amountKrw,
     }];
   };
@@ -171,66 +181,99 @@ function ExpenseDetailModal({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-100">
-                  <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">품목/내역</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">스타일번호</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">품명</th>
                   <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-16">수량</th>
                   <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-14">단위</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">단가</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">금액</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">단가(원)</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">금액(원)</th>
                   <th className="w-8 px-2"></th>
                 </tr>
               </thead>
               <tbody>
-                {detailLines.map((line) => (
-                  <tr key={line.id} className="border-b border-stone-50">
-                    <td className="px-2 py-1.5">
-                      <Input
-                        value={line.description}
-                        onChange={e => updateDetailLine(line.id, 'description', e.target.value)}
-                        placeholder="품목명"
-                        className="h-8 text-sm"
-                      />
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <Input
-                        type="number"
-                        value={line.qty}
-                        onChange={e => updateDetailLine(line.id, 'qty', parseFloat(e.target.value) || 0)}
-                        className="h-8 text-sm text-right w-16"
-                        min={0}
-                      />
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <Input
-                        value={line.unit}
-                        onChange={e => updateDetailLine(line.id, 'unit', e.target.value)}
-                        className="h-8 text-sm text-center w-14"
-                        placeholder="개"
-                      />
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <Input
-                        type="number"
-                        value={line.unitPrice}
-                        onChange={e => updateDetailLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                        className="h-8 text-sm text-right w-24"
-                        min={0}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-sm font-medium text-stone-700">
-                      {formatKRW(line.amountKrw)}
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-stone-400 hover:text-red-500"
-                        onClick={() => removeDetailLine(line.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {detailLines.map((line) => {
+                  const parsed = parseDescription(line.description);
+                  const styleNo = parsed.styleNo;
+                  const itemName = parsed.styleNo ? parsed.itemName : line.description;
+                  return (
+                    <tr key={line.id} className="border-b border-stone-50">
+                      <td className="px-2 py-1.5">
+                        <Input
+                          value={styleNo}
+                          onChange={e => {
+                            const newStyleNo = e.target.value;
+                            const newDesc = newStyleNo
+                              ? `[생산발주] ${newStyleNo} — ${itemName} ${line.qty}PCS`
+                              : itemName;
+                            updateDetailLine(line.id, 'description', newDesc);
+                          }}
+                          placeholder="스타일번호"
+                          className="h-8 text-sm font-mono w-32"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <Input
+                          value={itemName}
+                          onChange={e => {
+                            const newItemName = e.target.value;
+                            const newDesc = styleNo
+                              ? `[생산발주] ${styleNo} — ${newItemName} ${line.qty}PCS`
+                              : newItemName;
+                            updateDetailLine(line.id, 'description', newDesc);
+                          }}
+                          placeholder="품명"
+                          className="h-8 text-sm"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <Input
+                          type="number"
+                          value={line.qty}
+                          onChange={e => {
+                            const newQty = parseFloat(e.target.value) || 0;
+                            updateDetailLine(line.id, 'qty', newQty);
+                            if (styleNo) {
+                              const newDesc = `[생산발주] ${styleNo} — ${itemName} ${newQty}PCS`;
+                              updateDetailLine(line.id, 'description', newDesc);
+                            }
+                          }}
+                          className="h-8 text-sm text-right w-16"
+                          min={0}
+                        />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <Input
+                          value={line.unit}
+                          onChange={e => updateDetailLine(line.id, 'unit', e.target.value)}
+                          className="h-8 text-sm text-center w-14"
+                          placeholder="PCS"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <Input
+                          type="number"
+                          value={line.unitPrice}
+                          onChange={e => updateDetailLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                          className="h-8 text-sm text-right w-24"
+                          min={0}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-sm font-medium text-stone-700">
+                        {formatKRW(line.amountKrw)}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-stone-400 hover:text-red-500"
+                          onClick={() => removeDetailLine(line.id)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -749,7 +749,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
+      <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
         <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-6 py-3 flex items-center justify-between">
           <DialogHeader>
             <DialogTitle className="text-stone-800 font-semibold text-sm">업체용 견적서 — {bom.styleNo} {bom.styleName}</DialogTitle>
@@ -1176,7 +1176,7 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
 function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void }) {
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden">
+      <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl p-0 overflow-hidden">
         <div className="relative">
           <button
             onClick={onClose}
@@ -2914,7 +2914,7 @@ export default function BomManagement() {
           {/* 컬러 추가 모달 */}
           {showAddColorModal && (
             <Dialog open onOpenChange={() => { setShowAddColorModal(false); setNewColorName(''); }}>
-              <DialogContent className="max-w-sm">
+              <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-sm">
                 <DialogHeader>
                   <DialogTitle>{addColorForTab === 'post' ? '사후원가' : '사전원가'} 컬러 탭 추가</DialogTitle>
                 </DialogHeader>
@@ -3947,7 +3947,7 @@ export default function BomManagement() {
           {/* 유사 스타일 복사 모달 */}
           {showCopyModal && (
             <Dialog open onOpenChange={() => setShowCopyModal(false)}>
-              <DialogContent className="max-w-md">
+              <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md">
                 <DialogHeader><DialogTitle>유사 스타일 BOM 복사</DialogTitle></DialogHeader>
                 <div className="space-y-4 py-2">
                   <div>
@@ -3992,7 +3992,7 @@ export default function BomManagement() {
       {/* 유사 스타일 복사 모달 (editBom 없을 때) */}
       {showCopyModal && !editBom && (
         <Dialog open onOpenChange={() => setShowCopyModal(false)}>
-          <DialogContent className="max-w-md">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md">
             <DialogHeader><DialogTitle>유사 스타일 BOM 복사</DialogTitle></DialogHeader>
             <div className="space-y-4 py-2">
               <div>

@@ -1261,7 +1261,7 @@ export default function SampleManagement() {
 
       {/* ── 등록/수정 모달 ── */}
       <Dialog open={showModal} onOpenChange={(open) => { if (!open) handleModalClose(true); }}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editId ? '샘플 수정' : '샘플 접수'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
 
@@ -1689,7 +1689,7 @@ export default function SampleManagement() {
 
       {/* ── 상세 모달 (차수별 메모 + 자재 체크리스트) ── */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           {detailSample && (
             <>
               <DialogHeader>
@@ -1898,7 +1898,7 @@ export default function SampleManagement() {
       {/* ── 청구하기 모달 ── */}
       {billingTarget && (
         <Dialog open={billingModal} onOpenChange={setBillingModal}>
-          <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>청구하기 — {billingTarget.styleNo}</DialogTitle>
               <DialogDescription className="text-xs text-stone-500">

@@ -740,7 +740,7 @@ export default function ItemMaster() {
 
       {/* 시즌별 스타일 현황 모달 */}
       <Dialog open={showSeasonStats} onOpenChange={setShowSeasonStats}>
-        <DialogContent className="max-w-xl">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BarChart2 size={18} />시즌별 스타일 현황
@@ -806,7 +806,7 @@ export default function ItemMaster() {
 
       {/* 등록/수정 모달 */}
       <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) handleModalClose(true); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEdit ? '품목 수정' : '품목 등록'}</DialogTitle>
           </DialogHeader>
@@ -1518,7 +1518,7 @@ function MultiBulkOrderModal({
   if (postOrderState) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-lg">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-green-700">
               ✅ 발주 등록 완료
@@ -1580,7 +1580,7 @@ function MultiBulkOrderModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package size={18} className="text-amber-600" />

@@ -727,6 +727,12 @@ export interface SalesRecord {
   season?: Season;
   memo?: string;
   createdAt: string;
+  // 생산발주 연동 필드 (입고완료 시 자동 생성)
+  orderId?: string;
+  orderNo?: string;
+  vendorId?: string;
+  vendorName?: string;
+  source?: 'manual' | 'production';  // 수동 입력 vs 생산발주 자동
 }
 
 // ─── 시스템 설정 ───

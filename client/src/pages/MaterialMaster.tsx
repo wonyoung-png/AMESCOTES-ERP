@@ -347,7 +347,7 @@ export default function MaterialMaster() {
 
       {/* 등록/수정 모달 */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editId ? '자재 수정' : '자재 등록'}</DialogTitle>
           </DialogHeader>
