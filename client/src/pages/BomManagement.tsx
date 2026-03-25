@@ -1095,7 +1095,7 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
     if (partial.length > 0 && partial[0].name !== name) {
       // 유사한 업체가 있으면 그냥 계속 신규 등록 가능하게 (막지 않음)
     }
-    // 신규 등록
+    // 신규 등록 - Supabase에 저장
     const newVendor: Vendor = {
       id: genId(),
       name,
@@ -1105,6 +1105,11 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
       contactHistory: [],
       createdAt: new Date().toISOString(),
     };
+    import('@/lib/supabaseQueries').then(m => {
+      m.upsertVendor(newVendor).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      }).catch(() => {});
+    });
     store.addVendor(newVendor);
     toast.success(`"${name}" 거래처 마스터에 등록됨`);
     setInputVal(name);
