@@ -269,7 +269,7 @@ export default function ItemMaster() {
   const handleSave = () => {
     if (!editItem.styleNo || !editItem.name) { toast.error('스타일번호와 품명을 입력하세요'); return; }
     if (!isEdit) {
-      const dup = store.getItems().find(it => it.styleNo === editItem.styleNo);
+      const dup = (items as Item[]).find(it => it.styleNo === editItem.styleNo);
       if (dup) { toast.error(`스타일번호 '${editItem.styleNo}'는 이미 등록되어 있습니다`); return; }
     }
 
