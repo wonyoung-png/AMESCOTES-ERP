@@ -21,7 +21,7 @@ function normalizeBomLine(l: any): any {
   const netQty = l.netQty ?? l.net_qty ?? l.qty ?? 0;
   const effectiveQty = netQty || (unitPriceCny > 0 && l.total ? parseFloat((l.total / unitPriceCny).toFixed(4)) : 0);
   return {
-    id: l.id ?? Math.random().toString(36).slice(2),
+    id: Math.random().toString(36).slice(2), // 항상 새 id 생성 (중복 방지)
     category: l.category ?? '원자재',
     subPart: l.subPart ?? l.sub_part ?? l.subpart,
     itemName,

@@ -728,13 +728,17 @@ export default function ProductionOrders() {
       }
     }
 
-    // 본사제공 자재 자동 장바구니 저장 - Supabase에서 직접 최신 BOM 가져와서 처리
-    fetchBoms().then(latestBoms => {
-      const latestBom = latestBoms.find((b: any) => b.styleNo === order.styleNo);
-      if (!latestBom) { refreshCart(); return; }
-      // raw post_color_boms 직접 사용 (정규화 전 원본)
+    // 본사제공 자재 자동 장바구니 저장 - Supabase REST API로 raw 데이터 직접 조회
+    const _sbUrl = 'https://linzfvhgswrnoukssqyi.supabase.co/rest/v1';
+    const _sbKey = 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2';
+    fetch(`${_sbUrl}/boms?style_no=eq.${order.styleNo}&select=post_color_boms`, {
+      headers: { 'apikey': _sbKey, 'Authorization': `Bearer ${_sbKey}` }
+    }).then(r => r.json()).then((rawBoms: any[]) => {
+      const rawBom = rawBoms?.[0];
+      if (!rawBom) { refreshCart(); return; }
+      // raw post_color_boms (정규화 없이 원본 사용)
       const orderColorQtys2 = order.colorQtys || [];
-      const postColorBoms = (latestBom as any).postColorBoms || [];
+      const postColorBoms = rawBom.post_color_boms || [];
       if (postColorBoms.length > 0 && orderColorQtys2.length > 0) {
         for (const cq of orderColorQtys2) {
           if (!cq.qty || cq.qty <= 0) continue;
@@ -761,12 +765,7 @@ export default function ProductionOrders() {
         store.addToMaterialCart(order.styleNo, order.styleName, bomMaterials, totalQty);
       }
       refreshCart();
-    }).catch(() => {
-      if (bomMaterials.length > 0) {
-        store.addToMaterialCart(order.styleNo, order.styleName, bomMaterials, totalQty);
-      }
-      refreshCart();
-    });
+    }).catch(() => { refreshCart(); });
 
     setPostOrderInfo({ order, bomMaterials });
     setPostOrderModal(true);
