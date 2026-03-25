@@ -1672,10 +1672,8 @@ export default function BomManagement() {
     const item = items.find(i => i.id === styleId);
     // styleId가 정확히 일치하는 BOM만 사용 (styleNo는 참고용)
     const styleBoms = extBoms.filter(b => b.styleId === styleId && !!b.styleId);
-    // Supabase boms(useQuery)에서도 확인
-    const supabaseBom = (boms as any[]).find(b => b.styleNo === item?.styleNo || b.styleId === styleId);
     let loadedBom: ExtBom;
-    // extBoms에서 정확히 styleId 일치하는 것 OR supabaseBom이 있고 styleNo 일치하는 경우만
+    // styleId와 styleNo 모두 정확히 일치하는 BOM만 사용
     const validStyleBoms = styleBoms.filter(b => b.styleNo === item?.styleNo && b.styleId === styleId);
     if (validStyleBoms.length > 0) {
       const loaded: ExtBom = JSON.parse(JSON.stringify(validStyleBoms.sort((a, b) => b.version - a.version)[0]));
