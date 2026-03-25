@@ -705,7 +705,7 @@ export default function ProductionOrders() {
         } else {
           allLines = bom.lines || [];
         }
-        // 중복 제거 (같은 itemName)
+        // bomMaterials는 팝업용 (중복 제거)
         const seen = new Set<string>();
         for (const l of allLines) {
           if (l.isHqProvided && !seen.has(l.itemName)) {
@@ -726,9 +726,36 @@ export default function ProductionOrders() {
       }
     }
 
-    // 본사제공 자재 자동 장바구니 저장 (발주 등록 시 자동으로 담김)
-    if (bomMaterials.length > 0) {
-      store.addToMaterialCart(order.styleNo, order.styleName, bomMaterials, totalQty);
+    // 본사제공 자재 자동 장바구니 저장 - 컬러별로 각각 처리 (vendorName 보존)
+    if (bom) {
+      const postColorBoms = (bom as any).postColorBoms || [];
+      const orderColorQtys2 = order.colorQtys || [];
+      if (postColorBoms.length > 0 && orderColorQtys2.length > 0) {
+        // 컬러별로 각각 addToMaterialCart 호출
+        for (const cq of orderColorQtys2) {
+          if (!cq.qty || cq.qty <= 0) continue;
+          const colorBom = postColorBoms.find((cb: any) => cb.color?.trim() === cq.color?.trim());
+          if (!colorBom) continue;
+          const colorMaterials = (colorBom.lines || [])
+            .filter((l: any) => l.isHqProvided)
+            .map((l: any) => ({
+              itemName: l.itemName,
+              spec: l.spec,
+              unit: l.unit,
+              netQty: l.netQty,
+              lossRate: l.lossRate,
+              vendorName: l.vendorName,
+              isHqProvided: true,
+              imageUrl: l.imageUrl,
+              unitPriceCny: l.unitPriceCny ?? l.unitPrice ?? 0,
+            }));
+          if (colorMaterials.length > 0) {
+            store.addToMaterialCart(order.styleNo, order.styleName, colorMaterials, cq.qty);
+          }
+        }
+      } else if (bomMaterials.length > 0) {
+        store.addToMaterialCart(order.styleNo, order.styleName, bomMaterials, totalQty);
+      }
       refreshCart();
     }
 
