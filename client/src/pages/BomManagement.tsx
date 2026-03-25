@@ -2191,6 +2191,12 @@ export default function BomManagement() {
       (updated as any).postSubtotalKrw = Math.round(ps.totalCostKrw || 0);  // 제품 총원가
       (updated as any).postTotalCostKrw = Math.round(ps.totalCostKrw || 0);
     }
+    // 디버그: vendorName 확인
+    const _debugPostCB = (updated.postColorBoms || []).map(cb => ({
+      color: cb.color,
+      firstVendor: (cb.lines || [])[0]?.vendorName
+    }));
+    console.log('[BOM 저장 디버그] postColorBoms vendorName:', JSON.stringify(_debugPostCB));
     upsertBom(updated)
       .then(async () => {
         queryClient.invalidateQueries({ queryKey: ['boms'] });
