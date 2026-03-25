@@ -131,7 +131,7 @@ export function convertBomFromDB(row: any) {
     productionMarginRate: row.production_margin_rate ?? 0.16,
     postProcessLines,
     manufacturingCountry: row.manufacturing_country,
-    styleId: row.style_no, // styleId는 styleNo로 fallback
+    styleId: row.style_id || row.style_no, // style_id 컬럼 우선, 없으면 style_no로 fallback
     version: 1,
     logisticsCostKrw: row.logistics_cost_krw ?? 0,
     packagingCostKrw: 0,
@@ -155,7 +155,7 @@ const TABLE_COLUMNS: Record<string, string[]> = {
   samples: ['id', 'style_no', 'style_name', 'buyer_id', 'season', 'stage', 'assignee',
             'sales_person', 'request_date', 'expected_date', 'approved_date', 'cost_krw',
             'image_urls', 'material_requests', 'documents', 'memo', 'created_at', 'updated_at'],
-  boms: ['id', 'style_no', 'style_name', 'season', 'erp_category', 'designer', 'line_name',
+  boms: ['id', 'style_no', 'style_id', 'style_name', 'season', 'erp_category', 'designer', 'line_name',
          'manufacturing_country', 'currency', 'exchange_rate_cny', 'exchange_rate_usd',
          'pre_materials', 'pre_processing_fee', 'post_materials', 'post_processing_fee',
          'delivery_price', 'logistics_cost_krw', 'production_margin_rate', 'memo',
@@ -318,6 +318,7 @@ export async function upsertBom(bom: any) {
   const snakeBom: Record<string, any> = {
     id: bom.id,
     style_no: bom.styleNo,
+    style_id: bom.styleId ?? null, // items.id 참조 (BOM-아이템 연결 키)
     style_name: bom.styleName,
     season: bom.season,
     erp_category: bom.erpCategory,

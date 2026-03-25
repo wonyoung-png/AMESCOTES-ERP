@@ -885,6 +885,7 @@ export const store = {
     const snakeBom: Record<string, any> = {
       id: bom.id,
       style_no: bom.styleNo,
+      style_id: bom.styleId ?? null, // [FIX] items.id 참조 (BOM-아이템 연결 키)
       style_name: bom.styleName,
       season: bom.season,
       erp_category: bom.erpCategory,
