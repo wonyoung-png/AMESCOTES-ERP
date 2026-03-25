@@ -1614,31 +1614,10 @@ export default function BomManagement() {
 
   const { data: supabaseBoms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
   const [extBoms, setExtBoms] = useState<ExtBom[]>(() => getExtBoms());
-  // supabaseBoms가 로드되면 extBoms를 병합
-  // [FIX] Supabase 데이터가 localStorage보다 우선순위를 가짐 (updatedAt 기준 비교)
+  // Supabase BOM을 단일 소스로 사용 (localStorage 오래된 BOM 무시)
   useEffect(() => {
     if (supabaseBoms.length > 0) {
-      setExtBoms(prev => {
-        // localStorage 데이터를 기준 Map으로 시작
-        const mergedMap = new Map<string, ExtBom>(prev.map(b => [b.id, b]));
-        for (const sb of supabaseBoms as any[]) {
-          const existing = mergedMap.get(sb.id);
-          if (!existing) {
-            // localStorage에 없는 BOM은 추가
-            mergedMap.set(sb.id, sb as ExtBom);
-          } else {
-            // 두 곳 모두 있으면 더 최신 데이터 사용
-            // Supabase의 updatedAt이 localStorage보다 최신이거나 동일하면 Supabase 우선
-            const sbTime = new Date(sb.updatedAt || sb.createdAt || 0).getTime();
-            const localTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
-            if (sbTime >= localTime) {
-              mergedMap.set(sb.id, sb as ExtBom);
-            }
-            // localStorage가 더 최신이면 로컬 데이터 유지 (저장 대기 중인 미동기화 상태)
-          }
-        }
-        return Array.from(mergedMap.values());
-      });
+      setExtBoms(supabaseBoms as any[]);
     }
   }, [supabaseBoms]);
 
