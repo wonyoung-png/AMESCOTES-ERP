@@ -1367,6 +1367,10 @@ export const store = {
         if (mat.unitPriceCny !== undefined && mat.unitPriceCny > 0) {
           cart[idx].unitPriceCny = mat.unitPriceCny;
         }
+        // vendorName 업데이트 (새 값이 더 구체적이면 갱신)
+        if (mat.vendorName && mat.vendorName !== cart[idx].vendorName) {
+          cart[idx].vendorName = mat.vendorName;
+        }
       } else {
         cart.push({
           materialName: mat.itemName,
