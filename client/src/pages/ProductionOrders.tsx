@@ -519,7 +519,7 @@ export default function ProductionOrders() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.styleId) { toast.error('스타일을 선택해주세요'); return; }
     if (!form.vendorId) { toast.error('발주처(공장)를 선택해주세요'); return; }
 
@@ -728,44 +728,44 @@ export default function ProductionOrders() {
       }
     }
 
-    // 본사제공 자재 자동 장바구니 저장 - Supabase REST API로 raw 데이터 직접 조회
-    const _sbUrl = 'https://linzfvhgswrnoukssqyi.supabase.co/rest/v1';
-    const _sbKey = 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2';
-    fetch(`${_sbUrl}/boms?style_no=eq.${order.styleNo}&select=post_color_boms`, {
-      headers: { 'apikey': _sbKey, 'Authorization': `Bearer ${_sbKey}` }
-    }).then(r => r.json()).then((rawBoms: any[]) => {
-      const rawBom = rawBoms?.[0];
-      if (!rawBom) { refreshCart(); return; }
-      // raw post_color_boms (정규화 없이 원본 사용)
-      const orderColorQtys2 = order.colorQtys || [];
-      const postColorBoms = rawBom.post_color_boms || [];
-      if (postColorBoms.length > 0 && orderColorQtys2.length > 0) {
-        for (const cq of orderColorQtys2) {
+    // 본사제공 자재 자동 장바구니 저장 - Supabase REST API raw 데이터 직접 조회 (await)
+    try {
+      const _sbUrl = 'https://linzfvhgswrnoukssqyi.supabase.co/rest/v1';
+      const _sbKey = 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2';
+      const _rawRes = await fetch(`${_sbUrl}/boms?style_no=eq.${order.styleNo}&select=post_color_boms`, {
+        headers: { 'apikey': _sbKey, 'Authorization': `Bearer ${_sbKey}` }
+      });
+      const _rawBoms: any[] = await _rawRes.json();
+      const _rawBom = _rawBoms?.[0];
+      const _postColorBoms = _rawBom?.post_color_boms || [];
+      const _orderColorQtys = order.colorQtys || [];
+      if (_postColorBoms.length > 0 && _orderColorQtys.length > 0) {
+        for (const cq of _orderColorQtys) {
           if (!cq.qty || cq.qty <= 0) continue;
-          const colorBom = postColorBoms.find((cb: any) => cb.color?.trim() === cq.color?.trim());
-          if (!colorBom) continue;
-          const colorMaterials = (colorBom.lines || [])
+          const _cb = _postColorBoms.find((cb: any) => cb.color?.trim() === cq.color?.trim());
+          if (!_cb) continue;
+          const _mats = (_cb.lines || [])
             .filter((l: any) => l.isHqProvided)
             .map((l: any) => ({
-              itemName: l.itemName ?? l.item_name ?? '',
+              itemName: l.itemName ?? '',
               spec: l.spec ?? '',
               unit: l.unit ?? '',
-              netQty: l.netQty ?? l.net_qty ?? 0,
-              lossRate: l.lossRate ?? l.loss_rate ?? 0,
-              vendorName: l.vendorName ?? l.vendor_name ?? '',
+              netQty: l.netQty ?? 0,
+              lossRate: l.lossRate ?? 0,
+              vendorName: l.vendorName ?? '',
               isHqProvided: true,
-              imageUrl: l.imageUrl ?? l.image_url,
-              unitPriceCny: l.unitPriceCny ?? l.unit_price_cny ?? 0,
+              imageUrl: l.imageUrl,
+              unitPriceCny: l.unitPriceCny ?? 0,
             }));
-          if (colorMaterials.length > 0) {
-            store.addToMaterialCart(order.styleNo, order.styleName, colorMaterials, cq.qty);
+          if (_mats.length > 0) {
+            store.addToMaterialCart(order.styleNo, order.styleName, _mats, cq.qty);
           }
         }
       } else if (bomMaterials.length > 0) {
         store.addToMaterialCart(order.styleNo, order.styleName, bomMaterials, totalQty);
       }
-      refreshCart();
-    }).catch(() => { refreshCart(); });
+    } catch { /* ignore */ }
+    refreshCart();
 
     setPostOrderInfo({ order, bomMaterials });
     setPostOrderModal(true);
