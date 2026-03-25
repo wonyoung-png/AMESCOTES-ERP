@@ -1671,10 +1671,11 @@ export default function BomManagement() {
     if (!styleId) { setEditBom(null); setActivePreColor(''); setActivePostColor(''); return; }
     const item = items.find(i => i.id === styleId);
     // styleId가 정확히 일치하는 BOM만 사용 (styleNo는 참고용)
-    const styleBoms = extBoms.filter(b => b.styleId === styleId && !!b.styleId);
+    // styleId가 실제로 있고, 값이 일치하는 BOM만 사용 (undefined===undefined 방지)
+    const validStyleBoms = extBoms.filter(b => 
+      !!b.styleId && b.styleId === styleId && b.styleNo === (item?.styleNo || '')
+    );
     let loadedBom: ExtBom;
-    // styleId와 styleNo 모두 정확히 일치하는 BOM만 사용
-    const validStyleBoms = styleBoms.filter(b => b.styleNo === item?.styleNo && b.styleId === styleId);
     if (validStyleBoms.length > 0) {
       const loaded: ExtBom = JSON.parse(JSON.stringify(validStyleBoms.sort((a, b) => b.version - a.version)[0]));
       if (item) {
