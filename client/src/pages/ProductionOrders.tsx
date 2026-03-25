@@ -728,17 +728,14 @@ export default function ProductionOrders() {
       }
     }
 
-    // 본사제공 자재 자동 장바구니 저장 - 컬러별로 각각 처리 (vendorName 보존)
-    if (_bomForCart) {
-      const postColorBoms = (_bomForCart as any).postColorBoms || [];
-      console.log('[장바구니 디버그] postColorBoms 컬러 수:', postColorBoms.length);
-      postColorBoms.forEach((cb: any) => {
-        const hq = (cb.lines||[]).filter((l:any)=>l.isHqProvided);
-        console.log('  컬러:', cb.color, '본사제공:', hq.map((l:any)=>l.itemName+'('+l.vendorName+')'));
-      });
+    // 본사제공 자재 자동 장바구니 저장 - Supabase에서 직접 최신 BOM 가져와서 처리
+    fetchBoms().then(latestBoms => {
+      const latestBom = latestBoms.find((b: any) => b.styleNo === order.styleNo);
+      if (!latestBom) { refreshCart(); return; }
+      // raw post_color_boms 직접 사용 (정규화 전 원본)
       const orderColorQtys2 = order.colorQtys || [];
+      const postColorBoms = (latestBom as any).postColorBoms || [];
       if (postColorBoms.length > 0 && orderColorQtys2.length > 0) {
-        // 컬러별로 각각 addToMaterialCart 호출
         for (const cq of orderColorQtys2) {
           if (!cq.qty || cq.qty <= 0) continue;
           const colorBom = postColorBoms.find((cb: any) => cb.color?.trim() === cq.color?.trim());
@@ -746,15 +743,15 @@ export default function ProductionOrders() {
           const colorMaterials = (colorBom.lines || [])
             .filter((l: any) => l.isHqProvided)
             .map((l: any) => ({
-              itemName: l.itemName,
-              spec: l.spec,
-              unit: l.unit,
-              netQty: l.netQty,
-              lossRate: l.lossRate,
-              vendorName: l.vendorName,
+              itemName: l.itemName ?? l.item_name ?? '',
+              spec: l.spec ?? '',
+              unit: l.unit ?? '',
+              netQty: l.netQty ?? l.net_qty ?? 0,
+              lossRate: l.lossRate ?? l.loss_rate ?? 0,
+              vendorName: l.vendorName ?? l.vendor_name ?? '',
               isHqProvided: true,
-              imageUrl: l.imageUrl,
-              unitPriceCny: l.unitPriceCny ?? l.unitPrice ?? 0,
+              imageUrl: l.imageUrl ?? l.image_url,
+              unitPriceCny: l.unitPriceCny ?? l.unit_price_cny ?? 0,
             }));
           if (colorMaterials.length > 0) {
             store.addToMaterialCart(order.styleNo, order.styleName, colorMaterials, cq.qty);
@@ -764,7 +761,12 @@ export default function ProductionOrders() {
         store.addToMaterialCart(order.styleNo, order.styleName, bomMaterials, totalQty);
       }
       refreshCart();
-    }
+    }).catch(() => {
+      if (bomMaterials.length > 0) {
+        store.addToMaterialCart(order.styleNo, order.styleName, bomMaterials, totalQty);
+      }
+      refreshCart();
+    });
 
     setPostOrderInfo({ order, bomMaterials });
     setPostOrderModal(true);
