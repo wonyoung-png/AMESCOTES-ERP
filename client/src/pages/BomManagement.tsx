@@ -1614,10 +1614,31 @@ export default function BomManagement() {
 
   const { data: supabaseBoms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
   const [extBoms, setExtBoms] = useState<ExtBom[]>(() => getExtBoms());
-  // Supabase BOM을 단일 소스로 사용 (localStorage 오래된 BOM 무시)
+  // supabaseBoms가 로드되면 extBoms를 병합
+  // [FIX] Supabase 데이터가 localStorage보다 우선순위를 가짐 (updatedAt 기준 비교)
   useEffect(() => {
     if (supabaseBoms.length > 0) {
-      setExtBoms(supabaseBoms as any[]);
+      setExtBoms(prev => {
+        // localStorage 데이터를 기준 Map으로 시작
+        const mergedMap = new Map<string, ExtBom>(prev.map(b => [b.id, b]));
+        for (const sb of supabaseBoms as any[]) {
+          const existing = mergedMap.get(sb.id);
+          if (!existing) {
+            // localStorage에 없는 BOM은 추가
+            mergedMap.set(sb.id, sb as ExtBom);
+          } else {
+            // 두 곳 모두 있으면 더 최신 데이터 사용
+            // Supabase의 updatedAt이 localStorage보다 최신이거나 동일하면 Supabase 우선
+            const sbTime = new Date(sb.updatedAt || sb.createdAt || 0).getTime();
+            const localTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+            if (sbTime >= localTime) {
+              mergedMap.set(sb.id, sb as ExtBom);
+            }
+            // localStorage가 더 최신이면 로컬 데이터 유지 (저장 대기 중인 미동기화 상태)
+          }
+        }
+        return Array.from(mergedMap.values());
+      });
     }
   }, [supabaseBoms]);
 
@@ -1657,20 +1678,34 @@ export default function BomManagement() {
   // 스타일 선택 시 BOM 로드
   useEffect(() => {
     // _reload 접미사 처리 (강제 재로드용)
-    const styleId = selectedStyleId.endsWith('_reload')
+    const rawId = selectedStyleId.endsWith('_reload')
       ? selectedStyleId.replace('_reload', '')
       : selectedStyleId;
 
-    if (!styleId) { setEditBom(null); setActivePreColor(''); setActivePostColor(''); return; }
-    // styleId가 UUID가 아닌 styleNo 문자열이면 items에서 id로 변환
-    const resolvedStyleId = items.find(i => i.id === styleId)
-      ? styleId
-      : (items.find(i => i.styleNo === styleId)?.id || styleId);
-    const item = items.find(i => i.id === resolvedStyleId);
-    // styleId가 정확히 일치하는 BOM만 사용 (styleNo는 참고용)
-    // styleId가 실제로 있고, 값이 일치하는 BOM만 사용 (undefined===undefined 방지)
-    const validStyleBoms = extBoms.filter(b => 
-      !!b.styleId && (b.styleId === resolvedStyleId || b.styleId === styleId) && b.styleNo === (item?.styleNo || '')
+    if (!rawId) { setEditBom(null); setActivePreColor(''); setActivePostColor(''); return; }
+
+    // [FIX] items가 아직 로드되지 않은 경우 대기 (items 의존성 추가로 해결)
+    if (items.length === 0) return;
+
+    // [FIX] rawId가 UUID가 아닌 styleNo일 수 있음 (ItemMaster에서 prefill 시 styleNo 저장)
+    // items.id(UUID)로 먼저 찾고, 없으면 styleNo로 fallback 타입 변환
+    let item = items.find(i => i.id === rawId);
+    let styleId = rawId;
+    if (!item) {
+      // rawId가 styleNo일 가능성 있음 → items.styleNo로 매칭
+      item = items.find(i => i.styleNo === rawId);
+      if (item) {
+        // selectedStyleId를 UUID로 교체 (한 번만 실행되도록)
+        styleId = item.id;
+        setSelectedStyleId(item.id);
+        return; // setSelectedStyleId 후 이 effect가 다시 실행되므로 return
+      }
+    }
+
+    // styleId가 정확히 일치하는 BOM만 사용
+    // [FIX] styleNo 조건 제거: item이 없을 때 styleNo==='' 조건이 모든 BOM을 필터링하는 문제 해결
+    const validStyleBoms = extBoms.filter(b =>
+      !!b.styleId && b.styleId === styleId
     );
     let loadedBom: ExtBom;
     if (validStyleBoms.length > 0) {
@@ -1684,7 +1719,7 @@ export default function BomManagement() {
       }
       loadedBom = normalizeBom(loaded);
     } else {
-      if (!item) { setEditBom(null); return; }
+      if (!item) { setEditBom(null); setActivePreColor(''); setActivePostColor(''); return; }
       const nb = createNewBom(settings);
       nb.styleId = item.id;
       nb.styleNo = item.styleNo;
@@ -1729,7 +1764,7 @@ export default function BomManagement() {
     } else {
       setActivePostColor('');
     }
-  }, [selectedStyleId, items]);
+  }, [selectedStyleId, items]); // [FIX] items 의존성 추가: items 로드 후 styleNo→UUID 변환 시 재실행
 
   // URL 파라미터로 컬러 탭 자동 활성화 (품목 마스터 BOM 바로가기 연동)
   useEffect(() => {

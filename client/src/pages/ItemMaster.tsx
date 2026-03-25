@@ -651,7 +651,7 @@ export default function ItemMaster() {
                           {normalizeColors(item.colors || []).slice(0, 3).map(c => (
                             <button
                               key={c.name}
-                              onClick={() => navigate(`/bom?styleNo=${encodeURIComponent(item.styleNo)}&color=${encodeURIComponent(c.name)}`)}
+                              onClick={() => navigate(`/bom?styleNo=${encodeURIComponent(item.id)}&color=${encodeURIComponent(c.name)}`)} // [FIX] item.id(UUID) 사용
                               className="text-xs px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded hover:bg-amber-100 hover:text-amber-700 hover:border hover:border-amber-300 border border-transparent transition-colors"
                               title={`${c.name} 컬러 BOM으로 이동`}
                             >
@@ -706,7 +706,7 @@ export default function ItemMaster() {
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => {
-                          localStorage.setItem('ames_prefill_bom', item.id);
+                          localStorage.setItem('ames_prefill_bom', item.id); // [FIX] styleNo 대신 item.id(UUID) 저장
                           navigate('/bom');
                         }}
                         className={`text-xs px-2 py-0.5 rounded border transition-colors font-medium ${
@@ -980,7 +980,7 @@ export default function ItemMaster() {
                         type="button"
                         onClick={() => {
                           setModalOpen(false);
-                          localStorage.setItem('ames_prefill_bom', editItem?.id || styleNo);
+                          localStorage.setItem('ames_prefill_bom', editItem.id || styleNo); // [FIX] item.id(UUID) 우선, fallback은 styleNo
                           navigate('/bom');
                         }}
                         className="flex items-center gap-1 text-xs text-[#C9A96E] hover:text-amber-700 font-medium"
