@@ -678,8 +678,10 @@ export default function ProductionOrders() {
 
     // 발주 완료 후 액션 팝업: BOM 자재 목록 계산
     const bomMaterials: Array<any> = [];
+    let _bomForCart: any = null;  // 장바구니 담기용 bom 참조
     if (form.styleNo) {
       const { bom } = getBomForOrderFromList(boms as Bom[], form.styleNo);
+      _bomForCart = bom;  // 외부 스코프로 전달
       if (bom) {
         // postColorBoms 우선 → 선택된 컬러만 → postMaterials → lines 순서로 확인
         const postColorBoms = (bom as any).postColorBoms || [];
@@ -727,8 +729,8 @@ export default function ProductionOrders() {
     }
 
     // 본사제공 자재 자동 장바구니 저장 - 컬러별로 각각 처리 (vendorName 보존)
-    if (bom) {
-      const postColorBoms = (bom as any).postColorBoms || [];
+    if (_bomForCart) {
+      const postColorBoms = (_bomForCart as any).postColorBoms || [];
       const orderColorQtys2 = order.colorQtys || [];
       if (postColorBoms.length > 0 && orderColorQtys2.length > 0) {
         // 컬러별로 각각 addToMaterialCart 호출
