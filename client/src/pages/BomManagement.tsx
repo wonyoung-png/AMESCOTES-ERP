@@ -3877,41 +3877,44 @@ export default function BomManagement() {
                           <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">{fmtKrw(ps.factoryUnitCostKrw)}</td>
                         </tr>
                         {/* 5. 관세 (율 > 0일 때만) */}
-                        {ps.customsRate > 0 && (
-                          <tr className="border-b border-stone-100 hover:bg-stone-50">
-                            <td className="px-4 py-2 font-bold text-stone-400">관</td>
-                            <td className="px-4 py-2 font-medium text-stone-700">관세 ({ps.customsRate}%)</td>
-                            <td className="px-4 py-2 text-stone-400">임가공비 × 관세율</td>
-                            <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.customsKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.customsKrw)}</span></td>
-                          </tr>
-                        )}
-                        {/* 6. 물류비 */}
-                        {ps.logisticsKrw > 0 && (
-                          <tr className="border-b border-stone-100 hover:bg-stone-50">
-                            <td className="px-4 py-2 font-bold text-stone-400">물</td>
-                            <td className="px-4 py-2 font-medium text-stone-700">물류비</td>
-                            <td className="px-4 py-2 text-stone-400">PCS 배분 물류비</td>
-                            <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(ps.logisticsKrw)}</span></td>
-                          </tr>
-                        )}
-                        {/* 7. 포장/검사비 (값 있을 때만) */}
-                        {ps.packagingKrw > 0 && (
-                          <tr className="border-b border-stone-100 hover:bg-stone-50">
-                            <td className="px-4 py-2 font-bold text-stone-400">포</td>
-                            <td className="px-4 py-2 font-medium text-stone-700">포장/검사비</td>
-                            <td className="px-4 py-2 text-stone-400">포장 잡비, 검사 인건비</td>
-                            <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(ps.packagingKrw)}</span></td>
-                          </tr>
-                        )}
-                        {/* 8. 패킹재 (값 있을 때만) */}
-                        {ps.packingKrw > 0 && (
-                          <tr className="border-b border-stone-100 hover:bg-stone-50">
-                            <td className="px-4 py-2 font-bold text-stone-400">패</td>
-                            <td className="px-4 py-2 font-medium text-stone-700">패킹재</td>
-                            <td className="px-4 py-2 text-stone-400">쇼핑백, 박스, 에어캡 등</td>
-                            <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(ps.packingKrw)}</span></td>
-                          </tr>
-                        )}
+                        {/* 관세율 - 직접 입력 */}
+                        <tr className="border-b border-stone-100 hover:bg-stone-50">
+                          <td className="px-4 py-2 font-bold text-stone-400">관</td>
+                          <td className="px-4 py-2 font-medium text-stone-700">
+                            관세
+                            <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className="inline-block h-6 text-xs border-stone-200 text-right w-14 ml-1" placeholder="%" />
+                            <span className="text-xs text-stone-400 ml-1">%</span>
+                          </td>
+                          <td className="px-4 py-2 text-stone-400 text-xs">임가공비 × 관세율</td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.customsKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.customsKrw)}</span></td>
+                        </tr>
+                        {/* 물류비 - 직접 입력 */}
+                        <tr className="border-b border-stone-100 hover:bg-stone-50">
+                          <td className="px-4 py-2 font-bold text-stone-400">물</td>
+                          <td className="px-4 py-2 font-medium text-stone-700">물류비</td>
+                          <td className="px-4 py-2 text-stone-400">
+                            <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className="h-6 text-xs border-stone-200 text-right w-24" placeholder="₩" />
+                          </td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(ps.logisticsKrw)}</span></td>
+                        </tr>
+                        {/* 포장/검사비 - 직접 입력 */}
+                        <tr className="border-b border-stone-100 hover:bg-stone-50">
+                          <td className="px-4 py-2 font-bold text-stone-400">포</td>
+                          <td className="px-4 py-2 font-medium text-stone-700">포장/검사비</td>
+                          <td className="px-4 py-2 text-stone-400">
+                            <Input type="number" value={editBom.packagingCostKrw || ''} onChange={e => updateField('packagingCostKrw', Number(e.target.value))} className="h-6 text-xs border-stone-200 text-right w-24" placeholder="₩" />
+                          </td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.packagingKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.packagingKrw)}</span></td>
+                        </tr>
+                        {/* 패킹재 - 직접 입력 */}
+                        <tr className="border-b border-stone-100 hover:bg-stone-50">
+                          <td className="px-4 py-2 font-bold text-stone-400">패</td>
+                          <td className="px-4 py-2 font-medium text-stone-700">패킹재</td>
+                          <td className="px-4 py-2 text-stone-400">
+                            <Input type="number" value={editBom.packingCostKrw || ''} onChange={e => updateField('packingCostKrw', Number(e.target.value))} className="h-6 text-xs border-stone-200 text-right w-24" placeholder="₩" />
+                          </td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.packingKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.packingKrw)}</span></td>
+                        </tr>
                         {/* 9. 제품 총원가 (생산마진 전 실원가) */}
                         <tr className="bg-amber-50 border-y border-amber-200">
                           <td className="px-4 py-2 font-bold text-amber-600">제</td>
@@ -3961,28 +3964,7 @@ export default function BomManagement() {
                         )}
                       </tbody>
                     </table>
-                    {/* 원가 입력 필드 (관세율 / 물류비 / 포장검사비 / 패킹재) */}
-                    <div className="px-4 py-3 border-t border-stone-200 space-y-2">
-                      <p className="text-[11px] font-semibold text-stone-500 mb-1">추가 원가 입력</p>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-stone-600 whitespace-nowrap w-20">관세율 (%)</label>
-                          <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className="h-7 text-xs border-stone-200 text-right w-24" placeholder="%" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-stone-600 whitespace-nowrap w-20">물류비 (₩)</label>
-                          <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className="h-7 text-xs border-stone-200 text-right w-24" placeholder="₩" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-stone-600 whitespace-nowrap w-20">포장/검사비</label>
-                          <Input type="number" value={editBom.packagingCostKrw || ''} onChange={e => updateField('packagingCostKrw', Number(e.target.value))} className="h-7 text-xs border-stone-200 text-right w-24" placeholder="₩" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-stone-600 whitespace-nowrap w-20">패킹재 (₩)</label>
-                          <Input type="number" value={editBom.packingCostKrw || ''} onChange={e => updateField('packingCostKrw', Number(e.target.value))} className="h-7 text-xs border-stone-200 text-right w-24" placeholder="₩" />
-                        </div>
-                      </div>
-                    </div>
+
                     {/* 납품가 입력 */}
                     <div className="px-4 py-3 border-t border-stone-200 flex items-center gap-3">
                       <label className="text-xs font-semibold text-stone-700 whitespace-nowrap">납품가 (KRW)</label>
