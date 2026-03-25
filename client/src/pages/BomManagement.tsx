@@ -1670,7 +1670,8 @@ export default function BomManagement() {
 
     if (!styleId) { setEditBom(null); setActivePreColor(''); setActivePostColor(''); return; }
     const item = items.find(i => i.id === styleId);
-    const styleBoms = extBoms.filter(b => b.styleId === styleId);
+    // styleId와 styleNo 모두 확인해서 기존 BOM 정확히 매칭
+    const styleBoms = extBoms.filter(b => b.styleId === styleId && b.styleNo === (item?.styleNo || ''));
     let loadedBom: ExtBom;
     if (styleBoms.length > 0) {
       const loaded: ExtBom = JSON.parse(JSON.stringify(styleBoms.sort((a, b) => b.version - a.version)[0]));
