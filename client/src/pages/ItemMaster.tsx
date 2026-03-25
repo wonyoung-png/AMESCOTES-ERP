@@ -706,7 +706,7 @@ export default function ItemMaster() {
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => {
-                          localStorage.setItem('ames_prefill_bom', item.styleNo);
+                          localStorage.setItem('ames_prefill_bom', item.id);
                           navigate('/bom');
                         }}
                         className={`text-xs px-2 py-0.5 rounded border transition-colors font-medium ${
@@ -980,7 +980,7 @@ export default function ItemMaster() {
                         type="button"
                         onClick={() => {
                           setModalOpen(false);
-                          localStorage.setItem('ames_prefill_bom', styleNo);
+                          localStorage.setItem('ames_prefill_bom', editItem?.id || styleNo);
                           navigate('/bom');
                         }}
                         className="flex items-center gap-1 text-xs text-[#C9A96E] hover:text-amber-700 font-medium"

@@ -1662,11 +1662,15 @@ export default function BomManagement() {
       : selectedStyleId;
 
     if (!styleId) { setEditBom(null); setActivePreColor(''); setActivePostColor(''); return; }
-    const item = items.find(i => i.id === styleId);
+    // styleId가 UUID가 아닌 styleNo 문자열이면 items에서 id로 변환
+    const resolvedStyleId = items.find(i => i.id === styleId)
+      ? styleId
+      : (items.find(i => i.styleNo === styleId)?.id || styleId);
+    const item = items.find(i => i.id === resolvedStyleId);
     // styleId가 정확히 일치하는 BOM만 사용 (styleNo는 참고용)
     // styleId가 실제로 있고, 값이 일치하는 BOM만 사용 (undefined===undefined 방지)
     const validStyleBoms = extBoms.filter(b => 
-      !!b.styleId && b.styleId === styleId && b.styleNo === (item?.styleNo || '')
+      !!b.styleId && (b.styleId === resolvedStyleId || b.styleId === styleId) && b.styleNo === (item?.styleNo || '')
     );
     let loadedBom: ExtBom;
     if (validStyleBoms.length > 0) {
@@ -1680,7 +1684,7 @@ export default function BomManagement() {
       }
       loadedBom = normalizeBom(loaded);
     } else {
-      if (!item) return;
+      if (!item) { setEditBom(null); return; }
       const nb = createNewBom(settings);
       nb.styleId = item.id;
       nb.styleNo = item.styleNo;
@@ -1725,7 +1729,7 @@ export default function BomManagement() {
     } else {
       setActivePostColor('');
     }
-  }, [selectedStyleId]);
+  }, [selectedStyleId, items]);
 
   // URL 파라미터로 컬러 탭 자동 활성화 (품목 마스터 BOM 바로가기 연동)
   useEffect(() => {
