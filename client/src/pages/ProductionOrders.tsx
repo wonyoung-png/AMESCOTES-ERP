@@ -731,7 +731,11 @@ export default function ProductionOrders() {
     // 본사제공 자재 자동 장바구니 저장 - 컬러별로 각각 처리 (vendorName 보존)
     if (_bomForCart) {
       const postColorBoms = (_bomForCart as any).postColorBoms || [];
-      console.log('[장바구니 디버그] postColorBoms 컬러 수:', postColorBoms.length, postColorBoms.map((cb: any) => cb.color + '(' + (cb.lines||[]).filter((l:any)=>l.isHqProvided).length + '본사제공)'));
+      console.log('[장바구니 디버그] postColorBoms 컬러 수:', postColorBoms.length);
+      postColorBoms.forEach((cb: any) => {
+        const hq = (cb.lines||[]).filter((l:any)=>l.isHqProvided);
+        console.log('  컬러:', cb.color, '본사제공:', hq.map((l:any)=>l.itemName+'('+l.vendorName+')'));
+      });
       const orderColorQtys2 = order.colorQtys || [];
       if (postColorBoms.length > 0 && orderColorQtys2.length > 0) {
         // 컬러별로 각각 addToMaterialCart 호출
