@@ -1351,8 +1351,10 @@ export const store = {
       // 소요량 = netQty * (1 + lossRate) * orderQty
       const perPcsQty = mat.netQty * (1 + (mat.lossRate ?? 0));
       const totalQty = Math.round(perPcsQty * orderQty * 1000) / 1000;
-      const key = mat.itemName + '||' + mat.unit;
-      const idx = cart.findIndex(c => (c.materialName + '||' + c.unit) === key);
+      // vendorName까지 포함해서 키 생성 → 같은 자재라도 거래처 다르면 별도 항목
+      const vendorKey = mat.vendorName || '';
+      const key = mat.itemName + '||' + mat.unit + '||' + vendorKey;
+      const idx = cart.findIndex(c => (c.materialName + '||' + c.unit + '||' + (c.vendorName || '')) === key);
       if (idx >= 0) {
         // 기존 항목 — 수량 합산, 발주 목록 추가
         const existingOrder = cart[idx].orders.find(o => o.styleNo === styleNo);
@@ -1367,10 +1369,7 @@ export const store = {
         if (mat.unitPriceCny !== undefined && mat.unitPriceCny > 0) {
           cart[idx].unitPriceCny = mat.unitPriceCny;
         }
-        // vendorName 업데이트 (새 값이 더 구체적이면 갱신)
-        if (mat.vendorName && mat.vendorName !== cart[idx].vendorName) {
-          cart[idx].vendorName = mat.vendorName;
-        }
+
       } else {
         cart.push({
           materialName: mat.itemName,
