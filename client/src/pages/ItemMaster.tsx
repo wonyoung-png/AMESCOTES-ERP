@@ -163,10 +163,10 @@ export default function ItemMaster() {
     const vendor = vendors.find(v => v.id === selectedVendorId);
     if (!vendor?.code || !editItem.category) { setPreviewStyleNo(''); return; }
     const date = registDate ? new Date(registDate) : new Date();
-    const generated = generateStyleNo(vendor.code, date, editItem.category as Category, store.getItems(), isEdit ? editItem.id : undefined, editItem.erpCategory);
+    const generated = generateStyleNo(vendor.code, date, editItem.category as Category, items as Item[], isEdit ? editItem.id : undefined, editItem.erpCategory);
     setPreviewStyleNo(generated);
     setEditItem(prev => ({ ...prev, styleNo: generated }));
-  }, [selectedVendorId, registDate, editItem.category, editItem.erpCategory, manualStyleNo, isEdit, editItem.id, vendors]);
+  }, [selectedVendorId, registDate, editItem.category, editItem.erpCategory, manualStyleNo, isEdit, editItem.id, vendors, items]);
 
   const openAdd = (prefill?: { styleNo?: string; buyerId?: string; season?: string; styleName?: string; imageUrl?: string }) => {
     // 샘플에서 넘어온 prefill 확인
