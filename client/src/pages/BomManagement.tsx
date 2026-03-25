@@ -1670,11 +1670,15 @@ export default function BomManagement() {
 
     if (!styleId) { setEditBom(null); setActivePreColor(''); setActivePostColor(''); return; }
     const item = items.find(i => i.id === styleId);
-    // styleId와 styleNo 모두 확인해서 기존 BOM 정확히 매칭
-    const styleBoms = extBoms.filter(b => b.styleId === styleId && b.styleNo === (item?.styleNo || ''));
+    // styleId가 정확히 일치하는 BOM만 사용 (styleNo는 참고용)
+    const styleBoms = extBoms.filter(b => b.styleId === styleId && !!b.styleId);
+    // Supabase boms(useQuery)에서도 확인
+    const supabaseBom = (boms as any[]).find(b => b.styleNo === item?.styleNo || b.styleId === styleId);
     let loadedBom: ExtBom;
-    if (styleBoms.length > 0) {
-      const loaded: ExtBom = JSON.parse(JSON.stringify(styleBoms.sort((a, b) => b.version - a.version)[0]));
+    // extBoms에서 정확히 styleId 일치하는 것 OR supabaseBom이 있고 styleNo 일치하는 경우만
+    const validStyleBoms = styleBoms.filter(b => b.styleNo === item?.styleNo && b.styleId === styleId);
+    if (validStyleBoms.length > 0) {
+      const loaded: ExtBom = JSON.parse(JSON.stringify(validStyleBoms.sort((a, b) => b.version - a.version)[0]));
       if (item) {
         loaded.styleNo = item.styleNo;
         loaded.styleName = item.name;
