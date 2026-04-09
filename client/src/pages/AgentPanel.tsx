@@ -164,7 +164,7 @@ export default function AgentPanel() {
           <h1 className="text-lg font-semibold" style={{ color: '#1C1C1E' }}>
             AI 어시스턴트
           </h1>
-          <p className="text-xs text-muted-foreground">에이전트 팀 · claude-opus-4-6</p>
+          <p className="text-xs text-muted-foreground">AI 어시스턴트 · claude-haiku-4-5</p>
         </div>
       </div>
 

@@ -140,7 +140,7 @@ export default function ChatWidget() {
             <Bot className="w-5 h-5 text-white" />
             <div>
               <p className="text-sm font-semibold text-white">AI 어시스턴트</p>
-              <p className="text-xs text-white/70">에이전트 팀 · claude-opus-4-6</p>
+              <p className="text-xs text-white/70">AI 어시스턴트 · claude-haiku-4-5</p>
             </div>
             <button
               onClick={() => setOpen(false)}

@@ -33,11 +33,11 @@ pkill -f "dist/index.js" 2>/dev/null || true
 sleep 1
 
 if [ -f ".env" ]; then
-  nohup node --env-file=.env dist/agent-server.js >> /tmp/agent-server.log 2>&1 &
-  nohup node --env-file=.env dist/index.js >> /tmp/erp-server.log 2>&1 &
+  nohup node --use-env-proxy --env-file=.env dist/agent-server.js >> /tmp/agent-server.log 2>&1 &
+  nohup node --use-env-proxy --env-file=.env dist/index.js >> /tmp/erp-server.log 2>&1 &
 else
-  nohup node dist/agent-server.js >> /tmp/agent-server.log 2>&1 &
-  nohup node dist/index.js >> /tmp/erp-server.log 2>&1 &
+  nohup node --use-env-proxy dist/agent-server.js >> /tmp/agent-server.log 2>&1 &
+  nohup node --use-env-proxy dist/index.js >> /tmp/erp-server.log 2>&1 &
 fi
 
 sleep 2
