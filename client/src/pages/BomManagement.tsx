@@ -3406,8 +3406,6 @@ export default function BomManagement() {
                           { key: '자', label: '물류비', desc: 'PCS 배분 물류비', val: summary.logisticsKrw, editable: true, field: 'logisticsCostKrw' as keyof ExtBom },
                           { key: '재', label: '포장/검사비', desc: '포장 잡비, 검사 인건비', val: summary.packagingKrw, editable: true, field: 'packagingCostKrw' as keyof ExtBom },
                           { key: '패', label: '패킹재', desc: '쇼핑백, 박스, 에어캡 등', val: summary.packingKrw, editable: true, field: 'packingCostKrw' as keyof ExtBom },
-                          { key: '제', label: '제품 총원가', desc: '생산마진 전 실원가', val: summary.subTotal, editable: false },
-                          ...((editBom.productionMarginRate ?? 0) > 0 ? [{ key: '마', label: '생산마진', desc: `${Math.round((editBom.productionMarginRate || 0) * 100)}%`, val: summary.productionMarginKrw, editable: false }] : []),
                         ].map(row => (
                           <tr key={row.key} className="border-b border-stone-100 hover:bg-stone-50">
                             <td className="px-4 py-2 font-bold text-stone-400">{row.key}</td>
@@ -3422,6 +3420,25 @@ export default function BomManagement() {
                             </td>
                           </tr>
                         ))}
+                        <tr className="border-b border-stone-100 hover:bg-stone-50">
+                          <td className="px-4 py-2 font-bold text-stone-400">마</td>
+                          <td className="px-4 py-2 font-medium text-stone-700">생산마진</td>
+                          <td className="px-4 py-2 text-stone-400">
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={Math.round((editBom.productionMarginRate ?? 0.16) * 100)}
+                                onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)}
+                                className="h-6 text-xs border-stone-200 text-right w-16"
+                                placeholder="0"
+                              />
+                              <span className="text-stone-500 text-xs">%</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums">
+                            <span className={summary.productionMarginKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(summary.productionMarginKrw)}</span>
+                          </td>
+                        </tr>
                         <tr className="bg-stone-800 text-white">
                           <td className="px-4 py-3 font-bold">사</td>
                           <td className="px-4 py-3 font-bold text-base" colSpan={2}>총 원 가 액</td>
