@@ -11,17 +11,36 @@ const SYSTEM_PROMPT = `당신은 AMESCOTES ERP의 AI 어시스턴트입니다.
 숫자와 날짜는 알기 쉽게 포맷하고, 목록은 보기 좋게 정리하세요.
 항상 한국어로 응답하세요.`;
 
+export interface ImageInput {
+  data: string;       // base64
+  media_type: string; // image/jpeg | image/png | image/webp | image/gif
+}
+
 /** 에이전트 팀 실행 — SSE 콜백 방식 */
 export async function runAgentTeam(
   prompt: string,
   onText: (text: string) => void,
   onDone: () => void,
   onError: (err: unknown) => void,
+  images?: ImageInput[],
 ): Promise<void> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+  // 이미지가 있으면 multipart content 구성
+  const userContent: Anthropic.MessageParam['content'] = [
+    ...(images ?? []).map(img => ({
+      type: 'image' as const,
+      source: {
+        type: 'base64' as const,
+        media_type: img.media_type as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+        data: img.data,
+      },
+    })),
+    { type: 'text' as const, text: prompt },
+  ];
+
   const messages: Anthropic.MessageParam[] = [
-    { role: 'user', content: prompt },
+    { role: 'user', content: userContent },
   ];
 
   let accumulatedText = '';

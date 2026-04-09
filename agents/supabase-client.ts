@@ -1,5 +1,4 @@
 // 서버 사이드 Supabase 클라이언트 (service role key 사용)
-import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.SUPABASE_URL;

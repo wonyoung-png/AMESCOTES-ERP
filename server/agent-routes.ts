@@ -1,8 +1,8 @@
-// ERP 에이전트 팀 API 라우터 — SSE 스트리밍 + 파일 업로드
+// ERP 에이전트 팀 API 라우터 — SSE 스트리밍 + 파일 업로드 + 이미지 비전
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
-import { runAgentTeam } from '../agents/agent-team.js';
+import { runAgentTeam, type ImageInput } from '../agents/agent-team.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -12,10 +12,13 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
  * Response: SSE (text/event-stream)
  */
 router.post('/api/agent', async (req: Request, res: Response) => {
-  const { prompt } = req.body as { prompt?: string };
+  const { prompt, images } = req.body as { prompt?: string; images?: ImageInput[] };
 
-  if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
-    res.status(400).json({ error: '유효하지 않은 요청: prompt가 필요합니다.' });
+  // 이미지만 있어도 허용 (텍스트 없이 이미지만 붙여넣기)
+  const hasPrompt = prompt && typeof prompt === 'string' && prompt.trim() !== '';
+  const hasImages = Array.isArray(images) && images.length > 0;
+  if (!hasPrompt && !hasImages) {
+    res.status(400).json({ error: '유효하지 않은 요청: prompt 또는 이미지가 필요합니다.' });
     return;
   }
 
@@ -32,11 +35,14 @@ router.post('/api/agent', async (req: Request, res: Response) => {
     } catch { /* 클라이언트 연결 끊김 */ }
   };
 
+  const effectivePrompt = hasPrompt ? prompt!.trim() : '이 이미지를 분석해주세요.';
+
   await runAgentTeam(
-    prompt.trim(),
+    effectivePrompt,
     (text) => sendEvent({ type: 'text', text }),
     () => { sendEvent({ type: 'done' }); res.end(); },
-    (err) => { sendEvent({ type: 'error', message: String(err) }); res.end(); }
+    (err) => { sendEvent({ type: 'error', message: String(err) }); res.end(); },
+    hasImages ? images : undefined,
   );
 });
 
