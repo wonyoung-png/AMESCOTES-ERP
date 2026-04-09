@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, Send, User, AlertCircle, Loader2, Zap } from 'lucide-react';
+import { Bot, Send, User, AlertCircle, Loader2, Zap, Paperclip } from 'lucide-react';
 
 // ─── 메시지 타입 ───
 interface Message {
@@ -36,6 +36,7 @@ export default function AgentPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 새 메시지 추가 시 스크롤 아래로
   useEffect(() => {
@@ -134,6 +135,79 @@ export default function AgentPanel() {
       );
     } finally {
       setIsLoading(false);
+      textareaRef.current?.focus();
+    }
+  }, [isLoading]);
+
+  const uploadFile = useCallback(async (file: File) => {
+    if (isLoading) return;
+
+    const agentId = `agent-${Date.now()}`;
+    setMessages(prev => [
+      ...prev,
+      { id: `user-${Date.now()}`, role: 'user', text: `파일 업로드: ${file.name}` },
+      { id: agentId, role: 'agent', text: '', isStreaming: true },
+    ]);
+    setIsLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('mode', 'auto');
+
+      const response = await fetch('/api/agent/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error(`서버 오류: ${response.status}`);
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) throw new Error('스트림 오류');
+
+      let buffer = '';
+      let agentText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+          try {
+            const event = JSON.parse(raw) as { type: string; text?: string; message?: string };
+            if (event.type === 'text' && event.text) {
+              agentText = event.text;
+              setMessages(prev => prev.map(m =>
+                m.id === agentId ? { ...m, text: agentText, isStreaming: true } : m
+              ));
+            } else if (event.type === 'done') {
+              setMessages(prev => prev.map(m =>
+                m.id === agentId ? { ...m, text: agentText || '완료됐습니다.', isStreaming: false } : m
+              ));
+            } else if (event.type === 'error') {
+              setMessages(prev => prev.map(m =>
+                m.id === agentId ? { ...m, text: `오류: ${event.message}`, isStreaming: false, error: true } : m
+              ));
+            }
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (err) {
+      setMessages(prev => prev.map(m =>
+        m.id === agentId
+          ? { ...m, text: `연결 오류: ${String(err)}`, isStreaming: false, error: true }
+          : m
+      ));
+    } finally {
+      setIsLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       textareaRef.current?.focus();
     }
   }, [isLoading]);
@@ -241,6 +315,27 @@ export default function AgentPanel() {
       {/* 입력 영역 */}
       <div className="px-6 py-4 border-t">
         <form onSubmit={handleSubmit} className="flex items-end gap-3 max-w-4xl mx-auto">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0];
+              if (file) uploadFile(file);
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+            className="h-11 px-3"
+            style={{ color: '#C9A96E', borderColor: '#C9A96E55' }}
+            title="Excel/CSV 파일 업로드"
+          >
+            <Paperclip className="w-4 h-4" />
+          </Button>
           <Textarea
             ref={textareaRef}
             value={inputText}
@@ -264,9 +359,6 @@ export default function AgentPanel() {
             )}
           </Button>
         </form>
-        <p className="text-xs text-muted-foreground text-center mt-2">
-          ANTHROPIC_API_KEY 및 SUPABASE 환경변수 설정 필요
-        </p>
       </div>
     </div>
   );

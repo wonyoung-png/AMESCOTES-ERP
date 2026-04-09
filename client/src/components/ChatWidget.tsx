@@ -1,6 +1,6 @@
 // 플로팅 AI 챗봇 위젯 — 모든 페이지 우하단에 표시
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, X, Send, Loader2, Zap, AlertCircle } from 'lucide-react';
+import { Bot, X, Send, Loader2, Zap, AlertCircle, Paperclip } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -30,6 +30,7 @@ export default function ChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -103,6 +104,77 @@ export default function ChatWidget() {
       ));
     } finally {
       setIsLoading(false);
+      inputRef.current?.focus();
+    }
+  }, [isLoading]);
+
+  const uploadFile = useCallback(async (file: File) => {
+    if (isLoading) return;
+
+    const agentId = `agent-${Date.now()}`;
+    setMessages(prev => [
+      ...prev,
+      { id: `user-${Date.now()}`, role: 'user', text: `파일 업로드: ${file.name}` },
+      { id: agentId, role: 'agent', text: '', isStreaming: true },
+    ]);
+    setIsLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('mode', 'auto');
+
+      const response = await fetch('/api/agent/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error(`서버 오류: ${response.status}`);
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) throw new Error('스트림 오류');
+
+      let buffer = '';
+      let agentText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6)) as { type: string; text?: string; message?: string };
+            if (event.type === 'text' && event.text) {
+              agentText = event.text;
+              setMessages(prev => prev.map(m =>
+                m.id === agentId ? { ...m, text: agentText, isStreaming: true } : m
+              ));
+            } else if (event.type === 'done') {
+              setMessages(prev => prev.map(m =>
+                m.id === agentId ? { ...m, text: agentText || '완료됐습니다.', isStreaming: false } : m
+              ));
+            } else if (event.type === 'error') {
+              setMessages(prev => prev.map(m =>
+                m.id === agentId ? { ...m, text: `오류: ${event.message}`, isStreaming: false, error: true } : m
+              ));
+            }
+          } catch { /* JSON 파싱 무시 */ }
+        }
+      }
+    } catch (err) {
+      setMessages(prev => prev.map(m =>
+        m.id === agentId
+          ? { ...m, text: `연결 오류: ${String(err)}`, isStreaming: false, error: true }
+          : m
+      ));
+    } finally {
+      setIsLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       inputRef.current?.focus();
     }
   }, [isLoading]);
@@ -211,6 +283,25 @@ export default function ChatWidget() {
           {/* 입력창 */}
           <div className="px-3 py-2.5 border-t">
             <div className="flex items-end gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadFile(file);
+                }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                className="flex-shrink-0 w-9 h-9 rounded-lg border flex items-center justify-center disabled:opacity-50 transition-colors hover:bg-accent"
+                style={{ color: '#C9A96E', borderColor: '#C9A96E55' }}
+                title="Excel/CSV 파일 업로드"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
               <textarea
                 ref={inputRef}
                 value={inputText}
