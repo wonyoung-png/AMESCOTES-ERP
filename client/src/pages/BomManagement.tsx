@@ -160,13 +160,21 @@ function calcSummary(bom: ExtBom, settingsUsdKrw?: number, colorBom?: ExtColorBo
   const srcPostProcessLines = colorBom ? (colorBom.postProcessLines ?? []) : (bom.postProcessLines || []);
   const processingAmt = colorBom ? (colorBom.processingFee ?? 0) : (bom.processingFee || 0);
 
+  // 공장구매 자재만 (본사제공/업체제공 모두 제외) - 공장단가 계산용
   const materialAmt = srcLines.reduce((s, l) => {
-    if (l.isHqProvided) return s;
+    if (l.isHqProvided || l.isVendorProvided) return s;
     return s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate);
   }, 0);
+  // 마진 계산 기준: 공장구매 + 본사제공 포함, 업체제공만 제외
+  const marginBaseMaterialAmt = srcLines.reduce((s, l) => {
+    if (l.isVendorProvided) return s; // 업체제공만 제외
+    return s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate);
+  }, 0);
+  // 표시용 전체 합계 (본사+업체+공장 모두 포함)
   const totalMaterialAmt = srcLines.reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate), 0);
   const postProcessAmt = srcPostProcessLines.reduce((s, l) => s + l.netQty * l.unitPrice, 0);
   const materialKrw = materialAmt * toKrw;
+  const marginBaseMaterialKrw = marginBaseMaterialAmt * toKrw; // 마진 계산 기준 (공장+본사, 업체제곱 제외)
   const totalMaterialKrw = totalMaterialAmt * toKrw;
   const processingKrw = processingAmt * toKrw;
   const postProcessKrw = postProcessAmt * toKrw;
@@ -177,7 +185,8 @@ function calcSummary(bom: ExtBom, settingsUsdKrw?: number, colorBom?: ExtColorBo
   const packagingKrw = bom.packagingCostKrw || 0;
   const packingKrw = bom.packingCostKrw || 0;
   const marginRate = bom.productionMarginRate ?? 0.16;
-  const subTotal = materialKrw + processingKrw + postProcessKrw + customsKrw + logisticsKrw + packagingKrw + packingKrw;
+  // 마진 기준: 공장구매자재 + 본사제공자재 + 임가공비 + 후가공비 + 관세 + 물류비 + 포장검사비 + 패킹재 (업체제공만 제외)
+  const subTotal = marginBaseMaterialKrw + processingKrw + postProcessKrw + customsKrw + logisticsKrw + packagingKrw + packingKrw;
   const productionMarginKrw = subTotal * marginRate;
   const totalCostKrw = subTotal + productionMarginKrw;
   // 하위 호환성을 위해 Cny 명칭 유지
