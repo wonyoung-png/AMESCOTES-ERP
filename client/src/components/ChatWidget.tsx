@@ -119,7 +119,7 @@ export default function ChatWidget() {
       {/* 플로팅 버튼 */}
       <button
         onClick={() => setOpen(v => !v)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
+        className="fixed bottom-24 right-6 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
         style={{ backgroundColor: '#C9A96E' }}
         aria-label="AI 어시스턴트 열기"
       >
@@ -132,7 +132,7 @@ export default function ChatWidget() {
       {/* 채팅 창 */}
       {open && (
         <div
-          className="fixed bottom-24 right-6 z-50 w-[380px] max-h-[600px] flex flex-col rounded-2xl shadow-2xl border bg-background overflow-hidden"
+          className="fixed bottom-44 right-6 z-50 w-[380px] max-h-[560px] flex flex-col rounded-2xl shadow-2xl border bg-background overflow-hidden"
           style={{ borderColor: '#C9A96E33' }}
         >
           {/* 헤더 */}
