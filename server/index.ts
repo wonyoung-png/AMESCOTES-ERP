@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import path from "path";
@@ -13,6 +14,12 @@ async function startServer() {
 
   // JSON 파싱 미들웨어
   app.use(express.json());
+
+  // 요청 로깅 미들웨어
+  app.use((req, _res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+  });
 
   // AI 에이전트 API 라우터
   app.use(agentRoutes);
