@@ -1608,8 +1608,13 @@ export default function BomManagement() {
   const searchString = useSearch();
   const [, setLocation] = useLocation();
 
-  // 최상위 탭: 'pre' | 'post'
-  const [mainTab, setMainTab] = useState<'pre' | 'post'>('pre');
+  // 최상위 탭: 'pre' | 'post' | 'yardage'
+  const [mainTab, setMainTab] = useState<'pre' | 'post' | 'yardage'>('pre');
+  // 소요량 계산 탭
+  const [yardageTab, setYardageTab] = useState<'leather' | 'fabric'>('leather');
+  const [leatherRows, setLeatherRows] = useState<Array<{id: string; 부위: string; 가로: number; 세로: number; 수량: number}>>([]);
+  const [fabricRows, setFabricRows] = useState<Array<{id: string; 부위: string; 가로: number; 세로: number; 수량: number}>>([]);
+  const [fabricWidth, setFabricWidth] = useState<number>(150);
   // 각 탭 내 활성 컬러 탭
   const [activePreColor, setActivePreColor] = useState<string>('');
   const [activePostColor, setActivePostColor] = useState<string>('');
@@ -2955,6 +2960,16 @@ export default function BomManagement() {
                 <Badge className="text-[10px] py-0 h-4 bg-blue-100 text-blue-700 border-blue-300">{(editBom.postColorBoms || []).length}컬러</Badge>
               )}
             </button>
+            <button
+              onClick={() => setMainTab('yardage')}
+              className={`flex items-center gap-2 px-6 py-3 text-sm font-bold border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
+                mainTab === 'yardage'
+                  ? 'border-amber-500 text-amber-700'
+                  : 'border-transparent text-stone-400 hover:text-stone-600'
+              }`}
+            >
+              소요량 계산
+            </button>
           </div>
 
           {/* ── 사전원가 컬러 서브탭 ── */}
@@ -4256,6 +4271,188 @@ export default function BomManagement() {
               })()}
             </>
           )}
+
+          {/* ══════════════════════════════════════════════════════════════════
+            소요량 계산 탭
+          ══════════════════════════════════════════════════════════════════ */}
+          {mainTab === 'yardage' && (() => {
+            // 가죽 SF 계산
+            const netSF = leatherRows.reduce((sum, r) => {
+              return sum + (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764;
+            }, 0);
+            // 원단 YD 계산
+            const netYD = fabricWidth > 0
+              ? fabricRows.reduce((sum, r) => sum + r.가로 * r.세로 * r.수량, 0) / fabricWidth / 91.44
+              : 0;
+
+            const addLeatherRow = () => setLeatherRows(p => [...p, { id: genId(), 부위: '', 가로: 0, 세로: 0, 수량: 1 }]);
+            const addFabricRow = () => setFabricRows(p => [...p, { id: genId(), 부위: '', 가로: 0, 세로: 0, 수량: 1 }]);
+            const updateLeather = (id: string, field: string, val: string | number) =>
+              setLeatherRows(p => p.map(r => r.id === id ? { ...r, [field]: val } : r));
+            const updateFabric = (id: string, field: string, val: string | number) =>
+              setFabricRows(p => p.map(r => r.id === id ? { ...r, [field]: val } : r));
+
+            const yardageFileRef = React.createRef<HTMLInputElement>();
+
+            const handleYardageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const fd = new FormData();
+              fd.append('file', file);
+              try {
+                const res = await fetch('/api/yardage/parse', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json() as { leather: Array<{부위:string;가로:number;세로:number;수량:number}>; fabric: Array<{부위:string;가로:number;세로:number;수량:number}> };
+                if (data.leather?.length) setLeatherRows(data.leather.map(r => ({ ...r, id: genId() })));
+                if (data.fabric?.length) setFabricRows(data.fabric.map(r => ({ ...r, id: genId() })));
+                toast.success(`파싱 완료 — 가죽 ${data.leather?.length ?? 0}행, 원단 ${data.fabric?.length ?? 0}행`);
+              } catch (err) {
+                toast.error(`파싱 오류: ${String(err)}`);
+              }
+              e.target.value = '';
+            };
+
+            const applyToBom = () => {
+              if (!editBom) return;
+              const colorBom = activeColorBom;
+              const updateLines = (lines: ExtBomLine[]) =>
+                lines.map(l => {
+                  const unit = (l.customUnit || l.unit || '').toUpperCase();
+                  if (unit === 'SF') return { ...l, netQty: Math.ceil(netSF * 100) / 100 };
+                  if (unit === 'YD') return { ...l, netQty: Math.ceil(netYD * 100) / 100 };
+                  return l;
+                });
+              if (colorBom) {
+                setEditBom(prev => prev ? {
+                  ...prev,
+                  colorBoms: (prev.colorBoms || []).map(cb =>
+                    cb.color === colorBom.color ? { ...cb, lines: updateLines(cb.lines) } : cb
+                  ),
+                } : prev);
+              } else {
+                setEditBom(prev => prev ? { ...prev, lines: updateLines(prev.lines) } : prev);
+              }
+              toast.success('BOM에 소요량이 적용되었습니다');
+            };
+
+            const thCls = 'text-[11px] text-stone-500 font-semibold text-center py-2 px-2';
+            const tdCls = 'px-2 py-1';
+            const inputCls = 'w-full border border-stone-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-amber-400';
+
+            return (
+              <div className="space-y-4">
+                {/* 상단 컨트롤 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setYardageTab('leather')}
+                      className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                        yardageTab === 'leather' ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                      }`}
+                    >가죽 (SF)</button>
+                    <button
+                      onClick={() => setYardageTab('fabric')}
+                      className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                        yardageTab === 'fabric' ? 'bg-sky-600 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                      }`}
+                    >원단 (YD)</button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input ref={yardageFileRef} type="file" accept=".xls,.xlsx" className="hidden" onChange={handleYardageUpload} />
+                    <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => yardageFileRef.current?.click()}>
+                      <Upload className="w-3.5 h-3.5" /> CAD 파일 업로드
+                    </Button>
+                    <Button size="sm" className="gap-1.5 text-xs bg-amber-600 hover:bg-amber-700 text-white" onClick={applyToBom}>
+                      <Calculator className="w-3.5 h-3.5" /> BOM에 적용
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 가죽 탭 */}
+                {yardageTab === 'leather' && (
+                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-amber-50 border-b border-stone-200">
+                        <tr>
+                          <th className={thCls} style={{width:'36%'}}>부위</th>
+                          <th className={thCls} style={{width:'18%'}}>가로 CM</th>
+                          <th className={thCls} style={{width:'18%'}}>세로 CM</th>
+                          <th className={thCls} style={{width:'14%'}}>수량</th>
+                          <th className={thCls} style={{width:'10%'}}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leatherRows.map((r) => (
+                          <tr key={r.id} className="border-b border-stone-100 hover:bg-stone-50">
+                            <td className={tdCls}><input className={inputCls} value={r.부위} onChange={e => updateLeather(r.id, '부위', e.target.value)} placeholder="바디" /></td>
+                            <td className={tdCls}><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => updateLeather(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
+                            <td className={tdCls}><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => updateLeather(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
+                            <td className={tdCls}><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => updateLeather(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
+                            <td className={tdCls + ' text-center'}>
+                              <button onClick={() => setLeatherRows(p => p.filter(x => x.id !== r.id))} className="text-stone-300 hover:text-red-400 text-lg leading-none">×</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="p-3 flex items-center justify-between">
+                      <button onClick={addLeatherRow} className="text-xs text-amber-600 hover:text-amber-800 font-semibold">+ 행 추가</button>
+                      <div className="text-right">
+                        <span className="text-xs text-stone-400 mr-3">Net 소요량</span>
+                        <span className="text-lg font-bold text-amber-700">{netSF.toFixed(2)} SF</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 원단 탭 */}
+                {yardageTab === 'fabric' && (
+                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-sky-50 border-b border-stone-200">
+                      <span className="text-xs text-stone-500 font-semibold whitespace-nowrap">원단 폭 (cm)</span>
+                      <input
+                        type="number"
+                        value={fabricWidth}
+                        onChange={e => setFabricWidth(parseFloat(e.target.value) || 150)}
+                        className="w-24 border border-stone-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-sky-400"
+                      />
+                    </div>
+                    <table className="w-full">
+                      <thead className="bg-sky-50 border-b border-stone-200">
+                        <tr>
+                          <th className={thCls} style={{width:'36%'}}>부위</th>
+                          <th className={thCls} style={{width:'18%'}}>가로 CM</th>
+                          <th className={thCls} style={{width:'18%'}}>세로 CM</th>
+                          <th className={thCls} style={{width:'14%'}}>수량</th>
+                          <th className={thCls} style={{width:'10%'}}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fabricRows.map((r) => (
+                          <tr key={r.id} className="border-b border-stone-100 hover:bg-stone-50">
+                            <td className={tdCls}><input className={inputCls} value={r.부위} onChange={e => updateFabric(r.id, '부위', e.target.value)} placeholder="바디" /></td>
+                            <td className={tdCls}><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => updateFabric(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
+                            <td className={tdCls}><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => updateFabric(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
+                            <td className={tdCls}><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => updateFabric(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
+                            <td className={tdCls + ' text-center'}>
+                              <button onClick={() => setFabricRows(p => p.filter(x => x.id !== r.id))} className="text-stone-300 hover:text-red-400 text-lg leading-none">×</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="p-3 flex items-center justify-between">
+                      <button onClick={addFabricRow} className="text-xs text-sky-600 hover:text-sky-800 font-semibold">+ 행 추가</button>
+                      <div className="text-right">
+                        <span className="text-xs text-stone-400 mr-3">Net 소요량</span>
+                        <span className="text-lg font-bold text-sky-700">{netYD.toFixed(2)} YD</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* 유사 스타일 복사 모달 */}
           {showCopyModal && (
