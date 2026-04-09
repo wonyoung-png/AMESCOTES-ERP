@@ -10,7 +10,7 @@ import {
   BarChart3, Package, ClipboardList, FlaskConical, Factory,
   ShoppingCart, Building2, FileText, Receipt, CreditCard, Settings,
   ChevronLeft, ChevronRight, TrendingUp, DollarSign, LogOut, Layers,
-  Menu, X, MoreHorizontal,
+  Menu, X, MoreHorizontal, Bot,
 } from 'lucide-react';
 
 interface NavItem {
@@ -67,6 +67,12 @@ const navGroups: NavGroup[] = [
     label: '설정',
     items: [
       { path: '/settings', label: '환율 / 설정', icon: <Settings size={17} /> },
+    ]
+  },
+  {
+    label: 'AI',
+    items: [
+      { path: '/agent', label: 'AI 어시스턴트', icon: <Bot size={17} /> },
     ]
   },
 ];

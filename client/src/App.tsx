@@ -23,6 +23,7 @@ import DocumentOutput from "./pages/DocumentOutput";
 import ExchangeSettings from "./pages/ExchangeSettings";
 import SalesManagement from "./pages/SalesManagement";
 import MaterialMaster from "./pages/MaterialMaster";
+import AgentPanel from "./pages/AgentPanel";
 import NotFound from "./pages/NotFound";
 
 function Router() {
@@ -54,6 +55,7 @@ function Router() {
         <Route path="/settings" component={ExchangeSettings} />
         <Route path="/sales" component={SalesManagement} />
         <Route path="/materials" component={MaterialMaster} />
+        <Route path="/agent" component={AgentPanel} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

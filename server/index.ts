@@ -2,6 +2,7 @@ import express from "express";
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
+import agentRoutes from "./agent-routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,6 +10,12 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const server = createServer(app);
+
+  // JSON 파싱 미들웨어
+  app.use(express.json());
+
+  // AI 에이전트 API 라우터
+  app.use(agentRoutes);
 
   // Serve static files from dist/public in production
   const staticPath =
