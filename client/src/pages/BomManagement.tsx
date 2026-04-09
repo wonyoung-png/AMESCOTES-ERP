@@ -164,8 +164,10 @@ function calcSummary(bom: ExtBom, settingsUsdKrw?: number, colorBom?: ExtColorBo
     if (l.isHqProvided) return s;
     return s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate);
   }, 0);
+  const totalMaterialAmt = srcLines.reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate), 0);
   const postProcessAmt = srcPostProcessLines.reduce((s, l) => s + l.netQty * l.unitPrice, 0);
   const materialKrw = materialAmt * toKrw;
+  const totalMaterialKrw = totalMaterialAmt * toKrw;
   const processingKrw = processingAmt * toKrw;
   const postProcessKrw = postProcessAmt * toKrw;
   const logisticsKrw = bom.logisticsCostKrw || 0;
@@ -181,7 +183,7 @@ function calcSummary(bom: ExtBom, settingsUsdKrw?: number, colorBom?: ExtColorBo
   // 하위 호환성을 위해 Cny 명칭 유지
   return {
     materialCny: materialAmt, processingCny: processingAmt, postProcessCny: postProcessAmt,
-    materialKrw, processingKrw, postProcessKrw,
+    materialKrw, totalMaterialKrw, processingKrw, postProcessKrw,
     customsRate, customsKrw,
     logisticsKrw, packagingKrw, packingKrw,
     productionMarginKrw, totalCostKrw, subTotal, marginRate,
@@ -3399,7 +3401,7 @@ export default function BomManagement() {
                       <thead><tr className="bg-stone-100 text-stone-600"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-stone-400">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
                       <tbody>
                         {[
-                          { key: '원', label: '원부자재 합산', desc: `원자재 + 부자재 + 보강재 + 포장재 (${summary.preCur})`, val: summary.materialKrw + summary.postProcessKrw, editable: false },
+                          { key: '원', label: '원부자재 합산', desc: `원자재 + 부자재 + 보강재 + 포장재 (${summary.preCur}, 본사/업체제공 포함)`, val: summary.totalMaterialKrw + summary.postProcessKrw, editable: false },
                           { key: '부', label: '임가공비', desc: `NET (${summary.preCur})`, val: summary.processingKrw, editable: false },
                           { key: '자', label: '물류비', desc: 'PCS 배분 물류비', val: summary.logisticsKrw, editable: true, field: 'logisticsCostKrw' as keyof ExtBom },
                           { key: '재', label: '포장/검사비', desc: '포장 잡비, 검사 인건비', val: summary.packagingKrw, editable: true, field: 'packagingCostKrw' as keyof ExtBom },
@@ -3464,6 +3466,89 @@ export default function BomManagement() {
                     </table>
                   </div>
                 )}
+
+                {/* 본사/업체제공 자재 목록 */}
+                {summary && (() => {
+                  const allLines = colorBom.lines;
+                  const hqLines = allLines.filter(l => l.isHqProvided);
+                  const vendorLines = allLines.filter(l => l.isVendorProvided);
+                  if (hqLines.length === 0 && vendorLines.length === 0) return null;
+                  const { toKrw } = summary;
+                  return (
+                    <>
+                      {hqLines.length > 0 && (
+                        <div className="bg-white rounded-xl border border-orange-200 shadow-sm overflow-hidden">
+                          <div className="px-5 py-3 border-b border-orange-100 bg-orange-50">
+                            <h4 className="font-semibold text-sm text-orange-800">📦 본사제공 자재 목록</h4>
+                          </div>
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-orange-50 text-orange-700">
+                                <th className="px-3 py-2 text-left">부위</th>
+                                <th className="px-3 py-2 text-left">자재명</th>
+                                <th className="px-3 py-2 text-left">규격</th>
+                                <th className="px-3 py-2 text-left">단위</th>
+                                <th className="px-3 py-2 text-right">단가</th>
+                                <th className="px-3 py-2 text-right">소요량</th>
+                                <th className="px-3 py-2 text-right">금액(KRW)</th>
+                                <th className="px-3 py-2 text-left">자재업체</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {hqLines.map((l, i) => (
+                                <tr key={i} className="border-b border-orange-50 hover:bg-orange-50">
+                                  <td className="px-3 py-1.5 text-stone-600">{l.category}</td>
+                                  <td className="px-3 py-1.5 font-medium text-stone-800">{l.materialName || l.itemName}</td>
+                                  <td className="px-3 py-1.5 text-stone-500">{l.spec || '-'}</td>
+                                  <td className="px-3 py-1.5 text-stone-500">{l.unit || '-'}</td>
+                                  <td className="px-3 py-1.5 text-right text-stone-600">{l.unitPriceCny}</td>
+                                  <td className="px-3 py-1.5 text-right text-stone-600">{calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate).toFixed(3)}</td>
+                                  <td className="px-3 py-1.5 text-right font-semibold text-[#C9A96E]">₩{Math.round(calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * toKrw).toLocaleString()}</td>
+                                  <td className="px-3 py-1.5 text-stone-500">{l.vendorName || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      {vendorLines.length > 0 && (
+                        <div className="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
+                          <div className="px-5 py-3 border-b border-blue-100 bg-blue-50">
+                            <h4 className="font-semibold text-sm text-blue-800">🏭 업체제공 자재 목록</h4>
+                          </div>
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-blue-50 text-blue-700">
+                                <th className="px-3 py-2 text-left">부위</th>
+                                <th className="px-3 py-2 text-left">자재명</th>
+                                <th className="px-3 py-2 text-left">규격</th>
+                                <th className="px-3 py-2 text-left">단위</th>
+                                <th className="px-3 py-2 text-right">단가</th>
+                                <th className="px-3 py-2 text-right">소요량</th>
+                                <th className="px-3 py-2 text-right">금액(KRW)</th>
+                                <th className="px-3 py-2 text-left">자재업체</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {vendorLines.map((l, i) => (
+                                <tr key={i} className="border-b border-blue-50 hover:bg-blue-50">
+                                  <td className="px-3 py-1.5 text-stone-600">{l.category}</td>
+                                  <td className="px-3 py-1.5 font-medium text-stone-800">{l.materialName || l.itemName}</td>
+                                  <td className="px-3 py-1.5 text-stone-500">{l.spec || '-'}</td>
+                                  <td className="px-3 py-1.5 text-stone-500">{l.unit || '-'}</td>
+                                  <td className="px-3 py-1.5 text-right text-stone-600">{l.unitPriceCny}</td>
+                                  <td className="px-3 py-1.5 text-right text-stone-600">{calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate).toFixed(3)}</td>
+                                  <td className="px-3 py-1.5 text-right font-semibold text-[#C9A96E]">₩{Math.round(calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * toKrw).toLocaleString()}</td>
+                                  <td className="px-3 py-1.5 text-stone-500">{l.vendorName || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* P&L 분석 */}
                 {summary && editBom.pnl && pnlResult && (
