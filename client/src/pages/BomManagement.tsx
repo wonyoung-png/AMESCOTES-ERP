@@ -3442,7 +3442,7 @@ export default function BomManagement() {
                         <tr className="bg-stone-800 text-white">
                           <td className="px-4 py-3 font-bold">사</td>
                           <td className="px-4 py-3 font-bold text-base" colSpan={2}>총 원 가 액</td>
-                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums text-[#C9A96E]">{fmtKrw(summary.totalCostKrw)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums text-[#C9A96E]">{fmtKrw(summary.totalMaterialKrw + summary.postProcessKrw + summary.processingKrw + summary.logisticsKrw + summary.packagingKrw + summary.packingKrw + summary.productionMarginKrw)}</td>
                         </tr>
                         {(() => {
                           const linkedItem = items.find(i => i.id === editBom.styleId);
