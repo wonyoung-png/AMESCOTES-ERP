@@ -2799,7 +2799,11 @@ export default function BomManagement() {
     : undefined;
   // summary는 활성 컬러 BOM 기준 (없으면 lines 기준 fallback)
   const summary = editBom ? calcSummary(editBom, settings.usdKrw, activeColorBom) : null;
-  const pnlResult = summary && editBom?.pnl ? calcPnl(summary.totalCostKrw, editBom.pnl) : null;
+  // 총원가액 = 원부자재합산 + 임가공비 + 물류비 + 포장검사비 + 패킹재 + 생산마진 (P&L 분석에도 동일 기준 적용)
+  const displayTotalCostKrw = summary
+    ? summary.totalMaterialKrw + summary.postProcessKrw + summary.processingKrw + summary.logisticsKrw + summary.packagingKrw + summary.packingKrw + summary.productionMarginKrw
+    : 0;
+  const pnlResult = summary && editBom?.pnl ? calcPnl(displayTotalCostKrw, editBom.pnl) : null;
   const cnyKrw = editBom?.snapshotCnyKrw || settings.cnyKrw;
 
   return (
@@ -3448,7 +3452,7 @@ export default function BomManagement() {
                           const linkedItem = items.find(i => i.id === editBom.styleId);
                           const deliveryPrice = linkedItem?.deliveryPrice || linkedItem?.targetSalePrice;
                           if (!deliveryPrice || deliveryPrice <= 0) return null;
-                          const marginAmt = deliveryPrice - summary.totalCostKrw;
+                          const marginAmt = deliveryPrice - displayTotalCostKrw;
                           const marginPct = (marginAmt / deliveryPrice) * 100;
                           const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 20 ? 'text-amber-600' : marginPct <= 30 ? 'text-green-600' : 'text-orange-600';
                           const marginBg = marginPct < 15 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
