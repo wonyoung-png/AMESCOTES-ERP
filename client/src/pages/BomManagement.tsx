@@ -4078,15 +4078,26 @@ export default function BomManagement() {
                           <td className="px-4 py-2 font-semibold text-amber-800" colSpan={2}>제품 총원가 <span className="text-xs text-amber-500 font-normal">(생산마진 전 실원가)</span></td>
                           <td className="px-4 py-2 text-right font-bold tabular-nums text-amber-700">{fmtKrw(ps.totalCostKrw)}</td>
                         </tr>
-                        {/* 10. 생산마진 (율 > 0인 경우에만 표시) */}
-                        {postMarginRate > 0 && (
-                          <tr className="border-b border-stone-100 hover:bg-stone-50">
-                            <td className="px-4 py-2 font-bold text-stone-400">마</td>
-                            <td className="px-4 py-2 font-medium text-stone-700">생산마진</td>
-                            <td className="px-4 py-2 text-stone-400">{Math.round(postMarginRate * 100)}%</td>
-                            <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(postProductionMarginKrw)}</span></td>
-                          </tr>
-                        )}
+                        {/* 10. 생산마진 - 직접 입력 가능 */}
+                        <tr className="border-b border-stone-100 hover:bg-stone-50">
+                          <td className="px-4 py-2 font-bold text-stone-400">마</td>
+                          <td className="px-4 py-2 font-medium text-stone-700">생산마진</td>
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={Math.round((editBom.productionMarginRate ?? 0) * 100)}
+                                onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)}
+                                className="h-6 text-xs border-stone-200 text-right w-16"
+                                placeholder="0"
+                              />
+                              <span className="text-stone-500 text-xs">%</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums">
+                            <span className={postProductionMarginKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(postProductionMarginKrw)}</span>
+                          </td>
+                        </tr>
                         {/* 11. 총원가액 */}
                         <tr className="bg-stone-800 text-white">
                           <td className="px-4 py-3 font-bold">📦</td>

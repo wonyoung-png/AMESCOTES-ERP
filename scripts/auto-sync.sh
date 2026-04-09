@@ -24,7 +24,7 @@ if [ "$LOCAL" != "$REMOTE" ]; then
     sleep 2
     
     # 코드 업데이트
-    git pull origin main --quiet
+    git pull origin main --no-rebase --quiet
     npm install --legacy-peer-deps --silent 2>/dev/null
     
     # 개발 서버 재시작
