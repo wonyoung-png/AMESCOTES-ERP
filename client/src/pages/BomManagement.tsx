@@ -2967,14 +2967,32 @@ export default function BomManagement() {
       const fallback = editBom.exchangeRateCny ?? editBom.snapshotCnyKrw ?? 191;
       const { materials: postMaterials, parsedProcessingFee, parsedRate, postProcessLines: parsedPostLines2 } = parseExcelBomSheet(raw, fallback);
 
-      setEditBom(prev => prev ? {
-        ...prev,
-        postMaterials: postMaterials.length > 0 ? postMaterials : prev.postMaterials,
-        postProcessingFee: parsedProcessingFee || prev.postProcessingFee,
-        postProcessLines: parsedPostLines2.length > 0 ? parsedPostLines2 : prev.postProcessLines,
-        exchangeRateCny: parsedRate,
-        postSourceFileName: file.name,
-      } : prev);
+      setEditBom(prev => {
+        if (!prev) return prev;
+        // 현재 활성 사후원가 컬러 탭에 파싱 데이터 반영
+        const currentPostColor = activePostColor;
+        const updatedPostColorBoms = currentPostColor && (prev.postColorBoms || []).some(cb => cb.color === currentPostColor)
+          ? (prev.postColorBoms || []).map(cb =>
+              cb.color === currentPostColor
+                ? {
+                    ...cb,
+                    lines: postMaterials.length > 0 ? postMaterials.map(l => ({ ...l, id: genId() })) : cb.lines,
+                    postProcessLines: parsedPostLines2.length > 0 ? parsedPostLines2.map(l => ({ ...l, id: genId() })) : cb.postProcessLines,
+                    processingFee: parsedProcessingFee || cb.processingFee,
+                  }
+                : cb
+            )
+          : prev.postColorBoms;
+        return {
+          ...prev,
+          postMaterials: postMaterials.length > 0 ? postMaterials : prev.postMaterials,
+          postProcessingFee: parsedProcessingFee || prev.postProcessingFee,
+          postProcessLines: parsedPostLines2.length > 0 ? parsedPostLines2 : prev.postProcessLines,
+          exchangeRateCny: parsedRate,
+          postSourceFileName: file.name,
+          postColorBoms: updatedPostColorBoms,
+        };
+      });
       markDirty();
       toast.success(`공장 원가표 파싱 완료: ${postMaterials.length}개 자재 행, 후가공 ${parsedPostLines2.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
     } catch (err) {
