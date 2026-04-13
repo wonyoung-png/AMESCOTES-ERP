@@ -2160,32 +2160,7 @@ export default function BomManagement() {
         else { setActivePreColor(''); setAddColorForTab('pre'); setShowAddColorModal(true); }
       }
       const updated = { ...prev, [bomKey]: newColors };
-      // 삭제 후 자동 저장 (품목 마스터 연동)
-      setTimeout(() => {
-        const extBoms = getExtBoms();
-        const existing = extBoms.find(b => b.id === updated.id);
-        const newBoms = existing ? extBoms.map(b => b.id === updated.id ? updated : b) : [...extBoms, updated];
-        saveExtBoms(newBoms);
-        // 품목 마스터 업데이트
-        const allColors = [...new Set([...(updated.colorBoms||[]).map((c:any)=>c.color), ...(updated.postColorBoms||[]).map((c:any)=>c.color)])];
-        const firstColor = (updated.colorBoms || [])[0];
-        const settings2 = store.getSettings();
-        const summary2 = calcSummary(updated, settings2.usdKrw, firstColor);
-        const remainingPre = (updated.colorBoms || []).length;
-        const remainingPost = (updated.postColorBoms || []).length;
-        const stillHasBom = remainingPre > 0 || remainingPost > 0;
-        // 남은 컬러 목록도 품목 마스터에 반영
-        const remainingColors = [...new Set([
-          ...(updated.colorBoms || []).map((c: any) => c.color),
-          ...(updated.postColorBoms || []).map((c: any) => c.color),
-        ])].filter(c => c !== '기본').map(c => ({ name: c }));
-        import('@/lib/supabaseQueries').then(m => m.upsertItem({
-          id: updated.styleId,
-          baseCostKrw: stillHasBom ? Math.round(summary2.totalCostKrw) : 0,
-          hasBom: stillHasBom,
-          colors: remainingColors,
-        } as any)).catch(() => {});
-      }, 100);
+      // [FIX] 자동 저장 제거 — 저장 버튼을 눌러야만 DB에 반영됨
       return updated;
     });
     markDirty();
@@ -2635,6 +2610,38 @@ export default function BomManagement() {
     });
     toast.success(`사후원가 [${color}] → 사전원가 복사 완료`);
     markDirty();
+  };
+
+  // 사전원가 자재 일괄 삭제 (현재 활성 컬러탭 기준, 저장 버튼 눌러야 DB 반영)
+  const handleBulkDeletePreLines = (color: string) => {
+    if (!confirm(`현재 [${color}] 컬러의 자재 내역을 모두 삭제하시겠습니까?`)) return;
+    setEditBom(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        colorBoms: (prev.colorBoms || []).map(cb =>
+          cb.color === color ? { ...cb, lines: [] } : cb
+        ),
+      };
+    });
+    markDirty();
+    toast.info(`[${color}] 자재 내역이 초기화되었습니다. 저장 버튼을 눌러야 DB에 반영됩니다.`);
+  };
+
+  // 사후원가 자재 일괄 삭제 (현재 활성 컬러탭 기준, 저장 버튼 눌러야 DB 반영)
+  const handleBulkDeletePostLines = (color: string) => {
+    if (!confirm(`현재 [${color}] 컬러의 자재 내역을 모두 삭제하시겠습니까?`)) return;
+    setEditBom(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        postColorBoms: (prev.postColorBoms || []).map(cb =>
+          cb.color === color ? { ...cb, lines: [] } : cb
+        ),
+      };
+    });
+    markDirty();
+    toast.info(`[${color}] 사후원가 자재 내역이 초기화되었습니다. 저장 버튼을 눌러야 DB에 반영됩니다.`);
   };
 
   // 사전원가 엑셀 업로드
@@ -3518,6 +3525,14 @@ export default function BomManagement() {
                       >
                         <Copy className="w-3 h-3" /> 사후원가 전체 불러오기 →
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBulkDeletePreLines(colorBom.color)}
+                        className="h-7 gap-1 text-xs border-red-300 text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-3 h-3" /> 전체 삭제
+                      </Button>
                     </div>
                     <span className="text-xs text-stone-400">
                       입력 통화: {preCur} {preCur !== 'KRW' && `| CNY→KRW ${preCnyKrw} | USD→KRW ${preUsdKrw}`}
@@ -4079,6 +4094,14 @@ export default function BomManagement() {
                           className="h-7 gap-1 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
                         >
                           <Copy className="w-3 h-3" /> ← 사전원가 전체 불러오기
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleBulkDeletePostLines(postColorBom.color)}
+                          className="h-7 gap-1 text-xs border-red-300 text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-3 h-3" /> 전체 삭제
                         </Button>
                       </div>
                       <div className="flex items-center gap-3">
