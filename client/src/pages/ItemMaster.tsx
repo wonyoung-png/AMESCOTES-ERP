@@ -12,8 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link, ShoppingCart, Printer } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link, ShoppingCart, Printer, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 // HB 전용 세부 카테고리
 const HB_CATEGORIES: Category[] = ['숄더백', '토트백', '크로스백', '클러치', '백팩', '기타'];
@@ -97,6 +98,152 @@ export default function ItemMaster() {
   const [customCategory, setCustomCategory] = useState(''); // 세부 카테고리 직접 입력
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: () => import('@/lib/supabaseQueries').then(m => m.fetchOrders()) }); // 미발주기간 계산용
   const imageFileRef = useRef<HTMLInputElement>(null);
+  const excelUploadRef = useRef<HTMLInputElement>(null);
+
+  // ─── 엑셀 일괄 등록 상태 ───
+  const [excelPreviewOpen, setExcelPreviewOpen] = useState(false);
+  const [excelPreviewItems, setExcelPreviewItems] = useState<Array<{
+    styleNo: string; name: string; nameEn: string; season: string;
+    category: string; erpCategory: string; colors: string[];
+    salePriceKrw: number | null; material: string; memo: string;
+    isDuplicate: boolean;
+  }>>([]);
+
+  // 양식 다운로드
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['스타일번호*', '품목명*', '품목명(영문)', '시즌', '카테고리', 'ERP카테고리', '컬러코드1', '컬러코드2', '컬러코드3', '판매가', '소재', '메모'],
+      ['LLL6S82', 'SOFIA WEAVING BAG', 'SOFIA WEAVING BAG', '26SS', '숄더백', 'HB', 'OB', 'SB', '', 398000, '소프트레더', ''],
+    ]);
+    ws['!cols'] = [
+      { wch: 14 }, { wch: 30 }, { wch: 30 }, { wch: 8 }, { wch: 10 },
+      { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 20 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '품목등록양식');
+    XLSX.writeFile(wb, '품목등록양식.xlsx');
+    toast.success('양식 다운로드 완료');
+  };
+
+  // 엑셀 파싱 (표준 양식 + atlm.kr 형식)
+  const parseExcelFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+        if (rows.length < 2) { toast.error('데이터가 없습니다'); return; }
+
+        // 헤더로 형식 감지
+        const header = rows[0].map((h: any) => String(h || '').trim());
+        const isStandardFormat = header[0]?.includes('스타일번호');
+        const isAtlmFormat = header.length >= 15 && (header[2]?.includes('상품코드') || header[14]?.includes('제조사') || !isStandardFormat);
+
+        const grouped: Record<string, typeof excelPreviewItems[0]> = {};
+        const existingStyleNos = new Set((items as Item[]).map(i => i.styleNo));
+
+        const dataRows = rows.slice(1).filter(r => r && r.length >= 2);
+
+        for (const row of dataRows) {
+          if (isAtlmFormat && !isStandardFormat) {
+            // atlm.kr 형식: Col4=상품명, Col14=판매가, Col15=스타일번호+컬러
+            const name = String(row[3] || '').trim();
+            const price = row[13];
+            const fullStyle = String(row[14] || '').trim();
+            if (!name || !fullStyle) continue;
+
+            const colorMatch = fullStyle.match(/([A-Z]{2,4})$/);
+            const colorCode = colorMatch ? colorMatch[1] : '';
+            const styleNo = colorCode ? fullStyle.slice(0, -colorCode.length) : fullStyle;
+            if (!styleNo) continue;
+
+            if (!grouped[styleNo]) {
+              grouped[styleNo] = {
+                styleNo, name, nameEn: '', season: '26SS', category: '숄더백',
+                erpCategory: 'HB', colors: [], salePriceKrw: price ? Number(price) : null,
+                material: '', memo: '', isDuplicate: existingStyleNos.has(styleNo),
+              };
+            }
+            if (colorCode && !grouped[styleNo].colors.includes(colorCode)) {
+              grouped[styleNo].colors.push(colorCode);
+            }
+          } else {
+            // 표준 양식
+            const styleNo = String(row[0] || '').trim();
+            const name = String(row[1] || '').trim();
+            if (!styleNo || !name) continue;
+
+            const colors: string[] = [];
+            [row[6], row[7], row[8]].forEach(c => { if (c) colors.push(String(c).trim()); });
+
+            grouped[styleNo] = {
+              styleNo,
+              name,
+              nameEn: String(row[2] || '').trim(),
+              season: String(row[3] || '26SS').trim(),
+              category: String(row[4] || '숄더백').trim(),
+              erpCategory: String(row[5] || 'HB').trim(),
+              colors,
+              salePriceKrw: row[9] ? Number(row[9]) : null,
+              material: String(row[10] || '').trim(),
+              memo: String(row[11] || '').trim(),
+              isDuplicate: existingStyleNos.has(styleNo),
+            };
+          }
+        }
+
+        const result = Object.values(grouped);
+        if (result.length === 0) { toast.error('파싱된 데이터가 없습니다'); return; }
+        setExcelPreviewItems(result);
+        setExcelPreviewOpen(true);
+      } catch (err) {
+        toast.error('엑셀 파싱 실패: ' + String(err));
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // 엑셀 일괄 등록 실행
+  const handleExcelBulkRegister = async () => {
+    const toRegister = excelPreviewItems.filter(p => !p.isDuplicate);
+    if (toRegister.length === 0) { toast.error('등록할 신규 품목이 없습니다'); return; }
+
+    let success = 0;
+    let fail = 0;
+    for (const p of toRegister) {
+      try {
+        const itemData: Item = {
+          id: genId(),
+          styleNo: p.styleNo,
+          name: p.name,
+          nameEn: p.nameEn || undefined,
+          season: (p.season as Season) || '26SS',
+          category: (p.category as Category) || '숄더백',
+          erpCategory: (p.erpCategory as ErpCategory) || 'HB',
+          materialType: '완제품',
+          itemStatus: 'ACTIVE',
+          material: p.material || '',
+          deliveryPrice: p.salePriceKrw || 0,
+          colors: p.colors.map(c => ({ name: c })),
+          hasBom: false,
+          createdAt: new Date().toISOString(),
+          memo: p.memo || '',
+        };
+        await upsertItem(itemData);
+        success++;
+      } catch {
+        fail++;
+      }
+    }
+    setExcelPreviewOpen(false);
+    setExcelPreviewItems([]);
+    refresh();
+    toast.success(`일괄 등록 완료: ${success}개 등록, ${excelPreviewItems.filter(p => p.isDuplicate).length}개 중복 스킵${fail > 0 ? `, ${fail}개 실패` : ''}`);
+    if (excelUploadRef.current) excelUploadRef.current.value = '';
+  };
 
   const handleItemImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -457,10 +604,23 @@ export default function ItemMaster() {
           <h1 className="text-2xl font-bold text-stone-800">품목 마스터</h1>
           <p className="text-sm text-stone-500 mt-0.5">스타일별 품목 정보 · HB (핸드백) / SLG (소품)</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setShowSeasonStats(true)} className="gap-2 border-stone-300 text-stone-600 hover:bg-stone-50">
             <BarChart2 size={16} />시즌별 현황
           </Button>
+          <Button variant="outline" onClick={downloadTemplate} className="gap-2 border-stone-300 text-stone-600 hover:bg-stone-50">
+            <Download size={16} />양식 다운로드
+          </Button>
+          <Button variant="outline" onClick={() => excelUploadRef.current?.click()} className="gap-2 border-stone-300 text-stone-600 hover:bg-stone-50">
+            <Upload size={16} />엑셀 일괄 등록
+          </Button>
+          <input
+            ref={excelUploadRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) parseExcelFile(f); }}
+          />
           <Button onClick={() => openAdd()} className="bg-[#C9A96E] hover:bg-[#B8985D] text-white gap-2">
             <Plus size={16} />품목 등록
           </Button>
@@ -1206,6 +1366,76 @@ export default function ItemMaster() {
           }}
         />
       )}
+
+      {/* 엑셀 일괄 등록 미리보기 모달 */}
+      <Dialog open={excelPreviewOpen} onOpenChange={setExcelPreviewOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet size={18} className="text-green-600" />
+              엑셀 일괄 등록 미리보기
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex items-center gap-4 px-1 py-2 bg-stone-50 rounded-lg text-sm">
+            <span className="flex items-center gap-1.5 text-green-700">
+              <CheckCircle2 size={14} />
+              신규 {excelPreviewItems.filter(p => !p.isDuplicate).length}개
+            </span>
+            <span className="flex items-center gap-1.5 text-amber-600">
+              <XCircle size={14} />
+              중복 스킵 {excelPreviewItems.filter(p => p.isDuplicate).length}개
+            </span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-stone-100">
+                <tr>
+                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">상태</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">스타일번호</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">품목명</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">시즌</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">카테</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">콜러</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">판매가</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {excelPreviewItems.map((p, idx) => (
+                  <tr key={idx} className={p.isDuplicate ? 'bg-amber-50 opacity-60' : 'bg-white'}>
+                    <td className="px-2 py-1.5">
+                      {p.isDuplicate
+                        ? <span className="text-amber-600 font-medium">중복</span>
+                        : <span className="text-green-600 font-medium">신규</span>}
+                    </td>
+                    <td className="px-2 py-1.5 font-mono">{p.styleNo}</td>
+                    <td className="px-2 py-1.5 max-w-[200px] truncate">{p.name}</td>
+                    <td className="px-2 py-1.5">{p.season}</td>
+                    <td className="px-2 py-1.5">{p.erpCategory}</td>
+                    <td className="px-2 py-1.5">{p.colors.join(', ')}</td>
+                    <td className="px-2 py-1.5">{p.salePriceKrw ? p.salePriceKrw.toLocaleString() : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <DialogFooter className="pt-3 border-t border-stone-100">
+            <Button variant="outline" onClick={() => { setExcelPreviewOpen(false); if (excelUploadRef.current) excelUploadRef.current.value = ''; }}>
+              취소
+            </Button>
+            <Button
+              onClick={handleExcelBulkRegister}
+              disabled={excelPreviewItems.filter(p => !p.isDuplicate).length === 0}
+              className="bg-[#C9A96E] hover:bg-[#B8985D] text-white"
+            >
+              <FileSpreadsheet size={14} className="mr-1.5" />
+              {excelPreviewItems.filter(p => !p.isDuplicate).length}개 일괄 등록
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
