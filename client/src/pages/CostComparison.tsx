@@ -4,6 +4,7 @@
  */
 
 import { useState, useMemo, useRef } from 'react';
+import { useLocation } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchBoms, fetchItems } from '@/lib/supabaseQueries';
 import { supabase } from '@/lib/supabase';
@@ -54,6 +55,7 @@ interface EditingCell { bomId: string; field: EditField; }
 
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────────────
 export default function CostComparison() {
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'simple' | 'both' | 'nopre' | 'nopost'>('all');
   const [sortBy, setSortBy] = useState<'styleNo' | 'diff' | 'preCost' | 'postCost'>('styleNo');
@@ -502,7 +504,19 @@ export default function CostComparison() {
                         <EditableCostCell bomId={row.bomId} field="pre" value={row.preCost} />
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono">
-                        <EditableCostCell bomId={row.bomId} field="post" value={row.postCost} />
+                        {/* 사후원가 클릭 → BOM 사후원가 탭으로 이동 */}
+                        <div
+                          className="flex items-center justify-end gap-1.5 group cursor-pointer rounded px-1 py-0.5 hover:bg-blue-50 transition-colors"
+                          onClick={() => navigate(`/bom?style=${row.styleNo}&tab=post`)}
+                          title="클릭하면 BOM 사후원가 탭으로 이동"
+                        >
+                          {row.postCost !== null ? (
+                            <span className="text-stone-800 font-semibold font-mono">{fmtKrw(row.postCost)}</span>
+                          ) : (
+                            <span className="text-stone-300 text-xs">+ 입력</span>
+                          )}
+                          <span className="opacity-0 group-hover:opacity-100 text-blue-400 text-xs">↗</span>
+                        </div>
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono">
                         {row.diffAmt !== null ? (

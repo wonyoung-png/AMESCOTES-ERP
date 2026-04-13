@@ -2003,10 +2003,17 @@ export default function BomManagement() {
   useEffect(() => {
     const urlParams = new URLSearchParams(searchString);
     const urlColor = urlParams.get('color');
+    const urlTab = urlParams.get('tab');
+    const urlStyle = urlParams.get('style');
     if (urlColor) {
       setPendingColorTab(urlColor);
       // URL 파라미터 제거 (히스토리 클린업)
       setLocation('/bom', { replace: true });
+    }
+    // 원가 비교 화면에서 사후원가 탭으로 바로 이동
+    if (urlTab === 'post') {
+      setMainTab('post');
+      setLocation('/bom' + (urlStyle ? `?style=${urlStyle}` : ''), { replace: true });
     }
   }, [searchString]);
 
