@@ -65,6 +65,13 @@ const emptyItem: Partial<Item> = {
   colors: [], memo: '',
 };
 
+// ─── 컬럼 너비 리사이즈 기본값 ───
+const ITEM_DEFAULT_COL_WIDTHS: Record<string, number> = {
+  image: 60, styleNo: 130, season: 80, buyer: 120, name: 180,
+  category: 80, color: 100, delivery: 90, bomCost: 90, margin: 90,
+  noOrder: 90, createdAt: 100, bom: 60, action: 60,
+};
+
 export default function ItemMaster() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
@@ -103,6 +110,36 @@ export default function ItemMaster() {
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: () => import('@/lib/supabaseQueries').then(m => m.fetchOrders()) }); // 미발주기간 계산용
   const imageFileRef = useRef<HTMLInputElement>(null);
   const excelUploadRef = useRef<HTMLInputElement>(null);
+
+  // ─── 컬럼 너비 리사이즈 ───
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('ames_item_col_widths');
+      if (saved) return { ...ITEM_DEFAULT_COL_WIDTHS, ...JSON.parse(saved) };
+    } catch {}
+    return { ...ITEM_DEFAULT_COL_WIDTHS };
+  });
+  const colWidthsRef = useRef(colWidths);
+  colWidthsRef.current = colWidths;
+  const startResize = useCallback((e: React.MouseEvent, col: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = colWidthsRef.current[col];
+    const onMove = (ev: MouseEvent) => {
+      setColWidths(prev => ({ ...prev, [col]: Math.max(40, startW + ev.clientX - startX) }));
+    };
+    const onUp = () => {
+      setColWidths(prev => {
+        localStorage.setItem('ames_item_col_widths', JSON.stringify(prev));
+        return prev;
+      });
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, []);
 
   // ─── 엑셀 일괄 등록 상태 ───
   const [excelPreviewOpen, setExcelPreviewOpen] = useState(false);
@@ -802,10 +839,27 @@ export default function ItemMaster() {
       {/* 테이블 */}
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="text-sm table-fixed min-w-full">
+            <colgroup>
+              <col style={{ width: 40 }} />
+              <col style={{ width: colWidths.image }} />
+              <col style={{ width: colWidths.styleNo }} />
+              <col style={{ width: colWidths.season }} />
+              <col style={{ width: colWidths.buyer }} />
+              <col style={{ width: colWidths.name }} />
+              <col style={{ width: colWidths.category }} />
+              <col style={{ width: colWidths.color }} />
+              <col style={{ width: colWidths.delivery }} />
+              <col style={{ width: colWidths.bomCost }} />
+              <col style={{ width: colWidths.margin }} />
+              <col style={{ width: colWidths.noOrder }} />
+              <col style={{ width: colWidths.createdAt }} />
+              <col style={{ width: colWidths.bom }} />
+              <col style={{ width: colWidths.action }} />
+            </colgroup>
             <thead>
               <tr className="border-b border-stone-100 bg-stone-50">
-                <th className="px-4 py-3 w-10">
+                <th className="px-4 py-3" style={{ width: 40 }}>
                   <input
                     type="checkbox"
                     checked={isAllSelected}
@@ -814,27 +868,58 @@ export default function ItemMaster() {
                     className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
                   />
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 w-12">이미지</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none" onClick={() => handleSort('styleNo')}>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  이미지
+                  <div onMouseDown={(e) => startResize(e, 'image')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none relative overflow-hidden" onClick={() => handleSort('styleNo')}>
                   스타일번호<SortIcon field="styleNo" />
+                  <div onMouseDown={(e) => startResize(e, 'styleNo')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none" onClick={() => handleSort('season')}>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none relative overflow-hidden" onClick={() => handleSort('season')}>
                   시즌<SortIcon field="season" />
+                  <div onMouseDown={(e) => startResize(e, 'season')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">바이어</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none" onClick={() => handleSort('name')}>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  바이어
+                  <div onMouseDown={(e) => startResize(e, 'buyer')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none relative overflow-hidden" onClick={() => handleSort('name')}>
                   품명<SortIcon field="name" />
+                  <div onMouseDown={(e) => startResize(e, 'name')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">카테고리</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">컬러</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">납품가(KRW)</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">BOM원가</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">마진율</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">미발주기간</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none" onClick={() => handleSort('createdAt')}>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  카테고리
+                  <div onMouseDown={(e) => startResize(e, 'category')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  컬러
+                  <div onMouseDown={(e) => startResize(e, 'color')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  납품가(KRW)
+                  <div onMouseDown={(e) => startResize(e, 'delivery')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  BOM원가
+                  <div onMouseDown={(e) => startResize(e, 'bomCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  마진율
+                  <div onMouseDown={(e) => startResize(e, 'margin')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  미발주기간
+                  <div onMouseDown={(e) => startResize(e, 'noOrder')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none relative overflow-hidden" onClick={() => handleSort('createdAt')}>
                   등록일<SortIcon field="createdAt" />
+                  <div onMouseDown={(e) => startResize(e, 'createdAt')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">BOM</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  BOM
+                  <div onMouseDown={(e) => startResize(e, 'bom')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
               </tr>
             </thead>
@@ -882,9 +967,9 @@ export default function ItemMaster() {
                         </span>
                       ) : <span className="text-stone-300 text-xs">-</span>}
                     </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-stone-800">{item.name}</p>
-                      {item.nameEn && <p className="text-xs text-stone-400">{item.nameEn}</p>}
+                    <td className="px-4 py-3 overflow-hidden">
+                      <p className="font-medium text-stone-800 truncate" title={item.name}>{item.name}</p>
+                      {item.nameEn && <p className="text-xs text-stone-400 truncate" title={item.nameEn}>{item.nameEn}</p>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
