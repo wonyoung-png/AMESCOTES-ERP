@@ -3,14 +3,15 @@
  * Design: Maison Atelier — 에보니 사이드바, 골드 악센트, 아이보리 배경
  */
 
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchBoms, fetchItems } from '@/lib/supabaseQueries';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Download, Search, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Download, Search, TrendingUp, TrendingDown, Minus, Check, X } from 'lucide-react';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────
 interface CostRow {
@@ -47,12 +48,24 @@ function DiffBadge({ diff }: { diff: number | null }) {
   );
 }
 
+// ─── 편집 셀 타입 ─────────────────────────────────────────────────────────
+type EditField = 'pre' | 'post';
+interface EditingCell { bomId: string; field: EditField; }
+
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────────────
 export default function CostComparison() {
   const [search, setSearch] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'simple' | 'both' | 'nopre' | 'nopost'>('all');
   const [sortBy, setSortBy] = useState<'styleNo' | 'diff' | 'preCost' | 'postCost'>('styleNo');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  // 인라인 편집 상태
+  const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const queryClient = useQueryClient();
 
   const { data: rawBoms = [], isLoading: bomsLoading } = useQuery({
     queryKey: ['boms'],
@@ -179,6 +192,127 @@ export default function CostComparison() {
   };
   const SortIndicator = ({ col }: { col: typeof sortBy }) =>
     sortBy === col ? <span className="ml-0.5">{sortDir === 'asc' ? '↑' : '↓'}</span> : null;
+
+  // ─── 인라인 편집 핸들러 ──────────────────────────────────────────────────
+  const startEdit = (bomId: string, field: EditField, currentValue: number | null) => {
+    setEditingCell({ bomId, field });
+    setEditValue(currentValue !== null ? String(currentValue) : '');
+    setTimeout(() => inputRef.current?.select(), 30);
+  };
+
+  const cancelEdit = () => {
+    setEditingCell(null);
+    setEditValue('');
+  };
+
+  const saveEdit = async () => {
+    if (!editingCell || saving) return;
+    const newCost = parseInt(editValue.replace(/[^0-9]/g, ''), 10);
+    if (isNaN(newCost) || newCost < 0) {
+      toast.error('올바른 숫자를 입력해주세요');
+      return;
+    }
+    setSaving(true);
+    try {
+      const bom = rawBoms.find((b: any) => b.id === editingCell.bomId);
+      if (!bom) throw new Error('BOM을 찾을 수 없습니다');
+
+      // 기존 memo 파싱
+      let memo: Record<string, any> = {};
+      if (bom.memo && typeof bom.memo === 'string' && bom.memo.trim().startsWith('{')) {
+        try { memo = JSON.parse(bom.memo); } catch { memo = {}; }
+      }
+      memo.isSimple = true;
+
+      if (editingCell.field === 'pre') {
+        memo.preCost = newCost;
+        // items 테이블 base_cost_krw 업데이트
+        const { error: itemErr } = await supabase
+          .from('items')
+          .update({ base_cost_krw: newCost })
+          .eq('style_no', bom.styleNo);
+        if (itemErr) console.warn('items 업데이트 실패:', itemErr.message);
+      } else {
+        memo.postCost = newCost;
+      }
+
+      const { error } = await supabase
+        .from('boms')
+        .update({ memo: JSON.stringify(memo) })
+        .eq('id', editingCell.bomId);
+
+      if (error) throw error;
+
+      await queryClient.invalidateQueries({ queryKey: ['boms'] });
+      await queryClient.invalidateQueries({ queryKey: ['items'] });
+      toast.success(`${editingCell.field === 'pre' ? '사전원가' : '사후원가'} 저장 완료`);
+      setEditingCell(null);
+    } catch (e: any) {
+      toast.error(`저장 실패: ${e.message ?? e}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
+    if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+  };
+
+  // ─── 편집 가능 원가 셀 렌더러 ─────────────────────────────────────────────
+  const EditableCostCell = ({
+    bomId, field, value
+  }: { bomId: string; field: EditField; value: number | null }) => {
+    const isEditing = editingCell?.bomId === bomId && editingCell.field === field;
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1 justify-end">
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="numeric"
+            value={editValue}
+            onChange={e => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={() => { /* blur는 버튼 클릭 처리 후 동작하므로 mousedown으로 처리 */ }}
+            disabled={saving}
+            className="w-28 text-right text-xs font-mono px-2 py-1 rounded border-2 border-amber-400 bg-amber-50 focus:outline-none focus:border-amber-500"
+            autoFocus
+          />
+          <button
+            onMouseDown={(e) => { e.preventDefault(); saveEdit(); }}
+            disabled={saving}
+            className="w-6 h-6 flex items-center justify-center rounded bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+            title="저장 (Enter)"
+          >
+            <Check className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onMouseDown={(e) => { e.preventDefault(); cancelEdit(); }}
+            disabled={saving}
+            className="w-6 h-6 flex items-center justify-center rounded bg-stone-400 hover:bg-stone-500 text-white disabled:opacity-50"
+            title="취소 (Esc)"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div
+        className="flex items-center justify-end gap-1.5 group cursor-pointer rounded px-1 py-0.5 hover:bg-amber-50 transition-colors"
+        onClick={() => startEdit(bomId, field, value)}
+        title="클릭하여 편집"
+      >
+        {value !== null ? (
+          <span className="text-stone-800 font-semibold font-mono">{fmtKrw(value)}</span>
+        ) : (
+          <span className="text-stone-300 font-mono">-</span>
+        )}
+        <span className="opacity-0 group-hover:opacity-60 transition-opacity text-stone-400 text-[10px]">✏</span>
+      </div>
+    );
+  };
 
   // 엑셀 다운로드
   const handleExcelDownload = async () => {
@@ -363,18 +497,10 @@ export default function CostComparison() {
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono">
-                        {row.preCost !== null ? (
-                          <span className="text-stone-800 font-semibold">{fmtKrw(row.preCost)}</span>
-                        ) : (
-                          <span className="text-stone-300">-</span>
-                        )}
+                        <EditableCostCell bomId={row.bomId} field="pre" value={row.preCost} />
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono">
-                        {row.postCost !== null ? (
-                          <span className="text-stone-800 font-semibold">{fmtKrw(row.postCost)}</span>
-                        ) : (
-                          <span className="text-stone-300">-</span>
-                        )}
+                        <EditableCostCell bomId={row.bomId} field="post" value={row.postCost} />
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono">
                         {row.diffAmt !== null ? (
