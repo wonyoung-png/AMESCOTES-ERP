@@ -91,6 +91,10 @@ export default function ItemMaster() {
   const [colorDetailOpen, setColorDetailOpen] = useState<number | null>(null); // 열린 컬러 세부정보 인덱스
   const [filterBuyer, setFilterBuyer] = useState('전체');
   const [filterNoBom, setFilterNoBom] = useState(false);
+  const [filterStyleNo, setFilterStyleNo] = useState('');
+  const [filterName, setFilterName] = useState('');
+  const [sortField, setSortField] = useState<'styleNo' | 'name' | 'season' | 'createdAt' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [showSeasonStats, setShowSeasonStats] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
@@ -287,22 +291,75 @@ export default function ItemMaster() {
     return 'text-red-500';
   };
 
+  const activeFilterCount = [
+    filterStyleNo !== '',
+    filterName !== '',
+    filterSeason !== '전체',
+    filterCategory !== '전체',
+    filterErpCategory !== '전체',
+    filterBuyer !== '전체',
+    filterNoBom,
+  ].filter(Boolean).length;
+
+  const resetFilters = () => {
+    setSearch('');
+    setFilterStyleNo('');
+    setFilterName('');
+    setFilterSeason('전체');
+    setFilterCategory('전체');
+    setFilterErpCategory('전체');
+    setFilterBuyer('전체');
+    setFilterNoBom(false);
+  };
+
+  const handleSort = (field: 'styleNo' | 'name' | 'season' | 'createdAt') => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: string }) => (
+    <span className={`ml-1 text-[10px] ${sortField === field ? 'text-amber-500' : 'text-stone-300'}`}>
+      {sortField === field ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}
+    </span>
+  );
+
   const filtered = useMemo(() => {
-    return items.filter(item => {
-      // 바이어 이름 검색 포함
+    let result = items.filter(item => {
       const buyerName = vendors.find(v => v.id === item.buyerId)?.name || '';
       const matchSearch = !search ||
         item.styleNo.toLowerCase().includes(search.toLowerCase()) ||
         item.name.toLowerCase().includes(search.toLowerCase()) ||
         buyerName.toLowerCase().includes(search.toLowerCase());
+      const matchStyleNo = !filterStyleNo || item.styleNo.toLowerCase().includes(filterStyleNo.toLowerCase());
+      const matchName = !filterName ||
+        item.name.toLowerCase().includes(filterName.toLowerCase()) ||
+        (item.nameEn || '').toLowerCase().includes(filterName.toLowerCase());
       const matchSeason = filterSeason === '전체' || item.season === filterSeason;
       const matchCat = filterCategory === '전체' || item.category === filterCategory;
       const matchErpCat = filterErpCategory === '전체' || item.erpCategory === filterErpCategory;
       const matchBuyer = filterBuyer === '전체' || item.buyerId === filterBuyer;
       const matchNoBom = !filterNoBom || !item.hasBom;
-      return matchSearch && matchSeason && matchCat && matchErpCat && matchBuyer && matchNoBom;
+      return matchSearch && matchStyleNo && matchName && matchSeason && matchCat && matchErpCat && matchBuyer && matchNoBom;
     });
-  }, [items, search, filterSeason, filterCategory, filterErpCategory, filterBuyer, filterNoBom]);
+
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        let aVal = '', bVal = '';
+        if (sortField === 'styleNo') { aVal = a.styleNo; bVal = b.styleNo; }
+        else if (sortField === 'name') { aVal = a.name; bVal = b.name; }
+        else if (sortField === 'season') { aVal = a.season || ''; bVal = b.season || ''; }
+        else if (sortField === 'createdAt') { aVal = a.createdAt || ''; bVal = b.createdAt || ''; }
+        const cmp = aVal.localeCompare(bVal, 'ko');
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [items, search, filterStyleNo, filterName, filterSeason, filterCategory, filterErpCategory, filterBuyer, filterNoBom, sortField, sortDir, vendors]);
 
   // 자동생성 미리보기
   useEffect(() => {
@@ -645,48 +702,69 @@ export default function ItemMaster() {
 
       {/* 필터 */}
       <Card className="border-stone-200">
-        <CardContent className="p-3 flex flex-wrap gap-3 items-center">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-            <Input placeholder="스타일번호 / 품명 / 바이어 검색" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
+        <CardContent className="p-3 space-y-2">
+          {/* 1행: 텍스트 검색 + 바이어 + 입희화 */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[150px]">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+              <Input placeholder="스타일번호 검색" value={filterStyleNo} onChange={e => setFilterStyleNo(e.target.value)} className="pl-8 h-9 text-sm" />
+            </div>
+            <div className="relative flex-1 min-w-[150px]">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+              <Input placeholder="품명 검색 (한/영)" value={filterName} onChange={e => setFilterName(e.target.value)} className="pl-8 h-9 text-sm" />
+            </div>
+            <Select value={filterBuyer} onValueChange={setFilterBuyer}>
+              <SelectTrigger className="w-36 h-9"><SelectValue placeholder="바이어" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="전체">전체 바이어</SelectItem>
+                {buyerVendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <button
+              onClick={resetFilters}
+              className="h-9 px-3 rounded-lg border border-stone-200 text-xs font-medium text-stone-500 hover:bg-stone-50 flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <X size={13} />필터 초기화
+              {activeFilterCount > 0 && (
+                <span className="ml-0.5 inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
           </div>
-          <Select value={filterErpCategory} onValueChange={setFilterErpCategory}>
-            <SelectTrigger className="w-32 h-9"><SelectValue placeholder="카테고리" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="전체">전체 카테고리</SelectItem>
-              <SelectItem value="HB">HB (핸드백)</SelectItem>
-              <SelectItem value="SLG">SLG (소품)</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterSeason} onValueChange={setFilterSeason}>
-            <SelectTrigger className="w-28 h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="전체">전체 시즌</SelectItem>
-              {SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-28 h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="전체">세부 카테고리</SelectItem>
-              {[...HB_CATEGORIES, ...SLG_CATEGORIES.filter(c => !HB_CATEGORIES.includes(c))].map(c => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterBuyer} onValueChange={setFilterBuyer}>
-            <SelectTrigger className="w-36 h-9"><SelectValue placeholder="바이어" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="전체">전체 바이어</SelectItem>
-              {buyerVendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <button
-            onClick={() => setFilterNoBom(v => !v)}
-            className={`h-9 px-3 rounded-lg border text-xs font-medium transition-colors ${filterNoBom ? 'bg-red-50 border-red-300 text-red-700' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
-          >
-            BOM 미작성 {filterNoBom && `(${items.filter(i => !i.hasBom).length}건)`}
-          </button>
+          {/* 2행: 드롭다운 필터 */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <Select value={filterErpCategory} onValueChange={setFilterErpCategory}>
+              <SelectTrigger className="w-32 h-9"><SelectValue placeholder="카테고리" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="전체">전체 카테고리</SelectItem>
+                <SelectItem value="HB">HB (핸드백)</SelectItem>
+                <SelectItem value="SLG">SLG (소품)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterSeason} onValueChange={setFilterSeason}>
+              <SelectTrigger className="w-28 h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="전체">전체 시즌</SelectItem>
+                {SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-32 h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="전체">세부 카테고리</SelectItem>
+                {[...HB_CATEGORIES, ...SLG_CATEGORIES.filter(c => !HB_CATEGORIES.includes(c))].map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <button
+              onClick={() => setFilterNoBom(v => !v)}
+              className={`h-9 px-3 rounded-lg border text-xs font-medium transition-colors ${filterNoBom ? 'bg-red-50 border-red-300 text-red-700' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
+            >
+              BOM 미작성 {filterNoBom && `(${items.filter(i => !i.hasBom).length}건)`}
+            </button>
+          </div>
         </CardContent>
       </Card>
 
@@ -737,15 +815,25 @@ export default function ItemMaster() {
                   />
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 w-12">이미지</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">스타일번호</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none" onClick={() => handleSort('styleNo')}>
+                  스타일번호<SortIcon field="styleNo" />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none" onClick={() => handleSort('season')}>
+                  시즌<SortIcon field="season" />
+                </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">바이어</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">품명</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none" onClick={() => handleSort('name')}>
+                  품명<SortIcon field="name" />
+                </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">카테고리</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">컬러</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">납품가(KRW)</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">BOM원가</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">마진율</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">미발주기간</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none" onClick={() => handleSort('createdAt')}>
+                  등록일<SortIcon field="createdAt" />
+                </th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">BOM</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
               </tr>
@@ -782,6 +870,11 @@ export default function ItemMaster() {
                       )}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs font-medium text-stone-700">{item.styleNo}</td>
+                    <td className="px-4 py-3">
+                      {item.season ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 font-medium">{item.season}</span>
+                      ) : <span className="text-stone-300 text-xs">-</span>}
+                    </td>
                     <td className="px-4 py-3">
                       {item.buyerId ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
@@ -863,6 +956,10 @@ export default function ItemMaster() {
                         </span>
                       )}
                     </td>
+                    {/* 등록일 */}
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-xs text-stone-500">{item.createdAt ? item.createdAt.split('T')[0] : '-'}</span>
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => {
@@ -892,7 +989,7 @@ export default function ItemMaster() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={13} className="text-center py-12 text-stone-400">
+                <tr><td colSpan={15} className="text-center py-12 text-stone-400">
                   <Package size={32} className="mx-auto mb-2 opacity-30" />
                   등록된 품목이 없습니다
                 </td></tr>
