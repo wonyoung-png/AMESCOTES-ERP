@@ -94,12 +94,14 @@ export default function CostComparison() {
         preCost = item.baseCostKrw;
       }
 
-      // 사후원가
+      // 사후원가 - 종원가액(생산마진 포함) 기준
       let postCost: number | null = null;
       if (isSimple && (bom as any).simplePostCostKrw) {
         postCost = (bom as any).simplePostCostKrw;
       } else if (bom.postTotalCostKrw && bom.postTotalCostKrw > 0) {
-        postCost = bom.postTotalCostKrw;
+        // 생산마진 적용하여 종원가액 계산 (displayTotalCostKrw 기준)
+        const marginRate = (bom as any).productionMarginRate ?? 0;
+        postCost = Math.round(bom.postTotalCostKrw * (1 + marginRate));
       }
 
       // 차이
