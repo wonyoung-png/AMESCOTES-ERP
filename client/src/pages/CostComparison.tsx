@@ -24,6 +24,8 @@ interface CostRow {
   postCost: number | null;
   diff: number | null;        // (postCost - preCost) / preCost * 100
   diffAmt: number | null;     // postCost - preCost
+  salePrice: number | null;   // 확정판매가 (postDeliveryPrice)
+  multiplier: number | null;  // 실현배수 = salePrice / postCost
   isSimple: boolean;
   hasDetailedBom: boolean;
   bomId: string;
@@ -50,7 +52,7 @@ function DiffBadge({ diff }: { diff: number | null }) {
 }
 
 // ─── 편집 셀 타입 ─────────────────────────────────────────────────────────
-type EditField = 'pre' | 'post';
+type EditField = 'pre' | 'post' | 'salePrice';
 interface EditingCell { bomId: string; field: EditField; }
 
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────────────
@@ -119,6 +121,20 @@ export default function CostComparison() {
         ((bom.lines || []).some((l: any) => l.itemName))
       );
 
+      // 확정판매가 (postDeliveryPrice 우선, 없으면 item.deliveryPrice)
+      const salePrice: number | null =
+        bom.postDeliveryPrice != null && bom.postDeliveryPrice > 0
+          ? bom.postDeliveryPrice
+          : item?.deliveryPrice != null && item.deliveryPrice > 0
+          ? item.deliveryPrice
+          : null;
+
+      // 실현배수 = 확정판매가 / 사후원가
+      const multiplier: number | null =
+        salePrice !== null && postCost !== null && postCost > 0
+          ? Math.round((salePrice / postCost) * 100) / 100
+          : null;
+
       return {
         styleNo: bom.styleNo || '',
         styleName: bom.styleName || item?.name || '',
@@ -128,6 +144,8 @@ export default function CostComparison() {
         postCost,
         diff,
         diffAmt,
+        salePrice,
+        multiplier,
         isSimple,
         hasDetailedBom,
         bomId: bom.id,
@@ -236,20 +254,32 @@ export default function CostComparison() {
           .update({ base_cost_krw: newCost })
           .eq('style_no', bom.styleNo);
         if (itemErr) console.warn('items 업데이트 실패:', itemErr.message);
+
+        const { error } = await supabase
+          .from('boms')
+          .update({ memo: JSON.stringify(memo) })
+          .eq('id', editingCell.bomId);
+        if (error) throw error;
+      } else if (editingCell.field === 'salePrice') {
+        // 확정판매가 → post_delivery_price 컬럼 직접 저장
+        const { error } = await supabase
+          .from('boms')
+          .update({ post_delivery_price: newCost })
+          .eq('id', editingCell.bomId);
+        if (error) throw error;
       } else {
         memo.postCost = newCost;
+        const { error } = await supabase
+          .from('boms')
+          .update({ memo: JSON.stringify(memo) })
+          .eq('id', editingCell.bomId);
+        if (error) throw error;
       }
-
-      const { error } = await supabase
-        .from('boms')
-        .update({ memo: JSON.stringify(memo) })
-        .eq('id', editingCell.bomId);
-
-      if (error) throw error;
 
       await queryClient.invalidateQueries({ queryKey: ['boms'] });
       await queryClient.invalidateQueries({ queryKey: ['items'] });
-      toast.success(`${editingCell.field === 'pre' ? '사전원가' : '사후원가'} 저장 완료`);
+      const fieldLabel = editingCell.field === 'pre' ? '사전원가' : editingCell.field === 'salePrice' ? '확정판매가' : '사후원가';
+      toast.success(`${fieldLabel} 저장 완료`);
       setEditingCell(null);
     } catch (e: any) {
       toast.error(`저장 실패: ${e.message ?? e}`);
@@ -323,7 +353,7 @@ export default function CostComparison() {
     try {
       const XLSX = await import('xlsx');
       const wsData = [
-        ['스타일번호', '품목명', '시즌', '카테고리', '사전원가(KRW)', '사후원가(KRW)', '차이(KRW)', '차이(%)'],
+        ['스타일번호', '품목명', '시즌', '카테고리', '사전원가(KRW)', '사후원가(KRW)', '확정판매가(KRW)', '실현배수', '차이(KRW)', '차이(%)'],
         ...filtered.map(r => [
           r.styleNo,
           r.styleName,
@@ -331,6 +361,8 @@ export default function CostComparison() {
           r.erpCategory,
           r.preCost ?? '',
           r.postCost ?? '',
+          r.salePrice ?? '',
+          r.multiplier !== null ? r.multiplier : '',
           r.diffAmt ?? '',
           r.diff !== null ? parseFloat(r.diff.toFixed(2)) : '',
         ]),
@@ -339,7 +371,7 @@ export default function CostComparison() {
       // 컬럼 너비
       ws['!cols'] = [
         { wch: 14 }, { wch: 22 }, { wch: 8 }, { wch: 14 },
-        { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 8 },
+        { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 8 },
       ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '원가비교');
@@ -460,6 +492,8 @@ export default function CostComparison() {
                   >
                     사후원가 <SortIndicator col="postCost" />
                   </th>
+                  <th className="px-3 py-2.5 text-right w-32">확정판매가</th>
+                  <th className="px-3 py-2.5 text-center w-20">실현배수</th>
                   <th className="px-3 py-2.5 text-right w-28">차이(KRW)</th>
                   <th
                     className="px-3 py-2.5 text-center cursor-pointer hover:bg-stone-700 select-none w-24"
@@ -472,7 +506,7 @@ export default function CostComparison() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-stone-400">
+                    <td colSpan={11} className="px-4 py-12 text-center text-stone-400">
                       조건에 맞는 데이터가 없습니다
                     </td>
                   </tr>
@@ -480,7 +514,7 @@ export default function CostComparison() {
                   const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-stone-50/60';
                   return (
                     <tr key={row.bomId} className={`border-b border-stone-100 hover:bg-amber-50/30 transition-colors ${rowBg}`}>
-                      <td className="px-3 py-2.5 text-center text-stone-400">{idx + 1}</td>
+                      <td className="px-3 py-2.5 text-center text-stone-400 w-8">{idx + 1}</td>
                       <td className="px-3 py-2.5 font-mono font-semibold text-stone-700">
                         {row.styleNo}
                       </td>
@@ -517,6 +551,22 @@ export default function CostComparison() {
                           )}
                           <span className="opacity-0 group-hover:opacity-100 text-blue-400 text-xs">↗</span>
                         </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono">
+                        <EditableCostCell bomId={row.bomId} field="salePrice" value={row.salePrice} />
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-mono">
+                        {row.multiplier !== null ? (
+                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
+                            row.multiplier >= 2.5
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : row.multiplier >= 2.0
+                              ? 'bg-amber-50 text-amber-700'
+                              : 'bg-red-50 text-red-600'
+                          }`}>{row.multiplier.toFixed(2)}x</span>
+                        ) : (
+                          <span className="text-stone-300 text-xs">-</span>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono">
                         {row.diffAmt !== null ? (
