@@ -25,7 +25,7 @@ import { toast } from 'sonner';
 import {
   Plus, Trash2, Upload, FileText, Download, ChevronDown, ChevronRight,
   Calculator, TrendingUp, AlertTriangle, CheckCircle, Save, X, Copy, Search,
-  Factory,
+  Factory, DollarSign,
 } from 'lucide-react';
 
 // ─── 타입 정의 ───────────────────────────────────────────────────────────────
@@ -101,6 +101,10 @@ interface ExtBom {
   createdAt: string;
   updatedAt: string;
   memo?: string;
+  // 간단 원가 (Supabase memo JSON에 저장)
+  simpleCostKrw?: number;
+  simplePostCostKrw?: number;
+  isSimpleCost?: boolean;
 }
 
 interface ExtBomLine {
@@ -686,6 +690,219 @@ function applyMarginAdjustment(
   }
 
   return { adjustedRows: updatedRows, subtotal, internalPrice, marginAmt, gap };
+}
+
+// ─── 간단 원가 입력 모달 ──────────────────────────────────────────────────
+function SimpleCostModal({
+  items,
+  extBoms,
+  onClose,
+  onSaved,
+}: {
+  items: Item[];
+  extBoms: ExtBom[];
+  onClose: () => void;
+  onSaved: (bom: ExtBom) => void;
+}) {
+  const [selectedItemId, setSelectedItemId] = useState('');
+  const [preCost, setPreCost] = useState('');
+  const [postCost, setPostCost] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [itemSearch, setItemSearch] = useState('');
+
+  const selectedItem = items.find(i => i.id === selectedItemId);
+
+  const handleSave = async () => {
+    if (!selectedItemId) { toast.error('스타일을 선택하세요'); return; }
+    const preCostNum = Number(preCost.replace(/,/g, ''));
+    if (!preCostNum || preCostNum <= 0) { toast.error('사전원가를 입력하세요'); return; }
+    const postCostNum = postCost ? Number(postCost.replace(/,/g, '')) : undefined;
+
+    setSaving(true);
+    try {
+      // 기존 BOM 찾기 (해당 스타일로)
+      const existingBom = extBoms.find(b => b.styleId === selectedItemId);
+      const settings = store.getSettings();
+      const item = selectedItem!;
+
+      const bomData: ExtBom = existingBom
+        ? {
+            ...existingBom,
+            // 간단 원가 필드 추가
+            simpleCostKrw: preCostNum,
+            simplePostCostKrw: postCostNum,
+            isSimpleCost: true,
+            updatedAt: new Date().toISOString(),
+          }
+        : {
+            id: genId(),
+            styleId: item.id,
+            styleNo: item.styleNo,
+            styleName: item.name,
+            lineName: '',
+            designer: '',
+            erpCategory: item.erpCategory || '',
+            size: '',
+            boxSize: '',
+            version: 1,
+            season: item.season,
+            lines: [],
+            postProcessLines: [],
+            processingFee: 0,
+            logisticsCostKrw: 0,
+            packagingCostKrw: 0,
+            packingCostKrw: 0,
+            productionMarginRate: 0.16,
+            snapshotCnyKrw: settings.cnyKrw,
+            pnl: { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 },
+            colorBoms: [],
+            postColorBoms: [],
+            postMaterials: [],
+            postProcessingFee: 0,
+            currency: 'CNY',
+            manufacturingCountry: '중국',
+            exchangeRateCny: settings.cnyKrw,
+            // 간단 원가 필드
+            simpleCostKrw: preCostNum,
+            simplePostCostKrw: postCostNum,
+            isSimpleCost: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+      // Supabase 저장
+      await upsertBom(bomData);
+
+      // 품목 마스터 업데이트 (hasBom, baseCostKrw)
+      await (import('@/lib/supabaseQueries').then(m => m.upsertItem({
+        id: item.id,
+        baseCostKrw: preCostNum,
+        hasBom: true,
+      } as any))).catch(() => {});
+
+      toast.success(`[${item.styleNo}] 간단 원가 저장 완료`);
+      onSaved(bomData);
+      onClose();
+    } catch (e) {
+      toast.error('저장 실패: ' + String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filteredItems = items.filter(item =>
+    !itemSearch ||
+    item.styleNo.toLowerCase().includes(itemSearch.toLowerCase()) ||
+    item.name.toLowerCase().includes(itemSearch.toLowerCase())
+  );
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-amber-600" />
+            간단 원가 입력
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
+            자재 세부 내역 없이 사전원가(코스트)를 직접 입력합니다.
+            사후원가는 선택사항입니다.
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 mb-1 block font-medium">스타일 검색</label>
+            <Input
+              value={itemSearch}
+              onChange={e => setItemSearch(e.target.value)}
+              placeholder="스타일번호 / 품명 검색"
+              className="h-8 text-xs mb-2"
+            />
+            <Select value={selectedItemId} onValueChange={setSelectedItemId}>
+              <SelectTrigger className="text-xs h-9">
+                <SelectValue placeholder="스타일 선택..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-52 overflow-auto">
+                {filteredItems.map(item => (
+                  <SelectItem key={item.id} value={item.id} className="text-xs">
+                    <span className="flex items-center gap-2">
+                      {item.styleNo} — {item.name}
+                      {item.hasBom && (
+                        <span className="text-[10px] text-amber-600">(BOM있음)</span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedItem && (
+              <div className="mt-1 text-[10px] text-stone-500">
+                {selectedItem.season} | {selectedItem.erpCategory || '카테고리 없음'}
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 mb-1 block font-medium">
+              사전원가 (KRW) <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={preCost}
+              onChange={e => setPreCost(e.target.value)}
+              placeholder="예: 45000"
+              className="h-9 text-sm font-mono"
+              type="number"
+            />
+            {preCost && Number(preCost) > 0 && (
+              <div className="text-xs text-amber-700 mt-1">
+                ₩{Number(preCost).toLocaleString('ko-KR')}
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 mb-1 block font-medium">
+              사후원가 (KRW) <span className="text-stone-400">선택</span>
+            </label>
+            <Input
+              value={postCost}
+              onChange={e => setPostCost(e.target.value)}
+              placeholder="예: 48000"
+              className="h-9 text-sm font-mono"
+              type="number"
+            />
+            {postCost && Number(postCost) > 0 && (
+              <div className="text-xs text-blue-700 mt-1">
+                ₩{Number(postCost).toLocaleString('ko-KR')}
+              </div>
+            )}
+          </div>
+          {preCost && postCost && Number(preCost) > 0 && Number(postCost) > 0 && (() => {
+            const pre = Number(preCost);
+            const post = Number(postCost);
+            const diff = ((post - pre) / pre) * 100;
+            const cls = diff > 0 ? 'text-red-600 bg-red-50 border-red-200' : diff < 0 ? 'text-green-700 bg-green-50 border-green-200' : 'text-stone-500 bg-stone-50 border-stone-200';
+            return (
+              <div className={`rounded-lg border px-3 py-2 text-xs font-semibold ${cls}`}>
+                사후원가 차이: {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
+                {' '}({post - pre > 0 ? '+' : ''}₩{(post - pre).toLocaleString('ko-KR')})
+              </div>
+            );
+          })()}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={onClose}>취소</Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={saving || !selectedItemId || !preCost}
+              className="bg-amber-700 hover:bg-amber-800 text-white gap-1.5"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {saving ? '저장 중...' : '저장'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom; onClose: () => void; tab?: 'pre' | 'post'; colorBom?: ExtColorBom }) {
@@ -2774,6 +2991,9 @@ export default function BomManagement() {
     setCollapsedPostSections(prev => { const s = new Set(prev); s.has(cat) ? s.delete(cat) : s.add(cat); return s; });
   };
 
+  // 간단 원가 입력 모달
+  const [showSimpleCostModal, setShowSimpleCostModal] = useState(false);
+
   // BOM 목록 다중 선택
   const [selectedBomIds, setSelectedBomIds] = useState<Set<string>>(new Set());
   const isAllBomSelected = extBoms.length > 0 && extBoms.every(b => selectedBomIds.has(b.id));
@@ -2832,6 +3052,9 @@ export default function BomManagement() {
           <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handleExcelUpload} className="hidden" />
           <input ref={preFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePreExcelUpload} className="hidden" />
           <input ref={postFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePostExcelUpload} className="hidden" />
+          <Button variant="outline" size="sm" onClick={() => setShowSimpleCostModal(true)} className="gap-1.5 text-xs border-amber-400 text-amber-700 hover:bg-amber-50">
+            <DollarSign className="w-3.5 h-3.5" /> 간단 원가 입력
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowCopyModal(true)} className="gap-1.5 text-xs border-stone-300">
             <Copy className="w-3.5 h-3.5" /> 유사 스타일 복사
           </Button>
@@ -4497,6 +4720,24 @@ export default function BomManagement() {
             />
           )}
         </>
+      )}
+
+      {/* 간단 원가 입력 모달 */}
+      {showSimpleCostModal && (
+        <SimpleCostModal
+          items={items}
+          extBoms={extBoms}
+          onClose={() => setShowSimpleCostModal(false)}
+          onSaved={(bom) => {
+            const newBoms = extBoms.find(b => b.id === bom.id)
+              ? extBoms.map(b => b.id === bom.id ? bom : b)
+              : [...extBoms, bom];
+            setExtBoms(newBoms);
+            saveExtBoms(newBoms);
+            queryClient.invalidateQueries({ queryKey: ['boms'] });
+            queryClient.invalidateQueries({ queryKey: ['items'] });
+          }}
+        />
       )}
 
       {/* 유사 스타일 복사 모달 (editBom 없을 때) */}

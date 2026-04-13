@@ -10,7 +10,7 @@ import {
   BarChart3, Package, ClipboardList, FlaskConical, Factory,
   ShoppingCart, Building2, FileText, Receipt, CreditCard, Settings,
   ChevronLeft, ChevronRight, TrendingUp, DollarSign, LogOut, Layers,
-  Menu, X, MoreHorizontal, Bot,
+  Menu, X, MoreHorizontal, Bot, GitCompare,
 } from 'lucide-react';
 import ChatWidget from './ChatWidget';
 
@@ -45,6 +45,7 @@ const navGroups: NavGroup[] = [
       { path: '/items', label: '품목 마스터', icon: <Package size={17} /> },
       { path: '/materials', label: '자재 마스터', icon: <Layers size={17} /> },
       { path: '/bom', label: 'BOM / 원가 관리', icon: <ClipboardList size={17} /> },
+      { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} /> },
       { path: '/orders', label: '생산 발주', icon: <Factory size={17} /> },
     ]
   },

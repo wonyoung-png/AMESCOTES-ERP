@@ -24,6 +24,7 @@ import ExchangeSettings from "./pages/ExchangeSettings";
 import SalesManagement from "./pages/SalesManagement";
 import MaterialMaster from "./pages/MaterialMaster";
 import AgentPanel from "./pages/AgentPanel";
+import CostComparison from "./pages/CostComparison";
 import NotFound from "./pages/NotFound";
 
 function Router() {
@@ -56,6 +57,7 @@ function Router() {
         <Route path="/sales" component={SalesManagement} />
         <Route path="/materials" component={MaterialMaster} />
         <Route path="/agent" component={AgentPanel} />
+        <Route path="/cost-comparison" component={CostComparison} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

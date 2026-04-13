@@ -140,6 +140,34 @@ export function convertBomFromDB(row: any) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     memo: row.memo,
+    // 간단 원가 (memo JSON에서 파싱)
+    simpleCostKrw: (() => {
+      try {
+        if (row.memo && typeof row.memo === 'string' && row.memo.trim().startsWith('{')) {
+          const md = JSON.parse(row.memo);
+          if (md.isSimple) return md.preCost ?? undefined;
+        }
+      } catch {}
+      return undefined;
+    })(),
+    simplePostCostKrw: (() => {
+      try {
+        if (row.memo && typeof row.memo === 'string' && row.memo.trim().startsWith('{')) {
+          const md = JSON.parse(row.memo);
+          if (md.isSimple) return md.postCost ?? undefined;
+        }
+      } catch {}
+      return undefined;
+    })(),
+    isSimpleCost: (() => {
+      try {
+        if (row.memo && typeof row.memo === 'string' && row.memo.trim().startsWith('{')) {
+          const md = JSON.parse(row.memo);
+          return !!md.isSimple;
+        }
+      } catch {}
+      return false;
+    })(),
   };
 }
 
@@ -345,7 +373,17 @@ export async function upsertBom(bom: any) {
     post_currency: bom.currency ?? 'CNY',
     pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
     post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny ?? bom.snapshotCnyKrw,
-    memo: bom.memo,
+    // 간단 원가 BOM인 경우 memo에 JSON 저장
+    memo: (() => {
+      if (bom.simpleCostKrw !== undefined || bom.isSimpleCost) {
+        return JSON.stringify({
+          isSimple: true,
+          preCost: bom.simpleCostKrw ?? null,
+          postCost: bom.simplePostCostKrw ?? null,
+        });
+      }
+      return bom.memo;
+    })(),
     updated_at: new Date().toISOString(),
   };
   // 허용 컬럼만 필터링
