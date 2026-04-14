@@ -1452,36 +1452,107 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
   onApply: (qty: number) => void;
   onClose: () => void;
 }) {
+  const [calcType, setCalcType] = useState<'SF' | 'YD'>(unit);
   const [rows, setRows] = useState<Array<{id: string; 부위: string; 가로: number; 세로: number; 수량: number}>>(
     [{ id: Math.random().toString(36).slice(2), 부위: '', 가로: 0, 세로: 0, 수량: 1 }]
   );
   const [lossRate, setLossRate] = useState(10);
   const [width, setWidth] = useState(150); // 원단 전용
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const ocrFileRef = useRef<HTMLInputElement>(null);
 
   const netSF = rows.reduce((s, r) => s + (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764, 0);
   const netYD = width > 0 ? rows.reduce((s, r) => s + r.가로 * r.세로 * r.수량, 0) / width / 91.44 : 0;
-  const net = unit === 'SF' ? netSF : netYD;
+  const net = calcType === 'SF' ? netSF : netYD;
   const final = net * (1 + lossRate / 100);
 
   const addRow = () => setRows(p => [...p, { id: Math.random().toString(36).slice(2), 부위: '', 가로: 0, 세로: 0, 수량: 1 }]);
   const update = (id: string, field: string, val: string | number) =>
     setRows(p => p.map(r => r.id === id ? { ...r, [field]: val } : r));
 
+  const runOcr = async (blob: Blob) => {
+    setOcrLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', blob);
+      const res = await fetch('/api/yardage/ocr', { method: 'POST', body: formData });
+      const data = await res.json() as { leather?: Array<{부위:string;가로:number;세로:number;수량:number}>; fabric?: Array<{부위:string;가로:number;세로:number;수량:number}> };
+      if (calcType === 'SF' && data.leather?.length) {
+        setRows(data.leather.map((r, i) => ({ id: String(i), ...r })));
+        toast.success(`OCR 완료 — 가죽 ${data.leather.length}행 입력됨`);
+      } else if (calcType === 'YD' && data.fabric?.length) {
+        setRows(data.fabric.map((r, i) => ({ id: String(i), ...r })));
+        toast.success(`OCR 완료 — 원단 ${data.fabric.length}행 입력됨`);
+      } else {
+        toast.error('OCR 결과가 없습니다. 이미지를 확인해주세요.');
+      }
+    } catch {
+      toast.error('OCR 처리 중 오류가 발생했습니다.');
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  // 클립보드 붙여넣기 이벤트
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items || []);
+      const imageItem = items.find(item => item.type.startsWith('image/'));
+      if (!imageItem) return;
+      const blob = imageItem.getAsFile();
+      if (!blob) return;
+      e.preventDefault();
+      await runOcr(blob);
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [calcType]);
+
   const inputCls = 'w-full border border-stone-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400';
   const inputRO = 'w-full border border-stone-100 rounded px-1.5 py-1 text-xs text-center bg-stone-50 text-stone-500';
-  const accent = unit === 'SF' ? 'amber' : 'sky';
+  const accent = calcType === 'SF' ? 'amber' : 'sky';
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl w-[640px] max-w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className={`px-4 py-3 border-b border-stone-200 flex items-center justify-between bg-${accent}-50`}>
-          <h3 className="text-sm font-bold text-stone-700">📐 소요량 계산 — {itemName || '자재'} ({unit})</h3>
+          <h3 className="text-sm font-bold text-stone-700">📐 소요량 계산 — {itemName || '자재'}</h3>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-600 text-xl leading-none">×</button>
         </div>
         <div className="p-4 space-y-3">
+          {/* 가죽/원단 탭 + OCR 버튼 */}
+          <div className="flex items-center justify-between">
+            <div className="flex gap-1">
+              <button
+                onClick={() => setCalcType('SF')}
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+                  calcType === 'SF' ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                }`}
+              >가죽 (SF)</button>
+              <button
+                onClick={() => setCalcType('YD')}
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+                  calcType === 'YD' ? 'bg-sky-600 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                }`}
+              >원단 (YD)</button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-stone-400">Ctrl+V로 이미지 붙여넣기</span>
+              <input ref={ocrFileRef} type="file" accept="image/*" className="hidden" onChange={async e => {
+                const file = e.target.files?.[0];
+                if (file) await runOcr(file);
+                if (ocrFileRef.current) ocrFileRef.current.value = '';
+              }} />
+              <button
+                onClick={() => ocrFileRef.current?.click()}
+                disabled={ocrLoading}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs border border-stone-200 text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+              >{ocrLoading ? '처리중...' : '📷 이미지로 입력'}</button>
+            </div>
+          </div>
           {/* 로스율 + (원단: 폭) */}
           <div className="flex items-center gap-4">
-            {unit === 'YD' && (
+            {calcType === 'YD' && (
               <label className="flex items-center gap-2 text-xs text-stone-600">
                 <span className="font-semibold whitespace-nowrap">원단폭(cm)</span>
                 <input type="number" value={width} onChange={e => setWidth(parseFloat(e.target.value) || 150)}
@@ -1500,7 +1571,7 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
               <thead className={`bg-${accent}-50 border-b border-stone-200`}>
                 <tr>
                   <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">부위</th>
-                  {unit === 'SF' ? (
+                  {calcType === 'SF' ? (
                     <>
                       <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">가로 CM</th>
                       <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">세로 CM</th>
@@ -1514,13 +1585,13 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
                     </>
                   )}
                   <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">수량</th>
-                  <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">{unit === 'SF' ? 'NET(S/F)' : 'NET(YD)'}</th>
+                  <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">{calcType === 'SF' ? 'NET(S/F)' : 'NET(YD)'}</th>
                   <th className="w-6"></th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map(r => {
-                  const rowNet = unit === 'SF'
+                  const rowNet = calcType === 'SF'
                     ? (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764
                     : (width > 0 ? r.가로 * r.세로 * r.수량 / width / 91.44 : 0);
                   return (
@@ -1528,7 +1599,7 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
                       <td className="px-1 py-1"><input className={inputCls} value={r.부위} onChange={e => update(r.id, '부위', e.target.value)} placeholder="바디" /></td>
                       <td className="px-1 py-1"><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => update(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
                       <td className="px-1 py-1"><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => update(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
-                      {unit === 'SF' && (
+                      {calcType === 'SF' && (
                         <>
                           <td className="px-1 py-1"><input className={inputRO} value={(r.가로 + 0.5).toFixed(1)} readOnly /></td>
                           <td className="px-1 py-1"><input className={inputRO} value={(r.세로 + 0.5).toFixed(1)} readOnly /></td>
@@ -1547,9 +1618,9 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
           {/* 결과 */}
           <div className="flex items-center justify-between pt-2 border-t border-stone-100">
             <div className="text-sm">
-              <span className="text-stone-400 mr-2">Net</span><span className="font-bold text-stone-700">{net.toFixed(3)} {unit}</span>
+              <span className="text-stone-400 mr-2">Net</span><span className="font-bold text-stone-700">{net.toFixed(3)} {calcType}</span>
               <span className="text-stone-300 mx-2">→</span>
-              <span className="text-stone-400 mr-2">최종(+{lossRate}%)</span><span className={`font-bold text-${accent}-700 text-base`}>{final.toFixed(3)} {unit}</span>
+              <span className="text-stone-400 mr-2">최종(+{lossRate}%)</span><span className={`font-bold text-${accent}-700 text-base`}>{final.toFixed(3)} {calcType}</span>
             </div>
             <div className="flex gap-2">
               <button onClick={onClose} className="px-3 py-1.5 rounded text-xs border border-stone-200 text-stone-500 hover:bg-stone-50">취소</button>
