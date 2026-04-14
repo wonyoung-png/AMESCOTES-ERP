@@ -119,6 +119,7 @@ interface ExtBomLine {
   unitPriceCny: number;
   netQty: number;
   lossRate: number;
+  manualQty?: number;         // 소요량 직접 입력값 (있으면 계산값 대신 사용)
   isHqProvided: boolean;
   isVendorProvided?: boolean; // 업체제공 여부
   vendorName?: string;        // 본사제공 시 자재업체명
@@ -1452,7 +1453,8 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
   sectionKey?: string;
   accentColor?: 'amber' | 'blue';
 }) {
-  const qty = calcQty(line.netQty, line.lossRate);
+  const computedQty = calcQty(line.netQty, line.lossRate);
+  const qty = line.manualQty !== undefined ? line.manualQty : computedQty;
   const amt = line.unitPriceCny * qty;
   const isCustomUnit = line.unit === '직접입력';
   const displayUnit = isCustomUnit ? (line.customUnit || '') : line.unit;
@@ -1616,7 +1618,19 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
       {/* LOSS */}
       <td className="px-1 py-1"><Input type="number" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className="h-7 text-xs border-stone-200 bg-white text-right w-14" placeholder="5" /></td>
       {/* 소요량 */}
-      <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmt(qty)} {displayUnit && <span className="text-[10px] text-stone-400">{displayUnit}</span>}</td>
+      <td className="px-1 py-1">
+        <Input
+          type="number"
+          value={line.manualQty !== undefined ? line.manualQty : ''}
+          onChange={e => {
+            const raw = e.target.value;
+            onChange(line.id, 'manualQty', raw === '' ? undefined : parseFloat(raw) || 0);
+          }}
+          className="h-7 text-xs border-stone-300 bg-amber-50 text-right w-20"
+          placeholder={fmt(computedQty)}
+          title="소요량 직접 입력 (비우면 자동계산: NET × (1+LOSS))"
+        />
+      </td>
       {/* 제조금액 */}
       <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">{fmt(amt)}</td>
       {/* KRW */}
