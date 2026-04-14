@@ -1445,6 +1445,126 @@ function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void 
 }
 
 // ─── BOM 행 컴포넌트 ─────────────────────────────────────────────────────────
+// 포함: BomLineRow 소요량 계산기 미니 모달
+function CalcModal({ itemName, unit, onApply, onClose }: {
+  itemName: string;
+  unit: 'SF' | 'YD';
+  onApply: (qty: number) => void;
+  onClose: () => void;
+}) {
+  const [rows, setRows] = useState<Array<{id: string; 부위: string; 가로: number; 세로: number; 수량: number}>>(
+    [{ id: Math.random().toString(36).slice(2), 부위: '', 가로: 0, 세로: 0, 수량: 1 }]
+  );
+  const [lossRate, setLossRate] = useState(10);
+  const [width, setWidth] = useState(150); // 원단 전용
+
+  const netSF = rows.reduce((s, r) => s + (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764, 0);
+  const netYD = width > 0 ? rows.reduce((s, r) => s + r.가로 * r.세로 * r.수량, 0) / width / 91.44 : 0;
+  const net = unit === 'SF' ? netSF : netYD;
+  const final = net * (1 + lossRate / 100);
+
+  const addRow = () => setRows(p => [...p, { id: Math.random().toString(36).slice(2), 부위: '', 가로: 0, 세로: 0, 수량: 1 }]);
+  const update = (id: string, field: string, val: string | number) =>
+    setRows(p => p.map(r => r.id === id ? { ...r, [field]: val } : r));
+
+  const inputCls = 'w-full border border-stone-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400';
+  const inputRO = 'w-full border border-stone-100 rounded px-1.5 py-1 text-xs text-center bg-stone-50 text-stone-500';
+  const accent = unit === 'SF' ? 'amber' : 'sky';
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-[640px] max-w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className={`px-4 py-3 border-b border-stone-200 flex items-center justify-between bg-${accent}-50`}>
+          <h3 className="text-sm font-bold text-stone-700">📐 소요량 계산 — {itemName || '자재'} ({unit})</h3>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-600 text-xl leading-none">×</button>
+        </div>
+        <div className="p-4 space-y-3">
+          {/* 로스율 + (원단: 폭) */}
+          <div className="flex items-center gap-4">
+            {unit === 'YD' && (
+              <label className="flex items-center gap-2 text-xs text-stone-600">
+                <span className="font-semibold whitespace-nowrap">원단폭(cm)</span>
+                <input type="number" value={width} onChange={e => setWidth(parseFloat(e.target.value) || 150)}
+                  className="w-20 border border-stone-200 rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-sky-400" />
+              </label>
+            )}
+            <label className="flex items-center gap-2 text-xs text-stone-600">
+              <span className="font-semibold whitespace-nowrap">로스율(%)</span>
+              <input type="number" value={lossRate} onChange={e => setLossRate(parseFloat(e.target.value) || 0)}
+                className="w-20 border border-stone-200 rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400" min={0} max={100} />
+            </label>
+          </div>
+          {/* 행 테이블 */}
+          <div className="overflow-hidden rounded-lg border border-stone-200">
+            <table className="w-full">
+              <thead className={`bg-${accent}-50 border-b border-stone-200`}>
+                <tr>
+                  <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">부위</th>
+                  {unit === 'SF' ? (
+                    <>
+                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">가로 CM</th>
+                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">세로 CM</th>
+                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">가로(+0.5)</th>
+                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">세로(+0.5)</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">가로 CM</th>
+                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">세로 CM</th>
+                    </>
+                  )}
+                  <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">수량</th>
+                  <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">{unit === 'SF' ? 'NET(S/F)' : 'NET(YD)'}</th>
+                  <th className="w-6"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => {
+                  const rowNet = unit === 'SF'
+                    ? (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764
+                    : (width > 0 ? r.가로 * r.세로 * r.수량 / width / 91.44 : 0);
+                  return (
+                    <tr key={r.id} className="border-b border-stone-100 hover:bg-stone-50">
+                      <td className="px-1 py-1"><input className={inputCls} value={r.부위} onChange={e => update(r.id, '부위', e.target.value)} placeholder="바디" /></td>
+                      <td className="px-1 py-1"><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => update(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
+                      <td className="px-1 py-1"><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => update(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
+                      {unit === 'SF' && (
+                        <>
+                          <td className="px-1 py-1"><input className={inputRO} value={(r.가로 + 0.5).toFixed(1)} readOnly /></td>
+                          <td className="px-1 py-1"><input className={inputRO} value={(r.세로 + 0.5).toFixed(1)} readOnly /></td>
+                        </>
+                      )}
+                      <td className="px-1 py-1"><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => update(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
+                      <td className="px-1 py-1"><input className={inputRO + ` font-semibold text-${accent}-700`} value={rowNet.toFixed(3)} readOnly /></td>
+                      <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(x => x.id !== r.id))} className="text-stone-300 hover:text-red-400">×</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <button onClick={addRow} className={`text-xs text-${accent}-600 hover:text-${accent}-800 font-semibold`}>+ 행 추가</button>
+          {/* 결과 */}
+          <div className="flex items-center justify-between pt-2 border-t border-stone-100">
+            <div className="text-sm">
+              <span className="text-stone-400 mr-2">Net</span><span className="font-bold text-stone-700">{net.toFixed(3)} {unit}</span>
+              <span className="text-stone-300 mx-2">→</span>
+              <span className="text-stone-400 mr-2">최종(+{lossRate}%)</span><span className={`font-bold text-${accent}-700 text-base`}>{final.toFixed(3)} {unit}</span>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onClose} className="px-3 py-1.5 rounded text-xs border border-stone-200 text-stone-500 hover:bg-stone-50">취소</button>
+              <button
+                onClick={() => { onApply(Math.ceil(final * 1000) / 1000); onClose(); }}
+                className={`px-4 py-1.5 rounded text-xs bg-${accent}-600 text-white hover:bg-${accent}-700 font-semibold`}
+              >이 값 적용</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재', accentColor = 'amber' }: {
   line: ExtBomLine;
   onChange: (id: string, field: keyof ExtBomLine, val: unknown) => void;
@@ -1461,7 +1581,11 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
   const subPartOptions = SECTION_SUB_PARTS[sectionKey] || ['기타'];
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
+  const [showCalcModal, setShowCalcModal] = useState(false);
   const showImageFeature = sectionKey === '원자재' || sectionKey === '장식';
+  // SF/YD 단위일 때 계산기 버튼 노출
+  const effectiveUnit = (displayUnit || '').toUpperCase();
+  const showCalcBtn = effectiveUnit === 'SF' || effectiveUnit === 'YD';
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1544,6 +1668,14 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
       {showImagePreview && line.imageUrl && (
         <ImagePreviewModal src={line.imageUrl} onClose={() => setShowImagePreview(false)} />
       )}
+      {showCalcModal && showCalcBtn && (
+        <CalcModal
+          itemName={line.itemName}
+          unit={effectiveUnit as 'SF' | 'YD'}
+          onApply={(qty) => onChange(line.id, 'manualQty', qty)}
+          onClose={() => setShowCalcModal(false)}
+        />
+      )}
     <tr className={`group transition-colors border-b border-stone-100 ${ringCls}`}>
       {/* 자재명 (부위 Select가 inline으로 포함됨) */}
       <td className="px-1 py-1">
@@ -1619,17 +1751,28 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
       <td className="px-1 py-1"><Input type="number" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className="h-7 text-xs border-stone-200 bg-white text-right w-14" placeholder="5" /></td>
       {/* 소요량 */}
       <td className="px-1 py-1">
-        <Input
-          type="number"
-          value={line.manualQty !== undefined ? line.manualQty : ''}
-          onChange={e => {
-            const raw = e.target.value;
-            onChange(line.id, 'manualQty', raw === '' ? undefined : parseFloat(raw) || 0);
-          }}
-          className="h-7 text-xs border-stone-300 bg-amber-50 text-right w-20"
-          placeholder={fmt(computedQty)}
-          title="소요량 직접 입력 (비우면 자동계산: NET × (1+LOSS))"
-        />
+        <div className="flex items-center gap-1">
+          <Input
+            type="number"
+            value={line.manualQty !== undefined ? line.manualQty : ''}
+            onChange={e => {
+              const raw = e.target.value;
+              onChange(line.id, 'manualQty', raw === '' ? undefined : parseFloat(raw) || 0);
+            }}
+            className="h-7 text-xs border-stone-300 bg-amber-50 text-right w-20"
+            placeholder={fmt(computedQty)}
+            title="소요량 직접 입력 (비우면 자동계산: NET × (1+LOSS))"
+          />
+          {showCalcBtn && (
+            <button
+              onClick={() => setShowCalcModal(true)}
+              className="h-7 w-7 shrink-0 flex items-center justify-center rounded border border-stone-200 bg-white hover:bg-amber-50 hover:border-amber-300 text-sm transition-colors"
+              title={`소요량 계산기 (${effectiveUnit})`}
+            >
+              📐
+            </button>
+          )}
+        </div>
       </td>
       {/* 제조금액 */}
       <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">{fmt(amt)}</td>
@@ -1846,6 +1989,8 @@ export default function BomManagement() {
   const [leatherRows, setLeatherRows] = useState<Array<{id: string; 부위: string; 가로: number; 세로: number; 수량: number}>>([]);
   const [fabricRows, setFabricRows] = useState<Array<{id: string; 부위: string; 가로: number; 세로: number; 수량: number}>>([]);
   const [fabricWidth, setFabricWidth] = useState<number>(150);
+  const [leatherLossRate, setLeatherLossRate] = useState<number>(10);
+  const [fabricLossRate, setFabricLossRate] = useState<number>(10);
   // 각 탭 내 활성 컬러 탭
   const [activePreColor, setActivePreColor] = useState<string>('');
   const [activePostColor, setActivePostColor] = useState<string>('');
@@ -4561,14 +4706,18 @@ export default function BomManagement() {
             소요량 계산 탭
           ══════════════════════════════════════════════════════════════════ */}
           {mainTab === 'yardage' && (() => {
-            // 가죽 SF 계산
+            // 가죽 SF 계산 (NET)
             const netSF = leatherRows.reduce((sum, r) => {
               return sum + (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764;
             }, 0);
-            // 원단 YD 계산
+            // 가죽 최종 소요량 (로스 포함)
+            const finalSF = netSF * (1 + leatherLossRate / 100);
+            // 원단 YD 계산 (NET)
             const netYD = fabricWidth > 0
               ? fabricRows.reduce((sum, r) => sum + r.가로 * r.세로 * r.수량, 0) / fabricWidth / 91.44
               : 0;
+            // 원단 최종 소요량 (로스 포함)
+            const finalYD = netYD * (1 + fabricLossRate / 100);
 
             const addLeatherRow = () => setLeatherRows(p => [...p, { id: genId(), 부위: '', 가로: 0, 세로: 0, 수량: 1 }]);
             const addFabricRow = () => setFabricRows(p => [...p, { id: genId(), 부위: '', 가로: 0, 세로: 0, 수량: 1 }]);
@@ -4578,6 +4727,7 @@ export default function BomManagement() {
               setFabricRows(p => p.map(r => r.id === id ? { ...r, [field]: val } : r));
 
             const yardageFileRef = React.createRef<HTMLInputElement>();
+            const ocrFileRef = React.createRef<HTMLInputElement>();
 
             const handleYardageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
               const file = e.target.files?.[0];
@@ -4597,14 +4747,33 @@ export default function BomManagement() {
               e.target.value = '';
             };
 
+            const handleOcrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const fd = new FormData();
+              fd.append('image', file);
+              toast.info('손글씨 분석 중...');
+              try {
+                const res = await fetch('/api/yardage/ocr', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json() as { leather: Array<{부위:string;가로:number;세로:number;수량:number}>; fabric: Array<{부위:string;가로:number;세로:number;수량:number}> };
+                if (data.leather?.length) setLeatherRows(data.leather.map(r => ({ ...r, id: genId() })));
+                if (data.fabric?.length) setFabricRows(data.fabric.map(r => ({ ...r, id: genId() })));
+                toast.success(`OCR 완료 — 가죽 ${data.leather?.length ?? 0}행, 원단 ${data.fabric?.length ?? 0}행`);
+              } catch (err) {
+                toast.error(`OCR 오류: ${String(err)}`);
+              }
+              e.target.value = '';
+            };
+
             const applyToBom = () => {
               if (!editBom) return;
               const colorBom = activeColorBom;
               const updateLines = (lines: ExtBomLine[]) =>
                 lines.map(l => {
                   const unit = (l.customUnit || l.unit || '').toUpperCase();
-                  if (unit === 'SF') return { ...l, netQty: Math.ceil(netSF * 100) / 100 };
-                  if (unit === 'YD') return { ...l, netQty: Math.ceil(netYD * 100) / 100 };
+                  if (unit === 'SF') return { ...l, netQty: Math.ceil(finalSF * 100) / 100 };
+                  if (unit === 'YD') return { ...l, netQty: Math.ceil(finalYD * 100) / 100 };
                   return l;
                 });
               if (colorBom) {
@@ -4623,11 +4792,12 @@ export default function BomManagement() {
             const thCls = 'text-[11px] text-stone-500 font-semibold text-center py-2 px-2';
             const tdCls = 'px-2 py-1';
             const inputCls = 'w-full border border-stone-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-amber-400';
+            const inputClsRO = 'w-full border border-stone-100 rounded px-2 py-1 text-sm text-center bg-stone-50 text-stone-500 cursor-default';
 
             return (
               <div className="space-y-4">
                 {/* 상단 컨트롤 */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex gap-2">
                     <button
                       onClick={() => setYardageTab('leather')}
@@ -4642,10 +4812,14 @@ export default function BomManagement() {
                       }`}
                     >원단 (YD)</button>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <input ref={yardageFileRef} type="file" accept=".xls,.xlsx" className="hidden" onChange={handleYardageUpload} />
+                    <input ref={ocrFileRef} type="file" accept="image/*" className="hidden" onChange={handleOcrUpload} />
                     <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => yardageFileRef.current?.click()}>
                       <Upload className="w-3.5 h-3.5" /> CAD 파일 업로드
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-1.5 text-xs border-purple-300 text-purple-700 hover:bg-purple-50" onClick={() => ocrFileRef.current?.click()}>
+                      📷 손글씨로 입력
                     </Button>
                     <Button size="sm" className="gap-1.5 text-xs bg-amber-600 hover:bg-amber-700 text-white" onClick={applyToBom}>
                       <Calculator className="w-3.5 h-3.5" /> BOM에 적용
@@ -4656,35 +4830,64 @@ export default function BomManagement() {
                 {/* 가죽 탭 */}
                 {yardageTab === 'leather' && (
                   <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+                    {/* 로스율 헤더 */}
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border-b border-stone-200">
+                      <span className="text-xs text-stone-500 font-semibold whitespace-nowrap">로스율 (%)</span>
+                      <input
+                        type="number"
+                        value={leatherLossRate}
+                        onChange={e => setLeatherLossRate(parseFloat(e.target.value) || 0)}
+                        className="w-20 border border-stone-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-amber-400"
+                        min={0} max={100}
+                      />
+                      <span className="text-xs text-stone-400">최종 = Net × (1 + 로스율/100)</span>
+                    </div>
                     <table className="w-full">
-                      <thead className="bg-amber-50 border-b border-stone-200">
+                      <thead className="bg-amber-50/60 border-b border-stone-200">
                         <tr>
-                          <th className={thCls} style={{width:'36%'}}>부위</th>
-                          <th className={thCls} style={{width:'18%'}}>가로 CM</th>
-                          <th className={thCls} style={{width:'18%'}}>세로 CM</th>
-                          <th className={thCls} style={{width:'14%'}}>수량</th>
-                          <th className={thCls} style={{width:'10%'}}></th>
+                          <th className={thCls} style={{width:'22%'}}>부위</th>
+                          <th className={thCls} style={{width:'10%'}}>가로 CM</th>
+                          <th className={thCls} style={{width:'10%'}}>세로 CM</th>
+                          <th className={thCls} style={{width:'10%'}}>가로(+0.5)</th>
+                          <th className={thCls} style={{width:'10%'}}>세로(+0.5)</th>
+                          <th className={thCls} style={{width:'8%'}}>수량</th>
+                          <th className={thCls} style={{width:'12%'}}>NET (S/F)</th>
+                          <th className={thCls} style={{width:'4%'}}></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {leatherRows.map((r) => (
-                          <tr key={r.id} className="border-b border-stone-100 hover:bg-stone-50">
-                            <td className={tdCls}><input className={inputCls} value={r.부위} onChange={e => updateLeather(r.id, '부위', e.target.value)} placeholder="바디" /></td>
-                            <td className={tdCls}><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => updateLeather(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
-                            <td className={tdCls}><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => updateLeather(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
-                            <td className={tdCls}><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => updateLeather(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
-                            <td className={tdCls + ' text-center'}>
-                              <button onClick={() => setLeatherRows(p => p.filter(x => x.id !== r.id))} className="text-stone-300 hover:text-red-400 text-lg leading-none">×</button>
-                            </td>
-                          </tr>
-                        ))}
+                        {leatherRows.map((r) => {
+                          const garo5 = r.가로 + 0.5;
+                          const sero5 = r.세로 + 0.5;
+                          const rowNet = garo5 * sero5 * r.수량 / 10000 * 10.764;
+                          return (
+                            <tr key={r.id} className="border-b border-stone-100 hover:bg-stone-50">
+                              <td className={tdCls}><input className={inputCls} value={r.부위} onChange={e => updateLeather(r.id, '부위', e.target.value)} placeholder="바디" /></td>
+                              <td className={tdCls}><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => updateLeather(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
+                              <td className={tdCls}><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => updateLeather(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
+                              <td className={tdCls}><input className={inputClsRO} value={garo5.toFixed(1)} readOnly /></td>
+                              <td className={tdCls}><input className={inputClsRO} value={sero5.toFixed(1)} readOnly /></td>
+                              <td className={tdCls}><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => updateLeather(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
+                              <td className={tdCls}><input className={inputClsRO + ' font-semibold text-amber-700'} value={rowNet.toFixed(3)} readOnly /></td>
+                              <td className={tdCls + ' text-center'}>
+                                <button onClick={() => setLeatherRows(p => p.filter(x => x.id !== r.id))} className="text-stone-300 hover:text-red-400 text-lg leading-none">×</button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                     <div className="p-3 flex items-center justify-between">
                       <button onClick={addLeatherRow} className="text-xs text-amber-600 hover:text-amber-800 font-semibold">+ 행 추가</button>
-                      <div className="text-right">
-                        <span className="text-xs text-stone-400 mr-3">Net 소요량</span>
-                        <span className="text-lg font-bold text-amber-700">{netSF.toFixed(2)} SF</span>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <span className="text-xs text-stone-400 mr-2">Net</span>
+                          <span className="text-base font-bold text-amber-600">{netSF.toFixed(3)} SF</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-stone-400 mr-2">최종 (+{leatherLossRate}%)</span>
+                          <span className="text-lg font-bold text-amber-700">{finalSF.toFixed(3)} SF</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -4693,17 +4896,30 @@ export default function BomManagement() {
                 {/* 원단 탭 */}
                 {yardageTab === 'fabric' && (
                   <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-                    <div className="flex items-center gap-3 px-4 py-2.5 bg-sky-50 border-b border-stone-200">
-                      <span className="text-xs text-stone-500 font-semibold whitespace-nowrap">원단 폭 (cm)</span>
-                      <input
-                        type="number"
-                        value={fabricWidth}
-                        onChange={e => setFabricWidth(parseFloat(e.target.value) || 150)}
-                        className="w-24 border border-stone-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-sky-400"
-                      />
+                    <div className="flex items-center gap-4 px-4 py-2.5 bg-sky-50 border-b border-stone-200 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-stone-500 font-semibold whitespace-nowrap">원단 폭 (cm)</span>
+                        <input
+                          type="number"
+                          value={fabricWidth}
+                          onChange={e => setFabricWidth(parseFloat(e.target.value) || 150)}
+                          className="w-24 border border-stone-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-sky-400"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-stone-500 font-semibold whitespace-nowrap">로스율 (%)</span>
+                        <input
+                          type="number"
+                          value={fabricLossRate}
+                          onChange={e => setFabricLossRate(parseFloat(e.target.value) || 0)}
+                          className="w-20 border border-stone-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-sky-400"
+                          min={0} max={100}
+                        />
+                      </div>
+                      <span className="text-xs text-stone-400">최종 = Net × (1 + 로스율/100)</span>
                     </div>
                     <table className="w-full">
-                      <thead className="bg-sky-50 border-b border-stone-200">
+                      <thead className="bg-sky-50/60 border-b border-stone-200">
                         <tr>
                           <th className={thCls} style={{width:'36%'}}>부위</th>
                           <th className={thCls} style={{width:'18%'}}>가로 CM</th>
@@ -4728,9 +4944,15 @@ export default function BomManagement() {
                     </table>
                     <div className="p-3 flex items-center justify-between">
                       <button onClick={addFabricRow} className="text-xs text-sky-600 hover:text-sky-800 font-semibold">+ 행 추가</button>
-                      <div className="text-right">
-                        <span className="text-xs text-stone-400 mr-3">Net 소요량</span>
-                        <span className="text-lg font-bold text-sky-700">{netYD.toFixed(2)} YD</span>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <span className="text-xs text-stone-400 mr-2">Net</span>
+                          <span className="text-base font-bold text-sky-600">{netYD.toFixed(3)} YD</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-stone-400 mr-2">최종 (+{fabricLossRate}%)</span>
+                          <span className="text-lg font-bold text-sky-700">{finalYD.toFixed(3)} YD</span>
+                        </div>
                       </div>
                     </div>
                   </div>
