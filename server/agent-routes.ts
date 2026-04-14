@@ -195,7 +195,7 @@ router.post('/api/yardage/ocr', upload.single('image'), async (req: Request, res
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
+      model: 'claude-sonnet-4-5',
       max_tokens: 1024,
       messages: [{
         role: 'user',
@@ -206,14 +206,19 @@ router.post('/api/yardage/ocr', upload.single('image'), async (req: Request, res
           },
           {
             type: 'text',
-            text: `이 손글씨 이미지에서 가죽/원단 부위별 치수 정보를 추출해주세요.
-반드시 아래 JSON 형식으로만 응답하세요 (설명 없이 JSON만):
-{
-  "leather": [{"부위": "바디", "가로": 39.0, "세로": 20.0, "수량": 1}],
-  "fabric": [{"부위": "안감", "가로": 40.0, "세로": 21.0, "수량": 2}]
-}
-가죽(외피/걸감) 부위는 leather 배열에, 원단(안감/리닝/심지) 부위는 fabric 배열에 넣으세요.
-치수가 명확하지 않으면 합리적으로 추정하세요. 단위는 cm입니다.`,
+            text: `이 손글씨/도표 이미지에서 부위별 치수 정보를 모두 추출해주세요.
+
+중요: 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트나 설명을 추가하지 마세요.
+
+{"leather": [{"부위": "바디", "가로": 39.0, "세로": 20.0, "수량": 1}], "fabric": [{"부위": "안감", "가로": 40.0, "세로": 21.0, "수량": 2}]}
+
+규칙:
+- 가죽/외피/걸감/우라(가죽) → leather 배열
+- 원단/안감/리닝/심지/우라(원단) → fabric 배열
+- 구분이 명확하지 않으면 leather에 넣기
+- 가로×세로 형식이면 작은 수가 가로, 큰 수가 세로
+- 수량이 없으면 기본값 1
+- 배열이 비어있어도 두 키 모두 포함할 것`,
           },
         ],
       }],
