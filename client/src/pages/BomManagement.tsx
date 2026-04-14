@@ -4768,7 +4768,6 @@ export default function BomManagement() {
 
             const applyToBom = () => {
               if (!editBom) return;
-              const colorBom = activeColorBom;
               const updateLines = (lines: ExtBomLine[]) =>
                 lines.map(l => {
                   const unit = (l.customUnit || l.unit || '').toUpperCase();
@@ -4776,17 +4775,33 @@ export default function BomManagement() {
                   if (unit === 'YD') return { ...l, netQty: Math.ceil(finalYD * 100) / 100 };
                   return l;
                 });
-              if (colorBom) {
-                setEditBom(prev => prev ? {
-                  ...prev,
-                  colorBoms: (prev.colorBoms || []).map(cb =>
-                    cb.color === colorBom.color ? { ...cb, lines: updateLines(cb.lines) } : cb
-                  ),
-                } : prev);
+              
+              if (mainTab === 'post') {
+                // 사후원가 탭 활성화 시 → postColorBoms에 적용
+                const postColorBom = activePostColorBom;
+                if (postColorBom) {
+                  setEditBom(prev => prev ? {
+                    ...prev,
+                    postColorBoms: (prev.postColorBoms || []).map(cb =>
+                      cb.color === postColorBom.color ? { ...cb, lines: updateLines(cb.lines) } : cb
+                    ),
+                  } : prev);
+                }
               } else {
-                setEditBom(prev => prev ? { ...prev, lines: updateLines(prev.lines) } : prev);
+                // 사전원가 탭 활성화 시 → colorBoms에 적용
+                const colorBom = activeColorBom;
+                if (colorBom) {
+                  setEditBom(prev => prev ? {
+                    ...prev,
+                    colorBoms: (prev.colorBoms || []).map(cb =>
+                      cb.color === colorBom.color ? { ...cb, lines: updateLines(cb.lines) } : cb
+                    ),
+                  } : prev);
+                } else {
+                  setEditBom(prev => prev ? { ...prev, lines: updateLines(prev.lines) } : prev);
+                }
               }
-              toast.success('BOM에 소요량이 적용되었습니다');
+              toast.success(`${mainTab === 'post' ? '사후원가' : '사전원가'} BOM에 소요량이 적용되었습니다`);
             };
 
             const thCls = 'text-[11px] text-stone-500 font-semibold text-center py-2 px-2';
