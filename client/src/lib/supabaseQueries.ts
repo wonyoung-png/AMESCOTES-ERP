@@ -126,6 +126,7 @@ export function convertBomFromDB(row: any) {
     exchangeRateCny: row.exchange_rate_cny ?? 191,
     preExchangeRateCny: row.pre_exchange_rate_cny ?? row.exchange_rate_cny ?? 191,
     postExchangeRateCny: row.post_exchange_rate_cny ?? row.exchange_rate_cny ?? 191,
+    exchangeRateUsd: row.exchange_rate_usd ?? undefined,
     snapshotCnyKrw: row.exchange_rate_cny ?? 191,
     customsRate: row.customs_rate ?? 0,
     productionMarginRate: row.production_margin_rate ?? 0.16,

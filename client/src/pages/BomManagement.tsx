@@ -4511,6 +4511,7 @@ export default function BomManagement() {
               {(() => {
                 const ps = calcPostSummary(editBom, settings.usdKrw, activePostColorBom);
                 const postCur = editBom.currency || 'CNY';
+                const postUsdKrwSummary = editBom.exchangeRateUsd || settings.usdKrw;
                 const linkedItem = items.find(i => i.id === editBom.styleId);
                 // 생산마진 계산 (사전원가와 동일 구조)
                 const postMarginRate = editBom.productionMarginRate ?? 0;
@@ -4556,7 +4557,12 @@ export default function BomManagement() {
                           <td className="px-4 py-3 font-bold text-amber-600">🏭</td>
                           <td className="px-4 py-3 font-bold text-stone-800">공장단가</td>
                           <td className="px-4 py-3 text-stone-500 text-[11px]">공장구매자재 + 임가공 + 후가공 (관세 제외, 공장 결제금액)</td>
-                          <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">{fmtKrw(ps.factoryUnitCostKrw)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">
+                            {fmtKrw(ps.factoryUnitCostKrw)}
+                            {postCur !== 'KRW' && ps.factoryUnitCostKrw > 0 && postUsdKrwSummary > 0 && (
+                              <div className="text-[10px] text-stone-400 font-normal mt-0.5">${(ps.factoryUnitCostKrw / postUsdKrwSummary).toFixed(2)}</div>
+                            )}
+                          </td>
                         </tr>
                         {/* 5. 관세 (율 > 0일 때만) */}
                         {/* 관세율 - 직접 입력 */}
