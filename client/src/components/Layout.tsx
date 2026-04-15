@@ -79,6 +79,9 @@ const navGroups: NavGroup[] = [
   },
 ];
 
+// MD 목업 버튼 — 사이드바 하단 고정
+const MD_MOCKUP_PATH = '/md-mockup';
+
 // 하단 탭바용 주요 메뉴 (모바일)
 const bottomTabs = [
   { path: '/samples', label: '샘플', icon: <FlaskConical size={20} /> },
@@ -194,6 +197,20 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             </div>
           ))}
         </nav>
+
+        {/* MD 대시보드 초안 버튼 */}
+        <div className="px-2 pb-2">
+          <a
+            href={MD_MOCKUP_PATH}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${collapsed ? 'justify-center' : ''}`}
+            style={{ background: 'rgba(201,169,110,0.15)', color: '#C9A96E', border: '1px solid rgba(201,169,110,0.3)' }}
+          >
+            <span style={{ fontSize: 14 }}>📊</span>
+            {!collapsed && <span>MD 대시보드 초안</span>}
+          </a>
+        </div>
 
         {/* 사용자 / 로그아웃 */}
         <div className="px-2 py-3 border-t border-white/8 space-y-1">
