@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AMESCOTES MD 성과 분석</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans KR', sans-serif; background: #F7F5F2; font-size: 13px; color: #1C1C1E; }
+
+/* 헤더 */
+.header { background: #1C1C1E; padding: 0 28px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+.logo { color: #C9A96E; font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }
+.badge { color: #9CA3AF; font-size: 10px; border: 1px solid #374151; border-radius: 4px; padding: 2px 8px; margin-left: 12px; }
+.channels { display: flex; align-items: center; gap: 8px; }
+.ch { color: #9CA3AF; font-size: 11px; cursor: pointer; padding: 4px 10px; border-radius: 6px; }
+.ch.active { background: #374151; }
+.date-btn { background: #C9A96E; color: #fff; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; }
+
+/* 공식 바 */
+.formula-bar { background: #2D2D2F; padding: 7px 28px; display: flex; gap: 28px; flex-wrap: wrap; font-size: 10px; color: #9CA3AF; }
+.formula-bar span.key { color: #C9A96E; font-weight: 600; }
+.formula-bar .date-note { margin-left: auto; }
+
+/* 메인 컨텐츠 */
+.content { padding: 20px 28px; max-width: 1400px; margin: 0 auto; }
+
+/* KPI 카드 */
+.kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+.kpi-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px 16px; position: relative; }
+.kpi-card.gold { background: #FDF8F0; border-color: #C9A96E; }
+.kpi-label { font-size: 10px; color: #6B7280; margin-bottom: 6px; }
+.kpi-value { font-size: 20px; font-weight: 700; color: #1C1C1E; line-height: 1; }
+.kpi-card.gold .kpi-value { color: #C9A96E; }
+.kpi-sub { font-size: 10px; color: #9CA3AF; margin-top: 4px; }
+.kpi-badge { position: absolute; top: 10px; right: 10px; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+.badge-green { background: #D1FAE5; color: #065F46; }
+.badge-gold { background: #E8D5B0; color: #92400E; }
+.badge-red { background: #FEE2E2; color: #991B1B; }
+
+/* 차트 */
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.chart-box { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 18px; }
+.chart-title { font-size: 12px; font-weight: 600; margin-bottom: 14px; }
+.chart-title span { font-size: 10px; color: #9CA3AF; font-weight: 400; }
+
+/* 테이블 */
+.table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.table-title { font-size: 14px; font-weight: 700; }
+.table-sub { font-size: 11px; color: #9CA3AF; margin-left: 8px; }
+.table-note { font-size: 10px; color: #9CA3AF; }
+.table-wrap { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden; margin-bottom: 20px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 900px; }
+thead tr { background: #FAFAFA; border-bottom: 1px solid #E5E7EB; }
+th { padding: 9px 12px; text-align: right; font-size: 10px; font-weight: 600; color: #6B7280; white-space: nowrap; }
+th:first-child { text-align: left; }
+th.gold-th { color: #C9A96E; font-weight: 700; }
+tbody tr { border-bottom: 1px solid #F3F4F6; }
+tbody tr:hover { background: #FAFAFA; }
+td { padding: 10px 12px; text-align: right; font-size: 12px; white-space: nowrap; }
+td:first-child { text-align: left; }
+tfoot tr { background: #FAFAFA; border-top: 2px solid #E5E7EB; }
+tfoot td { font-weight: 700; font-size: 12px; }
+
+.rank-circle { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; margin-right: 8px; flex-shrink: 0; }
+.product-name { font-weight: 600; font-size: 12px; }
+.product-code { font-size: 10px; color: #9CA3AF; }
+.matrix-tag { font-weight: 600; font-size: 10px; }
+
+.mini-bar-wrap { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.mini-bar-bg { width: 48px; height: 4px; background: #F3F4F6; border-radius: 2px; flex-shrink: 0; }
+.mini-bar-fill { height: 100%; border-radius: 2px; }
+
+/* 하단 */
+.bottom-grid { display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
+.matrix-box { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 18px; }
+.matrix-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.matrix-desc { font-size: 10px; color: #9CA3AF; margin-bottom: 14px; }
+.matrix-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.matrix-cell { border-radius: 10px; padding: 12px; }
+.matrix-cell-title { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+.matrix-cell-desc { font-size: 10px; color: #6B7280; margin-bottom: 6px; }
+.matrix-cell-items { font-size: 11px; font-weight: 600; color: #374151; }
+
+.summary-box { background: #fff; border: 1px solid #E5E7EB; border-radius: 12px; padding: 18px; }
+.summary-title { font-size: 14px; font-weight: 700; margin-bottom: 14px; }
+.summary-badge { font-size: 10px; background: #E8D5B0; color: #92400E; border-radius: 4px; padding: 2px 6px; margin-left: 6px; }
+.summary-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #F3F4F6; }
+.summary-key { font-size: 11px; color: #6B7280; }
+.summary-val { font-size: 12px; font-weight: 700; }
+.pdf-btn { margin-top: 14px; background: #C9A96E; color: #fff; border-radius: 8px; padding: 10px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; border: none; width: 100%; }
+
+@media (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .chart-grid { grid-template-columns: 1fr; }
+  .bottom-grid { grid-template-columns: 1fr; }
+  .content { padding: 14px; }
+  .header { padding: 0 14px; flex-wrap: wrap; height: auto; gap: 8px; padding-top: 10px; padding-bottom: 10px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="header">
+  <div style="display:flex;align-items:center;">
+    <span class="logo">AMESCOTES</span>
+    <span class="badge">MD 성과 분석 초안</span>
+  </div>
+  <div class="channels">
+    <span class="ch active">자사몰</span>
+    <span class="ch">쿠팡</span>
+    <span class="ch">네이버</span>
+    <span class="ch">카카오</span>
+    <button class="date-btn">2026년 4월</button>
+  </div>
+</div>
+
+<!-- 공식 바 -->
+<div class="formula-bar">
+  <span><span class="key">매출구성비</span> = 상품매출 ÷ 총매출 × 100</span>
+  <span><span class="key">GMROI</span> = 이익률 × 재고회전율</span>
+  <span><span class="key">공헌도</span> = 매출구성비 × GMROI</span>
+  <span class="date-note">기준: 2026년 4월 · 자사몰</span>
+</div>
+
+<div class="content">
+
+  <!-- KPI 카드 -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- 차트 -->
+  <div class="chart-grid">
+    <div class="chart-box">
+      <div class="chart-title">상품별 매출구성비 (%)</div>
+      <canvas id="barChart" height="190"></canvas>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">GMROI × 매출구성비 버블차트 <span>(원 크기 = 공헌도)</span></div>
+      <canvas id="bubbleChart" height="190"></canvas>
+    </div>
+  </div>
+
+  <!-- 테이블 -->
+  <div class="table-header">
+    <div>
+      <span class="table-title">상품별 MD 성과 분석</span>
+      <span class="table-sub">공헌도 내림차순 · 4월 자사몰 기준</span>
+    </div>
+    <span class="table-note">★ 강조 열 = 핵심 지표 (매출구성비 · GMROI · 공헌도)</span>
+  </div>
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th>상품명</th>
+          <th>판매가</th>
+          <th>원가</th>
+          <th>판매수량</th>
+          <th>매출액</th>
+          <th>이익률</th>
+          <th class="gold-th">매출구성비</th>
+          <th class="gold-th">GMROI</th>
+          <th class="gold-th">공헌도</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+      <tfoot id="tableFoot"></tfoot>
+    </table>
+  </div>
+
+  <!-- 하단 -->
+  <div class="bottom-grid">
+    <div class="matrix-box">
+      <div class="matrix-title">GMROI × 매출구성비 포지셔닝 매트릭스</div>
+      <div class="matrix-desc">기준: GMROI 0.4 / 매출구성비 15%</div>
+      <div class="matrix-4" id="matrixGrid"></div>
+    </div>
+    <div class="summary-box">
+      <div class="summary-title">월 요약 <span class="summary-badge">26SS 4월</span></div>
+      <div id="summaryRows"></div>
+      <button class="pdf-btn" onclick="window.print()">📊 리포트 PDF 출력</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const GOLD = '#C9A96E';
+
+const RAW = [
+  { name: '파니에 쁘띠_탄브라운', code: 'A25-001', price: 218000, cost: 60000, qty: 100, ad: 1000000, shipping: 4000, inv: 500 },
+  { name: '스퀘어넥 원피스_블랙', code: 'A25-002', price: 185000, cost: 52000, qty: 130, ad: 800000, shipping: 4000, inv: 400 },
+  { name: '플리츠 스커트_아이보리', code: 'A25-003', price: 145000, cost: 38000, qty: 80, ad: 400000, shipping: 4000, inv: 200 },
+  { name: '린넨 팬츠_베이지', code: 'A25-004', price: 132000, cost: 35000, qty: 95, ad: 350000, shipping: 4000, inv: 180 },
+  { name: '트위드 재킷_크림', code: 'A25-005', price: 298000, cost: 95000, qty: 55, ad: 1200000, shipping: 4000, inv: 300 },
+  { name: '니트 가디건_그레이', code: 'A25-006', price: 168000, cost: 48000, qty: 110, ad: 900000, shipping: 4000, inv: 350 },
+  { name: '슬리브리스_화이트', code: 'A25-007', price: 98000, cost: 28000, qty: 75, ad: 300000, shipping: 4000, inv: 150 },
+  { name: '벨벳 블라우스_버건디', code: 'A25-008', price: 125000, cost: 42000, qty: 40, ad: 600000, shipping: 4000, inv: 250 },
+  { name: '와이드 데님_인디고', code: 'A25-009', price: 158000, cost: 55000, qty: 62, ad: 700000, shipping: 4000, inv: 220 },
+  { name: '미디 스커트_카키', code: 'A25-010', price: 118000, cost: 33000, qty: 100, ad: 450000, shipping: 4000, inv: 280 },
+];
+
+const TOTAL_REVENUE = RAW.reduce((s, p) => s + p.price * p.qty, 0);
+
+const data = RAW.map(p => {
+  const revenue = p.price * p.qty;
+  const variable = p.cost * p.qty + p.ad + p.shipping * p.qty;
+  const profit = revenue - variable;
+  const profitRate = profit / revenue * 100;
+  const invValue = p.inv * p.cost;
+  const turnover = invValue > 0 ? revenue / invValue : 0;
+  const gmroi = (profitRate / 100) * turnover;
+  const salesShare = revenue / TOTAL_REVENUE * 100;
+  const contribution = salesShare * gmroi;
+  return { ...p, revenue, profit, profitRate, invValue, turnover, gmroi, salesShare, contribution };
+}).sort((a, b) => b.contribution - a.contribution);
+
+const fmt = n => n.toLocaleString('ko-KR');
+const fmtP = n => n.toFixed(2) + '%';
+const fmtN = n => n.toFixed(3);
+
+function matrixCell(d) {
+  if (d.salesShare >= 15 && d.gmroi >= 0.4) return 'STAR';
+  if (d.salesShare < 15 && d.gmroi >= 0.4) return 'CASH';
+  if (d.salesShare >= 15 && d.gmroi < 0.4) return 'INVEST';
+  return 'DROP';
+}
+const MATRIX_COLOR = { STAR: '#F59E0B', CASH: '#10B981', INVEST: '#3B82F6', DROP: '#EF4444' };
+
+// KPI 카드
+const totalProfit = data.reduce((s, r) => s + r.profit, 0);
+const avgGmroi = data.reduce((s, r) => s + r.gmroi, 0) / data.length;
+const avgTurnover = data.reduce((s, r) => s + r.turnover, 0) / data.length;
+
+const kpis = [
+  { label: '월 총 매출', value: '1억', sub: fmt(TOTAL_REVENUE)+'원', badge: '▲ 12%', badgeClass: 'badge-green', gold: false },
+  { label: '총 판매수량', value: fmt(data.reduce((s,r)=>s+r.qty,0))+'개', sub: '전월 대비', badge: '▲ 8%', badgeClass: 'badge-green', gold: false },
+  { label: '총 공헌이익', value: Math.round(totalProfit/10000)+'만', sub: '이익률 '+fmtP(totalProfit/TOTAL_REVENUE*100), badge: '▲ 3%', badgeClass: 'badge-green', gold: false },
+  { label: '★ 최고 공헌도', value: fmtN(data[0].contribution), sub: data[0].name.slice(0,8)+'…', badge: '1위', badgeClass: 'badge-gold', gold: true },
+  { label: '★ 평균 GMROI', value: fmtN(avgGmroi), sub: '전월 0.398 대비', badge: '▲ 5.8%', badgeClass: 'badge-gold', gold: true },
+  { label: '★ 재고효율전율', value: fmtN(avgTurnover), sub: '목표 0.8 대비', badge: '▼ 20%', badgeClass: 'badge-red', gold: true },
+];
+const kpiGrid = document.getElementById('kpiGrid');
+kpis.forEach(k => {
+  kpiGrid.innerHTML += `
+    <div class="kpi-card ${k.gold?'gold':''}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+      <span class="kpi-badge ${k.badgeClass}">${k.badge}</span>
+    </div>`;
+});
+
+// 테이블
+const rankColors = ['#C9A96E','#9CA3AF','#D97706'];
+const maxShare = Math.max(...data.map(d=>d.salesShare));
+const maxGmroi = Math.max(...data.map(d=>d.gmroi));
+const maxContrib = Math.max(...data.map(d=>d.contribution));
+const tbody = document.getElementById('tableBody');
+data.forEach((r, i) => {
+  const cell = matrixCell(r);
+  const rc = rankColors[i] ?? '#E5E7EB';
+  const profitColor = r.profitRate >= 60 ? '#059669' : r.profitRate < 40 ? '#DC2626' : '#1C1C1E';
+  tbody.innerHTML += `
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;">
+          <div class="rank-circle" style="background:${rc}">${i+1}</div>
+          <div>
+            <div class="product-name">${r.name}</div>
+            <div class="product-code">${r.code} · <span class="matrix-tag" style="color:${MATRIX_COLOR[cell]}">${cell}</span></div>
+          </div>
+        </div>
+      </td>
+      <td>${fmt(r.price)}원</td>
+      <td>${fmt(r.cost)}원</td>
+      <td>${r.qty}개</td>
+      <td>${fmt(r.revenue)}원</td>
+      <td style="color:${profitColor};font-weight:${r.profitRate>=60?600:400}">${fmtP(r.profitRate)}</td>
+      <td>
+        <div class="mini-bar-wrap">
+          <span style="font-weight:700;color:${GOLD}">${fmtP(r.salesShare)}</span>
+          <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${r.salesShare/maxShare*100}%;background:${GOLD}"></div></div>
+        </div>
+      </td>
+      <td>
+        <div class="mini-bar-wrap">
+          <span style="font-weight:700;color:#3B82F6">${fmtN(r.gmroi)}</span>
+          <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${r.gmroi/maxGmroi*100}%;background:#3B82F6"></div></div>
+        </div>
+      </td>
+      <td>
+        <div class="mini-bar-wrap">
+          <span style="font-weight:700;font-size:13px">${fmtN(r.contribution)}</span>
+          <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${r.contribution/maxContrib*100}%;background:#10B981"></div></div>
+        </div>
+      </td>
+    </tr>`;
+});
+document.getElementById('tableFoot').innerHTML = `
+  <tr>
+    <td colspan="4" style="padding:9px 12px">합계</td>
+    <td>${fmt(data.reduce((s,r)=>s+r.revenue,0))}원</td>
+    <td>${fmtP(totalProfit/TOTAL_REVENUE*100)}</td>
+    <td style="color:${GOLD}">${fmtP(data.reduce((s,r)=>s+r.salesShare,0))}</td>
+    <td></td><td></td>
+  </tr>`;
+
+// 바차트
+new Chart(document.getElementById('barChart'), {
+  type: 'bar',
+  data: {
+    labels: data.map(d => d.name.length > 9 ? d.name.slice(0,9)+'…' : d.name),
+    datasets: [{
+      data: data.map(d => d.salesShare),
+      backgroundColor: data.map((_, i) => i < 2 ? GOLD : '#E5E7EB'),
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtP(ctx.raw) } } },
+    scales: {
+      x: { ticks: { font: { size: 9 } } },
+      y: { ticks: { font: { size: 9 }, callback: v => v.toFixed(1)+'%' } }
+    }
+  }
+});
+
+// 버블차트
+new Chart(document.getElementById('bubbleChart'), {
+  type: 'bubble',
+  data: {
+    datasets: [{
+      data: data.map(d => ({ x: d.salesShare, y: d.gmroi, r: Math.max(5, d.contribution * 4), name: d.name })),
+      backgroundColor: GOLD+'B3',
+      borderColor: GOLD,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: {
+        label: ctx => {
+          const d = ctx.raw;
+          return `${data[ctx.dataIndex].name} | 매출구성비: ${fmtP(d.x)} | GMROI: ${fmtN(d.y)}`;
+        }
+      }}
+    },
+    scales: {
+      x: { title: { display: true, text: '매출구성비(%)', font: { size: 9 } }, ticks: { font: { size: 9 }, callback: v => v.toFixed(1)+'%' } },
+      y: { title: { display: true, text: 'GMROI', font: { size: 9 } }, ticks: { font: { size: 9 } } }
+    }
+  }
+});
+
+// 매트릭스
+const QUADRANTS = [
+  { key:'STAR', emoji:'⭐', label:'STAR — 핵심 상품', bg:'#FFF8E1', border:'#FCD34D', color:'#D97706', desc:'높은 수익성 + 높은 매출 기여. 지속 투자.' },
+  { key:'CASH', emoji:'💰', label:'CASH COW — 수익 효자', bg:'#F0FDF4', border:'#86EFAC', color:'#059669', desc:'수익성 좋으나 구성비 낮음. 판매량 확대 필요.' },
+  { key:'INVEST', emoji:'🔵', label:'INVEST — 육성 필요', bg:'#EFF6FF', border:'#93C5FD', color:'#2563EB', desc:'구성비는 높으나 수익성 개선 필요. 비용 점검.' },
+  { key:'DROP', emoji:'🔴', label:'DROP — 재검토', bg:'#FEF2F2', border:'#FCA5A5', color:'#DC2626', desc:'수익성·구성비 모두 낮음. 할인·단종 검토.' },
+];
+const mg = document.getElementById('matrixGrid');
+QUADRANTS.forEach(q => {
+  const items = data.filter(d => matrixCell(d) === q.key);
+  mg.innerHTML += `
+    <div class="matrix-cell" style="background:${q.bg};border:1px solid ${q.border}">
+      <div class="matrix-cell-title" style="color:${q.color}">${q.emoji} ${q.label}</div>
+      <div class="matrix-cell-desc">${q.desc}</div>
+      <div class="matrix-cell-items">${items.map(d=>d.name.slice(0,8)).join(', ') || '해당 없음'}</div>
+    </div>`;
+});
+
+// 요약
+const summaryData = [
+  { k:'총 매출', v:fmt(TOTAL_REVENUE)+'원', c:'#1C1C1E' },
+  { k:'총 공헌이익', v:fmt(Math.round(totalProfit))+'원', c:'#059669' },
+  { k:'평균 이익률', v:fmtP(totalProfit/TOTAL_REVENUE*100), c:'#1C1C1E' },
+  { k:'평균 GMROI', v:fmtN(avgGmroi), c:GOLD },
+  { k:'평균 재고회전율', v:fmtN(avgTurnover), c:'#1C1C1E' },
+  { k:'STAR 상품 수', v:data.filter(d=>matrixCell(d)==='STAR').length+'개', c:'#059669' },
+  { k:'재검토 상품 수', v:data.filter(d=>matrixCell(d)==='DROP').length+'개', c:'#DC2626' },
+];
+const sr = document.getElementById('summaryRows');
+summaryData.forEach(s => {
+  sr.innerHTML += `<div class="summary-row"><span class="summary-key">${s.k}</span><span class="summary-val" style="color:${s.c}">${s.v}</span></div>`;
+});
+</script>
+</body>
+</html>

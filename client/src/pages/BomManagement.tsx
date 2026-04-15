@@ -1636,13 +1636,15 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
   );
 }
 
-function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재', accentColor = 'amber' }: {
+function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재', accentColor = 'amber', showUsdHint = false, usdKrw = 1380 }: {
   line: ExtBomLine;
   onChange: (id: string, field: keyof ExtBomLine, val: unknown) => void;
   onDelete: (id: string) => void;
   cnyKrw: number;
   sectionKey?: string;
   accentColor?: 'amber' | 'blue';
+  showUsdHint?: boolean;
+  usdKrw?: number;
 }) {
   const computedQty = calcQty(line.netQty, line.lossRate);
   const qty = line.manualQty !== undefined ? line.manualQty : computedQty;
@@ -1848,7 +1850,12 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
       {/* 제조금액 */}
       <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">{fmt(amt)}</td>
       {/* KRW */}
-      <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmtKrw(amt * cnyKrw)}</td>
+      <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">
+        {fmtKrw(amt * cnyKrw)}
+        {showUsdHint && amt > 0 && usdKrw > 0 && (
+          <div className="text-[10px] text-stone-400 mt-0.5">${((amt * cnyKrw) / usdKrw).toFixed(2)}</div>
+        )}
+      </td>
       {/* 공급 상태 + 체크박스 (본사/업체/공장) */}
       <td className="px-2 py-1 w-28">
         <div className="flex flex-col items-center gap-1.5">
@@ -4424,6 +4431,8 @@ export default function BomManagement() {
                                     cnyKrw={postRate}
                                     sectionKey={cat}
                                     accentColor="amber"
+                                    showUsdHint={true}
+                                    usdKrw={postUsdKrw || 1380}
                                   />
                                 ))}
                               </React.Fragment>
