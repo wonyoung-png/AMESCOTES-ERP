@@ -1819,7 +1819,12 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
         </div>
       </td>
       {/* 단가 */}
-      <td className="px-1 py-1"><Input type="number" value={line.unitPriceCny || ''} onChange={e => onChange(line.id, 'unitPriceCny', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="0" /></td>
+      <td className="px-1 py-1">
+        <Input type="number" value={line.unitPriceCny || ''} onChange={e => onChange(line.id, 'unitPriceCny', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="0" />
+        {line.unitPriceCny > 0 && usdKrw > 0 && (
+          <div className="text-[10px] text-stone-400 text-right mt-0.5">₩{Math.round(line.unitPriceCny * cnyKrw).toLocaleString()}</div>
+        )}
+      </td>
       {/* NET 소요량 */}
       <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => onChange(line.id, 'netQty', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="0" /></td>
       {/* LOSS */}
@@ -1849,14 +1854,10 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
           )}
         </div>
       </td>
-      {/* 제조금액 */}
-      <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">{fmt(amt)}</td>
-      {/* KRW */}
-      <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">
-        {fmtKrw(amt * cnyKrw)}
-        {showUsdHint && amt > 0 && usdKrw > 0 && (
-          <div className="text-[10px] text-stone-400 mt-0.5">${((amt * cnyKrw) / usdKrw).toFixed(2)}</div>
-        )}
+      {/* 제조금액 (USD + KRW 통합) */}
+      <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">
+        <div>${((amt * cnyKrw) / (usdKrw || 1380)).toFixed(2)}</div>
+        {amt > 0 && <div className="text-[10px] text-stone-400 mt-0.5">{fmtKrw(amt * cnyKrw)}</div>}
       </td>
       {/* 공급 상태 + 체크박스 (본사/업체/공장) */}
       <td className="px-2 py-1 w-28">
@@ -3799,12 +3800,11 @@ export default function BomManagement() {
                           <th className="px-2 py-2 text-left">부위 | 자재명</th>
                           <th className="px-2 py-2 text-left w-20">규격</th>
                           <th className="px-2 py-2 text-center w-20">단위</th>
-                          <th className="px-2 py-2 text-right w-20">단가({curSymbol})</th>
+                          <th className="px-2 py-2 text-right w-24">단가(기준)/KRW</th>
                           <th className="px-2 py-2 text-right w-20">NET</th>
                           <th className="px-2 py-2 text-right w-16">LOSS(%)</th>
                           <th className="px-2 py-2 text-right w-24">소요량</th>
-                          <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
-                          <th className="px-2 py-2 text-right w-24">KRW</th>
+                          <th className="px-2 py-2 text-right w-28">제조금액</th>
                           <th className="px-2 py-2 text-center w-28">공급</th>
                           <th className="px-2 py-2 text-left w-36">자재업체</th>
                           <th className="px-2 py-2 w-8"></th>
@@ -4387,12 +4387,11 @@ export default function BomManagement() {
                             <th className="px-2 py-2 text-left">부위 | 자재명</th>
                             <th className="px-2 py-2 text-left w-20">규격</th>
                             <th className="px-2 py-2 text-center w-20">단위</th>
-                            <th className="px-2 py-2 text-right w-20">단가({curSymbol})</th>
+                            <th className="px-2 py-2 text-right w-24">단가(기준)/KRW</th>
                             <th className="px-2 py-2 text-right w-20">NET</th>
                             <th className="px-2 py-2 text-right w-16">LOSS(%)</th>
                             <th className="px-2 py-2 text-right w-24">소요량</th>
-                            <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
-                            <th className="px-2 py-2 text-right w-24">KRW</th>
+                            <th className="px-2 py-2 text-right w-28">제조금액</th>
                             <th className="px-2 py-2 text-center w-28">공급</th>
                             <th className="px-2 py-2 text-left w-36">자재업체</th>
                             <th className="px-2 py-2 w-8"></th>
