@@ -135,8 +135,8 @@ export function convertBomFromDB(row: any) {
     styleId: row.style_id || row.style_no, // style_id 컬럼 우선, 없으면 style_no로 fallback
     version: 1,
     logisticsCostKrw: row.logistics_cost_krw ?? 0,
-    packagingCostKrw: 0,
-    packingCostKrw: 0,
+    packagingCostKrw: row.packaging_cost_krw ?? 0,
+    packingCostKrw: row.packing_cost_krw ?? 0,
     pnl: { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 },
     createdAt: row.created_at,
     updatedAt: row.updated_at,

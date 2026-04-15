@@ -900,6 +900,8 @@ export const store = {
       post_materials: bom.postMaterials ?? [],
       post_processing_fee: bom.postProcessingFee ?? 0,
       logistics_cost_krw: bom.logisticsCostKrw ?? 0,
+      packaging_cost_krw: bom.packagingCostKrw ?? 0,
+      packing_cost_krw: bom.packingCostKrw ?? 0,
       production_margin_rate: bom.productionMarginRate ?? 0.16,
       customs_rate: bom.customsRate ?? 0,
       color_boms: bom.colorBoms ?? [],

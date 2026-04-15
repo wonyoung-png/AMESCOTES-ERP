@@ -420,6 +420,8 @@ function syncBomToSupabase(bom: ExtBom) {
       post_materials: bom.postMaterials ?? [],
       post_processing_fee: bom.postProcessingFee ?? 0,
       logistics_cost_krw: bom.logisticsCostKrw ?? 0,
+      packaging_cost_krw: bom.packagingCostKrw ?? 0,
+      packing_cost_krw: bom.packingCostKrw ?? 0,
       production_margin_rate: bom.productionMarginRate ?? 0.16,
       customs_rate: bom.customsRate ?? 0,
       color_boms: bom.colorBoms ?? [],
@@ -2102,7 +2104,15 @@ export default function BomManagement() {
             const sbTime = new Date(sb.updatedAt || sb.createdAt || 0).getTime();
             const localTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
             if (sbTime >= localTime) {
-              mergedMap.set(sb.id, sb as ExtBom);
+              // Supabase에 아직 컬럼이 없는 필드는 localStorage 값 보존
+              const merged: ExtBom = { ...sb as ExtBom };
+              if (!merged.packagingCostKrw && existing.packagingCostKrw) {
+                merged.packagingCostKrw = existing.packagingCostKrw;
+              }
+              if (!merged.packingCostKrw && existing.packingCostKrw) {
+                merged.packingCostKrw = existing.packingCostKrw;
+              }
+              mergedMap.set(sb.id, merged);
             }
             // localStorage가 더 최신이면 로컬 데이터 유지 (저장 대기 중인 미동기화 상태)
           }

@@ -81,6 +81,8 @@ create table if not exists boms (
   post_processing_fee numeric,
   delivery_price numeric,
   logistics_cost_krw numeric,
+  packaging_cost_krw numeric,
+  packing_cost_krw numeric,
   production_margin_rate numeric,
   memo text,
   created_at timestamptz default now(),
