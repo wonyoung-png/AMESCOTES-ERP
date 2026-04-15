@@ -25,6 +25,7 @@ import SalesManagement from "./pages/SalesManagement";
 import MaterialMaster from "./pages/MaterialMaster";
 import AgentPanel from "./pages/AgentPanel";
 import CostComparison from "./pages/CostComparison";
+import MDMockup from "./pages/MDMockup";
 import NotFound from "./pages/NotFound";
 
 function Router() {
@@ -34,15 +35,9 @@ function Router() {
   const handleLogin = () => forceUpdate(n => n + 1);
   const handleLogout = () => forceUpdate(n => n + 1);
 
-  // MD 목업은 로그인 없이 full-page로 접근 가능
+  // MD 목업 — 로그인 없이 full-page로 바로 접근
   if (window.location.pathname === '/md-mockup') {
-    return (
-      <iframe
-        src="/md-mockup.html"
-        style={{ width: '100vw', height: '100vh', border: 'none', display: 'block' }}
-        title="MD 대시보드 초안"
-      />
-    );
+    return <MDMockup />;
   }
 
   if (!isAuthenticated()) {
