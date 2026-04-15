@@ -29,10 +29,21 @@ import NotFound from "./pages/NotFound";
 
 function Router() {
   const [, forceUpdate] = useState(0);
-  useAutoExchangeRate(); // 매일 자동 환율 업데이트
+  useAutoExchangeRate();
 
   const handleLogin = () => forceUpdate(n => n + 1);
   const handleLogout = () => forceUpdate(n => n + 1);
+
+  // MD 목업은 로그인 없이 full-page로 접근 가능
+  if (window.location.pathname === '/md-mockup') {
+    return (
+      <iframe
+        src="/md-mockup.html"
+        style={{ width: '100vw', height: '100vh', border: 'none', display: 'block' }}
+        title="MD 대시보드 초안"
+      />
+    );
+  }
 
   if (!isAuthenticated()) {
     return <Login onLogin={handleLogin} />;
