@@ -25,6 +25,7 @@ import SalesManagement from "./pages/SalesManagement";
 import MaterialMaster from "./pages/MaterialMaster";
 import AgentPanel from "./pages/AgentPanel";
 import CostComparison from "./pages/CostComparison";
+import MDDashboard from "./pages/MDDashboard";
 import NotFound from "./pages/NotFound";
 
 function Router() {
@@ -58,6 +59,7 @@ function Router() {
         <Route path="/materials" component={MaterialMaster} />
         <Route path="/agent" component={AgentPanel} />
         <Route path="/cost-comparison" component={CostComparison} />
+        <Route path="/md-dashboard" component={MDDashboard} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
