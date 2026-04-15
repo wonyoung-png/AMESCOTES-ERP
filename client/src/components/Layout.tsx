@@ -10,7 +10,7 @@ import {
   BarChart3, Package, ClipboardList, FlaskConical, Factory,
   ShoppingCart, Building2, FileText, Receipt, CreditCard, Settings,
   ChevronLeft, ChevronRight, TrendingUp, DollarSign, LogOut, Layers,
-  Menu, X, MoreHorizontal, Bot, GitCompare, LayoutDashboard,
+  Menu, X, MoreHorizontal, Bot, GitCompare,
 } from 'lucide-react';
 import ChatWidget from './ChatWidget';
 
@@ -60,7 +60,6 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/trade-statement', label: '거래명세표', icon: <FileText size={17} /> },
       { path: '/sales', label: '매출 관리', icon: <TrendingUp size={17} /> },
-      { path: '/md-dashboard', label: 'MD 대시보드', icon: <LayoutDashboard size={17} /> },
       { path: '/settlement', label: '정산 / 미수금', icon: <Receipt size={17} /> },
       { path: '/expense', label: '지출 전표', icon: <CreditCard size={17} /> },
       { path: '/documents', label: '서류 출력', icon: <FileText size={17} /> },
