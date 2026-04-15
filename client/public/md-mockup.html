@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MD 대시보드 — AMESCOTES</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --gold: #C9A96E;
+      --gold-light: #E8D5B0;
+      --gold-bg: #FDF8F0;
+      --dark: #1C1C1E;
+      --gray: #6B7280;
+      --gray-light: #F3F4F6;
+      --border: #E5E7EB;
+      --white: #FFFFFF;
+      --green: #10B981;
+      --red: #EF4444;
+      --blue: #3B82F6;
+    }
+    body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; background: #F7F5F2; color: var(--dark); font-size: 13px; }
+
+    /* ── 헤더 ── */
+    .header {
+      background: var(--dark);
+      padding: 0 28px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .logo { font-size: 15px; font-weight: 700; color: var(--gold); letter-spacing: 0.5px; }
+    .header-badge {
+      font-size: 10px; color: #9CA3AF;
+      border: 1px solid #374151;
+      border-radius: 4px; padding: 2px 8px;
+    }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .header-select {
+      background: #374151; color: #E5E7EB;
+      border: 1px solid #4B5563; border-radius: 6px;
+      padding: 5px 10px; font-size: 12px; cursor: pointer;
+      outline: none;
+    }
+    .header-btn {
+      background: var(--gold); color: var(--white);
+      border: none; border-radius: 6px;
+      padding: 6px 14px; font-size: 12px; font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* ── 필터 바 ── */
+    .filter-bar {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 28px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .filter-label { font-size: 11px; color: var(--gray); font-weight: 500; }
+    .filter-chip {
+      border: 1px solid var(--border); border-radius: 20px;
+      padding: 4px 12px; font-size: 11px; color: var(--gray);
+      cursor: pointer; background: var(--white); transition: all 0.15s;
+    }
+    .filter-chip.active {
+      background: var(--gold); border-color: var(--gold);
+      color: var(--white); font-weight: 600;
+    }
+    .filter-divider { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
+    .month-input {
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 4px 10px; font-size: 11px; color: var(--dark);
+      outline: none; cursor: pointer;
+    }
+    .month-input:focus { border-color: var(--gold); }
+
+    /* ── 메인 레이아웃 ── */
+    .main { padding: 20px 28px; max-width: 1400px; margin: 0 auto; }
+
+    /* ── KPI 카드 ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+    .kpi-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px 16px;
+      position: relative; overflow: hidden;
+    }
+    .kpi-card.highlight { border-color: var(--gold); background: var(--gold-bg); }
+    .kpi-card .kpi-label { font-size: 10px; color: var(--gray); font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
+    .kpi-card .kpi-value { font-size: 22px; font-weight: 700; color: var(--dark); line-height: 1; }
+    .kpi-card.highlight .kpi-value { color: var(--gold); }
+    .kpi-card .kpi-sub { font-size: 10px; color: var(--gray); margin-top: 4px; }
+    .kpi-card .kpi-badge {
+      position: absolute; top: 12px; right: 12px;
+      font-size: 10px; padding: 2px 6px; border-radius: 4px;
+      font-weight: 600;
+    }
+    .badge-up { background: #D1FAE5; color: #065F46; }
+    .badge-down { background: #FEE2E2; color: #991B1B; }
+    .badge-gold { background: var(--gold-light); color: #92400E; }
+
+    /* ── 섹션 헤더 ── */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .section-title { font-size: 14px; font-weight: 700; color: var(--dark); }
+    .section-sub { font-size: 11px; color: var(--gray); margin-left: 6px; font-weight: 400; }
+    .view-btn {
+      font-size: 11px; color: var(--gold); border: 1px solid var(--gold-light);
+      border-radius: 6px; padding: 4px 10px; cursor: pointer; background: var(--gold-bg);
+    }
+
+    /* ── 차트 행 ── */
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+    .chart-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px; overflow: hidden;
+    }
+    .chart-title { font-size: 12px; font-weight: 600; color: var(--dark); margin-bottom: 14px; }
+    .chart-wrap { height: 200px; position: relative; }
+
+    /* ── 메인 테이블 ── */
+    .table-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden; margin-bottom: 20px;
+    }
+    .table-toolbar {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .sort-hint { font-size: 10px; color: var(--gray); }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: #FAFAFA; border-bottom: 1px solid var(--border); }
+    th {
+      padding: 9px 14px; text-align: right;
+      font-size: 10px; font-weight: 600; color: var(--gray);
+      white-space: nowrap;
+    }
+    th:first-child { text-align: left; }
+    th.highlight-col { color: var(--gold); }
+    tbody tr { border-bottom: 1px solid #F3F4F6; transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--gold-bg); }
+    td { padding: 11px 14px; text-align: right; font-size: 12px; }
+    td:first-child { text-align: left; }
+    .product-cell { display: flex; align-items: center; gap: 10px; }
+    .rank-badge {
+      width: 20px; height: 20px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; flex-shrink: 0;
+    }
+    .rank-1 { background: var(--gold); color: white; }
+    .rank-2 { background: #9CA3AF; color: white; }
+    .rank-3 { background: #D97706; color: white; }
+    .rank-n { background: var(--gray-light); color: var(--gray); }
+    .product-name { font-weight: 600; color: var(--dark); font-size: 12px; }
+    .product-code { font-size: 10px; color: var(--gray); }
+    .bar-cell { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+    .bar-track {
+      width: 60px; height: 5px; background: #F3F4F6;
+      border-radius: 3px; overflow: hidden; flex-shrink: 0;
+    }
+    .bar-fill { height: 100%; border-radius: 3px; }
+    .bar-gold { background: var(--gold); }
+    .bar-blue { background: var(--blue); }
+    .bar-green { background: var(--green); }
+    .highlight-val { font-weight: 700; color: var(--gold); }
+    .positive { color: var(--green); font-weight: 600; }
+    .negative { color: var(--red); font-weight: 600; }
+
+    /* ── 하단 분석 블록 ── */
+    .bottom-row { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+    @media (max-width: 900px) { .bottom-row { grid-template-columns: 1fr; } }
+
+    /* ── 매트릭스 인사이트 ── */
+    .matrix-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px;
+    }
+    .matrix-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .matrix-cell {
+      border-radius: 10px; padding: 12px;
+      border: 1px solid var(--border);
+    }
+    .matrix-cell.star { background: #FFF8E1; border-color: #FCD34D; }
+    .matrix-cell.cash { background: #F0FDF4; border-color: #86EFAC; }
+    .matrix-cell.invest { background: #EFF6FF; border-color: #93C5FD; }
+    .matrix-cell.drop { background: #FEF2F2; border-color: #FCA5A5; }
+    .matrix-label { font-size: 10px; font-weight: 700; margin-bottom: 6px; }
+    .matrix-products { font-size: 11px; color: var(--gray); }
+    .matrix-cell.star .matrix-label { color: #D97706; }
+    .matrix-cell.cash .matrix-label { color: #059669; }
+    .matrix-cell.invest .matrix-label { color: #2563EB; }
+    .matrix-cell.drop .matrix-label { color: #DC2626; }
+    .matrix-axis {
+      display: flex; justify-content: space-between;
+      font-size: 9px; color: var(--gray); margin-top: 6px;
+    }
+
+    /* ── 요약 사이드 ── */
+    .summary-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px;
+    }
+    .summary-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #F3F4F6; }
+    .summary-item:last-child { border-bottom: none; }
+    .summary-key { font-size: 11px; color: var(--gray); }
+    .summary-val { font-size: 12px; font-weight: 700; color: var(--dark); }
+    .action-btn {
+      width: 100%; margin-top: 14px;
+      background: var(--gold); color: white;
+      border: none; border-radius: 8px;
+      padding: 10px; font-size: 12px; font-weight: 600;
+      cursor: pointer;
+    }
+    .tag { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 4px; margin-left: 4px; }
+    .tag-gold { background: var(--gold-light); color: #92400E; }
+
+    /* ── 설명 오버레이 ── */
+    .formula-bar {
+      background: var(--dark); color: #9CA3AF;
+      font-size: 10px; padding: 8px 28px;
+      display: flex; gap: 24px; flex-wrap: wrap;
+    }
+    .formula-item span { color: var(--gold); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">AMESCOTES</div>
+    <div class="header-badge">MD 성과 분석</div>
+  </div>
+  <div class="header-right">
+    <select class="header-select">
+      <option>자사몰</option>
+      <option>쿠팡</option>
+      <option>네이버쇼핑</option>
+      <option>카카오</option>
+      <option>전체 채널</option>
+    </select>
+    <input type="month" value="2026-04" class="header-select" style="width:130px;">
+    <button class="header-btn">데이터 내보내기</button>
+  </div>
+</div>
+
+<!-- 공식 바 -->
+<div class="formula-bar">
+  <div><span>매출구성비</span> = 상품매출 ÷ 총매출 × 100</div>
+  <div><span>GMROI</span> = 이익률 × 재고회전율</div>
+  <div><span>공헌도</span> = 매출구성비 × GMROI</div>
+  <div style="margin-left:auto; color: #6B7280;">기준월: 2026년 4월 · 자사몰</div>
+</div>
+
+<!-- 필터 바 -->
+<div class="filter-bar">
+  <span class="filter-label">채널</span>
+  <span class="filter-chip active">전체</span>
+  <span class="filter-chip">자사몰</span>
+  <span class="filter-chip">쿠팡</span>
+  <span class="filter-chip">네이버</span>
+  <div class="filter-divider"></div>
+  <span class="filter-label">카테고리</span>
+  <span class="filter-chip active">전체</span>
+  <span class="filter-chip">아우터</span>
+  <span class="filter-chip">원피스</span>
+  <span class="filter-chip">팬츠</span>
+  <span class="filter-chip">스커트</span>
+  <div class="filter-divider"></div>
+  <span class="filter-label">시즌</span>
+  <span class="filter-chip active">26SS</span>
+  <span class="filter-chip">25FW</span>
+</div>
+
+<!-- 메인 -->
+<div class="main">
+
+  <!-- KPI 카드 6개 -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">월 총 매출</div>
+      <div class="kpi-value">1억</div>
+      <div class="kpi-sub">100,000,000원</div>
+      <span class="kpi-badge badge-up">▲ 12%</span>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">총 판매 수량</div>
+      <div class="kpi-value">847</div>
+      <div class="kpi-sub">개 (전월 대비)</div>
+      <span class="kpi-badge badge-up">▲ 8%</span>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">총 공헌이익</div>
+      <div class="kpi-value">6,620</div>
+      <div class="kpi-sub">만원 (이익률 66.2%)</div>
+      <span class="kpi-badge badge-up">▲ 3%</span>
+    </div>
+    <div class="kpi-card highlight">
+      <div class="kpi-label">★ 최고 공헌도</div>
+      <div class="kpi-value">10.49</div>
+      <div class="kpi-sub">파니에 쁘띠_탄브라운</div>
+      <span class="kpi-badge badge-gold">1위</span>
+    </div>
+    <div class="kpi-card highlight">
+      <div class="kpi-label">★ 평균 GMROI</div>
+      <div class="kpi-value">0.421</div>
+      <div class="kpi-sub">전월 0.398 대비</div>
+      <span class="kpi-badge badge-gold">▲ 5.8%</span>
+    </div>
+    <div class="kpi-card highlight">
+      <div class="kpi-label">★ 평균 재고회전율</div>
+      <div class="kpi-value">0.641</div>
+      <div class="kpi-sub">목표 0.8 대비</div>
+      <span class="kpi-badge badge-down">▼ 20%</span>
+    </div>
+  </div>
+
+  <!-- 차트 2개 -->
+  <div class="chart-row">
+    <div class="chart-card">
+      <div class="chart-title">상품별 매출구성비 (%)</div>
+      <div class="chart-wrap">
+        <canvas id="shareChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">GMROI vs 매출구성비 — 버블 차트 (원 크기 = 공헌도)</div>
+      <div class="chart-wrap">
+        <canvas id="bubbleChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 메인 테이블 -->
+  <div class="section-header">
+    <div>
+      <span class="section-title">상품별 MD 성과 분석</span>
+      <span class="section-sub">공헌도 내림차순 · 4월 자사몰 기준</span>
+    </div>
+    <div class="view-btn">전체 보기 →</div>
+  </div>
+  <div class="table-card">
+    <div class="table-toolbar">
+      <div style="font-size:12px; font-weight:600; color:#1C1C1E;">10개 상품</div>
+      <div class="sort-hint">★ 강조 열 = 핵심 지표 (매출구성비 · GMROI · 공헌도)</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>상품명</th>
+          <th>판매가</th>
+          <th>원가</th>
+          <th>판매수량</th>
+          <th>매출액</th>
+          <th>이익률</th>
+          <th class="highlight-col">매출구성비</th>
+          <th class="highlight-col">GMROI</th>
+          <th class="highlight-col">공헌도</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- 하단: 매트릭스 + 요약 -->
+  <div class="bottom-row">
+    <div class="matrix-card">
+      <div class="section-header" style="margin-bottom:0;">
+        <div class="section-title">GMROI × 매출구성비 매트릭스</div>
+        <div style="font-size:10px; color:#9CA3AF;">기준: GMROI 0.4 / 매출구성비 15%</div>
+      </div>
+      <div class="matrix-grid">
+        <div class="matrix-cell star">
+          <div class="matrix-label">⭐ STAR — 핵심 상품</div>
+          <div class="matrix-products">파니에 쁘띠_탄브라운<br>스퀘어넥 원피스_블랙</div>
+          <div class="matrix-axis"><span>GMROI ↑ 높음</span><span>구성비 ↑ 높음</span></div>
+        </div>
+        <div class="matrix-cell cash">
+          <div class="matrix-label">💰 CASH COW — 수익 효자</div>
+          <div class="matrix-products">플리츠 스커트_아이보리<br>린넨 팬츠_베이지</div>
+          <div class="matrix-axis"><span>GMROI ↑ 높음</span><span>구성비 ↓ 낮음</span></div>
+        </div>
+        <div class="matrix-cell invest">
+          <div class="matrix-label">🔵 INVEST — 육성 필요</div>
+          <div class="matrix-products">트위드 재킷_크림<br>니트 가디건_그레이</div>
+          <div class="matrix-axis"><span>GMROI ↓ 낮음</span><span>구성비 ↑ 높음</span></div>
+        </div>
+        <div class="matrix-cell drop">
+          <div class="matrix-label">🔴 DROP — 재검토</div>
+          <div class="matrix-products">벨벳 블라우스_버건디<br>와이드 데님_인디고</div>
+          <div class="matrix-axis"><span>GMROI ↓ 낮음</span><span>구성비 ↓ 낮음</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="section-title" style="margin-bottom:12px;">월 요약 <span class="tag tag-gold">26SS 4월</span></div>
+      <div class="summary-item">
+        <span class="summary-key">총 매출</span>
+        <span class="summary-val">100,000,000원</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-key">총 공헌이익</span>
+        <span class="summary-val positive">66,200,000원</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-key">평균 이익률</span>
+        <span class="summary-val">66.2%</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-key">평균 GMROI</span>
+        <span class="summary-val" style="color:var(--gold);">0.421</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-key">평균 재고회전율</span>
+        <span class="summary-val">0.641</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-key">STAR 상품 수</span>
+        <span class="summary-val positive">2개</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-key">재검토 상품 수</span>
+        <span class="summary-val negative">2개</span>
+      </div>
+      <button class="action-btn">📊 리포트 PDF 출력</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── 예시 데이터 ──────────────────────────────────
+const products = [
+  { name: '파니에 쁘띠_탄브라운', code: 'A25-001', price: 218000, cost: 60000, qty: 100, ad: 1000000, commission: 0, settlement: 0, shipping: 4000, inventory: 500 },
+  { name: '스퀘어넥 원피스_블랙', code: 'A25-002', price: 185000, cost: 52000, qty: 130, ad: 800000, commission: 0, settlement: 0, shipping: 4000, inventory: 400 },
+  { name: '플리츠 스커트_아이보리', code: 'A25-003', price: 145000, cost: 38000, qty: 80, ad: 400000, commission: 0, settlement: 0, shipping: 4000, inventory: 200 },
+  { name: '린넨 팬츠_베이지', code: 'A25-004', price: 132000, cost: 35000, qty: 95, ad: 350000, commission: 0, settlement: 0, shipping: 4000, inventory: 180 },
+  { name: '트위드 재킷_크림', code: 'A25-005', price: 298000, cost: 95000, qty: 55, ad: 1200000, commission: 0, settlement: 0, shipping: 4000, inventory: 300 },
+  { name: '니트 가디건_그레이', code: 'A25-006', price: 168000, cost: 48000, qty: 110, ad: 900000, commission: 0, settlement: 0, shipping: 4000, inventory: 350 },
+  { name: '슬리브리스 블라우스_화이트', code: 'A25-007', price: 98000, cost: 28000, qty: 75, ad: 300000, commission: 0, settlement: 0, shipping: 4000, inventory: 150 },
+  { name: '벨벳 블라우스_버건디', code: 'A25-008', price: 125000, cost: 42000, qty: 40, ad: 600000, commission: 0, settlement: 0, shipping: 4000, inventory: 250 },
+  { name: '와이드 데님_인디고', code: 'A25-009', price: 158000, cost: 55000, qty: 62, ad: 700000, commission: 0, settlement: 0, shipping: 4000, inventory: 220 },
+  { name: '미디 스커트_카키', code: 'A25-010', price: 118000, cost: 33000, qty: 100, ad: 450000, commission: 0, settlement: 0, shipping: 4000, inventory: 280 },
+];
+
+const totalRevenue = products.reduce((s, p) => s + p.price * p.qty, 0);
+
+const rows = products.map(p => {
+  const revenue = p.price * p.qty;
+  const costTotal = p.cost * p.qty;
+  const adTotal = p.ad;
+  const shippingTotal = p.shipping * p.qty;
+  const variableCost = costTotal + adTotal + shippingTotal;
+  const profit = revenue - variableCost;
+  const profitRate = profit / revenue * 100;
+  const inventoryValue = p.inventory * p.cost;
+  const turnover = inventoryValue > 0 ? revenue / inventoryValue : 0;
+  const gmroi = (profitRate / 100) * turnover;
+  const salesShare = revenue / totalRevenue * 100;
+  const contribution = salesShare * gmroi;
+  return { ...p, revenue, profit, profitRate, inventoryValue, turnover, gmroi, salesShare, contribution };
+});
+
+rows.sort((a, b) => b.contribution - a.contribution);
+
+// ── 테이블 렌더 ──────────────────────────────────
+const maxShare = Math.max(...rows.map(r => r.salesShare));
+const maxGmroi = Math.max(...rows.map(r => r.gmroi));
+const maxContrib = Math.max(...rows.map(r => r.contribution));
+
+const rankClass = i => ['rank-1','rank-2','rank-3'][i] ?? 'rank-n';
+const fmt = n => n.toLocaleString('ko-KR');
+const fmtPct = n => n.toFixed(2) + '%';
+const fmtN = n => n.toFixed(3);
+
+document.getElementById('tableBody').innerHTML = rows.map((r, i) => `
+  <tr>
+    <td>
+      <div class="product-cell">
+        <div class="rank-badge ${rankClass(i)}">${i+1}</div>
+        <div>
+          <div class="product-name">${r.name}</div>
+          <div class="product-code">${r.code}</div>
+        </div>
+      </div>
+    </td>
+    <td>${fmt(r.price)}원</td>
+    <td>${fmt(r.cost)}원</td>
+    <td>${r.qty}개</td>
+    <td>${fmt(r.revenue)}원</td>
+    <td class="${r.profitRate >= 60 ? 'positive' : r.profitRate < 40 ? 'negative' : ''}">${fmtPct(r.profitRate)}</td>
+    <td>
+      <div class="bar-cell">
+        <span class="highlight-val">${fmtPct(r.salesShare)}</span>
+        <div class="bar-track"><div class="bar-fill bar-gold" style="width:${r.salesShare/maxShare*100}%"></div></div>
+      </div>
+    </td>
+    <td>
+      <div class="bar-cell">
+        <span class="highlight-val">${fmtN(r.gmroi)}</span>
+        <div class="bar-track"><div class="bar-fill bar-blue" style="width:${r.gmroi/maxGmroi*100}%"></div></div>
+      </div>
+    </td>
+    <td>
+      <div class="bar-cell">
+        <span class="highlight-val" style="font-size:13px;">${fmtN(r.contribution)}</span>
+        <div class="bar-track"><div class="bar-fill bar-green" style="width:${r.contribution/maxContrib*100}%"></div></div>
+      </div>
+    </td>
+  </tr>
+`).join('');
+
+// ── 매출구성비 바 차트 ──────────────────────────────
+const shareCtx = document.getElementById('shareChart').getContext('2d');
+new Chart(shareCtx, {
+  type: 'bar',
+  data: {
+    labels: rows.map(r => r.name.length > 10 ? r.name.substring(0,10)+'…' : r.name),
+    datasets: [{
+      data: rows.map(r => r.salesShare),
+      backgroundColor: rows.map((_, i) => i < 2 ? '#C9A96E' : '#E5E7EB'),
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+      y: { grid: { color: '#F3F4F6' }, ticks: { font: { size: 9 }, callback: v => v.toFixed(1)+'%' } }
+    }
+  }
+});
+
+// ── 버블 차트 (GMROI vs 매출구성비) ─────────────────
+const bubbleCtx = document.getElementById('bubbleChart').getContext('2d');
+new Chart(bubbleCtx, {
+  type: 'bubble',
+  data: {
+    datasets: rows.map((r, i) => ({
+      label: r.name,
+      data: [{ x: r.salesShare, y: r.gmroi, r: Math.max(4, r.contribution * 2.5) }],
+      backgroundColor: i < 2 ? 'rgba(201,169,110,0.7)' : i < 4 ? 'rgba(16,185,129,0.6)' : 'rgba(148,163,184,0.5)',
+      borderColor: i < 2 ? '#C9A96E' : 'transparent',
+      borderWidth: i < 2 ? 2 : 0,
+    }))
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            const r = rows[ctx.datasetIndex];
+            return [`${r.name}`, `매출구성비: ${fmtPct(r.salesShare)}`, `GMROI: ${fmtN(r.gmroi)}`, `공헌도: ${fmtN(r.contribution)}`];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        title: { display: true, text: '매출구성비 (%)', font: { size: 10 } },
+        grid: { color: '#F3F4F6' }, ticks: { font: { size: 9 }, callback: v => v.toFixed(1)+'%' }
+      },
+      y: {
+        title: { display: true, text: 'GMROI', font: { size: 10 } },
+        grid: { color: '#F3F4F6' }, ticks: { font: { size: 9 } }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
