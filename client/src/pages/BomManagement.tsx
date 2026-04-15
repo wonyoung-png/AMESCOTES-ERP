@@ -1847,19 +1847,14 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
           )}
         </div>
       </td>
-      {/* 단가 */}
-      <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">
-        <div>
-          <div>{fmtKrw(amt * cnyKrw)}</div>
-          {usdKrw > 0 && amt > 0 && <div style={{fontSize:'10px', color:'#9CA3AF'}}>${((amt * cnyKrw) / usdKrw).toFixed(2)}</div>}
-        </div>
-      </td>
-      {/* 공급가액 */}
+      {/* 제조금액 */}
+      <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">{fmt(amt)}</td>
+      {/* KRW */}
       <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">
-        <div>
-          <div>{fmtKrw(amt * cnyKrw)}</div>
-          {usdKrw > 0 && amt > 0 && <div style={{fontSize:'10px', color:'#9CA3AF'}}>${((amt * cnyKrw) / usdKrw).toFixed(2)}</div>}
-        </div>
+        {fmtKrw(amt * cnyKrw)}
+        {showUsdHint && amt > 0 && usdKrw > 0 && (
+          <div className="text-[10px] text-stone-400 mt-0.5">${((amt * cnyKrw) / usdKrw).toFixed(2)}</div>
+        )}
       </td>
       {/* 공급 상태 + 체크박스 (본사/업체/공장) */}
       <td className="px-2 py-1 w-28">
@@ -3798,8 +3793,8 @@ export default function BomManagement() {
                           <th className="px-2 py-2 text-right w-20">NET</th>
                           <th className="px-2 py-2 text-right w-16">LOSS(%)</th>
                           <th className="px-2 py-2 text-right w-24">소요량</th>
-                          <th className="px-2 py-2 text-right w-24">단가</th>
-                          <th className="px-2 py-2 text-right w-24">공급가액</th>
+                          <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
+                          <th className="px-2 py-2 text-right w-24">KRW</th>
                           <th className="px-2 py-2 text-center w-28">공급</th>
                           <th className="px-2 py-2 text-left w-36">자재업체</th>
                           <th className="px-2 py-2 w-8"></th>
@@ -3847,7 +3842,6 @@ export default function BomManagement() {
                                   cnyKrw={preRate}
                                   sectionKey={cat}
                                   accentColor="amber"
-                                  usdKrw={preUsdKrw}
                                 />
                               ))}
                             </React.Fragment>
@@ -4387,8 +4381,8 @@ export default function BomManagement() {
                             <th className="px-2 py-2 text-right w-20">NET</th>
                             <th className="px-2 py-2 text-right w-16">LOSS(%)</th>
                             <th className="px-2 py-2 text-right w-24">소요량</th>
-                            <th className="px-2 py-2 text-right w-24">단가</th>
-                            <th className="px-2 py-2 text-right w-24">공급가액</th>
+                            <th className="px-2 py-2 text-right w-24">제조금액({curSymbol})</th>
+                            <th className="px-2 py-2 text-right w-24">KRW</th>
                             <th className="px-2 py-2 text-center w-28">공급</th>
                             <th className="px-2 py-2 text-left w-36">자재업체</th>
                             <th className="px-2 py-2 w-8"></th>
