@@ -248,7 +248,7 @@ router.get('/api/agent/health', (_req: Request, res: Response) => {
 /** POST /api/print/pdf — Puppeteer PDF 생성 (URL 방식) */
 router.post('/api/print/pdf', async (req: Request, res: Response) => {
   try {
-    const { bomId, color } = req.body as { bomId: string; color?: string };
+    const { bomId, color, productImage } = req.body as { bomId: string; color?: string; productImage?: string | null };
     if (!bomId) {
       res.status(400).json({ error: 'bomId required' });
       return;
@@ -266,10 +266,35 @@ router.post('/api/print/pdf', async (req: Request, res: Response) => {
     await page.waitForSelector('#cost-sheet-ready', { timeout: 15000 }).catch(() => {
       console.warn('[PDF] #cost-sheet-ready 타임아웃 — 강제 진행');
     });
+    // 제품 이미지 주입 (base64)
+    if (productImage) {
+      await page.evaluate((imgSrc: string) => {
+        const imgEl = document.getElementById('cost-sheet-product-img') as HTMLImageElement | null;
+        if (imgEl) imgEl.src = imgSrc;
+        const placeholder = document.getElementById('cost-sheet-img-placeholder');
+        if (placeholder) (placeholder as HTMLElement).style.display = 'none';
+      }, productImage);
+    }
+    // 환율 배너 숨기기
+    await page.evaluate(() => {
+      document.querySelectorAll<HTMLElement>('*').forEach(el => {
+        try {
+          const text = el.innerText || '';
+          const cls = typeof el.className === 'string' ? el.className : '';
+          if (
+            text.includes('환율 자동 업데이트') ||
+            (cls.includes('fixed') && (text.includes('USD') || text.includes('환율')))
+          ) {
+            el.style.display = 'none';
+          }
+        } catch (_) {}
+      });
+    });
     await new Promise(r => setTimeout(r, 500));
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
+      scale: 0.8,
       margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' },
     });
     await browser.close();

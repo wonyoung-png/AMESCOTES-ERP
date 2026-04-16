@@ -5144,7 +5144,7 @@ export default function BomManagement() {
                             const res = await fetch('/api/print/pdf', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ bomId: editBom.id, color: activeColor }),
+                              body: JSON.stringify({ bomId: editBom.id, color: activeColor, productImage: costSheetProductImage || null }),
                             });
                             if (!res.ok) throw new Error(await res.text());
                             const blob = await res.blob();
