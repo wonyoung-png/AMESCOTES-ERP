@@ -4,7 +4,9 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "concurrently -n frontend,backend -c cyan,yellow \"pnpm run dev:frontend\" \"pnpm run dev:backend\"",
+    "dev:frontend": "vite --host",
+    "dev:backend": "PORT=3001 tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "preview": "vite preview --host",
@@ -89,6 +91,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "add": "^2.0.6",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^9.2.1",
     "esbuild": "^0.25.0",
     "eslint": "^10.2.0",
     "eslint-plugin-react": "^7.37.5",
