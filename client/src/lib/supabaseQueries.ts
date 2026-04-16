@@ -381,6 +381,10 @@ export async function upsertBom(bom: any) {
     post_currency: bom.currency ?? 'CNY',
     pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
     post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny ?? bom.snapshotCnyKrw,
+    pnl_data: bom.pnl ? JSON.stringify(bom.pnl) : null,
+    product_image: bom.productImage ?? null,
+    packaging_cost_krw: bom.packagingCostKrw ?? 0,
+    packing_cost_krw: bom.packingCostKrw ?? 0,
     // 간단 원가 BOM인 경우 memo에 JSON 저장
     memo: (() => {
       if (bom.simpleCostKrw !== undefined || bom.isSimpleCost) {

@@ -228,26 +228,32 @@ export default function CostSheetPrint() {
           display: none !important;
         }
       `}</style>
-      <div id="cost-sheet-print-content" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <div id="cost-sheet-print-content" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-        {/* 섹션 1: 제품 기본정보 */}
-        <div style={{ border: '1px solid #e7e5e4', borderRadius: '10px', overflow: 'hidden' }}>
-          <div style={{ background: '#292524', color: 'white', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '13px', fontWeight: 700, margin: 0 }}>제품 기본정보</h3>
-            <span style={{ fontSize: '11px', color: '#a8a29e' }}>작성일: {today}</span>
+        {/* 헤더: 제목 + 날짜 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #292524', paddingBottom: '8px' }}>
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#292524', letterSpacing: '0.05em' }}>원 가 계 산 서</h2>
+          <span style={{ fontSize: '10px', color: '#a8a29e' }}>작성일: {today}</span>
+        </div>
+
+        {/* 섹션 1: 제품 기본정보 (compact 가로형) */}
+        <div style={{ border: '1px solid #e7e5e4', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ background: '#292524', color: 'white', padding: '6px 12px' }}>
+            <h3 style={{ fontSize: '11px', fontWeight: 700, margin: 0 }}>제품 기본정보</h3>
           </div>
-          <div style={{ padding: '14px', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-            {/* 제품 이미지 영역 (Puppeteer가 주입) */}
-            <div style={{ flexShrink: 0, width: '90px', height: '90px', border: '1px solid #e7e5e4', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafaf9' }}>
+          <div style={{ padding: '10px 12px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {/* 제품 이미지 */}
+            <div style={{ flexShrink: 0, width: '70px', height: '70px', border: '1px solid #e7e5e4', borderRadius: '6px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafaf9' }}>
               <img
                 id="cost-sheet-product-img"
                 alt="제품사진"
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'none' }}
                 onLoad={e => { (e.target as HTMLImageElement).style.display = 'block'; const ph = document.getElementById('cost-sheet-img-placeholder'); if (ph) ph.style.display = 'none'; }}
               />
-              <div id="cost-sheet-img-placeholder" style={{ textAlign: 'center', color: '#a8a29e', fontSize: '11px' }}>No<br/>Image</div>
+              <div id="cost-sheet-img-placeholder" style={{ textAlign: 'center', color: '#a8a29e', fontSize: '10px' }}>No<br/>Image</div>
             </div>
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 20px' }}>
+            {/* 기본정보 그리드 */}
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px 16px' }}>
               {[
                 { label: '스타일번호', val: bom.styleNo },
                 { label: '품명', val: bom.styleName },
@@ -255,206 +261,203 @@ export default function CostSheetPrint() {
                 { label: '카테고리', val: bom.erpCategory || '—' },
                 { label: '컬러', val: activePostColorBom?.color || colorParam || '—' },
                 { label: '라인명', val: bom.lineName || '—' },
-                { label: '담당 디자이너', val: bom.designer || '—' },
+                { label: '디자이너', val: bom.designer || '—' },
                 { label: '제조국', val: bom.manufacturingCountry || '—' },
               ].map(item => (
                 <div key={item.label} style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ color: '#a8a29e', fontSize: '9px', fontWeight: 500 }}>{item.label}</span>
-                  <span style={{ color: '#292524', fontWeight: 600, fontSize: '11px' }}>{item.val}</span>
+                  <span style={{ color: '#a8a29e', fontSize: '8px', fontWeight: 500 }}>{item.label}</span>
+                  <span style={{ color: '#292524', fontWeight: 600, fontSize: '10px' }}>{item.val}</span>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* 섹션 2: 사후원가 요약 테이블 */}
-        <div style={{ border: '1px solid #e7e5e4', borderRadius: '10px', overflow: 'hidden' }}>
-          <div style={{ background: '#292524', color: 'white', padding: '10px 16px' }}>
-            <h3 style={{ fontSize: '13px', fontWeight: 700, margin: 0 }}>사후원가 요약</h3>
-          </div>
-          <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f5f5f4', color: '#78716c' }}>
-                <th style={{ padding: '5px 12px', textAlign: 'left', fontWeight: 600, fontSize: '11px' }}>항목</th>
-                <th style={{ padding: '5px 12px', textAlign: 'right', fontWeight: 600, fontSize: '11px' }}>금액 (KRW)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '5px 10px', color: '#78716c', fontSize: '11px' }}>공장구매 자재</td>
-                <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(psSheet.factoryMaterialKrw)}</td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '5px 10px', color: '#78716c', fontSize: '11px' }}>본사제공 자재</td>
-                <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(psSheet.hqMaterialKrw)}</td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '5px 10px', color: '#78716c', fontSize: '11px' }}>임가공비</td>
-                <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(psSheet.processingKrw)}</td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #fde68a', background: '#fffbeb' }}>
-                <td style={{ padding: '7px 10px', fontWeight: 700, color: '#292524', fontSize: '11px' }}>🏭 공장단가</td>
-                <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: '#b45309', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(psSheet.factoryUnitCostKrw)}</td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '5px 10px', color: '#78716c', fontSize: '11px' }}>관세 ({psSheet.customsRate}%)</td>
-                <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(psSheet.customsKrw)}</td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '5px 10px', color: '#78716c', fontSize: '11px' }}>물류비</td>
-                <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(psSheet.logisticsKrw)}</td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '5px 10px', color: '#78716c', fontSize: '11px' }}>포장/검사비</td>
-                <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(psSheet.packagingKrw)}</td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '5px 10px', color: '#78716c', fontSize: '11px' }}>패킹재</td>
-                <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(psSheet.packingKrw)}</td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #fde68a', background: '#fffbeb' }}>
-                <td style={{ padding: '7px 10px', fontWeight: 600, color: '#92400e', fontSize: '11px' }}>
-                  제품 총원가 <span style={{ fontSize: '10px', fontWeight: 400, color: '#d97706' }}>(생산마진 전)</span>
-                </td>
-                <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 600, color: '#b45309', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(psSheet.totalCostKrw)}</td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '5px 10px', color: '#78716c', fontSize: '11px' }}>생산마진 ({Math.round(postMarginRateSheet * 100)}%)</td>
-                <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(postProductionMarginKrwSheet)}</td>
-              </tr>
-              <tr style={{ background: '#292524' }}>
-                <td style={{ padding: '8px 10px', fontWeight: 700, color: 'white', fontSize: '13px' }}>
-                  {postMarginRateSheet > 0 ? '총 원 가 액' : '제 품 원 가'}
-                </td>
-                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, fontSize: '15px', color: '#C9A96E', fontFamily: 'monospace' }}>
-                  {fmtKrw(finalCostSheet)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        {/* 섹션 2+3: 2단 레이아웃 (원가 요약 | P&L 분석) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', alignItems: 'start' }}>
 
-        {/* 섹션 3: P&L 분석 */}
-        {bom.pnl && postPnlResultSheet && (
-          <div style={{ border: '1px solid #e7e5e4', borderRadius: '10px', overflow: 'hidden' }}>
-            <div style={{ background: '#292524', color: 'white', padding: '10px 16px' }}>
-              <h3 style={{ fontSize: '13px', fontWeight: 700, margin: 0 }}>P&L 분석</h3>
+          {/* 왼쪽: 사후원가 요약 테이블 */}
+          <div style={{ border: '1px solid #e7e5e4', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ background: '#292524', color: 'white', padding: '6px 12px' }}>
+              <h3 style={{ fontSize: '11px', fontWeight: 700, margin: 0 }}>사후원가 요약</h3>
             </div>
-            <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* 가정 */}
-              <div style={{ background: '#fafaf9', borderRadius: '8px', padding: '10px', border: '1px solid #e7e5e4' }}>
-                <h4 style={{ fontSize: '11px', fontWeight: 600, color: '#78716c', marginBottom: '8px', marginTop: 0 }}>가정 (Assumptions)</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '12px' }}>
-                  <div>
-                    <span style={{ color: '#a8a29e', fontSize: '10px', display: 'block' }}>할인율</span>
-                    <span style={{ fontWeight: 600, color: '#292524' }}>{Math.round(bom.pnl.discountRate * 100)}%</span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#a8a29e', fontSize: '10px', display: 'block' }}>플랫폼 수수료</span>
-                    <span style={{ fontWeight: 600, color: '#292524' }}>{Math.round(bom.pnl.platformFeeRate * 100)}%</span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#a8a29e', fontSize: '10px', display: 'block' }}>인건비/판관비</span>
-                    <span style={{ fontWeight: 600, color: '#292524' }}>{Math.round(bom.pnl.sgaRate * 100)}%</span>
+            <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#f5f5f4', color: '#78716c' }}>
+                  <th style={{ padding: '4px 10px', textAlign: 'left', fontWeight: 600, fontSize: '10px' }}>항목</th>
+                  <th style={{ padding: '4px 10px', textAlign: 'right', fontWeight: 600, fontSize: '10px' }}>금액 (KRW)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label: '공장구매 자재', val: psSheet.factoryMaterialKrw },
+                  { label: '본사제공 자재', val: psSheet.hqMaterialKrw },
+                  { label: '임가공비', val: psSheet.processingKrw },
+                ].map(row => (
+                  <tr key={row.label} style={{ borderBottom: '1px solid #f5f5f4' }}>
+                    <td style={{ padding: '4px 10px', color: '#78716c', fontSize: '10px' }}>{row.label}</td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '10px' }}>{fmtKrw(row.val)}</td>
+                  </tr>
+                ))}
+                <tr style={{ borderBottom: '1px solid #fde68a', background: '#fffbeb' }}>
+                  <td style={{ padding: '5px 10px', fontWeight: 700, color: '#292524', fontSize: '10px' }}>공장단가</td>
+                  <td style={{ padding: '5px 10px', textAlign: 'right', fontWeight: 700, color: '#b45309', fontFamily: 'monospace', fontSize: '10px' }}>{fmtKrw(psSheet.factoryUnitCostKrw)}</td>
+                </tr>
+                {[
+                  { label: `관세 (${psSheet.customsRate}%)`, val: psSheet.customsKrw },
+                  { label: '물류비', val: psSheet.logisticsKrw },
+                  { label: '포장/검사비', val: psSheet.packagingKrw },
+                  { label: '패킹재', val: psSheet.packingKrw },
+                ].map(row => (
+                  <tr key={row.label} style={{ borderBottom: '1px solid #f5f5f4' }}>
+                    <td style={{ padding: '4px 10px', color: '#78716c', fontSize: '10px' }}>{row.label}</td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '10px' }}>{fmtKrw(row.val)}</td>
+                  </tr>
+                ))}
+                <tr style={{ borderBottom: '1px solid #fde68a', background: '#fffbeb' }}>
+                  <td style={{ padding: '5px 10px', fontWeight: 600, color: '#92400e', fontSize: '10px' }}>
+                    제품 총원가 <span style={{ fontSize: '9px', fontWeight: 400, color: '#d97706' }}>(마진 전)</span>
+                  </td>
+                  <td style={{ padding: '5px 10px', textAlign: 'right', fontWeight: 600, color: '#b45309', fontFamily: 'monospace', fontSize: '10px' }}>{fmtKrw(psSheet.totalCostKrw)}</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
+                  <td style={{ padding: '4px 10px', color: '#78716c', fontSize: '10px' }}>생산마진 ({Math.round(postMarginRateSheet * 100)}%)</td>
+                  <td style={{ padding: '4px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '10px' }}>{fmtKrw(postProductionMarginKrwSheet)}</td>
+                </tr>
+                <tr style={{ background: '#292524' }}>
+                  <td style={{ padding: '7px 10px', fontWeight: 700, color: 'white', fontSize: '12px' }}>
+                    {postMarginRateSheet > 0 ? '총 원 가 액' : '제 품 원 가'}
+                  </td>
+                  <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, fontSize: '13px', color: '#C9A96E', fontFamily: 'monospace' }}>
+                    {fmtKrw(finalCostSheet)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* 오른쪽: P&L 분석 */}
+          {bom.pnl && postPnlResultSheet ? (
+            <div style={{ border: '1px solid #e7e5e4', borderRadius: '8px', overflow: 'hidden' }}>
+              <div style={{ background: '#292524', color: 'white', padding: '6px 12px' }}>
+                <h3 style={{ fontSize: '11px', fontWeight: 700, margin: 0 }}>P&L 분석</h3>
+              </div>
+              <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+
+                {/* 가정 */}
+                <div style={{ background: '#fafaf9', borderRadius: '6px', padding: '8px', border: '1px solid #e7e5e4' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px', fontSize: '10px' }}>
+                    <div>
+                      <span style={{ color: '#a8a29e', fontSize: '9px', display: 'block' }}>할인율</span>
+                      <span style={{ fontWeight: 600, color: '#292524' }}>{Math.round(bom.pnl.discountRate * 100)}%</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#a8a29e', fontSize: '9px', display: 'block' }}>플랫폼 수수료</span>
+                      <span style={{ fontWeight: 600, color: '#292524' }}>{Math.round(bom.pnl.platformFeeRate * 100)}%</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#a8a29e', fontSize: '9px', display: 'block' }}>인건비/판관비</span>
+                      <span style={{ fontWeight: 600, color: '#292524' }}>{Math.round(bom.pnl.sgaRate * 100)}%</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* 배수 분석 */}
-              <div style={{ background: '#fafaf9', borderRadius: '8px', padding: '10px', border: '1px solid #e7e5e4' }}>
-                <h4 style={{ fontSize: '11px', fontWeight: 600, color: '#78716c', marginBottom: '8px', marginTop: 0 }}>배수 분석</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
-                  {[
-                    { label: '3.5배 기준 최소 판매가', val: postPnlResultSheet.price35 },
-                    { label: '4.0배 기준 목표 판매가', val: postPnlResultSheet.price40 },
-                    { label: '4.5배 기준 이상적 판매가', val: postPnlResultSheet.price45 },
-                  ].map(item => (
-                    <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #e7e5e4' }}>
-                      <span style={{ color: '#78716c' }}>{item.label}</span>
-                      <span style={{ fontWeight: 700, color: '#292524', fontFamily: 'monospace' }}>{fmtKrw(item.val)}</span>
-                    </div>
-                  ))}
-                  {bom.pnl.confirmedSalePrice && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '2px solid #d6d3d1' }}>
-                      <span style={{ fontWeight: 600, color: '#44403c' }}>확정 판매가</span>
-                      <span style={{ fontWeight: 700, color: '#292524', fontFamily: 'monospace' }}>{fmtKrw(bom.pnl.confirmedSalePrice)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 영업이익 분석 */}
-              {bom.pnl.confirmedSalePrice && (
-                <div style={{ background: '#fafaf9', borderRadius: '8px', padding: '10px', border: '1px solid #e7e5e4' }}>
-                  <h4 style={{ fontSize: '11px', fontWeight: 600, color: '#78716c', marginBottom: '8px', marginTop: 0 }}>영업이익 분석 (P&L)</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {/* 배수 분석 */}
+                <div style={{ background: '#fafaf9', borderRadius: '6px', padding: '8px', border: '1px solid #e7e5e4' }}>
+                  <h4 style={{ fontSize: '10px', fontWeight: 600, color: '#78716c', marginBottom: '6px', marginTop: 0 }}>배수 분석</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                     {[
-                      { no: '①', label: '정가 (확정판매가)', desc: '', val: bom.pnl.confirmedSalePrice, color: '#292524', bold: false },
-                      { no: '②', label: '(-) 할인', desc: `${Math.round(bom.pnl.discountRate * 100)}%`, val: -(bom.pnl.confirmedSalePrice * bom.pnl.discountRate), color: '#ef4444', bold: false },
-                      { no: '③', label: '실판가 (Net Sale)', desc: '', val: postPnlResultSheet.netSale, color: '#44403c', bold: true },
-                      { no: '④', label: '(-) 플랫폼 수수료', desc: `${Math.round(bom.pnl.platformFeeRate * 100)}%`, val: -(postPnlResultSheet.netSale * bom.pnl.platformFeeRate), color: '#ef4444', bold: false },
-                      { no: '⑤', label: '(-) 인건비 / 판관비', desc: `${Math.round(bom.pnl.sgaRate * 100)}%`, val: -(postPnlResultSheet.netSale * bom.pnl.sgaRate), color: '#ef4444', bold: false },
-                      { no: '⑥', label: '(-) 매출원가 (COGS)', desc: '총 원가액', val: -finalCostSheet, color: '#ef4444', bold: false },
-                      { no: '⑦', label: '영업이익', desc: '', val: postPnlResultSheet.operatingProfit, color: postPnlResultSheet.operatingProfit >= 0 ? '#16a34a' : '#dc2626', bold: true },
-                    ].map(row => (
-                      <div key={row.no} style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '6px 12px', borderRadius: '4px',
-                        background: row.bold ? 'white' : 'transparent',
-                        border: row.bold ? '1px solid #e7e5e4' : 'none',
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ fontSize: '11px', color: '#a8a29e', width: '20px' }}>{row.no}</span>
-                          <span style={{ fontSize: '12px', color: row.bold ? '#292524' : '#78716c', fontWeight: row.bold ? 600 : 400 }}>
-                            {row.label} <span style={{ color: '#a8a29e', fontWeight: 400 }}>{row.desc}</span>
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '13px', fontFamily: 'monospace', fontWeight: 600, color: row.color }}>
-                          {fmtKrw(row.val)}
-                        </span>
+                      { label: '3.5× 최소 판매가', val: postPnlResultSheet.price35 },
+                      { label: '4.0× 목표 판매가', val: postPnlResultSheet.price40 },
+                      { label: '4.5× 이상적 판매가', val: postPnlResultSheet.price45 },
+                    ].map(item => (
+                      <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #e7e5e4' }}>
+                        <span style={{ color: '#78716c', fontSize: '10px' }}>{item.label}</span>
+                        <span style={{ fontWeight: 700, color: '#292524', fontFamily: 'monospace', fontSize: '10px' }}>{fmtKrw(item.val)}</span>
                       </div>
                     ))}
-                    {/* 영업이익률 */}
-                    <div style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '6px 12px', borderRadius: '4px',
-                      background: 'white', border: '1px solid #e7e5e4',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '11px', color: '#a8a29e', width: '20px' }}>★</span>
-                        <span style={{ fontSize: '12px', color: '#292524', fontWeight: 600 }}>영업이익률</span>
+                    {bom.pnl.confirmedSalePrice && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: '2px solid #d6d3d1' }}>
+                        <span style={{ fontWeight: 600, color: '#44403c', fontSize: '10px' }}>확정 판매가</span>
+                        <span style={{ fontWeight: 700, color: '#292524', fontFamily: 'monospace', fontSize: '10px' }}>{fmtKrw(bom.pnl.confirmedSalePrice)}</span>
                       </div>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: postPnlResultSheet.operatingMargin >= 0 ? '#16a34a' : '#dc2626' }}>
-                        {(postPnlResultSheet.operatingMargin * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                  {/* 실현 배수 */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '8px 12px', borderRadius: '8px', marginTop: '8px',
-                    background: postPnlResultSheet.meets35x ? '#f0fdf4' : '#fef2f2',
-                    border: `1px solid ${postPnlResultSheet.meets35x ? '#bbf7d0' : '#fecaca'}`,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: '#a8a29e', width: '20px' }}>⚡</span>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#44403c' }}>실현 배수</span>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: postPnlResultSheet.meets35x ? '#16a34a' : '#ef4444' }}>
-                        {postPnlResultSheet.actualMultiple.toFixed(2)}x
-                      </span>
-                      {postPnlResultSheet.meets35x
-                        ? <div style={{ fontSize: '10px', color: '#16a34a' }}>✅ 목표 달성 (3.5x 이상)</div>
-                        : <div style={{ fontSize: '10px', color: '#ef4444' }}>⚠️ 원가 절감 필요: {fmtKrw(postPnlResultSheet.costReductionNeeded)}</div>
-                      }
-                    </div>
+                    )}
                   </div>
                 </div>
-              )}
+
+                {/* 영업이익 분석 */}
+                {bom.pnl.confirmedSalePrice && (
+                  <div style={{ background: '#fafaf9', borderRadius: '6px', padding: '8px', border: '1px solid #e7e5e4' }}>
+                    <h4 style={{ fontSize: '10px', fontWeight: 600, color: '#78716c', marginBottom: '6px', marginTop: 0 }}>영업이익 분석 (P&L)</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                      {[
+                        { no: '①', label: '정가 (확정판매가)', val: bom.pnl.confirmedSalePrice, color: '#292524', bold: false },
+                        { no: '②', label: `(-) 할인 ${Math.round(bom.pnl.discountRate * 100)}%`, val: -(bom.pnl.confirmedSalePrice * bom.pnl.discountRate), color: '#ef4444', bold: false },
+                        { no: '③', label: '실판가 (Net Sale)', val: postPnlResultSheet.netSale, color: '#44403c', bold: true },
+                        { no: '④', label: `(-) 플랫폼 수수료 ${Math.round(bom.pnl.platformFeeRate * 100)}%`, val: -(postPnlResultSheet.netSale * bom.pnl.platformFeeRate), color: '#ef4444', bold: false },
+                        { no: '⑤', label: `(-) 판관비 ${Math.round(bom.pnl.sgaRate * 100)}%`, val: -(postPnlResultSheet.netSale * bom.pnl.sgaRate), color: '#ef4444', bold: false },
+                        { no: '⑥', label: '(-) COGS (총원가액)', val: -finalCostSheet, color: '#ef4444', bold: false },
+                        { no: '⑦', label: '영업이익', val: postPnlResultSheet.operatingProfit, color: postPnlResultSheet.operatingProfit >= 0 ? '#16a34a' : '#dc2626', bold: true },
+                      ].map(row => (
+                        <div key={row.no} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '4px 8px', borderRadius: '3px',
+                          background: row.bold ? 'white' : 'transparent',
+                          border: row.bold ? '1px solid #e7e5e4' : 'none',
+                          marginBottom: row.bold ? '1px' : 0,
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '9px', color: '#a8a29e', width: '14px' }}>{row.no}</span>
+                            <span style={{ fontSize: '10px', color: row.bold ? '#292524' : '#78716c', fontWeight: row.bold ? 600 : 400 }}>{row.label}</span>
+                          </div>
+                          <span style={{ fontSize: '11px', fontFamily: 'monospace', fontWeight: 600, color: row.color }}>{fmtKrw(row.val)}</span>
+                        </div>
+                      ))}
+                      {/* 영업이익률 */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderRadius: '3px', background: 'white', border: '1px solid #e7e5e4' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '9px', color: '#a8a29e', width: '14px' }}>★</span>
+                          <span style={{ fontSize: '10px', color: '#292524', fontWeight: 600 }}>영업이익률</span>
+                        </div>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: postPnlResultSheet.operatingMargin >= 0 ? '#16a34a' : '#dc2626' }}>
+                          {(postPnlResultSheet.operatingMargin * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                    {/* 실현 배수 */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '6px 10px', borderRadius: '6px', marginTop: '6px',
+                      background: postPnlResultSheet.meets35x ? '#f0fdf4' : '#fef2f2',
+                      border: `1px solid ${postPnlResultSheet.meets35x ? '#bbf7d0' : '#fecaca'}`,
+                    }}>
+                      <span style={{ fontSize: '10px', fontWeight: 600, color: '#44403c' }}>⚡ 실현 배수</span>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: postPnlResultSheet.meets35x ? '#16a34a' : '#ef4444' }}>
+                          {postPnlResultSheet.actualMultiple.toFixed(2)}×
+                        </span>
+                        <div style={{ fontSize: '9px', color: postPnlResultSheet.meets35x ? '#16a34a' : '#ef4444' }}>
+                          {postPnlResultSheet.meets35x ? '✅ 목표달성 (3.5×↑)' : `⚠️ 절감 필요: ${fmtKrw(postPnlResultSheet.costReductionNeeded)}`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 확정판매가 미입력 안내 */}
+                {!bom.pnl.confirmedSalePrice && (
+                  <div style={{ padding: '10px', textAlign: 'center', color: '#a8a29e', fontSize: '10px', background: '#fafaf9', borderRadius: '6px', border: '1px dashed #e7e5e4' }}>
+                    확정 판매가를 입력하면<br/>영업이익 P&L 분석이 표시됩니다
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div style={{ border: '1px dashed #e7e5e4', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', color: '#a8a29e', fontSize: '11px' }}>
+              P&L 데이터 없음
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Puppeteer가 기다리는 준비 완료 신호 */}
