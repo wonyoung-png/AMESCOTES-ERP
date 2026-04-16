@@ -5138,36 +5138,132 @@ export default function BomManagement() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => {
-                          const el = document.getElementById('cost-sheet-print-content');
-                          if (!el) return;
-                          // 현재 페이지 CSS link 절대 URL 추출
-                          const cssLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
-                            .map(l => `<link rel="stylesheet" href="${(l as HTMLLinkElement).href}">`)
-                            .join('\n');
+                          const GOLD = '#C9A96E';
+                          const fmtKrwInline = (n: number) => '₩' + Math.round(n).toLocaleString('ko-KR');
+                          const html = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>원가계산서</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans KR', sans-serif; background: white; padding: 24px; font-size: 13px; color: #1C1C1E; }
+h1 { font-size: 16px; font-weight: 700; }
+h2 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 8px 12px; border: 1px solid #E5E7EB; font-size: 12px; }
+th { background: #F9FAFB; font-weight: 600; }
+.section { margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 1px solid #E5E7EB; }
+.section-header { background: #1C1C1E; color: white; padding: 10px 16px; font-weight: 700; font-size: 13px; }
+.gold { color: ${GOLD}; font-weight: 700; }
+.highlight-row { background: #FDF8F0; }
+.total-row { background: #1C1C1E; color: white; font-weight: 700; font-size: 14px; }
+.total-row td { color: white; padding: 12px; border-color: #374151; }
+.total-row .gold { color: ${GOLD}; font-size: 16px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; padding: 12px; }
+.grid-item { display: flex; flex-direction: column; }
+.grid-label { font-size: 10px; color: #6B7280; margin-bottom: 2px; }
+.grid-value { font-size: 13px; font-weight: 600; }
+.pl-row { display: flex; justify-content: space-between; padding: 6px 12px; border-bottom: 1px solid #F3F4F6; font-size: 12px; }
+.pl-row.bold { background: #F9FAFB; font-weight: 700; }
+.pl-row.profit { background: #F0FDF4; }
+.red { color: #EF4444; }
+.green { color: #059669; }
+.img-placeholder { width: 120px; height: 120px; border: 2px dashed #D1D5DB; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #9CA3AF; font-size: 11px; flex-shrink: 0; }
+.info-wrap { display: flex; gap: 20px; padding: 16px; }
+@media print { body { padding: 10px; } @page { margin: 10mm; } }
+</style>
+</head>
+<body>
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+  <h1>&#x1F4C4; 원가계산서</h1>
+  <span style="font-size:11px;color:#6B7280;">작성일: ${today}</span>
+</div>
+<div class="section">
+  <div class="section-header">제품 기본정보</div>
+  <div class="info-wrap">
+    ${costSheetProductImage
+      ? `<img src="${costSheetProductImage}" style="width:120px;height:120px;object-fit:cover;border-radius:8px;flex-shrink:0;">`
+      : `<div class="img-placeholder">&#x1F4F7;<br>제품사진</div>`
+    }
+    <div class="grid2" style="flex:1;">
+      <div class="grid-item"><span class="grid-label">스타일번호</span><span class="grid-value">${editBom.styleNo || '—'}</span></div>
+      <div class="grid-item"><span class="grid-label">품명</span><span class="grid-value">${editBom.styleName || '—'}</span></div>
+      <div class="grid-item"><span class="grid-label">시즌</span><span class="grid-value">${editBom.season || '—'}</span></div>
+      <div class="grid-item"><span class="grid-label">카테고리</span><span class="grid-value">${editBom.erpCategory || '—'}</span></div>
+      <div class="grid-item"><span class="grid-label">컬러</span><span class="grid-value">${activePostColorBom?.color || '—'}</span></div>
+      <div class="grid-item"><span class="grid-label">라인명</span><span class="grid-value">${editBom.lineName || '—'}</span></div>
+      <div class="grid-item"><span class="grid-label">담당 디자이너</span><span class="grid-value">${editBom.designer || '—'}</span></div>
+      <div class="grid-item"><span class="grid-label">제조국</span><span class="grid-value">${editBom.manufacturingCountry || '—'}</span></div>
+    </div>
+  </div>
+</div>
+<div class="section">
+  <div class="section-header">사후원가 요약</div>
+  <table>
+    <thead><tr><th style="text-align:left;">항목</th><th style="text-align:right;">금액 (KRW)</th></tr></thead>
+    <tbody>
+      <tr><td>공장구매 자재</td><td style="text-align:right;">${fmtKrwInline(psSheet?.materialAmt ?? 0)}</td></tr>
+      <tr><td>본사제공 자재</td><td style="text-align:right;">${fmtKrwInline(psSheet?.hqMaterialAmt ?? 0)}</td></tr>
+      <tr><td>임가공비</td><td style="text-align:right;">${fmtKrwInline(psSheet?.processingFeeKrw ?? 0)}</td></tr>
+      <tr class="highlight-row"><td><strong class="gold">&#x1F3ED; 공장단가</strong></td><td style="text-align:right;" class="gold"><strong>${fmtKrwInline(psSheet?.factoryUnitCostKrw ?? 0)}</strong></td></tr>
+      <tr><td>관세 (${Math.round((editBom.customsRate ?? 0) * 100)}%)</td><td style="text-align:right;">${fmtKrwInline((psSheet?.factoryUnitCostKrw ?? 0) * (editBom.customsRate ?? 0))}</td></tr>
+      <tr><td>물류비</td><td style="text-align:right;">${fmtKrwInline(editBom.logisticsCostKrw ?? 0)}</td></tr>
+      <tr><td>포장/검사비</td><td style="text-align:right;">${fmtKrwInline(editBom.packagingCostKrw ?? 0)}</td></tr>
+      <tr><td>패킹재</td><td style="text-align:right;">${fmtKrwInline(editBom.packingCostKrw ?? 0)}</td></tr>
+      <tr class="highlight-row"><td class="gold"><em>제품 총원가 (생산마진 전)</em></td><td style="text-align:right;" class="gold">${fmtKrwInline(psSheet?.totalCostKrw ?? 0)}</td></tr>
+      <tr><td>생산마진 (${Math.round((postMarginRateSheet ?? 0) * 100)}%)</td><td style="text-align:right;">${fmtKrwInline((psSheet?.totalCostKrw ?? 0) * (postMarginRateSheet ?? 0))}</td></tr>
+    </tbody>
+    <tfoot>
+      <tr class="total-row"><td><strong>총 원 가 액</strong></td><td style="text-align:right;" class="gold"><strong>${fmtKrwInline(finalCostSheet ?? 0)}</strong></td></tr>
+    </tfoot>
+  </table>
+</div>
+${editBom.pnl && postPnlResultSheet ? `
+<div class="section">
+  <div class="section-header">P&L 분석</div>
+  <div style="padding:16px;">
+    <div style="display:flex;gap:24px;margin-bottom:12px;font-size:12px;">
+      <div><span style="color:#6B7280;">할인율</span> <strong>${Math.round((editBom.pnl.discountRate ?? 0.05) * 100)}%</strong></div>
+      <div><span style="color:#6B7280;">플랫폼 수수료</span> <strong>${Math.round((editBom.pnl.platformFeeRate ?? 0.30) * 100)}%</strong></div>
+      <div><span style="color:#6B7280;">인건비/판관비</span> <strong>${Math.round((editBom.pnl.sgaRate ?? 0.10) * 100)}%</strong></div>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:12px;">
+      <div style="flex:1;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:8px;text-align:center;font-size:11px;"><div style="color:#6B7280;">3.5배 최소 판매가</div><div style="font-weight:700;">${fmtKrwInline(postPnlResultSheet.price35)}</div></div>
+      <div style="flex:1;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:8px;text-align:center;font-size:11px;"><div style="color:#6B7280;">4.0배 목표 판매가</div><div style="font-weight:700;">${fmtKrwInline(postPnlResultSheet.price40)}</div></div>
+      <div style="flex:1;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:8px;text-align:center;font-size:11px;"><div style="color:#6B7280;">4.5배 이상적 판매가</div><div style="font-weight:700;">${fmtKrwInline(postPnlResultSheet.price45)}</div></div>
+    </div>
+    ${editBom.pnl.confirmedSalePrice ? `
+    <div style="border:1px solid #E5E7EB;border-radius:6px;overflow:hidden;">
+      <div class="pl-row bold"><span>① 정가 (확정판매가)</span><span>${fmtKrwInline(editBom.pnl.confirmedSalePrice)}</span></div>
+      <div class="pl-row"><span>② (-) 할인 (${Math.round((editBom.pnl.discountRate ?? 0) * 100)}%)</span><span class="red">-${fmtKrwInline(editBom.pnl.confirmedSalePrice * (editBom.pnl.discountRate ?? 0))}</span></div>
+      <div class="pl-row bold"><span>③ 실판가 (Net Sale)</span><span>${fmtKrwInline(postPnlResultSheet.netSale)}</span></div>
+      <div class="pl-row"><span>④ (-) 플랫폼 수수료 (${Math.round((editBom.pnl.platformFeeRate ?? 0) * 100)}%)</span><span class="red">-${fmtKrwInline(postPnlResultSheet.netSale * (editBom.pnl.platformFeeRate ?? 0))}</span></div>
+      <div class="pl-row"><span>⑤ (-) 인건비/판관비 (${Math.round((editBom.pnl.sgaRate ?? 0) * 100)}%)</span><span class="red">-${fmtKrwInline(postPnlResultSheet.netSale * (editBom.pnl.sgaRate ?? 0))}</span></div>
+      <div class="pl-row"><span>⑥ (-) 매출원가 (COGS)</span><span class="red">-${fmtKrwInline(finalCostSheet)}</span></div>
+      <div class="pl-row bold ${postPnlResultSheet.operatingProfit >= 0 ? 'profit' : ''}"><span>⑦ 영업이익</span><span class="${postPnlResultSheet.operatingProfit >= 0 ? 'green' : 'red'}">${fmtKrwInline(postPnlResultSheet.operatingProfit)}</span></div>
+      <div class="pl-row bold ${postPnlResultSheet.operatingProfit >= 0 ? 'profit' : ''}"><span>&#x2605; 영업이익률</span><span class="${postPnlResultSheet.operatingProfit >= 0 ? 'green' : 'red'}">${(postPnlResultSheet.operatingMargin * 100).toFixed(1)}%</span></div>
+      <div style="padding:8px 12px;background:${postPnlResultSheet.meets35x ? '#F0FDF4' : '#FEF2F2'};border-top:1px solid #E5E7EB;display:flex;justify-content:space-between;align-items:center;font-size:12px;">
+        <span>&#x26A1; 실현 배수</span>
+        <div style="text-align:right;">
+          <div style="font-weight:700;color:${postPnlResultSheet.meets35x ? '#059669' : '#EF4444'};">${postPnlResultSheet.actualMultiple.toFixed(2)}x</div>
+          <div style="font-size:10px;color:${postPnlResultSheet.meets35x ? '#059669' : '#EF4444'};">${postPnlResultSheet.meets35x ? '&#x2705; 목표 달성 (3.5x 이상)' : '&#x26A0;&#xFE0F; 원가 절감 필요: ' + fmtKrwInline(postPnlResultSheet.costReductionNeeded)}</div>
+        </div>
+      </div>
+    </div>
+    ` : '<div style="padding:12px;color:#9CA3AF;font-size:12px;text-align:center;">확정 판매가를 입력하면 영업이익 분석이 표시됩니다.</div>'}
+  </div>
+</div>
+` : ''}
+</body>
+</html>`;
                           const w = window.open('about:blank', '_blank', 'width=960,height=1200');
                           if (!w) return;
-                          const html = el.innerHTML;
                           w.document.open();
-                          w.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>원가계산서</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
-  ${cssLinks}
-  <style>
-    body { font-family: 'Noto Sans KR', sans-serif !important; background: white; margin: 0; padding: 20px; }
-    button, input[type=file], .print\\:hidden { display: none !important; }
-    @media print {
-      body { margin: 0; padding: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    }
-  </style>
-</head>
-<body>${html}</body>
-</html>`);
+                          w.document.write(html);
                           w.document.close();
-                          w.onload = () => setTimeout(() => w.print(), 500);
+                          setTimeout(() => w.print(), 1200);
                         }}
                         className="px-4 py-1.5 bg-[#C9A96E] hover:bg-[#b8924f] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
                       >
