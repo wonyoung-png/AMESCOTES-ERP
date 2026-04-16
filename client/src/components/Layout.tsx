@@ -12,7 +12,6 @@ import {
   ChevronLeft, ChevronRight, TrendingUp, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, Bot, GitCompare,
 } from 'lucide-react';
-import ChatWidget from './ChatWidget';
 
 interface NavItem {
   path: string;
@@ -277,7 +276,6 @@ export default function Layout({ children, onLogout }: LayoutProps) {
       </div>
 
       {/* 플로팅 AI 챗봇 버튼 */}
-      <ChatWidget />
 
       {/* 하단 탭바 (모바일 전용) */}
       <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-stone-200 z-20 safe-area-pb">
