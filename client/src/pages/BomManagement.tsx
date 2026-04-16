@@ -5138,27 +5138,36 @@ export default function BomManagement() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => {
-                          // visibility 방식으로 현재 페이지에서 인쇄 (SPA 모달 인쇄 표준 방법)
-                          const printStyle = document.createElement('style');
-                          printStyle.id = 'cost-sheet-print-style';
-                          printStyle.textContent = `
-                            @media print {
-                              body > * { visibility: hidden !important; }
-                              #cost-sheet-modal-wrap, #cost-sheet-modal-wrap * { visibility: visible !important; }
-                              #cost-sheet-modal-wrap {
-                                position: fixed !important; top: 0 !important; left: 0 !important;
-                                width: 100% !important; height: auto !important; z-index: 99999 !important;
-                                background: white !important; padding: 24px !important; overflow: visible !important;
-                              }
-                              #cost-sheet-print { max-height: none !important; overflow: visible !important; box-shadow: none !important; border-radius: 0 !important; }
-                              .print\\:hidden { display: none !important; }
-                              button, input[type="file"] { display: none !important; }
-                              -webkit-print-color-adjust: exact; print-color-adjust: exact;
-                            }
-                          `;
-                          document.head.appendChild(printStyle);
-                          window.print();
-                          setTimeout(() => { document.getElementById('cost-sheet-print-style')?.remove(); }, 1000);
+                          const el = document.getElementById('cost-sheet-print-content');
+                          if (!el) return;
+                          // 현재 페이지 CSS link 절대 URL 추출
+                          const cssLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+                            .map(l => `<link rel="stylesheet" href="${(l as HTMLLinkElement).href}">`)
+                            .join('\n');
+                          const w = window.open('about:blank', '_blank', 'width=960,height=1200');
+                          if (!w) return;
+                          const html = el.innerHTML;
+                          w.document.open();
+                          w.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>원가계산서</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  ${cssLinks}
+  <style>
+    body { font-family: 'Noto Sans KR', sans-serif !important; background: white; margin: 0; padding: 20px; }
+    button, input[type=file], .print\\:hidden { display: none !important; }
+    @media print {
+      body { margin: 0; padding: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
+  </style>
+</head>
+<body>${html}</body>
+</html>`);
+                          w.document.close();
+                          w.onload = () => setTimeout(() => w.print(), 500);
                         }}
                         className="px-4 py-1.5 bg-[#C9A96E] hover:bg-[#b8924f] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
                       >
