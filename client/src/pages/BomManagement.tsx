@@ -27,7 +27,6 @@ import {
   Calculator, TrendingUp, AlertTriangle, CheckCircle, Save, X, Copy, Search,
   Factory, DollarSign,
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
 
 // ─── 타입 정의 ───────────────────────────────────────────────────────────────
 interface PostProcessLine {
@@ -5138,41 +5137,34 @@ export default function BomManagement() {
                     <h2 className="text-base font-bold">📄 원가계산서</h2>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={async () => {
+                        onClick={() => {
                           const el = document.getElementById('cost-sheet-print-content');
                           if (!el) return;
-                          try {
-                            // 일시적으로 max-height 제거 (전체 캡처용)
-                            const parent = el.closest('#cost-sheet-print') as HTMLElement | null;
-                            const origStyle = parent?.style.maxHeight ?? '';
-                            const origOverflow = parent?.style.overflow ?? '';
-                            if (parent) { parent.style.maxHeight = 'none'; parent.style.overflow = 'visible'; }
+                          // iframe 방식 — 현재 페이지 CSS 그대로 사용
+                          const cssLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+                            .map(l => `<link rel="stylesheet" href="${(l as HTMLLinkElement).href}">`)
+                            .join('');
+                          // max-height 임시 제거
+                          const printDiv = document.getElementById('cost-sheet-print') as HTMLElement | null;
+                          if (printDiv) { printDiv.style.maxHeight = 'none'; printDiv.style.overflow = 'visible'; }
+                          const html = el.innerHTML;
+                          if (printDiv) { printDiv.style.maxHeight = ''; printDiv.style.overflow = ''; }
 
-                            const canvas = await html2canvas(el, {
-                              scale: 2,
-                              useCORS: true,
-                              allowTaint: true,
-                              backgroundColor: '#ffffff',
-                              logging: false,
-                            });
-
-                            // 원래 스타일 복구
-                            if (parent) { parent.style.maxHeight = origStyle; parent.style.overflow = origOverflow; }
-
-                            const imgData = canvas.toDataURL('image/png');
-                            const imgWidth = canvas.width;
-                            const imgHeight = canvas.height;
-
-                            const w = window.open('', '_blank', 'width=900,height=1200');
-                            if (!w) return;
-                            w.document.open();
-                            w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>원가계산서</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{background:white;}img{width:100%;height:auto;display:block;}@media print{@page{margin:5mm;size:A4;}body{margin:0;}}</style></head><body><img src="${imgData}" width="${imgWidth}" height="${imgHeight}" /></body></html>`);
-                            w.document.close();
-                            setTimeout(() => { w.print(); }, 500);
-                          } catch (e) {
-                            console.error('인쇄 오류:', e);
-                            alert('인쇄 중 오류가 발생했습니다.');
-                          }
+                          const iframe = document.createElement('iframe');
+                          iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+                          document.body.appendChild(iframe);
+                          const doc = iframe.contentDocument || iframe.contentWindow?.document;
+                          if (!doc) return;
+                          doc.open();
+                          doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>원가계산서</title>${cssLinks}<style>body{background:white;padding:20px;font-family:'Noto Sans KR',sans-serif;}button,input[type=file],.print\:hidden{display:none!important;}@media print{@page{margin:8mm;size:A4;}body{padding:8px;}-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style></head><body>${html}</body></html>`);
+                          doc.close();
+                          // CSS 로드 후 인쇄
+                          iframe.onload = () => {
+                            setTimeout(() => {
+                              iframe.contentWindow?.print();
+                              setTimeout(() => document.body.removeChild(iframe), 1000);
+                            }, 800);
+                          };
                         }}
                         className="px-4 py-1.5 bg-[#C9A96E] hover:bg-[#b8924f] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
                       >
