@@ -907,6 +907,7 @@ export const store = {
       color_boms: bom.colorBoms ?? [],
       post_color_boms: bom.postColorBoms ?? [],
       post_process_lines: bom.postProcessLines ?? [],
+      pnl_data: bom.pnl ? JSON.stringify(bom.pnl) : null,
       pre_currency: bom.preCurrency ?? bom.currency ?? 'CNY',
       post_currency: bom.currency ?? 'CNY',
       pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,

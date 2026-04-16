@@ -5344,6 +5344,20 @@ export default function BomManagement() {
                                   </div>
                                 ))}
                               </div>
+                              {/* 실현배수 + 원가절감 */}
+                              <div className={`flex items-center justify-between py-2 px-3 rounded mt-2 ${postPnlResultSheet.meets35x ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-stone-400 w-5">⚡</span>
+                                  <span className="text-xs font-semibold text-stone-700">실현 배수</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className={`text-sm font-bold ${postPnlResultSheet.meets35x ? 'text-green-600' : 'text-red-500'}`}>{postPnlResultSheet.actualMultiple.toFixed(2)}x</span>
+                                  {postPnlResultSheet.meets35x
+                                    ? <div className="text-[10px] text-green-600">✅ 목표 달성 (3.5x 이상)</div>
+                                    : <div className="text-[10px] text-red-500">⚠️ 원가 절감 필요: {fmtKrw(postPnlResultSheet.costReductionNeeded)}</div>
+                                  }
+                                </div>
+                              </div>
                             </div>
                           )}
                         </div>

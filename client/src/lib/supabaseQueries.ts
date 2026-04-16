@@ -137,7 +137,12 @@ export function convertBomFromDB(row: any) {
     logisticsCostKrw: row.logistics_cost_krw ?? 0,
     packagingCostKrw: row.packaging_cost_krw ?? 0,
     packingCostKrw: row.packing_cost_krw ?? 0,
-    pnl: { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 },
+    pnl: (() => {
+      try {
+        if (row.pnl_data) return JSON.parse(row.pnl_data);
+      } catch {}
+      return { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 };
+    })(),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     memo: row.memo,
