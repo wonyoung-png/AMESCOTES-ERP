@@ -1,5 +1,6 @@
 // ERP 에이전트 팀 API 라우터 — SSE 스트리밍 + 파일 업로드 + 이미지 비전
 import { Router, type Request, type Response } from 'express';
+import puppeteer from 'puppeteer';
 import multer from 'multer';
 import * as XLSX from 'xlsx';
 import Anthropic from '@anthropic-ai/sdk';
@@ -242,6 +243,39 @@ router.get('/api/agent/health', (_req: Request, res: Response) => {
     agents: ['등록-에이전트', '감지-에이전트', '조회-에이전트', '보고서-에이전트'],
     hasApiKey: !!process.env.ANTHROPIC_API_KEY,
   });
+});
+
+/** POST /api/print/pdf — Puppeteer PDF 생성 */
+router.post('/api/print/pdf', async (req: Request, res: Response) => {
+  try {
+    const { html } = req.body as { html: string };
+    if (!html) {
+      res.status(400).json({ error: 'html required' });
+      return;
+    }
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+    });
+    await browser.close();
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename="cost-sheet.pdf"',
+    });
+    res.send(pdf);
+  } catch (err) {
+    console.error('[PDF] 오류:', err);
+    res.status(500).json({ error: String(err) });
+  }
 });
 
 export default router;

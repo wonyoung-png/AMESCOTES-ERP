@@ -5137,38 +5137,58 @@ export default function BomManagement() {
                     <h2 className="text-base font-bold">📄 원가계산서</h2>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           const el = document.getElementById('cost-sheet-print-content');
                           if (!el) return;
-                          // iframe 방식 — 현재 페이지 CSS 그대로 사용
-                          const cssLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
-                            .map(l => `<link rel="stylesheet" href="${(l as HTMLLinkElement).href}">`)
-                            .join('');
-                          // max-height 임시 제거
+
+                          // max-height 임시 제거 후 HTML 캡처
                           const printDiv = document.getElementById('cost-sheet-print') as HTMLElement | null;
                           if (printDiv) { printDiv.style.maxHeight = 'none'; printDiv.style.overflow = 'visible'; }
                           const html = el.innerHTML;
                           if (printDiv) { printDiv.style.maxHeight = ''; printDiv.style.overflow = ''; }
 
-                          const iframe = document.createElement('iframe');
-                          iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-                          document.body.appendChild(iframe);
-                          const doc = iframe.contentDocument || iframe.contentWindow?.document;
-                          if (!doc) return;
-                          doc.open();
-                          doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>원가계산서</title>${cssLinks}<style>body{background:white;padding:20px;font-family:'Noto Sans KR',sans-serif;}button,input[type=file],.print\:hidden{display:none!important;}@media print{@page{margin:8mm;size:A4;}body{padding:8px;}-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style></head><body>${html}</body></html>`);
-                          doc.close();
-                          // CSS 로드 후 인쇄
-                          iframe.onload = () => {
-                            setTimeout(() => {
-                              iframe.contentWindow?.print();
-                              setTimeout(() => document.body.removeChild(iframe), 1000);
-                            }, 800);
-                          };
+                          // 현재 페이지 CSS link 절대 URL 추출
+                          const cssLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+                            .map(l => `<link rel="stylesheet" href="${(l as HTMLLinkElement).href}">`)
+                            .join('');
+
+                          const fullHtml = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  ${cssLinks}
+  <style>
+    body { font-family: 'Noto Sans KR', sans-serif !important; background: white; margin: 0; padding: 24px; }
+    button, input[type=file] { display: none !important; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  </style>
+</head>
+<body>${html}</body>
+</html>`;
+
+                          try {
+                            const res = await fetch('/api/print/pdf', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ html: fullHtml }),
+                            });
+                            if (!res.ok) throw new Error(await res.text());
+                            const blob = await res.blob();
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `원가계산서_${editBom?.styleNo || 'draft'}.pdf`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                          } catch (e) {
+                            console.error('PDF 오류:', e);
+                            alert('PDF 생성 중 오류: ' + String(e));
+                          }
                         }}
                         className="px-4 py-1.5 bg-[#C9A96E] hover:bg-[#b8924f] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
                       >
-                        🖨️ 인쇄 / PDF
+                        🖨️ PDF 다운로드
                       </button>
                       <button
                         onClick={() => setShowCostSheetModal(false)}
