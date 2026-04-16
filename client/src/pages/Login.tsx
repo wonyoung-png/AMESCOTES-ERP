@@ -1,4 +1,5 @@
 // AMESCOTES ERP — 로그인
+// 2026-04-16: 데모 계정 안내 블록 제거 (보안)
 import { useState } from 'react';
 import { login, initDefaultUsers } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // 최초 실행 시 기본 계정 초기화
+  // 최초 실행 시 기본 계정 초기화 (+ 팀 버전 자동 마이그레이션)
   initDefaultUsers();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -60,7 +61,7 @@ export default function Login({ onLogin }: LoginProps) {
               <Input
                 id="email"
                 type="email"
-                placeholder="example@amescotes.com"
+                placeholder="name@atlm.kr"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 autoComplete="email"
@@ -98,17 +99,10 @@ export default function Login({ onLogin }: LoginProps) {
             </Button>
           </form>
 
-          {/* 데모 계정 안내 */}
-          <div className="mt-6 p-3 bg-stone-50 rounded-lg border border-stone-100">
-            <p className="text-[11px] text-stone-500 font-medium mb-2">데모 계정</p>
-            <div className="space-y-1 text-[11px] text-stone-400">
-              <div className="flex justify-between"><span>대표</span><span className="font-mono">ceo@amescotes.com / admin1234</span></div>
-              <div className="flex justify-between"><span>생산관리팀장</span><span className="font-mono">pm@amescotes.com / pm1234</span></div>
-              <div className="flex justify-between"><span>부관리 주임</span><span className="font-mono">manager@amescotes.com / mgr1234</span></div>
-              <div className="flex justify-between"><span>사원</span><span className="font-mono">staff@amescotes.com / staff1234</span></div>
-              <div className="flex justify-between"><span>영업과장</span><span className="font-mono">sales@amescotes.com / sales1234</span></div>
-            </div>
-          </div>
+          {/* 안내 문구 (데모 블록 제거 — 대신 간단 안내) */}
+          <p className="mt-6 text-center text-[11px] text-stone-400">
+            계정 관련 문의는 대표님께 요청해 주십시오.
+          </p>
         </div>
 
         <p className="text-center text-xs text-stone-400 mt-6">
