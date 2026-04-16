@@ -5137,7 +5137,15 @@ export default function BomManagement() {
                     <h2 className="text-base font-bold">📄 원가계산서</h2>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => window.print()}
+                        onClick={() => {
+                          const el = document.getElementById('cost-sheet-print-content');
+                          if (!el) return;
+                          const w = window.open('', '_blank', 'width=900,height=1200');
+                          if (!w) return;
+                          w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>원가계산서</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Noto Sans KR',sans-serif;margin:20px;font-size:13px;color:#1C1C1E;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #e5e7eb;padding:6px 10px;font-size:12px;}th{background:#fafafa;font-weight:600;}@media print{body{margin:0;}}</style></head><body>${el.innerHTML}</body></html>`);
+                          w.document.close();
+                          setTimeout(() => { w.print(); }, 600);
+                        }}
                         className="px-4 py-1.5 bg-[#C9A96E] hover:bg-[#b8924f] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
                       >
                         🖨️ 인쇄 / PDF
@@ -5149,7 +5157,7 @@ export default function BomManagement() {
                     </div>
                   </div>
 
-                  <div className="p-6 space-y-6">
+                  <div id="cost-sheet-print-content" className="p-6 space-y-6">
                     {/* 섹션 1: 제품 기본정보 */}
                     <div className="border border-stone-200 rounded-xl overflow-hidden">
                       <div className="bg-stone-800 text-white px-5 py-3 flex items-center justify-between">
