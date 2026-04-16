@@ -5129,7 +5129,7 @@ export default function BomManagement() {
             const postPnlResultSheet = editBom.pnl ? calcPnl(finalCostSheet, editBom.pnl) : null;
             const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
             return (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div id="cost-sheet-modal-wrap" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
                 <style>{`@media print { body > * { display: none !important; } #cost-sheet-print { display: block !important; } }`}</style>
                 <div id="cost-sheet-print" className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
                   {/* 헤더 */}
@@ -5138,30 +5138,27 @@ export default function BomManagement() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => {
-                          const el = document.getElementById('cost-sheet-print-content');
-                          if (!el) return;
-                          const w = window.open('', '_blank', 'width=960,height=1200');
-                          if (!w) return;
-                          // 현재 페이지의 스타일시트 복사
-                          const styleSheets = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
-                            .map(s => s.outerHTML).join('\n');
-                          w.document.write(`<!DOCTYPE html><html><head>
-                            <meta charset="UTF-8">
-                            <title>원가계산서</title>
-                            <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
-                            ${styleSheets}
-                            <style>
-                              @media print {
-                                body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                                button, input[type="file"] { display: none !important; }
-                                .hidden { display: none !important; }
+                          // visibility 방식으로 현재 페이지에서 인쇄 (SPA 모달 인쇄 표준 방법)
+                          const printStyle = document.createElement('style');
+                          printStyle.id = 'cost-sheet-print-style';
+                          printStyle.textContent = `
+                            @media print {
+                              body > * { visibility: hidden !important; }
+                              #cost-sheet-modal-wrap, #cost-sheet-modal-wrap * { visibility: visible !important; }
+                              #cost-sheet-modal-wrap {
+                                position: fixed !important; top: 0 !important; left: 0 !important;
+                                width: 100% !important; height: auto !important; z-index: 99999 !important;
+                                background: white !important; padding: 24px !important; overflow: visible !important;
                               }
-                              body { font-family: 'Noto Sans KR', sans-serif; background: white; margin: 0; padding: 16px; }
-                              img { max-width: 100%; }
-                            </style>
-                          </head><body>${el.innerHTML}</body></html>`);
-                          w.document.close();
-                          setTimeout(() => { w.print(); }, 800);
+                              #cost-sheet-print { max-height: none !important; overflow: visible !important; box-shadow: none !important; border-radius: 0 !important; }
+                              .print\\:hidden { display: none !important; }
+                              button, input[type="file"] { display: none !important; }
+                              -webkit-print-color-adjust: exact; print-color-adjust: exact;
+                            }
+                          `;
+                          document.head.appendChild(printStyle);
+                          window.print();
+                          setTimeout(() => { document.getElementById('cost-sheet-print-style')?.remove(); }, 1000);
                         }}
                         className="px-4 py-1.5 bg-[#C9A96E] hover:bg-[#b8924f] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
                       >
