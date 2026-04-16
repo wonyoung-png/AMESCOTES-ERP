@@ -1819,11 +1819,9 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
         </div>
       </td>
       {/* 단가 */}
-      <td className="px-1 py-1">
-        <Input type="number" value={line.unitPriceCny || ''} onChange={e => onChange(line.id, 'unitPriceCny', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="0" />
-        {line.unitPriceCny > 0 && usdKrw > 0 && (
-          <div className="text-[10px] text-stone-400 text-right mt-0.5">₩{Math.round(line.unitPriceCny * cnyKrw).toLocaleString()}</div>
-        )}
+      <td className="px-2 py-1 text-right tabular-nums">
+        <div>${((line.unitPriceCny * cnyKrw) / (usdKrw || 1380)).toFixed(2)}</div>
+        <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round(line.unitPriceCny * cnyKrw).toLocaleString()}</div>
       </td>
       {/* NET 소요량 */}
       <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => onChange(line.id, 'netQty', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="0" /></td>
@@ -1855,9 +1853,9 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
         </div>
       </td>
       {/* 제조금액 (USD + KRW 통합) */}
-      <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">
-        <div>${((amt * cnyKrw) / (usdKrw || 1380)).toFixed(2)}</div>
-        {amt > 0 && <div className="text-[10px] text-stone-400 mt-0.5">{fmtKrw(amt * cnyKrw)}</div>}
+      <td className="px-2 py-1 text-right tabular-nums">
+        <div style={{fontWeight:600}}>${((amt * cnyKrw) / (usdKrw || 1380)).toFixed(2)}</div>
+        <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round(amt * cnyKrw).toLocaleString()}</div>
       </td>
       {/* 공급 상태 + 체크박스 (본사/업체/공장) */}
       <td className="px-2 py-1 w-28">
@@ -3804,7 +3802,7 @@ export default function BomManagement() {
                           <th className="px-2 py-2 text-left">부위 | 자재명</th>
                           <th className="px-2 py-2 text-left w-20">규격</th>
                           <th className="px-2 py-2 text-center w-20">단위</th>
-                          <th className="px-2 py-2 text-right w-24">단가(기준)/KRW</th>
+                          <th className="px-2 py-2 text-right w-24">단가</th>
                           <th className="px-2 py-2 text-right w-20">NET</th>
                           <th className="px-2 py-2 text-right w-16">LOSS(%)</th>
                           <th className="px-2 py-2 text-right w-24">소요량</th>
@@ -3824,7 +3822,7 @@ export default function BomManagement() {
                           return (
                             <React.Fragment key={cat}>
                               <tr className={`border-y ${isRawMaterial ? 'bg-amber-50 border-amber-200' : 'bg-stone-100 border-stone-200'}`}>
-                                <td colSpan={12} className="px-3 py-1.5">
+                                <td colSpan={11} className="px-3 py-1.5">
                                   <div className="flex items-center justify-between">
                                     <button onClick={() => toggleSection(cat)} className={`flex items-center gap-2 font-semibold text-xs hover:opacity-80 ${isRawMaterial ? 'text-amber-800' : 'text-stone-700'}`}>
                                       {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -3856,6 +3854,7 @@ export default function BomManagement() {
                                   cnyKrw={preRate}
                                   sectionKey={cat}
                                   accentColor="amber"
+                                  usdKrw={preUsdKrw}
                                 />
                               ))}
                             </React.Fragment>
@@ -3864,7 +3863,7 @@ export default function BomManagement() {
 
                         {/* 후가공 섹션 */}
                         <tr className="bg-stone-100 border-y border-stone-200">
-                          <td colSpan={12} className="px-3 py-1.5">
+                          <td colSpan={11} className="px-3 py-1.5">
                             <div className="flex items-center justify-between">
                               <button onClick={() => toggleSection('후가공')} className="flex items-center gap-2 text-stone-700 font-semibold text-xs hover:text-stone-900">
                                 {collapsedSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -3899,8 +3898,10 @@ export default function BomManagement() {
                               <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'netQty', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="수량" /></td>
                               <td className="px-2 py-1 text-center text-xs text-stone-300">-</td>
                               <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmt(line.netQty)}</td>
-                              <td className="px-2 py-1 text-right text-xs font-medium tabular-nums">{fmt(lineAmt)}</td>
-                              <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmtKrw(lineAmt * preRate)}</td>
+                              <td className="px-2 py-1 text-right tabular-nums">
+                                <div style={{fontWeight:600}}>${((lineAmt * preRate) / (preUsdKrw || 1380)).toFixed(2)}</div>
+                                <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round(lineAmt * preRate).toLocaleString()}</div>
+                              </td>
                               <td></td><td></td>
                               <td className="px-1 py-1"><button onClick={() => deleteColorPostLine(colorBom.color, line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-stone-300 hover:text-red-400 p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
                             </tr>
@@ -3909,7 +3910,7 @@ export default function BomManagement() {
 
                         {/* 임가공비 */}
                         <tr className="bg-amber-50/50 border-y border-stone-200">
-                          <td colSpan={12} className="px-3 py-1.5">
+                          <td colSpan={11} className="px-3 py-1.5">
                             <span className="text-xs font-semibold text-stone-600">임가공비</span>
                             <span className="text-[10px] text-stone-400 ml-2">자재비와 별도 항목</span>
                           </td>
@@ -3924,8 +3925,10 @@ export default function BomManagement() {
                           <td className="px-1 py-1"><span className="text-xs text-stone-400 px-2">1</span></td>
                           <td></td>
                           <td className="px-2 py-1 text-right text-xs text-stone-400">1</td>
-                          <td className="px-2 py-1 text-right text-xs font-semibold tabular-nums">{fmt(colorBom.processingFee ?? 0)} {curSymbol}</td>
-                          <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">{fmtKrw((colorBom.processingFee ?? 0) * preRate)}</td>
+                          <td className="px-2 py-1 text-right tabular-nums">
+                            <div style={{fontWeight:600}}>${(((colorBom.processingFee ?? 0) * preRate) / (preUsdKrw || 1380)).toFixed(2)}</div>
+                            <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round((colorBom.processingFee ?? 0) * preRate).toLocaleString()}</div>
+                          </td>
                           <td colSpan={3}></td>
                         </tr>
                       </tbody>
@@ -4395,7 +4398,7 @@ export default function BomManagement() {
                             <th className="px-2 py-2 text-left">부위 | 자재명</th>
                             <th className="px-2 py-2 text-left w-20">규격</th>
                             <th className="px-2 py-2 text-center w-20">단위</th>
-                            <th className="px-2 py-2 text-right w-24">단가(기준)/KRW</th>
+                            <th className="px-2 py-2 text-right w-24">단가</th>
                             <th className="px-2 py-2 text-right w-20">NET</th>
                             <th className="px-2 py-2 text-right w-16">LOSS(%)</th>
                             <th className="px-2 py-2 text-right w-24">소요량</th>
@@ -4411,7 +4414,7 @@ export default function BomManagement() {
                             const filledLines = catLines.filter(l => l.itemName);
                             const catTotal = catLines.reduce((s, l) => s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate), 0);
                             const collapsed = collapsedPostSections.has(cat);
-                            const colCount = 12;
+                            const colCount = 11;
                             const isRawMaterial = cat === '원자재';
                             return (
                               <React.Fragment key={cat}>
@@ -4458,7 +4461,7 @@ export default function BomManagement() {
                           {/* 후가공 섹션 (postColorBom 기반) */}
                           <React.Fragment key="후가공-post">
                             <tr className="bg-stone-100 border-y border-stone-200">
-                              <td colSpan={12} className="px-3 py-1.5">
+                              <td colSpan={11} className="px-3 py-1.5">
                                 <div className="flex items-center justify-between">
                                   <button onClick={() => togglePostSection('후가공')} className="flex items-center gap-2 font-semibold text-xs text-stone-700 hover:opacity-80">
                                     {collapsedPostSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -4486,8 +4489,10 @@ export default function BomManagement() {
                                   <Input type="number" value={line.unitPrice || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'unitPrice', Number(e.target.value))} placeholder="단가" className="h-7 text-xs border-stone-200 w-20 text-right" />
                                 </td>
                                 <td className="px-1 py-1"></td>
-                                <td className="px-2 py-1 text-right text-xs tabular-nums">{fmt(line.netQty * line.unitPrice)}</td>
-                                <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmtKrw(line.netQty * line.unitPrice * postRate)}</td>
+                                <td className="px-2 py-1 text-right tabular-nums">
+                                  <div style={{fontWeight:600}}>${((line.netQty * line.unitPrice * postRate) / (postUsdKrw || 1380)).toFixed(2)}</div>
+                                  <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round(line.netQty * line.unitPrice * postRate).toLocaleString()}</div>
+                                </td>
                                 <td colSpan={3}></td>
                                 <td className="px-1 py-1 text-center">
                                   <button onClick={() => deletePostColorPostLine(postColorBom.color, line.id)} className="text-stone-300 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -4497,7 +4502,7 @@ export default function BomManagement() {
                           </React.Fragment>
                           {/* 임가공비 (postColorBom 기반) */}
                           <tr className="bg-amber-50/50 border-y border-stone-200">
-                            <td colSpan={12} className="px-3 py-1.5">
+                            <td colSpan={11} className="px-3 py-1.5">
                               <span className="text-xs font-semibold text-stone-600">임가공비</span>
                               <span className="text-[10px] text-stone-400 ml-2">자재비와 별도 항목</span>
                             </td>
@@ -4512,8 +4517,10 @@ export default function BomManagement() {
                             <td className="px-1 py-1"><span className="text-xs text-stone-400 px-2">1</span></td>
                             <td></td>
                             <td className="px-2 py-1 text-right text-xs text-stone-400">1</td>
-                            <td className="px-2 py-1 text-right text-xs font-semibold tabular-nums">{fmt(postColorBom.processingFee ?? 0)} {curSymbol}</td>
-                            <td className="px-2 py-1 text-right text-xs font-semibold text-[#C9A96E] tabular-nums">{fmtKrw((postColorBom.processingFee ?? 0) * postRate)}</td>
+                            <td className="px-2 py-1 text-right tabular-nums">
+                              <div style={{fontWeight:600}}>${(((postColorBom.processingFee ?? 0) * postRate) / (postUsdKrw || 1380)).toFixed(2)}</div>
+                              <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round((postColorBom.processingFee ?? 0) * postRate).toLocaleString()}</div>
+                            </td>
                             <td colSpan={3}></td>
                           </tr>
                           {/* 관세율/물류비 입력은 사후원가 요약 패널로 이동 */}
