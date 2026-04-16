@@ -137,6 +137,7 @@ export function convertBomFromDB(row: any) {
     logisticsCostKrw: row.logistics_cost_krw ?? 0,
     packagingCostKrw: row.packaging_cost_krw ?? 0,
     packingCostKrw: row.packing_cost_krw ?? 0,
+    productImage: row.product_image ?? undefined,
     pnl: (() => {
       try {
         if (row.pnl_data) return JSON.parse(row.pnl_data);
@@ -195,7 +196,8 @@ const TABLE_COLUMNS: Record<string, string[]> = {
          'delivery_price', 'logistics_cost_krw', 'production_margin_rate', 'memo',
          'created_at', 'updated_at',
          'color_boms', 'post_color_boms', 'pre_currency', 'post_currency',
-         'pre_exchange_rate_cny', 'post_exchange_rate_cny', 'customs_rate', 'post_process_lines', 'post_delivery_price', 'post_subtotal_krw', 'post_total_cost_krw'],
+         'pre_exchange_rate_cny', 'post_exchange_rate_cny', 'customs_rate', 'post_process_lines', 'post_delivery_price', 'post_subtotal_krw', 'post_total_cost_krw',
+         'pnl_data', 'product_image', 'packaging_cost_krw', 'packing_cost_krw'],
   production_orders: ['id', 'style_no', 'style_name', 'buyer_id', 'vendor_id', 'quantity', 'unit_price',
                       'currency', 'order_date', 'expected_date', 'status', 'memo',
                       'order_no', 'vendor_name', 'factory_unit_price_krw', 'factory_unit_price_cny',

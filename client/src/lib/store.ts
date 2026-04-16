@@ -281,6 +281,7 @@ export interface Bom {
   snapshotUsdKrw?: number;    // 적용 환율 (USD→KRW)
   pnl?: BomPnlAssumptions;    // P&L 가정값
   sourceFileName?: string;    // 업로드한 엑셀 파일명 (사전원가)
+  productImage?: string;      // 제품 이미지 (base64)
   // ─── 사후원가 필드 ───
   preMaterials?: BomLine[];       // 사전원가 자재 (lines와 동일, 호환성)
   postMaterials?: BomLine[];      // 사후원가 자재
@@ -908,6 +909,7 @@ export const store = {
       post_color_boms: bom.postColorBoms ?? [],
       post_process_lines: bom.postProcessLines ?? [],
       pnl_data: bom.pnl ? JSON.stringify(bom.pnl) : null,
+      product_image: bom.productImage ?? null,
       pre_currency: bom.preCurrency ?? bom.currency ?? 'CNY',
       post_currency: bom.currency ?? 'CNY',
       pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,

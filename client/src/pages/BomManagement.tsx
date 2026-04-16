@@ -3416,6 +3416,28 @@ export default function BomManagement() {
                 <Input value={editBom.designer || ''} disabled className="h-8 text-xs border-stone-200 bg-stone-50 text-stone-500 cursor-not-allowed" />
               </div>
               <div><label className="text-xs text-stone-500 mb-1 block font-medium">라인명</label><Input value={editBom.lineName || ''} onChange={e => updateField('lineName', e.target.value)} className="h-8 text-xs border-stone-200" placeholder="라인명" /></div>
+              {/* 제품이미지 업로드 */}
+              <div className="col-span-2">
+                <label className="text-xs text-stone-500 mb-1 block font-medium">포토 구성 (제품사진 - 클릭 또는 Ctrl+V)</label>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-20 h-20 border-2 border-dashed border-stone-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-amber-400 hover:bg-amber-50 transition-colors overflow-hidden flex-shrink-0"
+                    onClick={() => document.getElementById('bom-product-img-input')?.click()}
+                    onPaste={e => { const items = Array.from(e.clipboardData?.items || []); const img = items.find(i => i.type.startsWith('image/')); if (img) { const blob = img.getAsFile(); if (blob) { const reader = new FileReader(); reader.onload = ev => updateField('productImage', ev.target?.result as string); reader.readAsDataURL(blob); } } }}
+                    tabIndex={0}
+                  >
+                    {editBom.productImage ? (
+                      <img src={editBom.productImage} alt="제품" className="w-full h-full object-cover" />
+                    ) : (
+                      <><span className="text-lg">📷</span><span className="text-[9px] text-stone-400 text-center">제품사진</span></>
+                    )}
+                  </div>
+                  <input id="bom-product-img-input" type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = ev => updateField('productImage', ev.target?.result as string); reader.readAsDataURL(file); e.target.value = ''; }} />
+                  {editBom.productImage && (
+                    <button onClick={() => updateField('productImage', undefined)} className="text-[10px] text-red-400 hover:text-red-600">× 삭제</button>
+                  )}
+                </div>
+              </div>
               <div><label className="text-xs text-stone-500 mb-1 block font-medium">환율 (CNY→KRW)</label><Input type="number" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 text-xs border-stone-200 text-right" /></div>
               <div><label className="text-xs text-stone-500 mb-1 block font-medium">생산마진율 (%)</label><Input type="number" value={Math.round((editBom.productionMarginRate || 0.16) * 100)} onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)} className="h-8 text-xs border-stone-200 text-right" /></div>
             </>
@@ -4323,7 +4345,7 @@ export default function BomManagement() {
                     <FileText className="w-3.5 h-3.5" /> 업체용 견적서
                   </Button>
                   {/* 원가계산서 출력 */}
-                  <Button variant="outline" size="sm" onClick={() => setShowCostSheetModal(true)} className="gap-1.5 text-xs border-stone-400 text-stone-700 hover:bg-stone-50">
+                  <Button variant="outline" size="sm" onClick={() => { setCostSheetProductImage(editBom?.productImage || null); setShowCostSheetModal(true); }} className="gap-1.5 text-xs border-stone-400 text-stone-700 hover:bg-stone-50">
                     📄 원가계산서
                   </Button>
                 </div>
