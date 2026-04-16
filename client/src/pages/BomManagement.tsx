@@ -5156,13 +5156,26 @@ export default function BomManagement() {
                             <div
                               className="w-32 h-32 border-2 border-dashed border-stone-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-stone-500 hover:bg-stone-50 transition-colors overflow-hidden"
                               onClick={() => document.getElementById('cost-sheet-img-input')?.click()}
+                              onPaste={e => {
+                                const items = Array.from(e.clipboardData?.items || []);
+                                const img = items.find(i => i.type.startsWith('image/'));
+                                if (img) {
+                                  const blob = img.getAsFile();
+                                  if (blob) {
+                                    const reader = new FileReader();
+                                    reader.onload = ev => setCostSheetProductImage(ev.target?.result as string);
+                                    reader.readAsDataURL(blob);
+                                  }
+                                }
+                              }}
+                              tabIndex={0}
                             >
                               {costSheetProductImage ? (
                                 <img src={costSheetProductImage} alt="제품사진" className="w-full h-full object-cover" />
                               ) : (
                                 <>
                                   <span className="text-2xl mb-1">📷</span>
-                                  <span className="text-[10px] text-stone-400 text-center px-1">제품사진<br/>클릭하여 업로드</span>
+                                  <span className="text-[10px] text-stone-400 text-center px-1">제품사진<br/>클릭 또는 Ctrl+V</span>
                                 </>
                               )}
                             </div>
