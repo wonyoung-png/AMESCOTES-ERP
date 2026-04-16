@@ -271,7 +271,7 @@ router.post('/api/print/pdf', async (req: Request, res: Response) => {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'attachment; filename="cost-sheet.pdf"',
     });
-    res.send(pdf);
+    res.send(Buffer.from(pdf));
   } catch (err) {
     console.error('[PDF] 오류:', err);
     res.status(500).json({ error: String(err) });
