@@ -5140,11 +5140,28 @@ export default function BomManagement() {
                         onClick={() => {
                           const el = document.getElementById('cost-sheet-print-content');
                           if (!el) return;
-                          const w = window.open('', '_blank', 'width=900,height=1200');
+                          const w = window.open('', '_blank', 'width=960,height=1200');
                           if (!w) return;
-                          w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>원가계산서</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Noto Sans KR',sans-serif;margin:20px;font-size:13px;color:#1C1C1E;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #e5e7eb;padding:6px 10px;font-size:12px;}th{background:#fafafa;font-weight:600;}@media print{body{margin:0;}}</style></head><body>${el.innerHTML}</body></html>`);
+                          // 현재 페이지의 스타일시트 복사
+                          const styleSheets = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+                            .map(s => s.outerHTML).join('\n');
+                          w.document.write(`<!DOCTYPE html><html><head>
+                            <meta charset="UTF-8">
+                            <title>원가계산서</title>
+                            <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+                            ${styleSheets}
+                            <style>
+                              @media print {
+                                body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                                button, input[type="file"] { display: none !important; }
+                                .hidden { display: none !important; }
+                              }
+                              body { font-family: 'Noto Sans KR', sans-serif; background: white; margin: 0; padding: 16px; }
+                              img { max-width: 100%; }
+                            </style>
+                          </head><body>${el.innerHTML}</body></html>`);
                           w.document.close();
-                          setTimeout(() => { w.print(); }, 600);
+                          setTimeout(() => { w.print(); }, 800);
                         }}
                         className="px-4 py-1.5 bg-[#C9A96E] hover:bg-[#b8924f] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
                       >
@@ -5190,7 +5207,7 @@ export default function BomManagement() {
                               ) : (
                                 <>
                                   <span className="text-2xl mb-1">📷</span>
-                                  <span className="text-[10px] text-stone-400 text-center px-1">제품사진<br/>클릭 또는 Ctrl+V</span>
+                                  <span className="text-[10px] text-stone-400 text-center px-1 print:hidden">제품사진<br/>클릭 또는 Ctrl+V</span>
                                 </>
                               )}
                             </div>
@@ -5198,7 +5215,7 @@ export default function BomManagement() {
                               id="cost-sheet-img-input"
                               type="file"
                               accept="image/*"
-                              className="hidden"
+                              className="hidden print:hidden"
                               onChange={e => {
                                 const file = e.target.files?.[0];
                                 if (!file) return;
