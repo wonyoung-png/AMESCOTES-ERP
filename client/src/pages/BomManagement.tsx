@@ -5138,40 +5138,13 @@ export default function BomManagement() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={async () => {
-                          const el = document.getElementById('cost-sheet-print-content');
-                          if (!el) return;
-
-                          // max-height 임시 제거 후 HTML 캡처
-                          const printDiv = document.getElementById('cost-sheet-print') as HTMLElement | null;
-                          if (printDiv) { printDiv.style.maxHeight = 'none'; printDiv.style.overflow = 'visible'; }
-                          const html = el.innerHTML;
-                          if (printDiv) { printDiv.style.maxHeight = ''; printDiv.style.overflow = ''; }
-
-                          // 현재 페이지 CSS link 절대 URL 추출
-                          const cssLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
-                            .map(l => `<link rel="stylesheet" href="${(l as HTMLLinkElement).href}">`)
-                            .join('');
-
-                          const fullHtml = `<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
-  ${cssLinks}
-  <style>
-    body { font-family: 'Noto Sans KR', sans-serif !important; background: white; margin: 0; padding: 24px; }
-    button, input[type=file] { display: none !important; }
-    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  </style>
-</head>
-<body>${html}</body>
-</html>`;
-
+                          if (!editBom?.id) { alert('BOM 데이터가 없습니다.'); return; }
+                          const activeColor = activePostColorBom?.color || '';
                           try {
                             const res = await fetch('/api/print/pdf', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ html: fullHtml }),
+                              body: JSON.stringify({ bomId: editBom.id, color: activeColor }),
                             });
                             if (!res.ok) throw new Error(await res.text());
                             const blob = await res.blob();
@@ -5179,7 +5152,9 @@ export default function BomManagement() {
                             const a = document.createElement('a');
                             a.href = url;
                             a.download = `원가계산서_${editBom?.styleNo || 'draft'}.pdf`;
+                            document.body.appendChild(a);
                             a.click();
+                            document.body.removeChild(a);
                             URL.revokeObjectURL(url);
                           } catch (e) {
                             console.error('PDF 오류:', e);

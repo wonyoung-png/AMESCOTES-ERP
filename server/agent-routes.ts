@@ -245,12 +245,12 @@ router.get('/api/agent/health', (_req: Request, res: Response) => {
   });
 });
 
-/** POST /api/print/pdf — Puppeteer PDF 생성 */
+/** POST /api/print/pdf — Puppeteer PDF 생성 (URL 방식) */
 router.post('/api/print/pdf', async (req: Request, res: Response) => {
   try {
-    const { html } = req.body as { html: string };
-    if (!html) {
-      res.status(400).json({ error: 'html required' });
+    const { bomId, color } = req.body as { bomId: string; color?: string };
+    if (!bomId) {
+      res.status(400).json({ error: 'bomId required' });
       return;
     }
 
@@ -259,11 +259,18 @@ router.post('/api/print/pdf', async (req: Request, res: Response) => {
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const url = `http://localhost:3000/cost-sheet-print?bomId=${encodeURIComponent(bomId)}&color=${encodeURIComponent(color || '')}`;
+    console.log('[PDF] Puppeteer 방문:', url);
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+    // 데이터 로딩 완료 대기 (#cost-sheet-ready 요소가 나타날 때까지)
+    await page.waitForSelector('#cost-sheet-ready', { timeout: 15000 }).catch(() => {
+      console.warn('[PDF] #cost-sheet-ready 타임아웃 — 강제 진행');
+    });
+    await new Promise(r => setTimeout(r, 500));
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
-      margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+      margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' },
     });
     await browser.close();
 

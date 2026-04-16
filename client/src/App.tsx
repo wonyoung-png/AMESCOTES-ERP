@@ -26,6 +26,7 @@ import MaterialMaster from "./pages/MaterialMaster";
 import AgentPanel from "./pages/AgentPanel";
 import CostComparison from "./pages/CostComparison";
 import MDMockup from "./pages/MDMockup";
+import CostSheetPrint from "./pages/CostSheetPrint";
 import NotFound from "./pages/NotFound";
 
 function Router() {
@@ -38,6 +39,11 @@ function Router() {
   // MD 목업 — 로그인 없이 full-page로 바로 접근
   if (window.location.pathname === '/md-mockup') {
     return <MDMockup />;
+  }
+
+  // 원가계산서 인쇄 전용 페이지 — 로그인 없이 접근 (Puppeteer PDF 생성용)
+  if (window.location.pathname === '/cost-sheet-print') {
+    return <CostSheetPrint />;
   }
 
   if (!isAuthenticated()) {
