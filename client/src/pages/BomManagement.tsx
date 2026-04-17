@@ -1819,9 +1819,15 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
         </div>
       </td>
       {/* 단가 */}
-      <td className="px-2 py-1 text-right tabular-nums">
-        <div>${((line.unitPriceCny * cnyKrw) / (usdKrw || 1380)).toFixed(2)}</div>
-        <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round(line.unitPriceCny * cnyKrw).toLocaleString()}</div>
+      <td className="px-1 py-1">
+        <Input
+          type="number"
+          value={line.unitPriceCny || ''}
+          onChange={e => onChange(line.id, 'unitPriceCny', Number(e.target.value))}
+          className="h-7 text-xs border-stone-200 bg-white text-right w-20"
+          placeholder="단가"
+        />
+        <div style={{fontSize:'10px', color:'#9CA3AF', textAlign:'right'}}>₩{Math.round(line.unitPriceCny * cnyKrw).toLocaleString()}</div>
       </td>
       {/* NET 소요량 */}
       <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => onChange(line.id, 'netQty', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="0" /></td>
