@@ -68,7 +68,7 @@ const emptyItem: Partial<Item> = {
 // ─── 컬럼 너비 리사이즈 기본값 ───
 const ITEM_DEFAULT_COL_WIDTHS: Record<string, number> = {
   image: 60, styleNo: 130, season: 80, buyer: 120, name: 180,
-  category: 80, color: 100, delivery: 90, bomCost: 90, margin: 90,
+  category: 80, color: 100, delivery: 90, bomCost: 100, salePrice: 110, multiple: 80, margin: 90,
   noOrder: 90, createdAt: 100, bom: 60, action: 60,
 };
 
@@ -851,6 +851,8 @@ export default function ItemMaster() {
               <col style={{ width: colWidths.color }} />
               <col style={{ width: colWidths.delivery }} />
               <col style={{ width: colWidths.bomCost }} />
+              <col style={{ width: colWidths.salePrice }} />
+              <col style={{ width: colWidths.multiple }} />
               <col style={{ width: colWidths.margin }} />
               <col style={{ width: colWidths.noOrder }} />
               <col style={{ width: colWidths.createdAt }} />
@@ -901,8 +903,16 @@ export default function ItemMaster() {
                   <div onMouseDown={(e) => startResize(e, 'delivery')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
-                  BOM원가
+                  총원가액
                   <div onMouseDown={(e) => startResize(e, 'bomCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  확정판매가
+                  <div onMouseDown={(e) => startResize(e, 'salePrice')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  실현배수
+                  <div onMouseDown={(e) => startResize(e, 'multiple')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
                   마진율
@@ -928,10 +938,12 @@ export default function ItemMaster() {
                 // 납품가: BOM 사후원가의 postDeliveryPrice 우선 → item.deliveryPrice → targetSalePrice
                 const itemBom = (boms as any[]).find(b => b.styleNo === item.styleNo);
                 const delivery = itemBom?.postDeliveryPrice || item.deliveryPrice || item.targetSalePrice || 0;
-                // BOM원가: Supabase에 저장된 사후원가 소계(생산마진 제외) 우선 사용
+                // 총원가액: Supabase에 저장된 사후원가 소계(생산마진 제외) 우선 사용
                 const bomCost = item.hasBom
                   ? ((itemBom as any)?.postSubtotalKrw || (itemBom as any)?.postTotalCostKrw || store.getBomTotalCost(item.styleNo))
                   : 0;
+                const confirmedSalePrice: number = (itemBom as any)?.pnl?.confirmedSalePrice || 0;
+                const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
                 const { rate: marginRate, amount: marginAmount } = calcMargin(delivery, bomCost);
                 const months = monthsSinceLastOrder(item);
                 const isChecked = selectedIds.has(item.id);
@@ -1008,7 +1020,7 @@ export default function ItemMaster() {
                         <p className="font-mono text-xs text-stone-700">{formatKRW(delivery)}</p>
                       ) : <span className="text-stone-300 text-xs">—</span>}
                     </td>
-                    {/* BOM 원가 */}
+                    {/* 총원가액 */}
                     <td className="px-4 py-3 text-right font-mono text-xs">
                       {item.hasBom && bomCost > 0 ? (
                         <span className="text-amber-700">{formatKRW(bomCost)}</span>
@@ -1016,6 +1028,24 @@ export default function ItemMaster() {
                         <span className="text-stone-300">계산중</span>
                       ) : (
                         <span className="text-stone-300 text-xs">미등록</span>
+                      )}
+                    </td>
+                    {/* 확정판매가 */}
+                    <td className="px-4 py-3 text-right font-mono text-xs">
+                      {confirmedSalePrice > 0 ? (
+                        <span className="text-stone-700">{formatKRW(confirmedSalePrice)}</span>
+                      ) : (
+                        <span className="text-stone-300">—</span>
+                      )}
+                    </td>
+                    {/* 실현배수 */}
+                    <td className="px-4 py-3 text-right font-mono text-xs">
+                      {actualMultiple > 0 ? (
+                        <span className={`font-semibold ${actualMultiple >= 3.5 ? 'text-green-600' : actualMultiple >= 3.0 ? 'text-amber-600' : 'text-red-500'}`}>
+                          {actualMultiple.toFixed(2)}x
+                        </span>
+                      ) : (
+                        <span className="text-stone-300">—</span>
                       )}
                     </td>
                     {/* 마진율 */}
@@ -1074,7 +1104,7 @@ export default function ItemMaster() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={15} className="text-center py-12 text-stone-400">
+                <tr><td colSpan={17} className="text-center py-12 text-stone-400">
                   <Package size={32} className="mx-auto mb-2 opacity-30" />
                   등록된 품목이 없습니다
                 </td></tr>
