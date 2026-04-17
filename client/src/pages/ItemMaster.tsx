@@ -935,12 +935,13 @@ export default function ItemMaster() {
             </thead>
             <tbody>
               {displayItems.map(item => {
-                // 납품가: BOM 사후원가의 postDeliveryPrice 우선 → item.deliveryPrice → targetSalePrice
-                const itemBom = (boms as any[]).find(b => b.styleNo === item.styleNo);
+                // BOM 매칭: styleId(UUID) 우선 → styleNo(문자열) 폴백
+                const itemBom = (boms as any[]).find(b => b.styleId === item.id) ||
+                                (boms as any[]).find(b => b.styleNo === item.styleNo);
                 const delivery = itemBom?.postDeliveryPrice || item.deliveryPrice || item.targetSalePrice || 0;
-                // 총원가액: Supabase에 저장된 사후원가 소계(생산마진 제외) 우선 사용
-                const bomCost = item.hasBom
-                  ? ((itemBom as any)?.postSubtotalKrw || (itemBom as any)?.postTotalCostKrw || store.getBomTotalCost(item.styleNo))
+                // 총원가액: 사후원가(postSubtotalKrw / postTotalCostKrw) 기준
+                const bomCost = itemBom
+                  ? ((itemBom as any).postSubtotalKrw || (itemBom as any).postTotalCostKrw || 0)
                   : 0;
                 const confirmedSalePrice: number = (itemBom as any)?.pnl?.confirmedSalePrice || 0;
                 const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
@@ -1022,9 +1023,9 @@ export default function ItemMaster() {
                     </td>
                     {/* 총원가액 */}
                     <td className="px-4 py-3 text-right font-mono text-xs">
-                      {item.hasBom && bomCost > 0 ? (
+                      {bomCost > 0 ? (
                         <span className="text-amber-700">{formatKRW(bomCost)}</span>
-                      ) : item.hasBom ? (
+                      ) : itemBom ? (
                         <span className="text-stone-300">계산중</span>
                       ) : (
                         <span className="text-stone-300 text-xs">미등록</span>
