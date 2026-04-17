@@ -2,6 +2,9 @@
  * CostSheetPrint — 원가계산서 전용 인쇄 페이지
  * Puppeteer가 URL로 방문해서 PDF 생성하는 전용 페이지
  * /cost-sheet-print?bomId=xxx&color=xxx
+ *
+ * ⚠️ 이 파일의 렌더 구조는 BomManagement.tsx 의 "원가계산서 모달" (id="cost-sheet-print-content") 과
+ *    동일하게 유지해야 합니다. 모달 수정 시 이 파일도 함께 수정하세요.
  */
 
 import { useEffect, useState } from 'react';
@@ -84,7 +87,6 @@ const calcLineAmt = (price: number, net: number, loss: number) => price * net * 
 const fmtKrw = (n: number) => '₩' + Math.round(n).toLocaleString('ko-KR');
 
 interface PostSummary {
-  // 원화
   factoryMaterialKrw: number;
   hqMaterialKrw: number;
   totalMaterialKrw: number;
@@ -97,7 +99,6 @@ interface PostSummary {
   packingKrw: number;
   factoryUnitCostKrw: number;
   totalCostKrw: number;
-  // 원화 환산 전 원래 통화
   factoryMaterialCny: number;
   hqMaterialCny: number;
   totalMaterialCny: number;
@@ -227,7 +228,7 @@ export default function CostSheetPrint() {
     );
   }
 
-  // 모달과 동일한 계산
+  // ── 계산 (BomManagement 모달과 동일) ──────────────────────────────────────
   const activePostColorBom = colorParam
     ? bom.postColorBoms?.find(c => c.color === colorParam)
     : bom.postColorBoms?.[0];
@@ -241,176 +242,132 @@ export default function CostSheetPrint() {
   const postPnlResultSheet = bom.pnl ? calcPnl(finalCostSheet, bom.pnl) : null;
   const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
-  // 통화 표시 헬퍼
-  const currency = bom.currency || 'CNY';
-  const currSymbol = currency === 'KRW' ? '₩' : currency === 'USD' ? '$' : '¥';
-  const showKrw = currency !== 'KRW';
-  const fmtFx = (n: number) => `${currSymbol}${n.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}`;
-  // 원화+외화 동시 표시 셀 (외화면 "¥12.50  ₩2,387" 형태, 원화면 "₩2,387")
-  const FxCell = ({ cny, krw }: { cny: number; krw: number }) => (
-    <div style={{ textAlign: 'right', lineHeight: 1.3 }}>
-      {showKrw ? (
-        <>
-          <div style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 600, color: '#292524' }}>{fmtFx(cny)}</div>
-          <div style={{ fontFamily: 'monospace', fontSize: '10px', color: '#78716c' }}>{fmtKrw(krw)}</div>
-        </>
-      ) : (
-        <div style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 600, color: '#292524' }}>{fmtKrw(krw)}</div>
-      )}
-    </div>
-  );
-
+  // ── 렌더 (BomManagement id="cost-sheet-print-content" 와 동일 구조) ────────
   return (
-    <div style={{ background: 'white', minHeight: '100vh', fontFamily: "'Noto Sans KR', sans-serif" }}>
+    <div className="bg-white min-h-screen font-sans">
       <style>{`
         [data-sonner-toaster], div[class*="fixed"], div[class*="toast"], div[class*="Toast"] { display: none !important; }
+        body { margin: 0; padding: 0; background: white; }
       `}</style>
-      <div id="cost-sheet-print-content" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-        {/* ── 헤더 ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #292524', paddingBottom: '8px' }}>
-          <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#292524', letterSpacing: '0.06em' }}>원 가 계 산 서</h2>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', color: '#a8a29e' }}>작성일: {today}</div>
-            {showKrw && (
-              <div style={{ fontSize: '10px', color: '#a8a29e' }}>
-                적용 환율: {currency} {psSheet.rate.toLocaleString()}
-              </div>
-            )}
-          </div>
-        </div>
+      {/* 모달의 id="cost-sheet-print-content" 와 동일한 구조 */}
+      <div id="cost-sheet-print-content" className="p-6 space-y-6">
 
         {/* ── 섹션 1: 제품 기본정보 ── */}
-        <div style={{ border: '1px solid #e7e5e4', borderRadius: '8px', overflow: 'hidden' }}>
-          <div style={{ background: '#292524', color: 'white', padding: '7px 14px' }}>
-            <h3 style={{ fontSize: '12px', fontWeight: 700, margin: 0 }}>제품 기본정보</h3>
+        <div className="border border-stone-200 rounded-xl overflow-hidden">
+          <div className="bg-stone-800 text-white px-5 py-3 flex items-center justify-between">
+            <h3 className="text-sm font-bold">제품 기본정보</h3>
+            <span className="text-xs text-stone-400">작성일: {today}</span>
           </div>
-          <div style={{ padding: '12px 14px', display: 'flex', gap: '14px', alignItems: 'center' }}>
-            <div style={{ flexShrink: 0, width: '80px', height: '80px', border: '1px solid #e7e5e4', borderRadius: '6px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafaf9' }}>
-              <img id="cost-sheet-product-img" alt="제품사진"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'none' }}
-                onLoad={e => { (e.target as HTMLImageElement).style.display = 'block'; const ph = document.getElementById('cost-sheet-img-placeholder'); if (ph) ph.style.display = 'none'; }}
-              />
-              <div id="cost-sheet-img-placeholder" style={{ textAlign: 'center', color: '#a8a29e', fontSize: '10px' }}>No<br/>Image</div>
-            </div>
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px 20px' }}>
-              {[
-                { label: '스타일번호', val: bom.styleNo },
-                { label: '품명', val: bom.styleName },
-                { label: '시즌', val: bom.season },
-                { label: '카테고리', val: bom.erpCategory || '—' },
-                { label: '컬러', val: activePostColorBom?.color || colorParam || '—' },
-                { label: '라인명', val: bom.lineName || '—' },
-                { label: '디자이너', val: bom.designer || '—' },
-                { label: '제조국', val: bom.manufacturingCountry || '—' },
-              ].map(item => (
-                <div key={item.label}>
-                  <div style={{ color: '#a8a29e', fontSize: '9px', fontWeight: 500 }}>{item.label}</div>
-                  <div style={{ color: '#292524', fontWeight: 600, fontSize: '11px' }}>{item.val}</div>
+          <div className="p-5">
+            <div className="flex gap-5">
+              {/* 제품 사진 (Puppeteer가 base64 주입) */}
+              <div className="flex-shrink-0">
+                <div className="w-32 h-32 border-2 border-dashed border-stone-300 rounded-xl flex flex-col items-center justify-center overflow-hidden">
+                  <img
+                    id="cost-sheet-product-img"
+                    alt="제품사진"
+                    className="w-full h-full object-cover"
+                    style={{ display: 'none' }}
+                    onLoad={e => {
+                      (e.target as HTMLImageElement).style.display = 'block';
+                      const ph = document.getElementById('cost-sheet-img-placeholder');
+                      if (ph) ph.style.display = 'none';
+                    }}
+                  />
+                  <div id="cost-sheet-img-placeholder" className="text-center text-stone-400 text-xs px-2">
+                    No Image
+                  </div>
                 </div>
-              ))}
+              </div>
+              {/* 정보 그리드 */}
+              <div className="flex-1 grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                {[
+                  { label: '스타일번호', val: bom.styleNo },
+                  { label: '품명', val: bom.styleName },
+                  { label: '시즌', val: bom.season },
+                  { label: '카테고리', val: bom.erpCategory || '—' },
+                  { label: '컬러', val: activePostColorBom?.color || colorParam || '—' },
+                  { label: '라인명', val: bom.lineName || '—' },
+                  { label: '담당 디자이너', val: bom.designer || '—' },
+                  { label: '제조국', val: bom.manufacturingCountry || '—' },
+                ].map(item => (
+                  <div key={item.label} className="flex flex-col">
+                    <span className="text-stone-400 text-[10px] font-medium">{item.label}</span>
+                    <span className="text-stone-800 font-semibold">{item.val}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ── 섹션 2: 사후원가 요약 ── */}
-        <div style={{ border: '1px solid #e7e5e4', borderRadius: '8px', overflow: 'hidden' }}>
-          <div style={{ background: '#292524', color: 'white', padding: '7px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '12px', fontWeight: 700, margin: 0 }}>사후원가 요약</h3>
-            <span style={{ fontSize: '10px', color: '#a8a29e' }}>공장 실제 원가 기준</span>
+        {/* ── 섹션 2: 사후원가 요약 테이블 ── */}
+        <div className="border border-stone-200 rounded-xl overflow-hidden">
+          <div className="bg-stone-800 text-white px-5 py-3">
+            <h3 className="text-sm font-bold">사후원가 요약</h3>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="w-full text-xs">
             <thead>
-              <tr style={{ background: '#f5f5f4' }}>
-                <th style={{ padding: '6px 14px', textAlign: 'left', fontWeight: 600, fontSize: '11px', color: '#78716c' }}>항목</th>
-                <th style={{ padding: '6px 14px', textAlign: 'right', fontWeight: 600, fontSize: '11px', color: '#78716c' }}>
-                  {showKrw ? `${currency} / ₩KRW` : '금액 (KRW)'}
-                </th>
+              <tr className="bg-stone-100 text-stone-600">
+                <th className="px-4 py-2 text-left">항목</th>
+                <th className="px-4 py-2 text-right">금액 (KRW)</th>
               </tr>
             </thead>
             <tbody>
-              {/* 자재비 묶음 */}
-              <tr style={{ background: '#fafaf9', borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '6px 14px 2px', fontSize: '11px', fontWeight: 600, color: '#44403c' }}>자재비 합계</td>
-                <td style={{ padding: '6px 14px 2px' }}>
-                  <FxCell cny={psSheet.totalMaterialCny} krw={psSheet.totalMaterialKrw} />
-                </td>
+              <tr className="border-b border-stone-100">
+                <td className="px-4 py-2 text-stone-600">공장구매 자재</td>
+                <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.factoryMaterialKrw)}</td>
               </tr>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '3px 14px 3px 24px', fontSize: '11px', color: '#78716c' }}>└ 공장구매 자재</td>
-                <td style={{ padding: '3px 14px' }}>
-                  <FxCell cny={psSheet.factoryMaterialCny} krw={psSheet.factoryMaterialKrw} />
-                </td>
+              <tr className="border-b border-stone-100">
+                <td className="px-4 py-2 text-stone-600">본사제공 자재</td>
+                <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.hqMaterialKrw)}</td>
               </tr>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '3px 14px 6px 24px', fontSize: '11px', color: '#78716c' }}>└ 본사제공 자재</td>
-                <td style={{ padding: '3px 14px 6px' }}>
-                  <FxCell cny={psSheet.hqMaterialCny} krw={psSheet.hqMaterialKrw} />
-                </td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '6px 14px', fontSize: '11px', color: '#78716c' }}>임가공비</td>
-                <td style={{ padding: '6px 14px' }}>
-                  <FxCell cny={psSheet.processingCny} krw={psSheet.processingKrw} />
-                </td>
+              <tr className="border-b border-stone-100">
+                <td className="px-4 py-2 text-stone-600">임가공비</td>
+                <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.processingKrw)}</td>
               </tr>
               {psSheet.postProcessKrw > 0 && (
-                <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                  <td style={{ padding: '6px 14px', fontSize: '11px', color: '#78716c' }}>후가공비</td>
-                  <td style={{ padding: '6px 14px' }}>
-                    <FxCell cny={psSheet.postProcessCny} krw={psSheet.postProcessKrw} />
-                  </td>
+                <tr className="border-b border-stone-100">
+                  <td className="px-4 py-2 text-stone-600">후가공비</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.postProcessKrw)}</td>
                 </tr>
               )}
-              {/* 공장단가 강조 */}
-              <tr style={{ background: '#fffbeb', borderTop: '2px solid #fde68a', borderBottom: '2px solid #fde68a' }}>
-                <td style={{ padding: '8px 14px', fontWeight: 700, fontSize: '12px', color: '#292524' }}>🏭 공장단가</td>
-                <td style={{ padding: '8px 14px' }}>
-                  <div style={{ textAlign: 'right' }}>
-                    {showKrw && <div style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#b45309' }}>{fmtFx(psSheet.factoryUnitCostCny)}</div>}
-                    <div style={{ fontFamily: 'monospace', fontSize: showKrw ? '11px' : '13px', fontWeight: 700, color: showKrw ? '#92400e' : '#b45309' }}>{fmtKrw(psSheet.factoryUnitCostKrw)}</div>
-                  </div>
-                </td>
+              <tr className="border-b border-amber-200 bg-amber-50">
+                <td className="px-4 py-2.5 font-bold text-stone-800">🏭 공장단가</td>
+                <td className="px-4 py-2.5 text-right font-bold text-amber-700 tabular-nums">{fmtKrw(psSheet.factoryUnitCostKrw)}</td>
               </tr>
-              {psSheet.customsRate > 0 && (
-                <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                  <td style={{ padding: '6px 14px', fontSize: '11px', color: '#78716c' }}>관세 ({psSheet.customsRate}%)</td>
-                  <td style={{ padding: '6px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', color: '#292524' }}>{fmtKrw(psSheet.customsKrw)}</td>
-                </tr>
-              )}
-              {psSheet.logisticsKrw > 0 && (
-                <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                  <td style={{ padding: '6px 14px', fontSize: '11px', color: '#78716c' }}>물류비</td>
-                  <td style={{ padding: '6px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', color: '#292524' }}>{fmtKrw(psSheet.logisticsKrw)}</td>
-                </tr>
-              )}
-              {psSheet.packagingKrw > 0 && (
-                <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                  <td style={{ padding: '6px 14px', fontSize: '11px', color: '#78716c' }}>포장/검사비</td>
-                  <td style={{ padding: '6px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', color: '#292524' }}>{fmtKrw(psSheet.packagingKrw)}</td>
-                </tr>
-              )}
-              {psSheet.packingKrw > 0 && (
-                <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                  <td style={{ padding: '6px 14px', fontSize: '11px', color: '#78716c' }}>패킹재</td>
-                  <td style={{ padding: '6px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', color: '#292524' }}>{fmtKrw(psSheet.packingKrw)}</td>
-                </tr>
-              )}
-              <tr style={{ borderBottom: '1px solid #f5f5f4', background: '#fafaf9' }}>
-                <td style={{ padding: '6px 14px', fontSize: '11px', color: '#78716c' }}>
-                  제품 총원가 <span style={{ fontSize: '10px', color: '#d97706' }}>(생산마진 전)</span>
-                </td>
-                <td style={{ padding: '6px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', fontWeight: 600, color: '#b45309' }}>{fmtKrw(psSheet.totalCostKrw)}</td>
+              <tr className="border-b border-stone-100">
+                <td className="px-4 py-2 text-stone-600">관세 ({psSheet.customsRate}%)</td>
+                <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.customsKrw)}</td>
               </tr>
-              <tr style={{ borderBottom: '1px solid #f5f5f4' }}>
-                <td style={{ padding: '6px 14px', fontSize: '11px', color: '#78716c' }}>생산마진 ({Math.round(postMarginRateSheet * 100)}%)</td>
-                <td style={{ padding: '6px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', color: '#292524' }}>{fmtKrw(postProductionMarginKrwSheet)}</td>
+              <tr className="border-b border-stone-100">
+                <td className="px-4 py-2 text-stone-600">물류비</td>
+                <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.logisticsKrw)}</td>
               </tr>
-              <tr style={{ background: '#292524' }}>
-                <td style={{ padding: '10px 14px', fontWeight: 700, color: 'white', fontSize: '14px', letterSpacing: '0.05em' }}>
-                  {postMarginRateSheet > 0 ? '총  원  가  액' : '제  품  원  가'}
+              <tr className="border-b border-stone-100">
+                <td className="px-4 py-2 text-stone-600">포장/검사비</td>
+                <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.packagingKrw)}</td>
+              </tr>
+              <tr className="border-b border-stone-100">
+                <td className="px-4 py-2 text-stone-600">패킹재</td>
+                <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.packingKrw)}</td>
+              </tr>
+              <tr className="border-b border-amber-200 bg-amber-50">
+                <td className="px-4 py-2.5 font-semibold text-amber-800">
+                  제품 총원가 <span className="text-[10px] font-normal text-amber-500">(생산마진 전)</span>
                 </td>
-                <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, fontSize: '16px', color: '#C9A96E', fontFamily: 'monospace' }}>
+                <td className="px-4 py-2.5 text-right font-semibold text-amber-700 tabular-nums">{fmtKrw(psSheet.totalCostKrw)}</td>
+              </tr>
+              <tr className="border-b border-stone-100">
+                <td className="px-4 py-2 text-stone-600">생산마진 ({Math.round(postMarginRateSheet * 100)}%)</td>
+                <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(postProductionMarginKrwSheet)}</td>
+              </tr>
+              <tr className="bg-stone-800">
+                <td className="px-4 py-3 font-bold text-white text-sm">
+                  {postMarginRateSheet > 0 ? '총 원 가 액' : '제 품 원 가'}
+                </td>
+                <td className="px-4 py-3 text-right font-bold text-lg text-[#C9A96E] tabular-nums">
                   {fmtKrw(finalCostSheet)}
                 </td>
               </tr>
@@ -418,113 +375,105 @@ export default function CostSheetPrint() {
           </table>
         </div>
 
-        {/* ── 섹션 3: P&L 분석 (총원가액 아래) ── */}
+        {/* ── 섹션 3: P&L 분석 ── */}
         {bom.pnl && postPnlResultSheet && (
-          <div style={{ border: '1px solid #e7e5e4', borderRadius: '8px', overflow: 'hidden' }}>
-            <div style={{ background: '#292524', color: 'white', padding: '7px 14px' }}>
-              <h3 style={{ fontSize: '12px', fontWeight: 700, margin: 0 }}>P&L 분석</h3>
+          <div className="border border-stone-200 rounded-xl overflow-hidden">
+            <div className="bg-stone-800 text-white px-5 py-3">
+              <h3 className="text-sm font-bold">P&L 분석</h3>
             </div>
-            <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="p-5 space-y-4">
 
-              {/* 가정 + 배수분석 — 2열 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-
-                {/* 가정 */}
-                <div style={{ background: '#fafaf9', borderRadius: '6px', padding: '10px 12px', border: '1px solid #e7e5e4' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 600, color: '#78716c', marginBottom: '8px' }}>가정 (Assumptions)</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                    {[
-                      { label: '할인율', val: Math.round(bom.pnl.discountRate * 100) },
-                      { label: '플랫폼수수료', val: Math.round(bom.pnl.platformFeeRate * 100) },
-                      { label: '인건비/판관비', val: Math.round(bom.pnl.sgaRate * 100) },
-                    ].map(item => (
-                      <div key={item.label}>
-                        <div style={{ color: '#a8a29e', fontSize: '9px' }}>{item.label}</div>
-                        <div style={{ fontWeight: 700, color: '#292524', fontSize: '13px' }}>{item.val}%</div>
-                      </div>
-                    ))}
+              {/* 가정 */}
+              <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
+                <h4 className="text-xs font-semibold text-stone-600 mb-3">가정 (Assumptions)</h4>
+                <div className="grid grid-cols-3 gap-4 text-xs">
+                  <div>
+                    <span className="text-stone-400 text-[10px] block">할인율</span>
+                    <span className="font-semibold text-stone-800">{Math.round(bom.pnl.discountRate * 100)}%</span>
+                  </div>
+                  <div>
+                    <span className="text-stone-400 text-[10px] block">플랫폼 수수료</span>
+                    <span className="font-semibold text-stone-800">{Math.round(bom.pnl.platformFeeRate * 100)}%</span>
+                  </div>
+                  <div>
+                    <span className="text-stone-400 text-[10px] block">인건비/판관비</span>
+                    <span className="font-semibold text-stone-800">{Math.round(bom.pnl.sgaRate * 100)}%</span>
                   </div>
                 </div>
+              </div>
 
-                {/* 배수 분석 */}
-                <div style={{ background: '#fafaf9', borderRadius: '6px', padding: '10px 12px', border: '1px solid #e7e5e4' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 600, color: '#78716c', marginBottom: '8px' }}>배수 분석</div>
+              {/* 배수 분석 */}
+              <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
+                <h4 className="text-xs font-semibold text-stone-600 mb-3">배수 분석</h4>
+                <div className="space-y-2 text-xs">
                   {[
-                    { label: '3.5× 최소', val: postPnlResultSheet.price35 },
-                    { label: '4.0× 목표', val: postPnlResultSheet.price40 },
-                    { label: '4.5× 이상적', val: postPnlResultSheet.price45 },
+                    { label: '3.5배 기준 최소 판매가', val: postPnlResultSheet.price35 },
+                    { label: '4.0배 기준 목표 판매가', val: postPnlResultSheet.price40 },
+                    { label: '4.5배 기준 이상적 판매가', val: postPnlResultSheet.price45 },
                   ].map(item => (
-                    <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #f0efee' }}>
-                      <span style={{ color: '#78716c', fontSize: '11px' }}>{item.label}</span>
-                      <span style={{ fontWeight: 700, color: '#292524', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(item.val)}</span>
+                    <div key={item.label} className="flex justify-between py-1.5 border-b border-stone-200 last:border-0">
+                      <span className="text-stone-600">{item.label}</span>
+                      <span className="font-bold text-stone-800 tabular-nums">{fmtKrw(item.val)}</span>
                     </div>
                   ))}
                   {bom.pnl.confirmedSalePrice && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: '2px solid #d6d3d1', marginTop: '2px' }}>
-                      <span style={{ fontWeight: 600, color: '#44403c', fontSize: '11px' }}>확정 판매가</span>
-                      <span style={{ fontWeight: 700, color: '#292524', fontFamily: 'monospace', fontSize: '11px' }}>{fmtKrw(bom.pnl.confirmedSalePrice)}</span>
+                    <div className="flex justify-between py-1.5 border-t-2 border-stone-300">
+                      <span className="font-semibold text-stone-700">확정 판매가</span>
+                      <span className="font-bold text-stone-800 tabular-nums">{fmtKrw(bom.pnl.confirmedSalePrice)}</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* 영업이익 분석 — 확정판매가 있을 때 전체 너비 */}
+              {/* 영업이익 분석 */}
               {bom.pnl.confirmedSalePrice ? (
-                <div style={{ background: '#fafaf9', borderRadius: '6px', border: '1px solid #e7e5e4', overflow: 'hidden' }}>
-                  <div style={{ padding: '8px 14px', background: '#f5f5f4', borderBottom: '1px solid #e7e5e4' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#78716c' }}>영업이익 분석 (P&L)</span>
-                  </div>
-                  <div style={{ padding: '8px 14px' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <tbody>
-                        {[
-                          { no: '①', label: '정가 (확정판매가)', val: bom.pnl.confirmedSalePrice, color: '#292524', bold: false },
-                          { no: '②', label: `(-) 할인 ${Math.round(bom.pnl.discountRate * 100)}%`, val: -(bom.pnl.confirmedSalePrice * bom.pnl.discountRate), color: '#ef4444', bold: false },
-                          { no: '③', label: '실판가 (Net Sale)', val: postPnlResultSheet.netSale, color: '#44403c', bold: true },
-                          { no: '④', label: `(-) 플랫폼 수수료 ${Math.round(bom.pnl.platformFeeRate * 100)}%`, val: -(postPnlResultSheet.netSale * bom.pnl.platformFeeRate), color: '#ef4444', bold: false },
-                          { no: '⑤', label: `(-) 인건비/판관비 ${Math.round(bom.pnl.sgaRate * 100)}%`, val: -(postPnlResultSheet.netSale * bom.pnl.sgaRate), color: '#ef4444', bold: false },
-                          { no: '⑥', label: '(-) COGS (총원가액)', val: -finalCostSheet, color: '#ef4444', bold: false },
-                          { no: '⑦', label: '영업이익', val: postPnlResultSheet.operatingProfit, color: postPnlResultSheet.operatingProfit >= 0 ? '#16a34a' : '#dc2626', bold: true },
-                        ].map(row => (
-                          <tr key={row.no} style={{ background: row.bold ? 'white' : 'transparent' }}>
-                            <td style={{ padding: '5px 6px', width: '20px', color: '#a8a29e', fontSize: '10px', verticalAlign: 'middle' }}>{row.no}</td>
-                            <td style={{ padding: '5px 4px', fontSize: '12px', color: row.bold ? '#292524' : '#78716c', fontWeight: row.bold ? 600 : 400, verticalAlign: 'middle' }}>{row.label}</td>
-                            <td style={{ padding: '5px 6px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 600, color: row.color, verticalAlign: 'middle' }}>{fmtKrw(row.val)}</td>
-                          </tr>
-                        ))}
-                        {/* 영업이익률 */}
-                        <tr style={{ borderTop: '1px solid #e7e5e4', background: 'white' }}>
-                          <td style={{ padding: '5px 6px', color: '#a8a29e', fontSize: '10px' }}>★</td>
-                          <td style={{ padding: '5px 4px', fontSize: '12px', fontWeight: 600, color: '#292524' }}>영업이익률</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right', fontSize: '14px', fontWeight: 700, color: postPnlResultSheet.operatingMargin >= 0 ? '#16a34a' : '#dc2626' }}>
-                            {(postPnlResultSheet.operatingMargin * 100).toFixed(1)}%
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                    {/* 실현 배수 */}
-                    <div style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '8px 12px', borderRadius: '6px', marginTop: '8px',
-                      background: postPnlResultSheet.meets35x ? '#f0fdf4' : '#fef2f2',
-                      border: `1px solid ${postPnlResultSheet.meets35x ? '#bbf7d0' : '#fecaca'}`,
-                    }}>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#44403c' }}>⚡ 실현 배수</span>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '15px', fontWeight: 700, color: postPnlResultSheet.meets35x ? '#16a34a' : '#ef4444' }}>
-                          {postPnlResultSheet.actualMultiple.toFixed(2)}×
-                        </span>
-                        <div style={{ fontSize: '10px', color: postPnlResultSheet.meets35x ? '#16a34a' : '#ef4444' }}>
-                          {postPnlResultSheet.meets35x
-                            ? '✅ 목표 달성 (3.5× 이상)'
-                            : `⚠️ 원가 절감 필요: ${fmtKrw(postPnlResultSheet.costReductionNeeded)}`}
+                <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
+                  <h4 className="text-xs font-semibold text-stone-600 mb-3">영업이익 분석 (P&L)</h4>
+                  <div className="space-y-1">
+                    {[
+                      { no: '①', label: '정가 (확정판매가)', desc: '', val: bom.pnl.confirmedSalePrice, color: 'text-stone-800', bold: false },
+                      { no: '②', label: '(-) 할인', desc: `${Math.round(bom.pnl.discountRate * 100)}%`, val: -(bom.pnl.confirmedSalePrice * bom.pnl.discountRate), color: 'text-red-500', bold: false },
+                      { no: '③', label: '실판가 (Net Sale)', desc: '', val: postPnlResultSheet.netSale, color: 'text-stone-700', bold: true },
+                      { no: '④', label: '(-) 플랫폼 수수료', desc: `${Math.round(bom.pnl.platformFeeRate * 100)}%`, val: -(postPnlResultSheet.netSale * bom.pnl.platformFeeRate), color: 'text-red-500', bold: false },
+                      { no: '⑤', label: '(-) 인건비 / 판관비', desc: `${Math.round(bom.pnl.sgaRate * 100)}%`, val: -(postPnlResultSheet.netSale * bom.pnl.sgaRate), color: 'text-red-500', bold: false },
+                      { no: '⑥', label: '(-) 매출원가 (COGS)', desc: '총 원가액', val: -finalCostSheet, color: 'text-red-500', bold: false },
+                      { no: '⑦', label: '영업이익', desc: '', val: postPnlResultSheet.operatingProfit, color: postPnlResultSheet.operatingProfit >= 0 ? 'text-green-600' : 'text-red-600', bold: true },
+                      { no: '★', label: '영업이익률', desc: '', val: null as number | null, color: postPnlResultSheet.operatingMargin >= 0 ? 'text-green-600' : 'text-red-600', bold: true, rate: postPnlResultSheet.operatingMargin },
+                    ].map(row => (
+                      <div key={row.no} className={`flex items-center justify-between py-1.5 px-3 rounded ${row.bold ? 'bg-white border border-stone-200' : ''}`}>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[11px] text-stone-400 w-5">{row.no}</span>
+                          <span className={`text-xs ${row.bold ? 'font-semibold text-stone-800' : 'text-stone-600'}`}>
+                            {row.label} <span className="text-stone-400 font-normal">{row.desc}</span>
+                          </span>
                         </div>
+                        <span className={`text-sm tabular-nums font-semibold ${row.color}`}>
+                          {'rate' in row && row.rate !== undefined
+                            ? `${(row.rate * 100).toFixed(1)}%`
+                            : row.val !== null ? fmtKrw(row.val) : '—'}
+                        </span>
                       </div>
+                    ))}
+                  </div>
+                  {/* 실현배수 */}
+                  <div className={`flex items-center justify-between py-2 px-3 rounded mt-2 ${postPnlResultSheet.meets35x ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-stone-400 w-5">⚡</span>
+                      <span className="text-xs font-semibold text-stone-700">실현 배수</span>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-sm font-bold ${postPnlResultSheet.meets35x ? 'text-green-600' : 'text-red-500'}`}>
+                        {postPnlResultSheet.actualMultiple.toFixed(2)}x
+                      </span>
+                      {postPnlResultSheet.meets35x
+                        ? <div className="text-[10px] text-green-600">✅ 목표 달성 (3.5x 이상)</div>
+                        : <div className="text-[10px] text-red-500">⚠️ 원가 절감 필요: {fmtKrw(postPnlResultSheet.costReductionNeeded)}</div>
+                      }
                     </div>
                   </div>
                 </div>
               ) : (
-                <div style={{ padding: '14px', textAlign: 'center', color: '#a8a29e', fontSize: '11px', background: '#fafaf9', borderRadius: '6px', border: '1px dashed #e7e5e4' }}>
+                <div className="text-center text-stone-400 text-xs py-4 bg-stone-50 rounded-lg border border-stone-200 border-dashed">
                   확정 판매가를 입력하면 영업이익 P&L 분석이 표시됩니다
                 </div>
               )}
