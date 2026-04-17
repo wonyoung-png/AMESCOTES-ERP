@@ -65,6 +65,31 @@ const emptyItem: Partial<Item> = {
   colors: [], memo: '',
 };
 
+// ─── 사후원가 계산 (BomManagement.calcPostSummary 동일 로직) ───
+function calcBomPostCostKrw(bom: any): number {
+  const postColorBom = (bom.postColorBoms || [])[0];
+  const materials: any[] = postColorBom ? (postColorBom.lines || []) : (bom.postMaterials || []);
+  if (materials.length === 0) return 0;
+  const cnyKrw = bom.postExchangeRateCny || bom.exchangeRateCny || bom.snapshotCnyKrw || 191;
+  const usdKrw = bom.exchangeRateUsd || 1380;
+  const cur = bom.currency || 'CNY';
+  const rate = cur === 'USD' ? usdKrw : cur === 'KRW' ? 1 : cnyKrw;
+  const calcLineAmt = (price: number, net: number, loss: number) => price * net * (1 + loss);
+  const factoryMat = materials.reduce((s: number, l: any) =>
+    l.isHqProvided ? s : s + calcLineAmt(l.unitPriceCny || 0, l.netQty || 0, l.lossRate || 0), 0);
+  const hqMat = materials.reduce((s: number, l: any) =>
+    l.isHqProvided ? s + calcLineAmt(l.unitPriceCny || 0, l.netQty || 0, l.lossRate || 0) : s, 0);
+  const processingCny = postColorBom ? (postColorBom.processingFee ?? 0) : (bom.postProcessingFee || 0);
+  const postProcLines: any[] = postColorBom ? (postColorBom.postProcessLines ?? []) : (bom.postProcessLines || []);
+  const postProcCny = postProcLines.reduce((s: number, l: any) => s + (l.netQty || 0) * (l.unitPrice || 0), 0);
+  const processingKrw = processingCny * rate;
+  const customsKrw = processingKrw * ((bom.customsRate || 0) / 100);
+  const factoryUnitCostKrw = factoryMat * rate + processingKrw + postProcCny * rate;
+  const totalCostKrw = factoryUnitCostKrw + hqMat * rate + customsKrw +
+    (bom.logisticsCostKrw || 0) + (bom.packagingCostKrw || 0) + (bom.packingCostKrw || 0);
+  return Math.round(totalCostKrw);
+}
+
 // ─── 컬럼 너비 리사이즈 기본값 ───
 const ITEM_DEFAULT_COL_WIDTHS: Record<string, number> = {
   image: 60, styleNo: 130, season: 80, buyer: 120, name: 180,
@@ -939,9 +964,9 @@ export default function ItemMaster() {
                 const itemBom = (boms as any[]).find(b => b.styleId === item.id) ||
                                 (boms as any[]).find(b => b.styleNo === item.styleNo);
                 const delivery = itemBom?.postDeliveryPrice || item.deliveryPrice || item.targetSalePrice || 0;
-                // 총원가액: 사후원가(postSubtotalKrw / postTotalCostKrw) 기준
+                // 총원가액: postColorBoms에서 직접 계산 (DB 저장 값 우선, 없으면 실시간 계산)
                 const bomCost = itemBom
-                  ? ((itemBom as any).postSubtotalKrw || (itemBom as any).postTotalCostKrw || 0)
+                  ? ((itemBom as any).postSubtotalKrw || (itemBom as any).postTotalCostKrw || calcBomPostCostKrw(itemBom))
                   : 0;
                 const confirmedSalePrice: number = (itemBom as any)?.pnl?.confirmedSalePrice || 0;
                 const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
