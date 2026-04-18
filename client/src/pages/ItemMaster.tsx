@@ -66,15 +66,17 @@ const emptyItem: Partial<Item> = {
 };
 
 // ─── 사후원가 계산 (BomManagement finalCost 동일 로직) ───
-// finalCost = ps.totalCostKrw + (ps.totalCostKrw × productionMarginRate)
-function calcBomPostCostKrw(bom: any): number {
-  // 간단 원가 BOM 처리 (postColorBoms/postMaterials 없이 숫자만 입력된 경우)
+// productCost  = calcPostSummary.totalCostKrw (제품총원가, 생산마진 제외)
+// totalCostKrw = productCost × (1 + productionMarginRate) (총원가액, 생산마진 포함)
+function calcBomCosts(bom: any): { productCost: number; totalCostKrw: number } {
+  // 간단 원가 BOM: simplePostCostKrw를 총원가액으로 사용 (제품총원가 = 동일)
   if (bom.isSimpleCost && bom.simplePostCostKrw && bom.simplePostCostKrw > 0) {
-    return Math.round(bom.simplePostCostKrw);
+    const v = Math.round(bom.simplePostCostKrw);
+    return { productCost: v, totalCostKrw: v };
   }
   const postColorBom = (bom.postColorBoms || [])[0];
   const materials: any[] = postColorBom ? (postColorBom.lines || []) : (bom.postMaterials || []);
-  if (materials.length === 0) return 0;
+  if (materials.length === 0) return { productCost: 0, totalCostKrw: 0 };
   const cnyKrw = bom.postExchangeRateCny || bom.exchangeRateCny || bom.snapshotCnyKrw || 191;
   const usdKrw = bom.exchangeRateUsd || 1380;
   const cur = bom.currency || 'CNY';
@@ -90,18 +92,24 @@ function calcBomPostCostKrw(bom: any): number {
   const processingKrw = processingCny * rate;
   const customsKrw = processingKrw * ((bom.customsRate || 0) / 100);
   const factoryUnitCostKrw = factoryMat * rate + processingKrw + postProcCny * rate;
-  const totalCostKrw = factoryUnitCostKrw + hqMat * rate + customsKrw +
-    (bom.logisticsCostKrw || 0) + (bom.packagingCostKrw || 0) + (bom.packingCostKrw || 0);
-  // 생산관리비용 포함 (BomManagement finalCost와 동일)
+  const productCost = Math.round(
+    factoryUnitCostKrw + hqMat * rate + customsKrw +
+    (bom.logisticsCostKrw || 0) + (bom.packagingCostKrw || 0) + (bom.packingCostKrw || 0)
+  );
+  // 총원가액 = 제품총원가 + 생산마진 (BomManagement finalCost와 동일)
   const marginRate = bom.productionMarginRate ?? 0;
-  const finalCost = marginRate > 0 ? totalCostKrw * (1 + marginRate) : totalCostKrw;
-  return Math.round(finalCost);
+  const totalCostKrw = marginRate > 0 ? Math.round(productCost * (1 + marginRate)) : productCost;
+  return { productCost, totalCostKrw };
+}
+// 하위 호환용 단순 래퍼 (syncPostCost에서 사용)
+function calcBomPostCostKrw(bom: any): number {
+  return calcBomCosts(bom).totalCostKrw;
 }
 
 // ─── 컬럼 너비 리사이즈 기본값 ───
 const ITEM_DEFAULT_COL_WIDTHS: Record<string, number> = {
   image: 60, styleNo: 130, season: 80, buyer: 120, name: 180,
-  category: 80, color: 100, delivery: 90, bomCost: 100, salePrice: 110, multiple: 80, margin: 90,
+  category: 80, color: 100, delivery: 90, productCost: 100, bomCost: 100, salePrice: 110, multiple: 80, margin: 90,
   noOrder: 90, createdAt: 100, bom: 60, action: 60,
 };
 
@@ -968,6 +976,7 @@ export default function ItemMaster() {
               <col style={{ width: colWidths.category }} />
               <col style={{ width: colWidths.color }} />
               <col style={{ width: colWidths.delivery }} />
+              <col style={{ width: colWidths.productCost }} />
               <col style={{ width: colWidths.bomCost }} />
               <col style={{ width: colWidths.salePrice }} />
               <col style={{ width: colWidths.multiple }} />
@@ -1021,6 +1030,10 @@ export default function ItemMaster() {
                   <div onMouseDown={(e) => startResize(e, 'delivery')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  제품총원가
+                  <div onMouseDown={(e) => startResize(e, 'productCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
                   총원가액
                   <div onMouseDown={(e) => startResize(e, 'bomCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
@@ -1058,10 +1071,10 @@ export default function ItemMaster() {
                                 (boms as any[]).find(b => b.styleNo === item.styleNo) ||
                                 (boms as any[]).find(b => b.styleNo?.trim() === item.styleNo?.trim());
                 const delivery = itemBom?.postDeliveryPrice || item.deliveryPrice || item.targetSalePrice || 0;
-                // 총원가액: boms 에서 실시간 계산 (DB 저장값 없으면 즉시 계산으로 fallback)
-                const bomCostFromDb: number = (item as any).postCostKrw || 0;
-                const bomCostCalc: number = itemBom ? calcBomPostCostKrw(itemBom) : 0;
-                const bomCost: number = bomCostFromDb > 0 ? bomCostFromDb : bomCostCalc;
+                // 제품총원가 / 총원가액: boms 실시간 계산 (마진 포함 여부 분리)
+                const { productCost: productCostCalc, totalCostKrw: bomCostCalc } = itemBom ? calcBomCosts(itemBom) : { productCost: 0, totalCostKrw: 0 };
+                const productCost: number = productCostCalc;   // 제품총원가 (생산마진 미포함)
+                const bomCost: number = bomCostCalc;           // 총원가액 (생산마진 포함)
                 // 확정판매가: pnl.confirmedSalePrice 우선 → items.confirmedSalePrice
                 const confirmedSalePrice: number = itemBom?.pnl?.confirmedSalePrice || (item as any).confirmedSalePrice || 0;
                 const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
@@ -1141,10 +1154,18 @@ export default function ItemMaster() {
                         <p className="font-mono text-xs text-stone-700">{formatKRW(delivery)}</p>
                       ) : <span className="text-stone-300 text-xs">—</span>}
                     </td>
-                    {/* 총원가액 */}
+                    {/* 제품총원가 (생산마진 미포함) */}
+                    <td className="px-4 py-3 text-right font-mono text-xs">
+                      {productCost > 0 ? (
+                        <span className="text-stone-500">{formatKRW(productCost)}</span>
+                      ) : (
+                        <span className="text-stone-300">—</span>
+                      )}
+                    </td>
+                    {/* 총원가액 (생산마진 포함) */}
                     <td className="px-4 py-3 text-right font-mono text-xs">
                       {bomCost > 0 ? (
-                        <span className="text-amber-700">{formatKRW(bomCost)}</span>
+                        <span className="text-amber-700 font-semibold">{formatKRW(bomCost)}</span>
                       ) : itemBom ? (
                         <span className="text-stone-300 text-xs">원가미입력</span>
                       ) : (
