@@ -109,7 +109,7 @@ function calcBomPostCostKrw(bom: any): number {
 // ─── 컬럼 너비 리사이즈 기본값 ───
 const ITEM_DEFAULT_COL_WIDTHS: Record<string, number> = {
   image: 60, styleNo: 130, season: 80, buyer: 120, name: 180,
-  category: 80, color: 100, delivery: 90, productCost: 100, bomCost: 100, salePrice: 110, multiple: 80, margin: 90,
+  category: 80, color: 100, delivery: 90, bomCost: 100, salePrice: 110, multiple: 80, margin: 90,
   noOrder: 90, createdAt: 100, bom: 60, action: 60,
 };
 
@@ -976,7 +976,6 @@ export default function ItemMaster() {
               <col style={{ width: colWidths.category }} />
               <col style={{ width: colWidths.color }} />
               <col style={{ width: colWidths.delivery }} />
-              <col style={{ width: colWidths.productCost }} />
               <col style={{ width: colWidths.bomCost }} />
               <col style={{ width: colWidths.salePrice }} />
               <col style={{ width: colWidths.multiple }} />
@@ -1030,10 +1029,6 @@ export default function ItemMaster() {
                   <div onMouseDown={(e) => startResize(e, 'delivery')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
-                  제품총원가
-                  <div onMouseDown={(e) => startResize(e, 'productCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
-                </th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
                   총원가액
                   <div onMouseDown={(e) => startResize(e, 'bomCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
@@ -1071,13 +1066,15 @@ export default function ItemMaster() {
                                 (boms as any[]).find(b => b.styleNo === item.styleNo) ||
                                 (boms as any[]).find(b => b.styleNo?.trim() === item.styleNo?.trim());
                 const delivery = itemBom?.postDeliveryPrice || item.deliveryPrice || item.targetSalePrice || 0;
-                // 제품총원가 / 총원가액: boms 실시간 계산 (마진 포함 여부 분리)
+                // 총원가액: 실시간 계산 우선, 실패 시 DB 저장값 fallback
                 const { productCost: productCostCalc, totalCostKrw: bomCostCalc } = itemBom ? calcBomCosts(itemBom) : { productCost: 0, totalCostKrw: 0 };
-                const productCost: number = productCostCalc;   // 제품총원가 (생산마진 미포함)
+                const postCostKrwDb: number = (item as any).postCostKrw || 0;
                 // 바이어 판별: 자사 브랜드(아뜰리에드루멘)이면 생산마진 제외
                 const buyer = (vendors as any[]).find(v => v.id === (item as any).buyerId);
                 const isSelfBrand = !buyer || buyer.name?.includes('아뜰리에드루멘');
-                const bomCost: number = isSelfBrand ? productCost : bomCostCalc;  // 총원가액
+                const bomCostLive = isSelfBrand ? productCostCalc : bomCostCalc;
+                // live calc 실패 시 DB 저장값으로 fallback (postCostKrw = BOM 저장 시점의 finalCost)
+                const bomCost: number = bomCostLive > 0 ? bomCostLive : postCostKrwDb;
                 // 확정판매가: pnl.confirmedSalePrice 우선 → items.confirmedSalePrice
                 const confirmedSalePrice: number = itemBom?.pnl?.confirmedSalePrice || (item as any).confirmedSalePrice || 0;
                 const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
@@ -1157,15 +1154,7 @@ export default function ItemMaster() {
                         <p className="font-mono text-xs text-stone-700">{formatKRW(delivery)}</p>
                       ) : <span className="text-stone-300 text-xs">—</span>}
                     </td>
-                    {/* 제품총원가 (생산마진 미포함) */}
-                    <td className="px-4 py-3 text-right font-mono text-xs">
-                      {productCost > 0 ? (
-                        <span className="text-stone-500">{formatKRW(productCost)}</span>
-                      ) : (
-                        <span className="text-stone-300">—</span>
-                      )}
-                    </td>
-                    {/* 총원가액 (생산마진 포함) */}
+                    {/* 총원가액 */}
                     <td className="px-4 py-3 text-right font-mono text-xs">
                       {bomCost > 0 ? (
                         <span className="text-amber-700 font-semibold">{formatKRW(bomCost)}</span>
