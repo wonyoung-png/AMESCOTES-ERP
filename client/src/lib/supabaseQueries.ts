@@ -185,7 +185,7 @@ const TABLE_COLUMNS: Record<string, string[]> = {
   items: ['id', 'style_no', 'name', 'erp_category', 'sub_category', 'buyer_id', 'season',
           'designer', 'material', 'delivery_price', 'margin_amount', 'margin_rate',
           'last_order_date', 'memo', 'image_url',
-          'has_bom', 'base_cost_krw', 'colors',
+          'has_bom', 'base_cost_krw', 'post_cost_krw', 'confirmed_sale_price', 'colors',
           'created_at', 'updated_at'],
   samples: ['id', 'style_no', 'style_name', 'buyer_id', 'season', 'stage', 'assignee',
             'sales_person', 'request_date', 'expected_date', 'approved_date', 'cost_krw',
@@ -301,6 +301,8 @@ export async function fetchItems() {
     imageUrl: row.image_url,
     hasBom: row.has_bom ?? false,
     baseCostKrw: row.base_cost_krw ?? 0,
+    postCostKrw: row.post_cost_krw ?? 0,
+    confirmedSalePrice: row.confirmed_sale_price ?? 0,
     colors: Array.isArray(row.colors) ? row.colors : [],
     buyerId: row.buyer_id,
     memo: row.memo,
@@ -326,6 +328,8 @@ export async function upsertItem(item: Record<string, any>) {
     image_url: item.imageUrl,
     has_bom: item.hasBom,
     base_cost_krw: item.baseCostKrw,
+    post_cost_krw: item.postCostKrw ?? null,
+    confirmed_sale_price: item.confirmedSalePrice ?? null,
     colors: item.colors,
   });
   const { error } = await supabase.from('items').upsert(row);

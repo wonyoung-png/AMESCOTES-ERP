@@ -2687,19 +2687,15 @@ export default function BomManagement() {
     saveExtBoms(newBoms);
     setExtBoms(newBoms);
     // Supabase에 직접 저장
-    // 사후원가 소계/원가 계산 후 저장 (품목마스터 연동용)
+    // 사후원가 계산 (품목마스터 items 테이블에도 동기화)
     const activePostCB = (updated.postColorBoms || [])[0];
+    let postCostKrw = 0;
     if (activePostCB) {
       const ps = calcPostSummary(updated, store.getSettings().usdKrw || 1380, activePostCB);
-      (updated as any).postSubtotalKrw = Math.round(ps.totalCostKrw || 0);  // 제품 총원가
-      (updated as any).postTotalCostKrw = Math.round(ps.totalCostKrw || 0);
+      postCostKrw = Math.round(ps.totalCostKrw || 0);
+      (updated as any).postSubtotalKrw = postCostKrw;
+      (updated as any).postTotalCostKrw = postCostKrw;
     }
-    // 디버그: vendorName 확인
-    const _debugPostCB = (updated.postColorBoms || []).map(cb => ({
-      color: cb.color,
-      firstVendor: (cb.lines || [])[0]?.vendorName
-    }));
-    console.log('[BOM 저장 디버그] postColorBoms vendorName:', JSON.stringify(_debugPostCB));
     upsertBom(updated)
       .then(async () => {
         queryClient.invalidateQueries({ queryKey: ['boms'] });
@@ -2740,6 +2736,9 @@ export default function BomManagement() {
       ...(currentItem || {}),
       id: editBom.styleId,
       baseCostKrw: Math.round(summary.totalCostKrw),
+      // 사후원가 & 확정판매가를 items 테이블에 직접 저장 (품목마스터 연동 핵심)
+      ...(postCostKrw > 0 ? { postCostKrw } : {}),
+      ...(editBom.pnl?.confirmedSalePrice ? { confirmedSalePrice: editBom.pnl.confirmedSalePrice } : {}),
       hasBom: true,
       ...(newColors.length > 0 ? {
         colors: [
