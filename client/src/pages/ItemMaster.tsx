@@ -67,6 +67,10 @@ const emptyItem: Partial<Item> = {
 
 // ─── 사후원가 계산 (BomManagement.calcPostSummary 동일 로직) ───
 function calcBomPostCostKrw(bom: any): number {
+  // 간단 원가 BOM 처리 (postColorBoms/postMaterials 없이 숫자만 입력된 경우)
+  if (bom.isSimpleCost && bom.simplePostCostKrw && bom.simplePostCostKrw > 0) {
+    return Math.round(bom.simplePostCostKrw);
+  }
   const postColorBom = (bom.postColorBoms || [])[0];
   const materials: any[] = postColorBom ? (postColorBom.lines || []) : (bom.postMaterials || []);
   if (materials.length === 0) return 0;
@@ -326,29 +330,32 @@ export default function ItemMaster() {
   const refresh = () => { queryClient.invalidateQueries({ queryKey: ['items'] }); queryClient.invalidateQueries({ queryKey: ['boms'] }); };
   const { data: boms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
 
-  // ─── BOM→items 일괄 동기화 (SQL 마이그레이션 후 1회 자동 실행) ───
-  useEffect(() => {
-    if (items.length === 0 || boms.length === 0) return;
-    const needSync = items.filter(item =>
-      item.hasBom && (item as any).postCostKrw === 0
+  // ─── BOM→items 원가 일괄 동기화 ───
+  const [isSyncing, setIsSyncing] = useState(false);
+  const syncPostCost = async () => {
+    setIsSyncing(true);
+    let saved = 0, noMatch = 0, zeroCost = 0;
+    // BOM 기준으로 순회 (hasBom 의존 없음)
+    for (const bom of (boms as any[])) {
+      const cost = calcBomPostCostKrw(bom);
+      if (cost <= 0) { zeroCost++; continue; }
+      // 매칭: bom.styleId(UUID) 또는 bom.styleNo(문자열)로 items에서 찾기
+      const matchedItem =
+        (items as any[]).find(i => i.id === bom.styleId) ||
+        (items as any[]).find(i => i.styleNo === bom.styleNo) ||
+        (items as any[]).find(i => i.styleNo?.trim() === bom.styleNo?.trim());
+      if (!matchedItem) { noMatch++; continue; }
+      const salePx = bom?.pnl?.confirmedSalePrice || 0;
+      await updateItemCostData(matchedItem.id, cost, salePx);
+      saved++;
+    }
+    if (saved > 0) queryClient.invalidateQueries({ queryKey: ['items'] });
+    setIsSyncing(false);
+    toast.info(
+      `동기화 완료 — 저장: ${saved}개 | 아이템미매칭: ${noMatch}개 | 원가0원: ${zeroCost}개`,
+      { duration: 8000 }
     );
-    if (needSync.length === 0) return;
-    let synced = 0;
-    const run = async () => {
-      for (const item of needSync) {
-        const itemBom = (boms as any[]).find(b => b.styleId === item.id) ||
-                        (boms as any[]).find(b => b.styleNo === item.styleNo);
-        if (!itemBom) continue;
-        const cost = calcBomPostCostKrw(itemBom);
-        if (cost <= 0) continue;
-        const salePx = itemBom?.pnl?.confirmedSalePrice || 0;
-        await updateItemCostData(item.id, cost, salePx);
-        synced++;
-      }
-      if (synced > 0) queryClient.invalidateQueries({ queryKey: ['items'] });
-    };
-    run();
-  }, [items.length, boms.length]); // 데이터 로드 완료 시 1회
+  };
 
   // 현재 선택된 erpCategory에 따른 세부 카테고리 옵션
   const subCategories = editItem.erpCategory === 'SLG' ? SLG_CATEGORIES : HB_CATEGORIES;
@@ -764,6 +771,14 @@ export default function ItemMaster() {
             className="hidden"
             onChange={e => { const f = e.target.files?.[0]; if (f) parseExcelFile(f); }}
           />
+          <Button
+            variant="outline"
+            onClick={syncPostCost}
+            disabled={isSyncing}
+            className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+          >
+            {isSyncing ? '동기화 중...' : '원가 동기화'}
+          </Button>
           <Button onClick={() => openAdd()} className="bg-[#C9A96E] hover:bg-[#B8985D] text-white gap-2">
             <Plus size={16} />품목 등록
           </Button>

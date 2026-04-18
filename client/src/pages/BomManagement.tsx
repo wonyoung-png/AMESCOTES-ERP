@@ -783,6 +783,11 @@ function SimpleCostModal({
         hasBom: true,
       } as any))).catch(() => {});
 
+      // 간단 사후원가 → items 테이블 동기화
+      if (postCostNum && postCostNum > 0) {
+        import('@/lib/supabaseQueries').then(m => m.updateItemCostData(item.id, postCostNum)).catch(() => {});
+      }
+
       toast.success(`[${item.styleNo}] 간단 원가 저장 완료`);
       onSaved(bomData);
       onClose();
