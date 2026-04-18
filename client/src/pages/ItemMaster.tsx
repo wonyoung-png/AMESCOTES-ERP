@@ -1074,7 +1074,10 @@ export default function ItemMaster() {
                 // 제품총원가 / 총원가액: boms 실시간 계산 (마진 포함 여부 분리)
                 const { productCost: productCostCalc, totalCostKrw: bomCostCalc } = itemBom ? calcBomCosts(itemBom) : { productCost: 0, totalCostKrw: 0 };
                 const productCost: number = productCostCalc;   // 제품총원가 (생산마진 미포함)
-                const bomCost: number = bomCostCalc;           // 총원가액 (생산마진 포함)
+                // 바이어 판별: 자사 브랜드(아뜰리에드루멘)이면 생산마진 제외
+                const buyer = (vendors as any[]).find(v => v.id === (item as any).buyerId);
+                const isSelfBrand = !buyer || buyer.name?.includes('아뜰리에드루멘');
+                const bomCost: number = isSelfBrand ? productCost : bomCostCalc;  // 총원가액
                 // 확정판매가: pnl.confirmedSalePrice 우선 → items.confirmedSalePrice
                 const confirmedSalePrice: number = itemBom?.pnl?.confirmedSalePrice || (item as any).confirmedSalePrice || 0;
                 const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
