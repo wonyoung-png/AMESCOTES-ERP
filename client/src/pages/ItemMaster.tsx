@@ -180,18 +180,27 @@ export default function ItemMaster() {
     styleNo: string; name: string; nameEn: string; season: string;
     category: string; erpCategory: string; colors: string[];
     salePriceKrw: number | null; material: string; memo: string;
+    buyerId?: string; buyerName?: string;
     isDuplicate: boolean;
   }>>([]);
 
   // 양식 다운로드
   const downloadTemplate = () => {
+    // 거래처 목록 주석용 (code 또는 name)
+    const vendorList = (vendors as any[]).map(v => v.code || v.name).filter(Boolean).join(', ');
     const ws = XLSX.utils.aoa_to_sheet([
-      ['스타일번호*', '품목명*', '품목명(영문)', '시즌', '카테고리', 'ERP카테고리', '컬러코드1', '컬러코드2', '컬러코드3', '판매가', '소재', '메모'],
-      ['LLL6S82', 'SOFIA WEAVING BAG', 'SOFIA WEAVING BAG', '26SS', '숄더백', 'HB', 'OB', 'SB', '', 398000, '소프트레더', ''],
+      ['스타일번호*', '품목명*', '거래처(브랜드코드)', '품목명(영문)', '시즌', '카테고리', 'ERP카테고리', '컬러코드1', '컬러코드2', '컬러코드3', '판매가', '소재', '메모'],
+      ['LLL6S82', 'SOFIA WEAVING BAG', 'LLL', 'SOFIA WEAVING BAG', '26SS', '숄더백', 'HB', 'OB', 'SB', '', 398000, '소프트레더', ''],
     ]);
+    // 거래처 컬럼에 주석 추가 (등록된 거래처 목록 안내)
+    if (vendorList) {
+      if (!ws['C1'].c) ws['C1'].c = [];
+      ws['C1'].c.hidden = false;
+      ws['C1'].c.push({ a: 'ERP', t: `등록된 거래처 코드/이름: ${vendorList}` });
+    }
     ws['!cols'] = [
-      { wch: 14 }, { wch: 30 }, { wch: 30 }, { wch: 8 }, { wch: 10 },
-      { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 20 },
+      { wch: 14 }, { wch: 30 }, { wch: 16 }, { wch: 30 }, { wch: 8 },
+      { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 20 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '품목등록양식');
@@ -215,9 +224,22 @@ export default function ItemMaster() {
         const header = rows[0].map((h: any) => String(h || '').trim());
         const isStandardFormat = header[0]?.includes('스타일번호');
         const isAtlmFormat = header.length >= 15 && (header[2]?.includes('상품코드') || header[14]?.includes('제조사') || !isStandardFormat);
+        // 신양식: 헤더 col2에 '거래처' 포함 여부로 구분
+        const hasVendorCol = isStandardFormat && header[2]?.includes('거래처');
 
         const grouped: Record<string, typeof excelPreviewItems[0]> = {};
         const existingStyleNos = new Set((items as Item[]).map(i => i.styleNo));
+
+        // 거래처 매칭 헬퍼: code 또는 name으로 검색
+        const matchVendor = (input: string) => {
+          const s = input.trim();
+          if (!s) return undefined;
+          return (vendors as any[]).find(v =>
+            v.code === s || v.name === s ||
+            v.code?.toLowerCase() === s.toLowerCase() ||
+            v.name?.toLowerCase() === s.toLowerCase()
+          );
+        };
 
         const dataRows = rows.slice(1).filter(r => r && r.length >= 2);
 
@@ -244,8 +266,35 @@ export default function ItemMaster() {
             if (colorCode && !grouped[styleNo].colors.includes(colorCode)) {
               grouped[styleNo].colors.push(colorCode);
             }
+          } else if (hasVendorCol) {
+            // 신양식: col2=거래처(브랜드코드), 이후 컬럼 +1 shift
+            const styleNo = String(row[0] || '').trim();
+            const name = String(row[1] || '').trim();
+            if (!styleNo || !name) continue;
+
+            const vendorInput = String(row[2] || '').trim();
+            const matched = matchVendor(vendorInput);
+
+            const colors: string[] = [];
+            [row[7], row[8], row[9]].forEach(c => { if (c) colors.push(String(c).trim()); });
+
+            grouped[styleNo] = {
+              styleNo,
+              name,
+              buyerId: matched?.id,
+              buyerName: matched ? (matched.name || matched.code) : (vendorInput || undefined),
+              nameEn: String(row[3] || '').trim(),
+              season: String(row[4] || '26SS').trim(),
+              category: String(row[5] || '숄더백').trim(),
+              erpCategory: String(row[6] || 'HB').trim(),
+              colors,
+              salePriceKrw: row[10] ? Number(row[10]) : null,
+              material: String(row[11] || '').trim(),
+              memo: String(row[12] || '').trim(),
+              isDuplicate: existingStyleNos.has(styleNo),
+            };
           } else {
-            // 표준 양식
+            // 구양식: 거래처 컬럼 없음
             const styleNo = String(row[0] || '').trim();
             const name = String(row[1] || '').trim();
             if (!styleNo || !name) continue;
@@ -301,6 +350,7 @@ export default function ItemMaster() {
           itemStatus: 'ACTIVE',
           material: p.material || '',
           deliveryPrice: p.salePriceKrw || 0,
+          buyerId: p.buyerId || undefined,
           colors: p.colors.map(c => ({ name: c })),
           hasBom: false,
           createdAt: new Date().toISOString(),
@@ -1678,9 +1728,10 @@ export default function ItemMaster() {
                   <th className="px-2 py-1.5 text-left font-medium text-stone-600">상태</th>
                   <th className="px-2 py-1.5 text-left font-medium text-stone-600">스타일번호</th>
                   <th className="px-2 py-1.5 text-left font-medium text-stone-600">품목명</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">거래처</th>
                   <th className="px-2 py-1.5 text-left font-medium text-stone-600">시즌</th>
                   <th className="px-2 py-1.5 text-left font-medium text-stone-600">카테</th>
-                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">콜러</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">컬러</th>
                   <th className="px-2 py-1.5 text-left font-medium text-stone-600">판매가</th>
                 </tr>
               </thead>
@@ -1694,6 +1745,11 @@ export default function ItemMaster() {
                     </td>
                     <td className="px-2 py-1.5 font-mono">{p.styleNo}</td>
                     <td className="px-2 py-1.5 max-w-[200px] truncate">{p.name}</td>
+                    <td className="px-2 py-1.5">
+                      {p.buyerName
+                        ? <span className={p.buyerId ? 'text-green-700 font-medium' : 'text-amber-600'}>{p.buyerName}{!p.buyerId && ' ⚠️미매칭'}</span>
+                        : <span className="text-stone-300">—</span>}
+                    </td>
                     <td className="px-2 py-1.5">{p.season}</td>
                     <td className="px-2 py-1.5">{p.erpCategory}</td>
                     <td className="px-2 py-1.5">{p.colors.join(', ')}</td>
