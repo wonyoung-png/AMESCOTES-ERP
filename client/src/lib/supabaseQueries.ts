@@ -328,12 +328,23 @@ export async function upsertItem(item: Record<string, any>) {
     image_url: item.imageUrl,
     has_bom: item.hasBom,
     base_cost_krw: item.baseCostKrw,
-    post_cost_krw: item.postCostKrw ?? null,
-    confirmed_sale_price: item.confirmedSalePrice ?? null,
     colors: item.colors,
   });
   const { error } = await supabase.from('items').upsert(row);
   if (error) throw error;
+}
+
+// 사후원가/확정판매가 전용 업데이트 (마이그레이션 실행 후 동작, 컬럼 없어도 다른 기능 안 깨짐)
+export async function updateItemCostData(id: string, postCostKrw: number, confirmedSalePrice?: number) {
+  const patch: Record<string, any> = { post_cost_krw: postCostKrw };
+  if (confirmedSalePrice !== undefined && confirmedSalePrice > 0) {
+    patch.confirmed_sale_price = confirmedSalePrice;
+  }
+  const { error } = await supabase.from('items').update(patch).eq('id', id);
+  if (error) {
+    // 컬럼 미존재(마이그레이션 미실행) 시 경고만 출력, throw 안 함
+    console.warn('[updateItemCostData] 사후원가 저장 실패 (SQL 마이그레이션 필요):', error.message);
+  }
 }
 
 export async function deleteItem(id: string) {

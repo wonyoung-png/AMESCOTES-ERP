@@ -2747,9 +2747,20 @@ export default function BomManagement() {
         ],
       } : {}),
     };
-    import('@/lib/supabaseQueries').then(m => m.upsertItem(updatedItemData as any))
-      .then(() => queryClient.invalidateQueries({ queryKey: ['items'] }))
-      .catch(() => {});
+    import('@/lib/supabaseQueries').then(m => {
+      // 1. 기본 품목 정보 저장 (has_bom, colors 등 — 항상 성공해야 함)
+      m.upsertItem(updatedItemData as any)
+        .then(() => queryClient.invalidateQueries({ queryKey: ['items'] }))
+        .catch(() => {});
+      // 2. 사후원가/확정판매가 별도 저장 (migration_add_post_cost_to_items.sql 실행 후 반영)
+      if (postCostKrw > 0 || editBom.pnl?.confirmedSalePrice) {
+        m.updateItemCostData(
+          editBom.styleId,
+          postCostKrw,
+          editBom.pnl?.confirmedSalePrice,
+        );
+      }
+    });
     setIsDirty(false);
     toast.success('BOM이 저장되었습니다' + (newColors.length > 0 ? ` (컬러 ${newColors.length}개 품목에 추가됨)` : ''));
   };
