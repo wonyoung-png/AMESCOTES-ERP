@@ -1005,11 +1005,15 @@ export default function ItemMaster() {
               {displayItems.map(item => {
                 // 납품가: BOM 사후원가 postDeliveryPrice 우선 → item.deliveryPrice
                 const itemBom = (boms as any[]).find(b => b.styleId === item.id) ||
-                                (boms as any[]).find(b => b.styleNo === item.styleNo);
+                                (boms as any[]).find(b => b.styleNo === item.styleNo) ||
+                                (boms as any[]).find(b => b.styleNo?.trim() === item.styleNo?.trim());
                 const delivery = itemBom?.postDeliveryPrice || item.deliveryPrice || item.targetSalePrice || 0;
-                // 총원가액/확정판매가: items 테이블에 직접 저장된 값 사용 (BOM 저장 시 자동 동기화)
-                const bomCost: number = (item as any).postCostKrw || 0;
-                const confirmedSalePrice: number = (item as any).confirmedSalePrice || 0;
+                // 총원가액: boms 에서 실시간 계산 (DB 저장값 없으면 즉시 계산으로 fallback)
+                const bomCostFromDb: number = (item as any).postCostKrw || 0;
+                const bomCostCalc: number = itemBom ? calcBomPostCostKrw(itemBom) : 0;
+                const bomCost: number = bomCostFromDb > 0 ? bomCostFromDb : bomCostCalc;
+                // 확정판매가: pnl.confirmedSalePrice 우선 → items.confirmedSalePrice
+                const confirmedSalePrice: number = itemBom?.pnl?.confirmedSalePrice || (item as any).confirmedSalePrice || 0;
                 const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
                 const { rate: marginRate, amount: marginAmount } = calcMargin(delivery, bomCost);
                 const months = monthsSinceLastOrder(item);
@@ -1091,8 +1095,8 @@ export default function ItemMaster() {
                     <td className="px-4 py-3 text-right font-mono text-xs">
                       {bomCost > 0 ? (
                         <span className="text-amber-700">{formatKRW(bomCost)}</span>
-                      ) : item.hasBom ? (
-                        <span className="text-stone-300 text-xs">저장필요</span>
+                      ) : itemBom ? (
+                        <span className="text-stone-300 text-xs">원가미입력</span>
                       ) : (
                         <span className="text-stone-300 text-xs">미등록</span>
                       )}
