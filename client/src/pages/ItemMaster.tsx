@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type ProductionOrder, type ColorQty } from '@/lib/store';
-import { fetchItems, upsertItem, deleteItem as deleteItemSB, fetchVendors, fetchBoms } from '@/lib/supabaseQueries';
+import { fetchItems, upsertItem, deleteItem as deleteItemSB, fetchVendors, fetchBoms, updateItemCostData } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -325,6 +325,30 @@ export default function ItemMaster() {
 
   const refresh = () => { queryClient.invalidateQueries({ queryKey: ['items'] }); queryClient.invalidateQueries({ queryKey: ['boms'] }); };
   const { data: boms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
+
+  // ─── BOM→items 일괄 동기화 (SQL 마이그레이션 후 1회 자동 실행) ───
+  useEffect(() => {
+    if (items.length === 0 || boms.length === 0) return;
+    const needSync = items.filter(item =>
+      item.hasBom && (item as any).postCostKrw === 0
+    );
+    if (needSync.length === 0) return;
+    let synced = 0;
+    const run = async () => {
+      for (const item of needSync) {
+        const itemBom = (boms as any[]).find(b => b.styleId === item.id) ||
+                        (boms as any[]).find(b => b.styleNo === item.styleNo);
+        if (!itemBom) continue;
+        const cost = calcBomPostCostKrw(itemBom);
+        if (cost <= 0) continue;
+        const salePx = itemBom?.pnl?.confirmedSalePrice || 0;
+        await updateItemCostData(item.id, cost, salePx);
+        synced++;
+      }
+      if (synced > 0) queryClient.invalidateQueries({ queryKey: ['items'] });
+    };
+    run();
+  }, [items.length, boms.length]); // 데이터 로드 완료 시 1회
 
   // 현재 선택된 erpCategory에 따른 세부 카테고리 옵션
   const subCategories = editItem.erpCategory === 'SLG' ? SLG_CATEGORIES : HB_CATEGORIES;
