@@ -2697,7 +2697,10 @@ export default function BomManagement() {
     let postCostKrw = 0;
     if (activePostCB) {
       const ps = calcPostSummary(updated, store.getSettings().usdKrw || 1380, activePostCB);
-      postCostKrw = Math.round(ps.totalCostKrw || 0);
+      // BomManagement finalCost와 동일: totalCostKrw + 생산관리비용(마진)
+      const marginRate = updated.productionMarginRate ?? 0;
+      const finalCost = marginRate > 0 ? ps.totalCostKrw * (1 + marginRate) : ps.totalCostKrw;
+      postCostKrw = Math.round(finalCost);
       (updated as any).postSubtotalKrw = postCostKrw;
       (updated as any).postTotalCostKrw = postCostKrw;
     }

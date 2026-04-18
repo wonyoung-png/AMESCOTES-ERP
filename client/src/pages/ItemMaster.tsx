@@ -65,7 +65,8 @@ const emptyItem: Partial<Item> = {
   colors: [], memo: '',
 };
 
-// ─── 사후원가 계산 (BomManagement.calcPostSummary 동일 로직) ───
+// ─── 사후원가 계산 (BomManagement finalCost 동일 로직) ───
+// finalCost = ps.totalCostKrw + (ps.totalCostKrw × productionMarginRate)
 function calcBomPostCostKrw(bom: any): number {
   // 간단 원가 BOM 처리 (postColorBoms/postMaterials 없이 숫자만 입력된 경우)
   if (bom.isSimpleCost && bom.simplePostCostKrw && bom.simplePostCostKrw > 0) {
@@ -91,7 +92,10 @@ function calcBomPostCostKrw(bom: any): number {
   const factoryUnitCostKrw = factoryMat * rate + processingKrw + postProcCny * rate;
   const totalCostKrw = factoryUnitCostKrw + hqMat * rate + customsKrw +
     (bom.logisticsCostKrw || 0) + (bom.packagingCostKrw || 0) + (bom.packingCostKrw || 0);
-  return Math.round(totalCostKrw);
+  // 생산관리비용 포함 (BomManagement finalCost와 동일)
+  const marginRate = bom.productionMarginRate ?? 0;
+  const finalCost = marginRate > 0 ? totalCostKrw * (1 + marginRate) : totalCostKrw;
+  return Math.round(finalCost);
 }
 
 // ─── 컬럼 너비 리사이즈 기본값 ───
