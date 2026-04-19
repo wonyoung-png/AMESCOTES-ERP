@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type ProductionOrder, type ColorQty } from '@/lib/store';
-import { fetchItems, upsertItem, deleteItem as deleteItemSB, fetchVendors, fetchBoms, updateItemCostData } from '@/lib/supabaseQueries';
+import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, updateItemCostData } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -348,10 +348,12 @@ export default function ItemMaster() {
 
     let success = 0;
     let fail = 0;
+    const cnyKrwRate = store.getSettings().cnyKrw || 191;
     for (const p of toRegister) {
       try {
+        const itemId = genId();
         const itemData: Item = {
-          id: genId(),
+          id: itemId,
           styleNo: p.styleNo,
           name: p.name,
           nameEn: p.nameEn || undefined,
@@ -361,14 +363,63 @@ export default function ItemMaster() {
           materialType: '완제품',
           itemStatus: 'ACTIVE',
           material: p.material || '',
-          deliveryPrice: p.salePriceKrw || 0,
+          deliveryPrice: 0,
           buyerId: p.buyerId || undefined,
           colors: p.colors.map(c => ({ name: c })),
-          hasBom: false,
+          hasBom: p.colors.length > 0,
           createdAt: new Date().toISOString(),
           memo: p.memo || '',
         };
         await upsertItem(itemData);
+
+        // 확정판매가 저장 (납품가가 아닌 confirmedSalePrice로)
+        if (p.salePriceKrw && p.salePriceKrw > 0) {
+          await updateItemCostData(itemId, 0, p.salePriceKrw);
+        }
+
+        // 컬러가 있으면 사후원가 BOM 자동 생성 (원가항목 빈칸, 확정판매가 입력)
+        if (p.colors.length > 0) {
+          const buyer = (vendors as any[]).find(v => v.id === p.buyerId);
+          const isSelfBrand = !buyer || buyer.name?.includes('아뜰리에드루멘');
+          const bomData = {
+            id: genId(),
+            styleNo: p.styleNo,
+            styleId: itemId,
+            styleName: p.name,
+            season: itemData.season,
+            erpCategory: itemData.erpCategory,
+            lineName: '',
+            manufacturingCountry: '중국',
+            currency: 'CNY',
+            snapshotCnyKrw: cnyKrwRate,
+            exchangeRateCny: cnyKrwRate,
+            lines: [],
+            processingFee: 0,
+            postMaterials: [],
+            postProcessingFee: 0,
+            postProcessLines: [],
+            colorBoms: [],
+            postColorBoms: p.colors.map(c => ({
+              color: c,
+              lines: [],
+              postProcessLines: [],
+              processingFee: 0,
+            })),
+            productionMarginRate: isSelfBrand ? 0 : 0.16,
+            customsRate: 0,
+            logisticsCostKrw: 0,
+            packagingCostKrw: 0,
+            packingCostKrw: 0,
+            pnl: {
+              discountRate: 0.05,
+              platformFeeRate: 0.30,
+              sgaRate: 0.10,
+              ...(p.salePriceKrw && p.salePriceKrw > 0 ? { confirmedSalePrice: p.salePriceKrw } : {}),
+            },
+          };
+          await upsertBom(bomData);
+        }
+
         success++;
       } catch {
         fail++;
