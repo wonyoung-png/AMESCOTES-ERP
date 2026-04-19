@@ -347,6 +347,12 @@ export async function updateItemCostData(id: string, postCostKrw: number, confir
   }
 }
 
+// 확정판매가만 단독 저장 (delivery_price/post_cost_krw 건드리지 않음)
+export async function saveConfirmedSalePrice(id: string, confirmedSalePrice: number) {
+  const { error } = await supabase.from('items').update({ confirmed_sale_price: confirmedSalePrice }).eq('id', id);
+  if (error) throw error;
+}
+
 export async function deleteItem(id: string) {
   const { error } = await supabase.from('items').delete().eq('id', id);
   if (error) throw error;

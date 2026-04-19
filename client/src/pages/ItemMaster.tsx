@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type ProductionOrder, type ColorQty } from '@/lib/store';
-import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, updateItemCostData } from '@/lib/supabaseQueries';
+import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, updateItemCostData, saveConfirmedSalePrice } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -372,9 +372,9 @@ export default function ItemMaster() {
         };
         await upsertItem(itemData);
 
-        // 확정판매가 저장 (납품가가 아닌 confirmedSalePrice로)
+        // 확정판매가 저장 (confirmed_sale_price 전용 함수 사용 — delivery_price/post_cost_krw 건드리지 않음)
         if (p.salePriceKrw && p.salePriceKrw > 0) {
-          await updateItemCostData(itemId, 0, p.salePriceKrw);
+          await saveConfirmedSalePrice(itemId, p.salePriceKrw);
         }
 
         // 컬러가 있으면 사후원가 BOM 자동 생성 (원가항목 빈칸, 확정판매가 입력)
