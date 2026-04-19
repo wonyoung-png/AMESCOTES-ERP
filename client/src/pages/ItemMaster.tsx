@@ -892,7 +892,7 @@ export default function ItemMaster() {
               <SelectTrigger className="w-36 h-9"><SelectValue placeholder="바이어" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="전체">전체 바이어</SelectItem>
-                {buyerVendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                {buyerVendors.map(v => <SelectItem key={v.id} value={v.id}>{v.code || v.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <button
@@ -1122,7 +1122,7 @@ export default function ItemMaster() {
                     <td className="px-4 py-3">
                       {item.buyerId ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                          {vendors.find(v => v.id === item.buyerId)?.name || '-'}
+                          {vendors.find(v => v.id === item.buyerId)?.code || vendors.find(v => v.id === item.buyerId)?.name || '-'}
                         </span>
                       ) : <span className="text-stone-300 text-xs">-</span>}
                     </td>
