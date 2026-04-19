@@ -4739,11 +4739,11 @@ export default function BomManagement() {
                       <label className="text-xs font-semibold text-stone-700 whitespace-nowrap">납품가 (KRW)</label>
                       <Input
                         type="number"
-                        value={deliveryPrice || ''}
+                        value={editBom.postDeliveryPrice != null ? editBom.postDeliveryPrice : (linkedItem?.deliveryPrice ?? '')}
                         onChange={e => {
-                          const val = Number(e.target.value);
-                          updateField('postDeliveryPrice', val);
-                          if (editBom.styleId) import('@/lib/supabaseQueries').then(m => m.upsertItem({ id: editBom.styleId, deliveryPrice: val } as any)).catch(() => {});
+                          const val = e.target.value === '' ? null : Number(e.target.value);
+                          updateField('postDeliveryPrice', val as any);
+                          if (editBom.styleId) import('@/lib/supabaseQueries').then(m => m.upsertItem({ id: editBom.styleId, deliveryPrice: val ?? 0 } as any)).catch(() => {});
                         }}
                         className="h-8 text-sm border-stone-300 text-right w-36 font-semibold"
                         placeholder="납품가 입력"

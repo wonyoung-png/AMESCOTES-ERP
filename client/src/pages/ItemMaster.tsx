@@ -693,8 +693,8 @@ export default function ItemMaster() {
     // 바이어 연결: selectedVendorId(자동생성 거래처)가 있으면 적용
     const buyerId = selectedVendorId || editItem.buyerId;
 
-    // 납품가: deliveryPrice 우선, 없으면 targetSalePrice 사용
-    const deliveryVal = editItem.deliveryPrice || editItem.targetSalePrice || 0;
+    // 납품가: deliveryPrice 우선, 없으면 targetSalePrice 사용 (0도 유효한 값이므로 ?? 사용)
+    const deliveryVal = editItem.deliveryPrice ?? editItem.targetSalePrice ?? 0;
 
     // BOM 원가 조회 후 마진 자동 계산
     const bomCostForSave = editItem.styleNo ? store.getBomTotalCost(editItem.styleNo) : 0;
@@ -1584,7 +1584,7 @@ export default function ItemMaster() {
                 const styleNo = editItem.styleNo || '';
                 const hasBom = isEdit ? items.find(i => i.id === editItem.id)?.hasBom : false;
                 const bomCostVal = hasBom && styleNo ? store.getBomTotalCost(styleNo) : 0;
-                const deliveryVal = editItem.deliveryPrice || editItem.targetSalePrice || 0;
+                const deliveryVal = editItem.deliveryPrice ?? editItem.targetSalePrice ?? 0;
                 const { rate, amount } = calcMargin(deliveryVal, bomCostVal);
                 if (rate === null) return null;
                 const bgClass = rate >= 30 ? 'bg-green-50 border-green-200' : rate >= 15 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
