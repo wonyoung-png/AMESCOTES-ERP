@@ -79,16 +79,16 @@ export function convertBomFromDB(row: any) {
   const postProcessLines = Array.isArray(postProcLines) ? postProcLines.map(normalizePostLine) : [];
 
   // colorBoms
+  // null/undefined = 구버전 BOM (color_boms 미도입) → 기본탭 자동생성
+  // []            = 사용자가 모든 탭 삭제 → 빈 배열 유지 (재생성 금지)
+  // [...]         = 저장된 탭 복원
   let colorBoms: any[];
-  if (Array.isArray(row.color_boms) && row.color_boms.length > 0) {
+  if (row.color_boms === null || row.color_boms === undefined) {
+    colorBoms = [{ color: '기본', lines, postProcessLines: [], processingFee: row.pre_processing_fee ?? 0 }];
+  } else if (Array.isArray(row.color_boms) && row.color_boms.length > 0) {
     colorBoms = row.color_boms.map(normalizeColorBom);
   } else {
-    colorBoms = [{
-      color: '기본',
-      lines,
-      postProcessLines: [],
-      processingFee: row.pre_processing_fee ?? 0,
-    }];
+    colorBoms = [];
   }
 
   // postColorBoms
