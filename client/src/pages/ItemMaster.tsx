@@ -18,8 +18,10 @@ import * as XLSX from 'xlsx';
 
 // HB 전용 세부 카테고리
 const HB_CATEGORIES: Category[] = ['숄더백', '토트백', '크로스백', '클러치', '백팩', '기타'];
-// SLG 전용 세부 카테고리
-const SLG_CATEGORIES: Category[] = ['파우치', '키링', '지갑', '기타'];
+// ACC 전용 세부 카테고리
+const ACC_CATEGORIES: Category[] = ['파우치', '키링', '지갑', '기타'];
+// SHOES 전용 세부 카테고리
+const SHOES_CATEGORIES: Category[] = ['스니커즈', '힐', '로퍼', '부츠', '샌들', '기타'];
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 
@@ -30,8 +32,9 @@ const CATEGORY_CODE_MAP: Record<Category, string> = {
 };
 
 const ERP_CAT_COLOR: Record<ErpCategory, string> = {
-  'HB':  'bg-blue-50 text-blue-700 border-blue-200',
-  'SLG': 'bg-purple-50 text-purple-700 border-purple-200',
+  'HB':   'bg-blue-50 text-blue-700 border-blue-200',
+  'ACC':  'bg-purple-50 text-purple-700 border-purple-200',
+  'SHOES':'bg-green-50 text-green-700 border-green-200',
 };
 
 function generateStyleNo(
@@ -44,10 +47,11 @@ function generateStyleNo(
 ): string {
   const yy = String(registDate.getFullYear()).slice(2);
   const mm = String(registDate.getMonth() + 1).padStart(2, '0');
-  // erpCategory가 SLG면 'SL'로 강제 적용
+  // erpCategory별 타입코드 강제 적용
   let typeCode = CATEGORY_CODE_MAP[category] || 'HB';
-  if (erpCategory === 'SLG') typeCode = 'SL';
-  else if (erpCategory === 'HB' && typeCode === 'SL') typeCode = 'HB'; // SLG 카테고리가 HB로 변경 시 복원
+  if (erpCategory === 'ACC') typeCode = 'AC';
+  else if (erpCategory === 'SHOES') typeCode = 'SH';
+  else if (erpCategory === 'HB') typeCode = CATEGORY_CODE_MAP[category] || 'HB';
   const prefix = `${brandCode.toUpperCase()}${yy}${mm}${typeCode}`;
   const existing = existingItems.filter(it => it.styleNo.startsWith(prefix) && it.id !== currentItemId);
   let maxSeq = 0;
@@ -420,7 +424,10 @@ export default function ItemMaster() {
   };
 
   // 현재 선택된 erpCategory에 따른 세부 카테고리 옵션
-  const subCategories = editItem.erpCategory === 'SLG' ? SLG_CATEGORIES : HB_CATEGORIES;
+  const subCategories =
+    editItem.erpCategory === 'ACC' ? ACC_CATEGORIES :
+    editItem.erpCategory === 'SHOES' ? SHOES_CATEGORIES :
+    HB_CATEGORIES;
 
   /**
    * BOM 원가 기반 마진 계산
@@ -789,7 +796,8 @@ export default function ItemMaster() {
         season,
         total: seasonItems.length,
         hb: seasonItems.filter(i => i.erpCategory === 'HB').length,
-        slg: seasonItems.filter(i => i.erpCategory === 'SLG').length,
+        acc: seasonItems.filter(i => i.erpCategory === 'ACC').length,
+        shoes: seasonItems.filter(i => i.erpCategory === 'SHOES').length,
         hasBom: seasonItems.filter(i => i.hasBom).length,
         noBom: seasonItems.filter(i => !i.hasBom).length,
       };
@@ -814,7 +822,7 @@ export default function ItemMaster() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-stone-800">품목 마스터</h1>
-          <p className="text-sm text-stone-500 mt-0.5">스타일별 품목 정보 · HB (핸드백) / SLG (소품)</p>
+          <p className="text-sm text-stone-500 mt-0.5">스타일별 품목 정보 · HB (핸드백) / ACC (소품) / SHOES (슈즈)</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setShowSeasonStats(true)} className="gap-2 border-stone-300 text-stone-600 hover:bg-stone-50">
@@ -848,14 +856,18 @@ export default function ItemMaster() {
       </div>
 
       {/* 품목 수 통계 */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-3 text-center">
           <p className="text-xl font-bold text-blue-700">{items.filter(i => i.erpCategory === 'HB').length}</p>
           <p className="text-xs text-blue-600 mt-0.5">HB (핸드백)</p>
         </div>
         <div className="bg-purple-50 rounded-xl border border-purple-200 p-3 text-center">
-          <p className="text-xl font-bold text-purple-700">{items.filter(i => i.erpCategory === 'SLG').length}</p>
-          <p className="text-xs text-purple-600 mt-0.5">SLG (소품)</p>
+          <p className="text-xl font-bold text-purple-700">{items.filter(i => i.erpCategory === 'ACC').length}</p>
+          <p className="text-xs text-purple-600 mt-0.5">ACC (소품)</p>
+        </div>
+        <div className="bg-green-50 rounded-xl border border-green-200 p-3 text-center">
+          <p className="text-xl font-bold text-green-700">{items.filter(i => i.erpCategory === 'SHOES').length}</p>
+          <p className="text-xs text-green-600 mt-0.5">SHOES (슈즈)</p>
         </div>
         <div className="bg-white rounded-xl border border-stone-200 p-3 text-center">
           <p className="text-xl font-bold text-stone-800">{items.length}</p>
@@ -902,7 +914,8 @@ export default function ItemMaster() {
               <SelectContent>
                 <SelectItem value="전체">전체 카테고리</SelectItem>
                 <SelectItem value="HB">HB (핸드백)</SelectItem>
-                <SelectItem value="SLG">SLG (소품)</SelectItem>
+                <SelectItem value="ACC">ACC (소품)</SelectItem>
+                <SelectItem value="SHOES">SHOES (슈즈)</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filterSeason} onValueChange={setFilterSeason}>
@@ -916,7 +929,7 @@ export default function ItemMaster() {
               <SelectTrigger className="w-32 h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="전체">세부 카테고리</SelectItem>
-                {[...HB_CATEGORIES, ...SLG_CATEGORIES.filter(c => !HB_CATEGORIES.includes(c))].map(c => (
+                {[...HB_CATEGORIES, ...ACC_CATEGORIES, ...SHOES_CATEGORIES].filter((c, i, a) => a.indexOf(c) === i).map(c => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>
@@ -1274,7 +1287,8 @@ export default function ItemMaster() {
                     <th className="text-left px-4 py-2.5 text-xs font-medium text-stone-500">시즌</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-stone-500">전체</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-600">HB</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-purple-600">SLG</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-medium text-purple-600">ACC</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-medium text-green-600">SHOES</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-600">BOM완료</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-red-500">BOM미작성</th>
                   </tr>
@@ -1285,7 +1299,8 @@ export default function ItemMaster() {
                       <td className="px-4 py-2.5 font-semibold text-stone-700">{row.season}</td>
                       <td className="px-3 py-2.5 text-center font-bold text-stone-800">{row.total}</td>
                       <td className="px-3 py-2.5 text-center text-blue-700">{row.hb}</td>
-                      <td className="px-3 py-2.5 text-center text-purple-700">{row.slg}</td>
+                      <td className="px-3 py-2.5 text-center text-purple-700">{row.acc}</td>
+                      <td className="px-3 py-2.5 text-center text-green-700">{row.shoes}</td>
                       <td className="px-3 py-2.5 text-center text-blue-600">{row.hasBom}</td>
                       <td className="px-3 py-2.5 text-center">
                         {row.noBom > 0 ? (
@@ -1396,7 +1411,7 @@ export default function ItemMaster() {
                     onValueChange={v => {
                       const newErpCat = v as ErpCategory;
                       // erpCategory 변경 시 세부 카테고리 기본값 변경
-                      const defaultCategory = newErpCat === 'SLG' ? '파우치' : '숄더백';
+                      const defaultCategory = newErpCat === 'ACC' ? '파우치' : newErpCat === 'SHOES' ? '스니커즈' : '숄더백';
                       setEditItem({ ...editItem, erpCategory: newErpCat, category: defaultCategory });
                       setCustomCategory('');
                     }}
@@ -1404,14 +1419,15 @@ export default function ItemMaster() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="HB">HB (핸드백)</SelectItem>
-                      <SelectItem value="SLG">SLG (소품)</SelectItem>
+                      <SelectItem value="ACC">ACC (소품)</SelectItem>
+                      <SelectItem value="SHOES">SHOES (슈즈)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>세부 카테고리</Label>
                   <Select
-                    value={editItem.category || (editItem.erpCategory === 'SLG' ? '파우치' : '숄더백')}
+                    value={editItem.category || (editItem.erpCategory === 'ACC' ? '파우치' : editItem.erpCategory === 'SHOES' ? '스니커즈' : '숄더백')}
                     onValueChange={v => {
                       setEditItem({ ...editItem, category: v as Category });
                       if (v !== '기타') setCustomCategory('');
