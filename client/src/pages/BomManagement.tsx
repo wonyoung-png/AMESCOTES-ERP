@@ -1662,6 +1662,8 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [showCalcModal, setShowCalcModal] = useState(false);
+  // NET 소요량: 소수점 입력 허용을 위해 로컬 문자열 상태로 관리
+  const [netQtyStr, setNetQtyStr] = useState<string>(line.netQty !== 0 ? String(line.netQty) : '');
   const showImageFeature = sectionKey === '원자재' || sectionKey === '장식';
   // SF/YD 단위일 때 계산기 버튼 노출
   const effectiveUnit = (displayUnit || '').toUpperCase();
@@ -1835,9 +1837,9 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
         <div style={{fontSize:'10px', color:'#9CA3AF', textAlign:'right'}}>₩{Math.round(line.unitPriceCny * cnyKrw).toLocaleString()}</div>
       </td>
       {/* NET 소요량 */}
-      <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => onChange(line.id, 'netQty', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="0" /></td>
+      <td className="px-1 py-1"><Input type="number" step="any" value={netQtyStr} onChange={e => { setNetQtyStr(e.target.value); const n = parseFloat(e.target.value); if (!isNaN(n)) onChange(line.id, 'netQty', n); else onChange(line.id, 'netQty', 0); }} onBlur={e => { const n = parseFloat(e.target.value); const v = isNaN(n) ? 0 : n; onChange(line.id, 'netQty', v); setNetQtyStr(v !== 0 ? String(v) : ''); }} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="0" /></td>
       {/* LOSS */}
-      <td className="px-1 py-1"><Input type="number" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className="h-7 text-xs border-stone-200 bg-white text-right w-14" placeholder="5" /></td>
+      <td className="px-1 py-1"><Input type="number" step="any" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className="h-7 text-xs border-stone-200 bg-white text-right w-14" placeholder="5" /></td>
       {/* 소요량 */}
       <td className="px-1 py-1">
         <div className="flex items-center gap-1">
