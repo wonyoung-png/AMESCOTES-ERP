@@ -78,7 +78,9 @@ function calcBomCosts(bom: any): { productCost: number; totalCostKrw: number } {
     const v = Math.round(bom.simplePostCostKrw);
     return { productCost: v, totalCostKrw: v };
   }
-  const postColorBom = (bom.postColorBoms || [])[0];
+  // 데이터(lines)가 있는 첫 번째 postColorBom 우선 사용, 없으면 index 0 fallback
+  const postColorBom = (bom.postColorBoms || []).find((cb: any) => (cb.lines || []).some((l: any) => l.itemName || l.unitPriceCny > 0))
+    ?? (bom.postColorBoms || [])[0];
   const materials: any[] = postColorBom ? (postColorBom.lines || []) : (bom.postMaterials || []);
   if (materials.length === 0) return { productCost: 0, totalCostKrw: 0 };
   const cnyKrw = bom.postExchangeRateCny || bom.exchangeRateCny || bom.snapshotCnyKrw || 191;

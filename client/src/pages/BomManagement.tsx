@@ -2693,7 +2693,8 @@ export default function BomManagement() {
     setExtBoms(newBoms);
     // Supabase에 직접 저장
     // 사후원가 계산 (품목마스터 items 테이블에도 동기화)
-    const activePostCB = (updated.postColorBoms || [])[0];
+    const activePostCB = (updated.postColorBoms || []).find((cb: any) => (cb.lines || []).some((l: any) => l.itemName || l.unitPriceCny > 0))
+      ?? (updated.postColorBoms || [])[0];
     let postCostKrw = 0;
     if (activePostCB) {
       const ps = calcPostSummary(updated, store.getSettings().usdKrw || 1380, activePostCB);
