@@ -512,11 +512,18 @@ export default function ItemMaster() {
         const { materials, processingFee, exchangeRateCny, postProcessLines } = bi.parsedData!;
         let updatedBom: any;
         if (bi.bom) {
-          let tabs = [...(bi.bom.postColorBoms || [])];
-          if (tabs.length === 0) {
+          const existing = bi.bom.postColorBoms || [];
+          let tabs;
+          if (existing.length === 0) {
             tabs = [{ color: '기본', lines: materials.map(l => ({ ...l, id: genId() })), postProcessLines: postProcessLines.map(l => ({ ...l, id: genId() })), processingFee: processingFee || 0 }];
           } else {
-            tabs[0] = { ...tabs[0], lines: materials.length > 0 ? materials.map(l => ({ ...l, id: genId() })) : tabs[0].lines, postProcessLines: postProcessLines.length > 0 ? postProcessLines.map(l => ({ ...l, id: genId() })) : tabs[0].postProcessLines, processingFee: processingFee || tabs[0].processingFee };
+            // 전체 컬러 탭에 동일한 자재 데이터 적용 (컬러별 가격 동일)
+            tabs = existing.map((cb: any) => ({
+              ...cb,
+              lines: materials.length > 0 ? materials.map(l => ({ ...l, id: genId() })) : cb.lines,
+              postProcessLines: postProcessLines.length > 0 ? postProcessLines.map(l => ({ ...l, id: genId() })) : cb.postProcessLines,
+              processingFee: processingFee || cb.processingFee,
+            }));
           }
           updatedBom = {
             ...bi.bom,
@@ -1988,9 +1995,9 @@ export default function ItemMaster() {
               </thead>
               <tbody>
                 {batchCostItems.map(bi => {
-                  const firstTab = bi.bom?.postColorBoms?.[0];
+                  const tabCount = bi.bom?.postColorBoms?.length ?? 0;
                   const tabLabel = bi.bom
-                    ? (bi.bom.postColorBoms?.length > 0 ? `${firstTab?.color ?? '기본'} (1번 탭)` : '새 탭 생성')
+                    ? (tabCount > 0 ? `전체 ${tabCount}개 탭 덮어쓰기` : '새 탭 생성')
                     : 'BOM 없음 (자동 생성)';
                   const statusEl = (() => {
                     if (bi.status === 'pending') return <span className="text-stone-400">대기중</span>;
