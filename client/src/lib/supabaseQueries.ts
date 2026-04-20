@@ -198,7 +198,7 @@ const TABLE_COLUMNS: Record<string, string[]> = {
          'created_at', 'updated_at',
          'color_boms', 'post_color_boms', 'pre_currency', 'post_currency',
          'pre_exchange_rate_cny', 'post_exchange_rate_cny', 'customs_rate', 'post_process_lines', 'post_delivery_price', 'post_subtotal_krw', 'post_total_cost_krw',
-         'pnl_data', 'product_image', 'packaging_cost_krw', 'packing_cost_krw'],
+         'pnl_data', 'product_image'],
   production_orders: ['id', 'style_no', 'style_name', 'buyer_id', 'vendor_id', 'quantity', 'unit_price',
                       'currency', 'order_date', 'expected_date', 'status', 'memo',
                       'order_no', 'vendor_name', 'factory_unit_price_krw', 'factory_unit_price_cny',
@@ -380,7 +380,7 @@ const BOM_LIGHT_COLS = [
   'post_color_boms', 'post_materials', 'post_processing_fee', 'post_process_lines',
   'post_exchange_rate_cny', 'post_delivery_price',
   'post_subtotal_krw', 'post_total_cost_krw',
-  'logistics_cost_krw', 'packaging_cost_krw', 'packing_cost_krw',
+  'logistics_cost_krw',
   'production_margin_rate', 'customs_rate',
   'pnl_data', 'memo',
   'created_at', 'updated_at',
@@ -428,8 +428,6 @@ export async function upsertBom(bom: any) {
     post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny ?? bom.snapshotCnyKrw,
     pnl_data: bom.pnl ? JSON.stringify(bom.pnl) : null,
     product_image: bom.productImage ?? null,
-    packaging_cost_krw: bom.packagingCostKrw ?? 0,
-    packing_cost_krw: bom.packingCostKrw ?? 0,
     // 간단 원가 BOM인 경우 memo에 JSON 저장
     memo: (() => {
       if (bom.simpleCostKrw !== undefined || bom.isSimpleCost) {

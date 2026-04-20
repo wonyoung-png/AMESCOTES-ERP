@@ -91,12 +91,18 @@ function calcBomCosts(bom: any): { productCost: number; totalCostKrw: number; fa
     const v = Math.round(bom.simplePostCostKrw);
     return { productCost: v, totalCostKrw: v, factoryUnitCostKrw: v };
   }
-  // 데이터(lines)가 있는 첫 번째 postColorBom 우선 사용, 없으면 index 0 fallback
-  const postColorBom = (bom.postColorBoms || []).find((cb: any) => (cb.lines || []).some((l: any) => l.itemName || l.unitPriceCny > 0))
-    ?? (bom.postColorBoms || [])[0];
-  const materials: any[] = postColorBom ? (postColorBom.lines || []) : (bom.postMaterials || []);
+  // BomManagement PostCostSummary와 완전 동일:
+  //   1) postMaterials(컬럼) 우선 — 처리비도 postProcessingFee(컬럼) 사용
+  //   2) postMaterials 없을 때만 lines가 있는 첫 번째 postColorBom 탭으로 폴백
+  const hasMaterials = (bom.postMaterials || []).length > 0;
+  const postColorBom = !hasMaterials
+    ? (bom.postColorBoms || []).find((cb: any) => (cb.lines || []).some((l: any) => l.itemName || l.unitPriceCny > 0))
+    : undefined;
+  const materials: any[] = hasMaterials
+    ? (bom.postMaterials || [])
+    : (postColorBom ? (postColorBom.lines || []) : []);
   if (materials.length === 0) return { productCost: 0, totalCostKrw: 0, factoryUnitCostKrw: 0 };
-  // BomManagement calcPostSummary와 동일한 환율 로직
+  // 환율 (BomManagement calcPostSummary와 동일)
   const postCur = bom.currency || 'CNY';
   const cnyKrw = bom.exchangeRateCny || bom.snapshotCnyKrw || 191;
   const usdKrw = bom.exchangeRateUsd || 1380;
@@ -107,12 +113,18 @@ function calcBomCosts(bom: any): { productCost: number; totalCostKrw: number; fa
   // 본사제공 자재
   const hqMaterialCny = materials.reduce((s: number, l: any) =>
     l.isHqProvided ? s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) : s, 0);
-  const processingCny = postColorBom ? (postColorBom.processingFee ?? 0) : (bom.postProcessingFee || 0);
-  const postProcLines: any[] = postColorBom ? (postColorBom.postProcessLines ?? []) : (bom.postProcessLines || []);
+  // 처리비: postMaterials 사용 시 bom 레벨 컬럼값, 탭 사용 시 탭의 값
+  const processingCny = hasMaterials
+    ? (bom.postProcessingFee || 0)
+    : (postColorBom ? (postColorBom.processingFee ?? 0) : (bom.postProcessingFee || 0));
+  // 후가공: postMaterials 사용 시 bom 레벨, 탭 사용 시 탭의 값
+  const postProcLines: any[] = hasMaterials
+    ? (bom.postProcessLines || [])
+    : (postColorBom ? (postColorBom.postProcessLines ?? []) : (bom.postProcessLines || []));
   const postProcessCny = postProcLines.reduce((s: number, l: any) => s + (l.netQty || 0) * (l.unitPrice || 0), 0);
   const processingKrw = processingCny * rate;
   const customsKrw = processingKrw * ((bom.customsRate || 0) / 100);
-  // 공장단가 = 공장구매자재 + 임가공비 + 후가공비 (관세 제외, BomManagement calcPostSummary와 동일)
+  // 공장단가 = 공장구매자재 + 임가공비 + 후가공비 (관세 제외)
   const factoryUnitCostKrw = factoryMaterialCny * rate + processingKrw + postProcessCny * rate;
   // 제품원가 = 공장단가 + 본사제공 + 관세 + 물류비 + 포장/검사비 + 패킹재
   const productCost = Math.round(
@@ -552,7 +564,6 @@ export default function ItemMaster() {
     setBatchCostActiveId(null);
     if (batchCostFileRef.current) batchCostFileRef.current.value = '';
     try {
-      const XLSX = await import('xlsx');
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -604,14 +615,15 @@ export default function ItemMaster() {
         } else {
           updatedBom = { id: genId(), styleNo: bi.item.styleNo, styleId: bi.item.id, styleName: bi.item.name, colorBoms: [], postColorBoms: [{ color: '기본', lines: materials.map(l => ({ ...l, id: genId() })), postProcessLines: postProcessLines.map(l => ({ ...l, id: genId() })), processingFee: processingFee || 0 }], exchangeRateCny: exchangeRateCny || 191, productionMarginRate: 0.16, logisticsCostKrw: 0, packagingCostKrw: 0, packingCostKrw: 0, customsRate: 0, pnl: { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 } };
         }
-        const { totalCostKrw } = calcBomCosts(updatedBom);
+        const { totalCostKrw, factoryUnitCostKrw: factKrw } = calcBomCosts(updatedBom);
         (updatedBom as any).postSubtotalKrw = totalCostKrw;
         (updatedBom as any).postTotalCostKrw = totalCostKrw;
+        if (factKrw > 0) updatedBom.pnl = { ...(updatedBom.pnl || {}), factoryUnitCostKrw: factKrw };
         await upsertBom(updatedBom);
         if (totalCostKrw > 0) await updateItemCostData(bi.item.id, totalCostKrw); // confirmedSalePrice 전달 안함 → 수정 안됨
         setBatchCostItems(prev => prev.map(b => b.item.id === bi.item.id ? { ...b, status: 'done' } : b));
       } catch (err) {
-        setBatchCostItems(prev => prev.map(b => b.item.id === bi.item.id ? { ...b, status: 'error', errorMsg: String(err) } : b));
+        setBatchCostItems(prev => prev.map(b => b.item.id === bi.item.id ? { ...b, status: 'error', errorMsg: (err as Error)?.message || String(err) } : b));
       }
     }
     queryClient.invalidateQueries({ queryKey: ['boms'] });
@@ -784,7 +796,8 @@ export default function ItemMaster() {
       const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
       const marginAmount = delivery > 0 ? delivery - bomCost : null;
       const marginRate = delivery > 0 && marginAmount != null ? (marginAmount / delivery) * 100 : null;
-      m.set(item.id, { bom, delivery, bomCost, confirmedSalePrice, actualMultiple, marginRate, marginAmount, factoryUnitCostKrw: factCalc });
+      const factCalcDb: number = bom?.pnl?.factoryUnitCostKrw ?? 0;
+      m.set(item.id, { bom, delivery, bomCost, confirmedSalePrice, actualMultiple, marginRate, marginAmount, factoryUnitCostKrw: factCalc > 0 ? factCalc : factCalcDb });
     }
     return m;
   }, [items, boms, vendors, bomMap, vendorMap]);

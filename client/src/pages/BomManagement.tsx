@@ -2707,6 +2707,10 @@ export default function BomManagement() {
       postCostKrw = Math.round(finalCost);
       (updated as any).postSubtotalKrw = postCostKrw;
       (updated as any).postTotalCostKrw = postCostKrw;
+      // factoryUnitCostKrw를 pnl에 저장 (품목마스터 공장단가 연동)
+      if (ps.factoryUnitCostKrw > 0) {
+        updated.pnl = { ...(updated.pnl || {}), factoryUnitCostKrw: Math.round(ps.factoryUnitCostKrw) };
+      }
     }
     upsertBom(updated)
       .then(async () => {
