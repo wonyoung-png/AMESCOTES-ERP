@@ -4,6 +4,7 @@ import { useLocation, useSearch } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type ProductionOrder, type ColorQty } from '@/lib/store';
 import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, updateItemCostData, saveConfirmedSalePrice } from '@/lib/supabaseQueries';
+import { parseExcelBomSheet } from '@/lib/bomExcelParser';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link, ShoppingCart, Printer, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+
+// ─── 공장 원가표 일괄 업로드 타입 ───
+interface BatchCostItem {
+  item: Item;
+  bom: any | null;
+  parsedData?: { materials: any[]; processingFee: number; exchangeRateCny: number; postProcessLines: any[] };
+  fileName?: string;
+  status: 'pending' | 'ready' | 'saving' | 'done' | 'error';
+  errorMsg?: string;
+}
 
 // HB 전용 세부 카테고리
 const HB_CATEGORIES: Category[] = ['숄더백', '토트백', '크로스백', '클러치', '백팩', '기타'];
@@ -157,6 +168,11 @@ export default function ItemMaster() {
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: () => import('@/lib/supabaseQueries').then(m => m.fetchOrders()) }); // 미발주기간 계산용
   const imageFileRef = useRef<HTMLInputElement>(null);
   const excelUploadRef = useRef<HTMLInputElement>(null);
+  // 공장 원가표 일괄 업로드
+  const [showBatchCostUpload, setShowBatchCostUpload] = useState(false);
+  const [batchCostItems, setBatchCostItems] = useState<BatchCostItem[]>([]);
+  const [batchCostActiveId, setBatchCostActiveId] = useState<string | null>(null);
+  const batchCostFileRef = useRef<HTMLInputElement>(null);
 
   // ─── 컬럼 너비 리사이즈 ───
   const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
@@ -448,6 +464,78 @@ export default function ItemMaster() {
 
   const refresh = () => { queryClient.invalidateQueries({ queryKey: ['items'] }); queryClient.invalidateQueries({ queryKey: ['boms'] }); };
   const { data: boms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
+
+  // ─── 공장 원가표 일괄 업로드 ───
+  const openBatchCostUpload = () => {
+    const selectedItems = (items as Item[]).filter(i => selectedIds.has(i.id));
+    const batch: BatchCostItem[] = selectedItems.map(item => ({
+      item,
+      bom: (boms as any[]).find(b => b.styleId === item.id || b.styleNo === item.styleNo) ?? null,
+      status: 'pending',
+    }));
+    setBatchCostItems(batch);
+    setShowBatchCostUpload(true);
+  };
+
+  const handleBatchCostFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !batchCostActiveId) return;
+    const itemId = batchCostActiveId;
+    setBatchCostActiveId(null);
+    if (batchCostFileRef.current) batchCostFileRef.current.value = '';
+    try {
+      const XLSX = await import('xlsx');
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
+      const existingBom = (boms as any[]).find(b => b.styleId === itemId || b.styleNo === (items as Item[]).find(i => i.id === itemId)?.styleNo);
+      const fallback = existingBom?.exchangeRateCny ?? 191;
+      const { materials, parsedProcessingFee, parsedRate, postProcessLines } = parseExcelBomSheet(raw, fallback);
+      setBatchCostItems(prev => prev.map(bi =>
+        bi.item.id === itemId
+          ? { ...bi, status: 'ready', fileName: file.name, parsedData: { materials, processingFee: parsedProcessingFee, exchangeRateCny: parsedRate, postProcessLines } }
+          : bi
+      ));
+    } catch {
+      setBatchCostItems(prev => prev.map(bi =>
+        bi.item.id === itemId ? { ...bi, status: 'error', errorMsg: '파싱 실패' } : bi
+      ));
+    }
+  };
+
+  const applyBatchCostUpload = async () => {
+    const readyItems = batchCostItems.filter(bi => bi.parsedData && bi.status === 'ready');
+    for (const bi of readyItems) {
+      setBatchCostItems(prev => prev.map(b => b.item.id === bi.item.id ? { ...b, status: 'saving' } : b));
+      try {
+        const { materials, processingFee, exchangeRateCny, postProcessLines } = bi.parsedData!;
+        let updatedBom: any;
+        if (bi.bom) {
+          let tabs = [...(bi.bom.postColorBoms || [])];
+          if (tabs.length === 0) {
+            tabs = [{ color: '기본', lines: materials.map(l => ({ ...l, id: genId() })), postProcessLines: postProcessLines.map(l => ({ ...l, id: genId() })), processingFee: processingFee || 0 }];
+          } else {
+            tabs[0] = { ...tabs[0], lines: materials.length > 0 ? materials.map(l => ({ ...l, id: genId() })) : tabs[0].lines, postProcessLines: postProcessLines.length > 0 ? postProcessLines.map(l => ({ ...l, id: genId() })) : tabs[0].postProcessLines, processingFee: processingFee || tabs[0].processingFee };
+          }
+          updatedBom = { ...bi.bom, postColorBoms: tabs, exchangeRateCny: exchangeRateCny || bi.bom.exchangeRateCny };
+        } else {
+          updatedBom = { id: genId(), styleNo: bi.item.styleNo, styleId: bi.item.id, styleName: bi.item.name, colorBoms: [], postColorBoms: [{ color: '기본', lines: materials.map(l => ({ ...l, id: genId() })), postProcessLines: postProcessLines.map(l => ({ ...l, id: genId() })), processingFee: processingFee || 0 }], exchangeRateCny: exchangeRateCny || 191, productionMarginRate: 0.16, logisticsCostKrw: 0, packagingCostKrw: 0, packingCostKrw: 0, customsRate: 0, pnl: { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 } };
+        }
+        const { totalCostKrw } = calcBomCosts(updatedBom);
+        (updatedBom as any).postSubtotalKrw = totalCostKrw;
+        (updatedBom as any).postTotalCostKrw = totalCostKrw;
+        await upsertBom(updatedBom);
+        if (totalCostKrw > 0) await updateItemCostData(bi.item.id, totalCostKrw); // confirmedSalePrice 전달 안함 → 수정 안됨
+        setBatchCostItems(prev => prev.map(b => b.item.id === bi.item.id ? { ...b, status: 'done' } : b));
+      } catch (err) {
+        setBatchCostItems(prev => prev.map(b => b.item.id === bi.item.id ? { ...b, status: 'error', errorMsg: String(err) } : b));
+      }
+    }
+    queryClient.invalidateQueries({ queryKey: ['boms'] });
+    queryClient.invalidateQueries({ queryKey: ['items'] });
+    toast.success('공장 원가표 일괄 적용 완료');
+  };
 
   // ─── BOM→items 원가 일괄 동기화 ───
   const [isSyncing, setIsSyncing] = useState(false);
@@ -1006,6 +1094,12 @@ export default function ItemMaster() {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-medium transition-colors"
           >
             📦 선택 발주
+          </button>
+          <button
+            onClick={openBatchCostUpload}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            🏭 공장 원가표 업로드
           </button>
           <button
             onClick={handleBulkDelete}
@@ -1853,6 +1947,85 @@ export default function ItemMaster() {
             >
               <FileSpreadsheet size={14} className="mr-1.5" />
               {excelPreviewItems.filter(p => !p.isDuplicate).length}개 일괄 등록
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 공장 원가표 일괄 업로드 hidden input */}
+      <input
+        ref={batchCostFileRef}
+        type="file"
+        accept=".xlsx,.xlsm,.xls"
+        className="hidden"
+        onChange={handleBatchCostFileChange}
+      />
+
+      {/* 공장 원가표 일괄 업로드 모달 */}
+      <Dialog open={showBatchCostUpload} onOpenChange={open => { if (!open) setShowBatchCostUpload(false); }}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-stone-800">🏭 공장 원가표 일괄 업로드</DialogTitle>
+            <p className="text-xs text-stone-500 mt-0.5">각 스타일별로 공장 원가표 엑셀을 업로드하세요. 확정판매가는 변경되지 않습니다.</p>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 mt-2">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-stone-100 text-stone-600">
+                  <th className="px-3 py-2 text-left font-medium">스타일번호</th>
+                  <th className="px-3 py-2 text-left font-medium">품명</th>
+                  <th className="px-3 py-2 text-left font-medium">적용 탭</th>
+                  <th className="px-3 py-2 text-left font-medium">파일 / 상태</th>
+                  <th className="px-3 py-2 text-center font-medium">업로드</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchCostItems.map(bi => {
+                  const firstTab = bi.bom?.postColorBoms?.[0];
+                  const tabLabel = bi.bom
+                    ? (bi.bom.postColorBoms?.length > 0 ? `${firstTab?.color ?? '기본'} (1번 탭)` : '새 탭 생성')
+                    : 'BOM 없음 (자동 생성)';
+                  const statusEl = (() => {
+                    if (bi.status === 'pending') return <span className="text-stone-400">대기중</span>;
+                    if (bi.status === 'ready') return <span className="text-blue-600 font-medium">✓ {bi.parsedData!.materials.length}개 자재 · 환율 {bi.parsedData!.exchangeRateCny}</span>;
+                    if (bi.status === 'saving') return <span className="text-amber-500 animate-pulse">저장중…</span>;
+                    if (bi.status === 'done') return <span className="text-green-600 font-medium">✅ 적용 완료</span>;
+                    if (bi.status === 'error') return <span className="text-red-500">⚠ {bi.errorMsg}</span>;
+                  })();
+                  return (
+                    <tr key={bi.item.id} className="border-b border-stone-100 hover:bg-stone-50">
+                      <td className="px-3 py-2 font-mono font-medium text-stone-700">{bi.item.styleNo}</td>
+                      <td className="px-3 py-2 text-stone-600 max-w-[180px] truncate">{bi.item.name}</td>
+                      <td className="px-3 py-2 text-stone-500">{tabLabel}</td>
+                      <td className="px-3 py-2">{bi.fileName ? <span className="text-stone-500 truncate max-w-[140px] block">{bi.fileName}</span> : null}<div className="mt-0.5">{statusEl}</div></td>
+                      <td className="px-3 py-2 text-center">
+                        {bi.status !== 'done' && bi.status !== 'saving' && (
+                          <button
+                            onClick={() => { setBatchCostActiveId(bi.item.id); setTimeout(() => batchCostFileRef.current?.click(), 0); }}
+                            className="px-2.5 py-1 bg-stone-700 hover:bg-stone-800 text-white rounded text-xs font-medium"
+                          >
+                            파일 선택
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <DialogFooter className="mt-3 pt-3 border-t border-stone-100 flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={() => setShowBatchCostUpload(false)} className="border-stone-300 text-stone-600">
+              닫기
+            </Button>
+            <Button
+              size="sm"
+              onClick={applyBatchCostUpload}
+              disabled={batchCostItems.filter(bi => bi.status === 'ready').length === 0}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Upload size={13} className="mr-1.5" />
+              {batchCostItems.filter(bi => bi.status === 'ready').length}개 적용
             </Button>
           </DialogFooter>
         </DialogContent>
