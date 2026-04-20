@@ -465,6 +465,67 @@ export default function ItemMaster() {
   const refresh = () => { queryClient.invalidateQueries({ queryKey: ['items'] }); queryClient.invalidateQueries({ queryKey: ['boms'] }); };
   const { data: boms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
 
+  // ─── 선택 품목 엑셀 다운로드 ───
+  const downloadSelectedItemsExcel = () => {
+    const selectedItems = (items as Item[]).filter(i => selectedIds.has(i.id));
+    if (selectedItems.length === 0) return;
+
+    const HEADERS = ['스타일번호', '품명', '바이어', '시즌', '카테고리', '세부카테고리', '납품가', '총원가액', '확정판매가', '실현배수', '마진율(%)'];
+
+    const getRow = (item: Item) => {
+      const itemBom = (boms as any[]).find(b => b.styleId === item.id) ||
+                      (boms as any[]).find(b => b.styleNo === item.styleNo) ||
+                      (boms as any[]).find(b => b.styleNo?.trim() === item.styleNo?.trim());
+      const delivery = itemBom?.postDeliveryPrice || item.deliveryPrice || item.targetSalePrice || 0;
+      const { productCost: pcCalc, totalCostKrw: tcCalc } = itemBom ? calcBomCosts(itemBom) : { productCost: 0, totalCostKrw: 0 };
+      const postCostDb: number = (item as any).postCostKrw || 0;
+      const buyer = (vendors as any[]).find(v => v.id === (item as any).buyerId);
+      const isSelfBrand = !buyer || buyer.name?.includes('아뜰리에드루멘');
+      const bomCost = (isSelfBrand ? pcCalc : tcCalc) > 0 ? (isSelfBrand ? pcCalc : tcCalc) : postCostDb;
+      const confirmedSalePrice = itemBom?.pnl?.confirmedSalePrice || (item as any).confirmedSalePrice || 0;
+      const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? parseFloat((confirmedSalePrice / bomCost).toFixed(2)) : '';
+      const { rate: mRate } = calcMargin(delivery, bomCost);
+      return [
+        item.styleNo,
+        item.name,
+        buyer?.code || buyer?.name || '',
+        item.season || '',
+        item.erpCategory || '',
+        item.category || '',
+        delivery || '',
+        bomCost || '',
+        confirmedSalePrice || '',
+        actualMultiple,
+        mRate != null ? parseFloat(mRate.toFixed(1)) : '',
+      ];
+    };
+
+    const wb = XLSX.utils.book_new();
+
+    // 전체 시트
+    const makeSheet = (rows: Item[]) => {
+      const ws = XLSX.utils.aoa_to_sheet([HEADERS, ...rows.map(getRow)]);
+      const colWidths = [14, 30, 12, 8, 8, 10, 12, 12, 12, 10, 10];
+      ws['!cols'] = colWidths.map(w => ({ wch: w }));
+      return ws;
+    };
+
+    XLSX.utils.book_append_sheet(wb, makeSheet(selectedItems), '전체');
+
+    const catMap: { key: string; label: string }[] = [
+      { key: 'HB', label: 'HB' },
+      { key: 'ACC', label: 'ACC' },
+      { key: 'SHOES', label: 'SHOES' },
+    ];
+    for (const { key, label } of catMap) {
+      const rows = selectedItems.filter(i => i.erpCategory === key);
+      if (rows.length > 0) XLSX.utils.book_append_sheet(wb, makeSheet(rows), label);
+    }
+
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    XLSX.writeFile(wb, `품목목록_${date}.xlsx`);
+  };
+
   // ─── 공장 원가표 일괄 업로드 ───
   const openBatchCostUpload = () => {
     const selectedItems = (items as Item[]).filter(i => selectedIds.has(i.id));
@@ -1114,6 +1175,12 @@ export default function ItemMaster() {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
           >
             🏭 공장 원가표 업로드
+          </button>
+          <button
+            onClick={downloadSelectedItemsExcel}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            <Download size={13} />엑셀 다운로드
           </button>
           <button
             onClick={handleBulkDelete}
