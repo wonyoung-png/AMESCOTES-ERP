@@ -604,16 +604,34 @@ export default function ItemMaster() {
               processingFee: processingFee || cb.processingFee,
             }));
           }
+          // postMaterials / postProcessingFee / postProcessLines 도 갱신:
+          // BomManagement PostCostSummary는 postColorBoms 탭이 아닌 이 필드들을 읽음
+          const newPostMaterials = materials.length > 0 ? materials.map(l => ({ ...l, id: genId() })) : (bi.bom.postMaterials || []);
+          const newPostProcLines = postProcessLines.length > 0 ? postProcessLines.map(l => ({ ...l, id: genId() })) : (bi.bom.postProcessLines || []);
+          const newProcessingFee = processingFee || bi.bom.postProcessingFee || 0;
           updatedBom = {
             ...bi.bom,
             postColorBoms: tabs,
+            postMaterials: newPostMaterials,
+            postProcessingFee: newProcessingFee,
+            postProcessLines: newPostProcLines,
             exchangeRateCny: exchangeRateCny || bi.bom.exchangeRateCny,
             // 패킹자재·포장/검사비: 엑셀 업로드로 변경 안됨 — 기존 BOM 값 유지
             packagingCostKrw: bi.bom.packagingCostKrw ?? 0,
             packingCostKrw: bi.bom.packingCostKrw ?? 0,
           };
         } else {
-          updatedBom = { id: genId(), styleNo: bi.item.styleNo, styleId: bi.item.id, styleName: bi.item.name, colorBoms: [], postColorBoms: [{ color: '기본', lines: materials.map(l => ({ ...l, id: genId() })), postProcessLines: postProcessLines.map(l => ({ ...l, id: genId() })), processingFee: processingFee || 0 }], exchangeRateCny: exchangeRateCny || 191, productionMarginRate: 0.16, logisticsCostKrw: 0, packagingCostKrw: 0, packingCostKrw: 0, customsRate: 0, pnl: { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 } };
+          updatedBom = {
+            id: genId(), styleNo: bi.item.styleNo, styleId: bi.item.id, styleName: bi.item.name,
+            colorBoms: [],
+            postColorBoms: [{ color: '기본', lines: materials.map(l => ({ ...l, id: genId() })), postProcessLines: postProcessLines.map(l => ({ ...l, id: genId() })), processingFee: processingFee || 0 }],
+            postMaterials: materials.map(l => ({ ...l, id: genId() })),
+            postProcessingFee: processingFee || 0,
+            postProcessLines: postProcessLines.map(l => ({ ...l, id: genId() })),
+            exchangeRateCny: exchangeRateCny || 191,
+            productionMarginRate: 0.16, logisticsCostKrw: 0, packagingCostKrw: 0, packingCostKrw: 0, customsRate: 0,
+            pnl: { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 },
+          };
         }
         const { totalCostKrw, factoryUnitCostKrw: factKrw } = calcBomCosts(updatedBom);
         (updatedBom as any).postSubtotalKrw = totalCostKrw;
