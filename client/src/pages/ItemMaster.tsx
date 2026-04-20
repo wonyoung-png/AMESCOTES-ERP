@@ -656,9 +656,8 @@ export default function ItemMaster() {
     let bomSynced = 0, bomFailed = 0;
 
     // Step 1: localStorage BOM → Supabase 동기화
-    // postMaterials 또는 비용 필드가 있는 BOM만 대상
+    // postMaterials 또는 비용 필드가 있는 BOM은 무조건 upsert (타임스탬프 비교 제거)
     const localBoms = store.getBoms() as any[];
-    const supaBomsById = new Map((boms as any[]).map((b: any) => [b.id, b]));
     for (const lb of localBoms) {
       if (!lb.id) continue;
       const hasData = (lb.postMaterials?.length > 0) ||
@@ -666,21 +665,17 @@ export default function ItemMaster() {
                       (lb.packagingCostKrw > 0) ||
                       (lb.packingCostKrw > 0);
       if (!hasData) continue;
-      const sb = supaBomsById.get(lb.id);
-      // localStorage가 최신이거나 Supabase에 없는 경우만 upsert
-      if (!sb || (lb.updatedAt || '') >= (sb.updatedAt || '')) {
-        try {
-          await upsertBom(lb);
-          bomSynced++;
-        } catch (e) {
-          bomFailed++;
-          console.warn('[원가동기화] BOM upsert 실패:', lb.styleNo, (e as any)?.message);
-        }
+      try {
+        await upsertBom(lb);
+        bomSynced++;
+      } catch (e) {
+        bomFailed++;
+        console.warn('[원가동기화] BOM upsert 실패:', lb.styleNo, (e as any)?.message);
       }
     }
 
-    // Step 2: 최신 BOM fetch (Step 1에서 변경이 있었으면 새로 fetch)
-    const freshBoms = bomSynced > 0 ? await fetchBomsLight() : (boms as any[]);
+    // Step 2: 최신 BOM fetch (항상 새로 fetch하여 캐시 무효화)
+    const freshBoms = await fetchBomsLight();
     // 중복 styleNo 중 updatedAt 최신 BOM 우선 선택
     const latestBomMap = new Map<string, any>();
     for (const b of freshBoms) {
