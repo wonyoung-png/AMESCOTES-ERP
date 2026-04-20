@@ -80,11 +80,13 @@ const emptyItem: Partial<Item> = {
   colors: [], memo: '',
 };
 
-// ─── 사후원가 계산 (BomManagement finalCost 동일 로직) ───
-// productCost  = calcPostSummary.totalCostKrw (제품총원가, 생산마진 제외)
+// ─── 사후원가 계산 (BomManagement calcPostSummary 동일 로직) ───
+// productCost  = calcPostSummary.totalCostKrw (제품원가, 생산마진 제외)
 // totalCostKrw = productCost × (1 + productionMarginRate) (총원가액, 생산마진 포함)
+// factoryUnitCostKrw = 공장구매자재 + 임가공비 + 후가공비 (본사제공/관세/물류비 제외)
 function calcBomCosts(bom: any): { productCost: number; totalCostKrw: number; factoryUnitCostKrw: number } {
-  // 간단 원가 BOM: simplePostCostKrw를 총원가액으로 사용 (제품총원가 = 동일)
+  const calcLineAmt = (price: number, net: number, loss: number) => (price || 0) * (net || 0) * (1 + (loss || 0));
+  // 간단 원가 BOM
   if (bom.isSimpleCost && bom.simplePostCostKrw && bom.simplePostCostKrw > 0) {
     const v = Math.round(bom.simplePostCostKrw);
     return { productCost: v, totalCostKrw: v, factoryUnitCostKrw: v };
@@ -94,26 +96,30 @@ function calcBomCosts(bom: any): { productCost: number; totalCostKrw: number; fa
     ?? (bom.postColorBoms || [])[0];
   const materials: any[] = postColorBom ? (postColorBom.lines || []) : (bom.postMaterials || []);
   if (materials.length === 0) return { productCost: 0, totalCostKrw: 0, factoryUnitCostKrw: 0 };
-  const cnyKrw = bom.postExchangeRateCny || bom.exchangeRateCny || bom.snapshotCnyKrw || 191;
+  // BomManagement calcPostSummary와 동일한 환율 로직
+  const postCur = bom.currency || 'CNY';
+  const cnyKrw = bom.exchangeRateCny || bom.snapshotCnyKrw || 191;
   const usdKrw = bom.exchangeRateUsd || 1380;
-  const cur = bom.currency || 'CNY';
-  const rate = cur === 'USD' ? usdKrw : cur === 'KRW' ? 1 : cnyKrw;
-  const calcLineAmt = (price: number, net: number, loss: number) => price * net * (1 + loss);
-  const factoryMat = materials.reduce((s: number, l: any) =>
-    l.isHqProvided ? s : s + calcLineAmt(l.unitPriceCny || 0, l.netQty || 0, l.lossRate || 0), 0);
-  const hqMat = materials.reduce((s: number, l: any) =>
-    l.isHqProvided ? s + calcLineAmt(l.unitPriceCny || 0, l.netQty || 0, l.lossRate || 0) : s, 0);
+  const rate = postCur === 'USD' ? usdKrw : postCur === 'KRW' ? 1 : cnyKrw;
+  // 공장구매자재 (본사제공 제외)
+  const factoryMaterialCny = materials.reduce((s: number, l: any) =>
+    l.isHqProvided ? s : s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate), 0);
+  // 본사제공 자재
+  const hqMaterialCny = materials.reduce((s: number, l: any) =>
+    l.isHqProvided ? s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) : s, 0);
   const processingCny = postColorBom ? (postColorBom.processingFee ?? 0) : (bom.postProcessingFee || 0);
   const postProcLines: any[] = postColorBom ? (postColorBom.postProcessLines ?? []) : (bom.postProcessLines || []);
-  const postProcCny = postProcLines.reduce((s: number, l: any) => s + (l.netQty || 0) * (l.unitPrice || 0), 0);
+  const postProcessCny = postProcLines.reduce((s: number, l: any) => s + (l.netQty || 0) * (l.unitPrice || 0), 0);
   const processingKrw = processingCny * rate;
   const customsKrw = processingKrw * ((bom.customsRate || 0) / 100);
-  const factoryUnitCostKrw = factoryMat * rate + processingKrw + postProcCny * rate;
+  // 공장단가 = 공장구매자재 + 임가공비 + 후가공비 (관세 제외, BomManagement calcPostSummary와 동일)
+  const factoryUnitCostKrw = factoryMaterialCny * rate + processingKrw + postProcessCny * rate;
+  // 제품원가 = 공장단가 + 본사제공 + 관세 + 물류비 + 포장/검사비 + 패킹재
   const productCost = Math.round(
-    factoryUnitCostKrw + hqMat * rate + customsKrw +
+    factoryUnitCostKrw + hqMaterialCny * rate + customsKrw +
     (bom.logisticsCostKrw || 0) + (bom.packagingCostKrw || 0) + (bom.packingCostKrw || 0)
   );
-  // 총원가액 = 제품총원가 + 생산마진 (BomManagement finalCost와 동일)
+  // 총원가액 = 제품원가 × (1 + 생산마진율)
   const marginRate = bom.productionMarginRate ?? 0;
   const totalCostKrw = marginRate > 0 ? Math.round(productCost * (1 + marginRate)) : productCost;
   return { productCost, totalCostKrw, factoryUnitCostKrw: Math.round(factoryUnitCostKrw) };

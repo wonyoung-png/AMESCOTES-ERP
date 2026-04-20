@@ -123,6 +123,7 @@ export function convertBomFromDB(row: any) {
     postDeliveryPrice: row.post_delivery_price ?? undefined,
     postTotalCostKrw: row.post_total_cost_krw ?? undefined,
     postSubtotalKrw: row.post_subtotal_krw ?? undefined,
+    currency: row.currency ?? 'CNY',
     exchangeRateCny: row.exchange_rate_cny ?? 191,
     preExchangeRateCny: row.pre_exchange_rate_cny ?? row.exchange_rate_cny ?? 191,
     postExchangeRateCny: row.post_exchange_rate_cny ?? row.exchange_rate_cny ?? 191,
@@ -376,7 +377,7 @@ export async function fetchBoms() {
 const BOM_LIGHT_COLS = [
   'id', 'style_no', 'style_id', 'style_name', 'season', 'erp_category',
   'currency', 'exchange_rate_cny', 'exchange_rate_usd',
-  'post_color_boms', 'post_processing_fee', 'post_process_lines',
+  'post_color_boms', 'post_materials', 'post_processing_fee', 'post_process_lines',
   'post_exchange_rate_cny', 'post_delivery_price',
   'post_subtotal_krw', 'post_total_cost_krw',
   'logistics_cost_krw', 'packaging_cost_krw', 'packing_cost_krw',
