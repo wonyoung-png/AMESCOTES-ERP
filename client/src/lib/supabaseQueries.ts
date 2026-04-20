@@ -371,6 +371,29 @@ export async function fetchBoms() {
   return (data || []).map(convertBomFromDB);
 }
 
+// 목록 조회용 경량 fetch — product_image / pre_materials / color_boms 제외
+// ItemMaster, PurchaseMatching 등 목록 표시에 사용 (수십 MB 절감)
+const BOM_LIGHT_COLS = [
+  'id', 'style_no', 'style_id', 'style_name', 'season', 'erp_category',
+  'currency', 'exchange_rate_cny', 'exchange_rate_usd',
+  'post_color_boms', 'post_processing_fee', 'post_process_lines',
+  'post_exchange_rate_cny', 'post_delivery_price',
+  'post_subtotal_krw', 'post_total_cost_krw',
+  'logistics_cost_krw', 'packaging_cost_krw', 'packing_cost_krw',
+  'production_margin_rate', 'customs_rate',
+  'pnl_data', 'memo',
+  'created_at', 'updated_at',
+].join(',');
+
+export async function fetchBomsLight() {
+  const { data, error } = await supabase
+    .from('boms')
+    .select(BOM_LIGHT_COLS)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(convertBomFromDB);
+}
+
 export async function upsertBom(bom: any) {
   const snakeBom: Record<string, any> = {
     id: bom.id,

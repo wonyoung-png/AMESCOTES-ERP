@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type ProductionOrder, type ColorQty } from '@/lib/store';
-import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, updateItemCostData, saveConfirmedSalePrice } from '@/lib/supabaseQueries';
+import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, fetchBomsLight, updateItemCostData, saveConfirmedSalePrice } from '@/lib/supabaseQueries';
 import { parseExcelBomSheet } from '@/lib/bomExcelParser';
 import { resizeImage } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -83,17 +83,17 @@ const emptyItem: Partial<Item> = {
 // ─── 사후원가 계산 (BomManagement finalCost 동일 로직) ───
 // productCost  = calcPostSummary.totalCostKrw (제품총원가, 생산마진 제외)
 // totalCostKrw = productCost × (1 + productionMarginRate) (총원가액, 생산마진 포함)
-function calcBomCosts(bom: any): { productCost: number; totalCostKrw: number } {
+function calcBomCosts(bom: any): { productCost: number; totalCostKrw: number; factoryUnitCostKrw: number } {
   // 간단 원가 BOM: simplePostCostKrw를 총원가액으로 사용 (제품총원가 = 동일)
   if (bom.isSimpleCost && bom.simplePostCostKrw && bom.simplePostCostKrw > 0) {
     const v = Math.round(bom.simplePostCostKrw);
-    return { productCost: v, totalCostKrw: v };
+    return { productCost: v, totalCostKrw: v, factoryUnitCostKrw: v };
   }
   // 데이터(lines)가 있는 첫 번째 postColorBom 우선 사용, 없으면 index 0 fallback
   const postColorBom = (bom.postColorBoms || []).find((cb: any) => (cb.lines || []).some((l: any) => l.itemName || l.unitPriceCny > 0))
     ?? (bom.postColorBoms || [])[0];
   const materials: any[] = postColorBom ? (postColorBom.lines || []) : (bom.postMaterials || []);
-  if (materials.length === 0) return { productCost: 0, totalCostKrw: 0 };
+  if (materials.length === 0) return { productCost: 0, totalCostKrw: 0, factoryUnitCostKrw: 0 };
   const cnyKrw = bom.postExchangeRateCny || bom.exchangeRateCny || bom.snapshotCnyKrw || 191;
   const usdKrw = bom.exchangeRateUsd || 1380;
   const cur = bom.currency || 'CNY';
@@ -116,7 +116,7 @@ function calcBomCosts(bom: any): { productCost: number; totalCostKrw: number } {
   // 총원가액 = 제품총원가 + 생산마진 (BomManagement finalCost와 동일)
   const marginRate = bom.productionMarginRate ?? 0;
   const totalCostKrw = marginRate > 0 ? Math.round(productCost * (1 + marginRate)) : productCost;
-  return { productCost, totalCostKrw };
+  return { productCost, totalCostKrw, factoryUnitCostKrw: Math.round(factoryUnitCostKrw) };
 }
 // 하위 호환용 단순 래퍼 (syncPostCost에서 사용)
 function calcBomPostCostKrw(bom: any): number {
@@ -126,7 +126,7 @@ function calcBomPostCostKrw(bom: any): number {
 // ─── 컬럼 너비 리사이즈 기본값 ───
 const ITEM_DEFAULT_COL_WIDTHS: Record<string, number> = {
   image: 60, styleNo: 130, season: 80, buyer: 120, name: 180,
-  category: 80, color: 100, delivery: 90, bomCost: 100, salePrice: 110, multiple: 80, margin: 90,
+  category: 80, color: 100, delivery: 90, bomCost: 100, factoryCost: 100, salePrice: 110, multiple: 80, margin: 90,
   noOrder: 90, createdAt: 100, bom: 60, action: 60,
 };
 
@@ -463,7 +463,8 @@ export default function ItemMaster() {
   };
 
   const refresh = () => { queryClient.invalidateQueries({ queryKey: ['items'] }); queryClient.invalidateQueries({ queryKey: ['boms'] }); };
-  const { data: boms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
+  // product_image 제외한 경량 쿼리로 목록 조회 속도 개선
+  const { data: boms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBomsLight });
 
   // ─── 선택 품목 엑셀 다운로드 ───
   const downloadSelectedItemsExcel = () => {
@@ -738,6 +739,49 @@ export default function ItemMaster() {
 
     return result;
   }, [items, search, filterStyleNo, filterName, filterSeason, filterCategory, filterErpCategory, filterBuyer, filterNoBom, sortField, sortDir, vendors]);
+
+  // ─── O(1) 조회용 Map 캐시 (boms/vendors 변경 시에만 재생성) ───
+  const bomMap = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const b of boms as any[]) {
+      if (b.styleId) m.set(b.styleId, b);
+      if (b.styleNo) m.set(b.styleNo, b);
+      if (b.styleNo?.trim()) m.set(b.styleNo.trim(), b);
+    }
+    return m;
+  }, [boms]);
+
+  const vendorMap = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const v of vendors as any[]) m.set(v.id, v);
+    return m;
+  }, [vendors]);
+
+  // ─── 행별 원가 계산 사전 처리 — 렌더링 중 반복 연산 제거 ───
+  const rowDataMap = useMemo(() => {
+    const m = new Map<string, {
+      bom: any; delivery: number; bomCost: number;
+      confirmedSalePrice: number; actualMultiple: number;
+      marginRate: number | null; marginAmount: number | null;
+      factoryUnitCostKrw: number;
+    }>();
+    for (const item of items as Item[]) {
+      const bom = bomMap.get(item.id) ?? bomMap.get(item.styleNo) ?? bomMap.get(item.styleNo?.trim());
+      const delivery = bom?.postDeliveryPrice || item.deliveryPrice || (item as any).targetSalePrice || 0;
+      const { productCost: pcCalc, totalCostKrw: tcCalc, factoryUnitCostKrw: factCalc } = bom ? calcBomCosts(bom) : { productCost: 0, totalCostKrw: 0, factoryUnitCostKrw: 0 };
+      const postCostDb: number = (item as any).postCostKrw || 0;
+      const buyer = vendorMap.get((item as any).buyerId);
+      const isSelf = !buyer || buyer.name?.includes('아뜰리에드루멘');
+      const bomCostLive = isSelf ? pcCalc : tcCalc;
+      const bomCost = bomCostLive > 0 ? bomCostLive : postCostDb;
+      const confirmedSalePrice: number = bom?.pnl?.confirmedSalePrice || (item as any).confirmedSalePrice || 0;
+      const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
+      const marginAmount = delivery > 0 ? delivery - bomCost : null;
+      const marginRate = delivery > 0 && marginAmount != null ? (marginAmount / delivery) * 100 : null;
+      m.set(item.id, { bom, delivery, bomCost, confirmedSalePrice, actualMultiple, marginRate, marginAmount, factoryUnitCostKrw: factCalc });
+    }
+    return m;
+  }, [items, boms, vendors, bomMap, vendorMap]);
 
   // 자동생성 미리보기
   useEffect(() => {
@@ -1218,6 +1262,7 @@ export default function ItemMaster() {
               <col style={{ width: colWidths.color }} />
               <col style={{ width: colWidths.delivery }} />
               <col style={{ width: colWidths.bomCost }} />
+              <col style={{ width: colWidths.factoryCost }} />
               <col style={{ width: colWidths.salePrice }} />
               <col style={{ width: colWidths.multiple }} />
               <col style={{ width: colWidths.margin }} />
@@ -1274,6 +1319,10 @@ export default function ItemMaster() {
                   <div onMouseDown={(e) => startResize(e, 'bomCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
+                  공장단가
+                  <div onMouseDown={(e) => startResize(e, 'factoryCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden">
                   확정판매가
                   <div onMouseDown={(e) => startResize(e, 'salePrice')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
                 </th>
@@ -1302,24 +1351,8 @@ export default function ItemMaster() {
             </thead>
             <tbody>
               {displayItems.map(item => {
-                // 납품가: BOM 사후원가 postDeliveryPrice 우선 → item.deliveryPrice
-                const itemBom = (boms as any[]).find(b => b.styleId === item.id) ||
-                                (boms as any[]).find(b => b.styleNo === item.styleNo) ||
-                                (boms as any[]).find(b => b.styleNo?.trim() === item.styleNo?.trim());
-                const delivery = itemBom?.postDeliveryPrice || item.deliveryPrice || item.targetSalePrice || 0;
-                // 총원가액: 실시간 계산 우선, 실패 시 DB 저장값 fallback
-                const { productCost: productCostCalc, totalCostKrw: bomCostCalc } = itemBom ? calcBomCosts(itemBom) : { productCost: 0, totalCostKrw: 0 };
-                const postCostKrwDb: number = (item as any).postCostKrw || 0;
-                // 바이어 판별: 자사 브랜드(아뜰리에드루멘)이면 생산마진 제외
-                const buyer = (vendors as any[]).find(v => v.id === (item as any).buyerId);
-                const isSelfBrand = !buyer || buyer.name?.includes('아뜰리에드루멘');
-                const bomCostLive = isSelfBrand ? productCostCalc : bomCostCalc;
-                // live calc 실패 시 DB 저장값으로 fallback (postCostKrw = BOM 저장 시점의 finalCost)
-                const bomCost: number = bomCostLive > 0 ? bomCostLive : postCostKrwDb;
-                // 확정판매가: pnl.confirmedSalePrice 우선 → items.confirmedSalePrice
-                const confirmedSalePrice: number = itemBom?.pnl?.confirmedSalePrice || (item as any).confirmedSalePrice || 0;
-                const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
-                const { rate: marginRate, amount: marginAmount } = calcMargin(delivery, bomCost);
+                const rd = rowDataMap.get(item.id) ?? { bom: null, delivery: 0, bomCost: 0, confirmedSalePrice: 0, actualMultiple: 0, marginRate: null, marginAmount: null, factoryUnitCostKrw: 0 };
+                const { bom: itemBom, delivery, bomCost, confirmedSalePrice, actualMultiple, marginRate, marginAmount, factoryUnitCostKrw } = rd;
                 const months = monthsSinceLastOrder(item);
                 const isChecked = selectedIds.has(item.id);
                 return (
@@ -1350,7 +1383,7 @@ export default function ItemMaster() {
                     <td className="px-4 py-3">
                       {item.buyerId ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                          {vendors.find(v => v.id === item.buyerId)?.code || vendors.find(v => v.id === item.buyerId)?.name || '-'}
+                          {vendorMap.get(item.buyerId)?.code || vendorMap.get(item.buyerId)?.name || '-'}
                         </span>
                       ) : <span className="text-stone-300 text-xs">-</span>}
                     </td>
@@ -1403,6 +1436,14 @@ export default function ItemMaster() {
                         <span className="text-stone-300 text-xs">원가미입력</span>
                       ) : (
                         <span className="text-stone-300 text-xs">미등록</span>
+                      )}
+                    </td>
+                    {/* 공장단가 */}
+                    <td className="px-4 py-3 text-right font-mono text-xs">
+                      {factoryUnitCostKrw > 0 ? (
+                        <span className="text-blue-700">{formatKRW(factoryUnitCostKrw)}</span>
+                      ) : (
+                        <span className="text-stone-300 text-xs">—</span>
                       )}
                     </td>
                     {/* 확정판매가 */}
