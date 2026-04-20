@@ -852,15 +852,25 @@ export default function ItemMaster() {
     for (const item of items as Item[]) {
       const bom = bomMap.get(item.id) ?? bomMap.get(item.styleNo) ?? bomMap.get(item.styleNo?.trim());
       const localBom = localBomMap.get(item.id) ?? localBomMap.get(item.styleNo) ?? localBomMap.get(item.styleNo?.trim());
-      // Supabase bom에 비용/자재 필드가 없으면 localStorage 값으로 보완
-      const mergedBom = bom ? {
-        ...bom,
-        logisticsCostKrw: bom.logisticsCostKrw || localBom?.logisticsCostKrw || 0,
-        packagingCostKrw: bom.packagingCostKrw || localBom?.packagingCostKrw || 0,
-        packingCostKrw: bom.packingCostKrw || localBom?.packingCostKrw || 0,
-        postMaterials: (bom.postMaterials?.length > 0) ? bom.postMaterials : (localBom?.postMaterials || []),
-        postProcessingFee: bom.postProcessingFee || localBom?.postProcessingFee || 0,
-        postProcessLines: (bom.postProcessLines?.length > 0) ? bom.postProcessLines : (localBom?.postProcessLines || []),
+      // Supabase bom이 없으면 localBom 기본, 있으면 Supabase 우선 + 빈 필드는 localStorage 보완
+      const baseBom = bom || localBom;
+      const mergedBom = baseBom ? {
+        ...(localBom || {}),
+        ...(bom || {}),
+        logisticsCostKrw: bom?.logisticsCostKrw || localBom?.logisticsCostKrw || 0,
+        packagingCostKrw: bom?.packagingCostKrw || localBom?.packagingCostKrw || 0,
+        packingCostKrw: bom?.packingCostKrw || localBom?.packingCostKrw || 0,
+        postMaterials: (bom?.postMaterials?.length > 0) ? bom.postMaterials : (localBom?.postMaterials || []),
+        postProcessingFee: bom?.postProcessingFee || localBom?.postProcessingFee || 0,
+        postProcessLines: (bom?.postProcessLines?.length > 0) ? bom.postProcessLines : (localBom?.postProcessLines || []),
+        postColorBoms: (bom?.postColorBoms?.length > 0) ? bom.postColorBoms : (localBom?.postColorBoms || []),
+        customsRate: bom?.customsRate || localBom?.customsRate || 0,
+        exchangeRateCny: bom?.exchangeRateCny || localBom?.exchangeRateCny || localBom?.snapshotCnyKrw || 191,
+        productionMarginRate: bom?.productionMarginRate ?? localBom?.productionMarginRate ?? 0,
+        postDeliveryPrice: bom?.postDeliveryPrice || localBom?.postDeliveryPrice || 0,
+        postTotalCostKrw: bom?.postTotalCostKrw || localBom?.postTotalCostKrw || 0,
+        currency: bom?.currency || localBom?.currency || 'CNY',
+        pnl: bom?.pnl || localBom?.pnl || { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 },
       } : null;
       const delivery = mergedBom?.postDeliveryPrice || item.deliveryPrice || (item as any).targetSalePrice || 0;
       const { productCost: pcCalc, totalCostKrw: tcCalc, factoryUnitCostKrw: factCalc } = mergedBom ? calcBomCosts(mergedBom) : { productCost: 0, totalCostKrw: 0, factoryUnitCostKrw: 0 };
