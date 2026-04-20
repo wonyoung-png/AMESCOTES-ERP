@@ -653,25 +653,63 @@ export default function ItemMaster() {
   const [isSyncing, setIsSyncing] = useState(false);
   const syncPostCost = async () => {
     setIsSyncing(true);
+    let bomSynced = 0, bomFailed = 0;
+
+    // Step 1: localStorage BOM → Supabase 동기화
+    // postMaterials 또는 비용 필드가 있는 BOM만 대상
+    const localBoms = store.getBoms() as any[];
+    const supaBomsById = new Map((boms as any[]).map((b: any) => [b.id, b]));
+    for (const lb of localBoms) {
+      if (!lb.id) continue;
+      const hasData = (lb.postMaterials?.length > 0) ||
+                      (lb.logisticsCostKrw > 0) ||
+                      (lb.packagingCostKrw > 0) ||
+                      (lb.packingCostKrw > 0);
+      if (!hasData) continue;
+      const sb = supaBomsById.get(lb.id);
+      // localStorage가 최신이거나 Supabase에 없는 경우만 upsert
+      if (!sb || (lb.updatedAt || '') >= (sb.updatedAt || '')) {
+        try {
+          await upsertBom(lb);
+          bomSynced++;
+        } catch (e) {
+          bomFailed++;
+          console.warn('[원가동기화] BOM upsert 실패:', lb.styleNo, (e as any)?.message);
+        }
+      }
+    }
+
+    // Step 2: 최신 BOM fetch (Step 1에서 변경이 있었으면 새로 fetch)
+    const freshBoms = bomSynced > 0 ? await fetchBomsLight() : (boms as any[]);
+    // 중복 styleNo 중 updatedAt 최신 BOM 우선 선택
+    const latestBomMap = new Map<string, any>();
+    for (const b of freshBoms) {
+      const key = b.styleId || b.styleNo;
+      const ex = latestBomMap.get(key);
+      if (!ex || (b.updatedAt || '') >= (ex.updatedAt || '')) latestBomMap.set(key, b);
+    }
+
+    // Step 3: items 원가 업데이트
     let saved = 0, noMatch = 0, zeroCost = 0;
-    // BOM 기준으로 순회 (hasBom 의존 없음)
-    for (const bom of (boms as any[])) {
+    for (const bom of latestBomMap.values()) {
       const cost = calcBomPostCostKrw(bom);
       if (cost <= 0) { zeroCost++; continue; }
-      // 매칭: bom.styleId(UUID) 또는 bom.styleNo(문자열)로 items에서 찾기
       const matchedItem =
-        (items as any[]).find(i => i.id === bom.styleId) ||
-        (items as any[]).find(i => i.styleNo === bom.styleNo) ||
-        (items as any[]).find(i => i.styleNo?.trim() === bom.styleNo?.trim());
+        (items as any[]).find((i: any) => i.id === bom.styleId) ||
+        (items as any[]).find((i: any) => i.styleNo === bom.styleNo) ||
+        (items as any[]).find((i: any) => i.styleNo?.trim() === bom.styleNo?.trim());
       if (!matchedItem) { noMatch++; continue; }
       const salePx = bom?.pnl?.confirmedSalePrice || 0;
       await updateItemCostData(matchedItem.id, cost, salePx);
       saved++;
     }
+
+    queryClient.invalidateQueries({ queryKey: ['boms'] });
     if (saved > 0) queryClient.invalidateQueries({ queryKey: ['items'] });
     setIsSyncing(false);
-    toast.info(
-      `동기화 완료 — 저장: ${saved}개 | 아이템미매칭: ${noMatch}개 | 원가0원: ${zeroCost}개`,
+    const failMsg = bomFailed > 0 ? ` | BOM실패: ${bomFailed}개` : '';
+    toast.success(
+      `동기화 완료 — BOM저장: ${bomSynced}개 | 원가업데이트: ${saved}개 | 미매칭: ${noMatch}개${failMsg}`,
       { duration: 8000 }
     );
   };
