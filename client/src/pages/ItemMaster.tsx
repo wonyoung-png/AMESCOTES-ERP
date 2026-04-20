@@ -777,12 +777,19 @@ export default function ItemMaster() {
   }, [items, search, filterStyleNo, filterName, filterSeason, filterCategory, filterErpCategory, filterBuyer, filterNoBom, sortField, sortDir, vendors]);
 
   // ─── O(1) 조회용 Map 캐시 (boms/vendors 변경 시에만 재생성) ───
+  // 동일 styleNo BOM이 여러 개 있을 경우 updatedAt 최신 BOM 우선 선택
   const bomMap = useMemo(() => {
     const m = new Map<string, any>();
+    const setIfNewer = (key: string, b: any) => {
+      const existing = m.get(key);
+      if (!existing || (b.updatedAt || b.updated_at || '') >= (existing.updatedAt || existing.updated_at || '')) {
+        m.set(key, b);
+      }
+    };
     for (const b of boms as any[]) {
-      if (b.styleId) m.set(b.styleId, b);
-      if (b.styleNo) m.set(b.styleNo, b);
-      if (b.styleNo?.trim()) m.set(b.styleNo.trim(), b);
+      if (b.styleId) setIfNewer(b.styleId, b);
+      if (b.styleNo) setIfNewer(b.styleNo, b);
+      if (b.styleNo?.trim()) setIfNewer(b.styleNo.trim(), b);
     }
     return m;
   }, [boms]);
@@ -801,25 +808,44 @@ export default function ItemMaster() {
       marginRate: number | null; marginAmount: number | null;
       factoryUnitCostKrw: number;
     }>();
+    // localStorage bom 맵 — Supabase에 비용 필드가 없을 때 보완용
+    const localBoms = store.getBoms() as any[];
+    const localBomMap = new Map<string, any>();
+    for (const b of localBoms) {
+      if (b.styleId) localBomMap.set(b.styleId, b);
+      if (b.styleNo) localBomMap.set(b.styleNo, b);
+      if (b.styleNo?.trim()) localBomMap.set(b.styleNo.trim(), b);
+    }
     for (const item of items as Item[]) {
       const bom = bomMap.get(item.id) ?? bomMap.get(item.styleNo) ?? bomMap.get(item.styleNo?.trim());
-      const delivery = bom?.postDeliveryPrice || item.deliveryPrice || (item as any).targetSalePrice || 0;
-      const { productCost: pcCalc, totalCostKrw: tcCalc, factoryUnitCostKrw: factCalc } = bom ? calcBomCosts(bom) : { productCost: 0, totalCostKrw: 0, factoryUnitCostKrw: 0 };
+      const localBom = localBomMap.get(item.id) ?? localBomMap.get(item.styleNo) ?? localBomMap.get(item.styleNo?.trim());
+      // Supabase bom에 비용/자재 필드가 없으면 localStorage 값으로 보완
+      const mergedBom = bom ? {
+        ...bom,
+        logisticsCostKrw: bom.logisticsCostKrw || localBom?.logisticsCostKrw || 0,
+        packagingCostKrw: bom.packagingCostKrw || localBom?.packagingCostKrw || 0,
+        packingCostKrw: bom.packingCostKrw || localBom?.packingCostKrw || 0,
+        postMaterials: (bom.postMaterials?.length > 0) ? bom.postMaterials : (localBom?.postMaterials || []),
+        postProcessingFee: bom.postProcessingFee || localBom?.postProcessingFee || 0,
+        postProcessLines: (bom.postProcessLines?.length > 0) ? bom.postProcessLines : (localBom?.postProcessLines || []),
+      } : null;
+      const delivery = mergedBom?.postDeliveryPrice || item.deliveryPrice || (item as any).targetSalePrice || 0;
+      const { productCost: pcCalc, totalCostKrw: tcCalc, factoryUnitCostKrw: factCalc } = mergedBom ? calcBomCosts(mergedBom) : { productCost: 0, totalCostKrw: 0, factoryUnitCostKrw: 0 };
       // 총원가액: 실시간 calcBomCosts 우선 (calcPostSummary.totalCostKrw와 동일 수식)
       //   - 자사(아뜰리에드루멘): productCost = calcPostSummary.totalCostKrw (생산마진 제외)
       //   - OEM: totalCostKrw = productCost × (1 + 생산마진율)
       //   - 실시간 값이 0일 때만 DB 스냅샷(post_cost_krw) 폴백
-      const postCostDb: number = (item as any).postCostKrw || bom?.postTotalCostKrw || 0;
+      const postCostDb: number = (item as any).postCostKrw || mergedBom?.postTotalCostKrw || 0;
       const buyer = vendorMap.get((item as any).buyerId);
       const isSelf = !buyer || buyer.name?.includes('아뜰리에드루멘');
       const bomCostLive = isSelf ? pcCalc : tcCalc;
       const bomCost = bomCostLive > 0 ? bomCostLive : postCostDb;
-      const confirmedSalePrice: number = bom?.pnl?.confirmedSalePrice || (item as any).confirmedSalePrice || 0;
+      const confirmedSalePrice: number = mergedBom?.pnl?.confirmedSalePrice || (item as any).confirmedSalePrice || 0;
       const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
       const marginAmount = delivery > 0 ? delivery - bomCost : null;
       const marginRate = delivery > 0 && marginAmount != null ? (marginAmount / delivery) * 100 : null;
-      const factCalcDb: number = bom?.pnl?.factoryUnitCostKrw ?? 0;
-      m.set(item.id, { bom, delivery, bomCost, confirmedSalePrice, actualMultiple, marginRate, marginAmount, factoryUnitCostKrw: factCalc > 0 ? factCalc : factCalcDb });
+      const factCalcDb: number = mergedBom?.pnl?.factoryUnitCostKrw ?? 0;
+      m.set(item.id, { bom: mergedBom, delivery, bomCost, confirmedSalePrice, actualMultiple, marginRate, marginAmount, factoryUnitCostKrw: factCalc > 0 ? factCalc : factCalcDb });
     }
     return m;
   }, [items, boms, vendors, bomMap, vendorMap]);

@@ -2736,7 +2736,11 @@ export default function BomManagement() {
           console.warn('[BomManagement] 자재마스터 단가 동기화 실패:', e);
         }
       })
-      .catch((e: Error) => console.warn('[BomManagement] BOM 저장 실패:', e.message));
+      .catch((e: any) => {
+        const msg = e?.message || String(e);
+        console.warn('[BomManagement] BOM 저장 실패:', msg);
+        toast.error(`BOM 저장 실패: ${msg}`);
+      });
     // 첫 번째 컬러 BOM 기준으로 원가 업데이트 (없으면 lines 기준)
     const firstColor = (updated.colorBoms || [])[0];
     const summary = calcSummary(updated, settings.usdKrw, firstColor);
