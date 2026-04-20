@@ -786,12 +786,11 @@ export default function ItemMaster() {
     for (const item of items as Item[]) {
       const bom = bomMap.get(item.id) ?? bomMap.get(item.styleNo) ?? bomMap.get(item.styleNo?.trim());
       const delivery = bom?.postDeliveryPrice || item.deliveryPrice || (item as any).targetSalePrice || 0;
-      const { productCost: pcCalc, totalCostKrw: tcCalc, factoryUnitCostKrw: factCalc } = bom ? calcBomCosts(bom) : { productCost: 0, totalCostKrw: 0, factoryUnitCostKrw: 0 };
-      const postCostDb: number = (item as any).postCostKrw || 0;
-      const buyer = vendorMap.get((item as any).buyerId);
-      const isSelf = !buyer || buyer.name?.includes('아뜰리에드루멘');
-      const bomCostLive = isSelf ? pcCalc : tcCalc;
-      const bomCost = bomCostLive > 0 ? bomCostLive : postCostDb;
+      const { factoryUnitCostKrw: factCalc } = bom ? calcBomCosts(bom) : { factoryUnitCostKrw: 0 };
+      // 총원가액: items.post_cost_krw(BomManagement 저장값) 우선 → 없으면 bom.postTotalCostKrw → 없으면 0
+      // BomManagement는 포장비/패킹재 포함 총원가를 items에 저장하므로 이게 단일 정보원
+      const postCostDb: number = (item as any).postCostKrw || bom?.postTotalCostKrw || 0;
+      const bomCost = postCostDb;
       const confirmedSalePrice: number = bom?.pnl?.confirmedSalePrice || (item as any).confirmedSalePrice || 0;
       const actualMultiple = bomCost > 0 && confirmedSalePrice > 0 ? confirmedSalePrice / bomCost : 0;
       const marginAmount = delivery > 0 ? delivery - bomCost : null;
