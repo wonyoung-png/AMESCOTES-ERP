@@ -17,6 +17,7 @@ interface NavItem {
   path: string;
   label: string;
   icon: React.ReactNode;
+  table?: string;
 }
 
 interface NavGroup {
@@ -34,24 +35,24 @@ const navGroups: NavGroup[] = [
   {
     label: '바이어',
     items: [
-      { path: '/vendors', label: '바이어 마스터', icon: <Building2 size={17} /> },
+      { path: '/vendors', label: '바이어 마스터', icon: <Building2 size={17} />, table: 'vendors' },
     ]
   },
   {
     label: '품목/생산',
     items: [
-      { path: '/samples', label: '샘플 관리', icon: <FlaskConical size={17} /> },
-      { path: '/items', label: '품목 마스터', icon: <Package size={17} /> },
-      { path: '/materials', label: '자재 마스터', icon: <Layers size={17} /> },
-      { path: '/bom', label: 'BOM / 원가 관리', icon: <ClipboardList size={17} /> },
-      { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} /> },
-      { path: '/orders', label: '생산 발주', icon: <Factory size={17} /> },
+      { path: '/samples', label: '샘플 관리', icon: <FlaskConical size={17} />, table: 'samples' },
+      { path: '/items', label: '품목 마스터', icon: <Package size={17} />, table: 'items' },
+      { path: '/materials', label: '자재 마스터', icon: <Layers size={17} />, table: 'materials' },
+      { path: '/bom', label: 'BOM / 원가 관리', icon: <ClipboardList size={17} />, table: 'boms' },
+      { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} />, table: 'boms' },
+      { path: '/orders', label: '생산 발주', icon: <Factory size={17} />, table: 'production_orders' },
     ]
   },
   {
     label: '원가/구매',
     items: [
-      { path: '/purchase', label: '자재 구매', icon: <ShoppingCart size={17} /> },
+      { path: '/purchase', label: '자재 구매', icon: <ShoppingCart size={17} />, table: 'purchase_items' },
     ]
   },
   {
@@ -67,7 +68,7 @@ const navGroups: NavGroup[] = [
   {
     label: '설정',
     items: [
-      { path: '/settings', label: '환율 / 설정', icon: <Settings size={17} /> },
+      { path: '/settings', label: '환율 / 설정', icon: <Settings size={17} />, table: 'exchange_rates' },
     ]
   },
   {
@@ -186,9 +187,18 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     <span className={`shrink-0 ${active ? 'text-[#C9A96E]' : ''}`}>
                       {item.icon}
                     </span>
-                    {!collapsed && <span className="truncate">{item.label}</span>}
+                    {!collapsed && (
+                      <span className="flex-1 min-w-0">
+                        <span className="block truncate">{item.label}</span>
+                        {item.table && (
+                          <span className="block text-[9px] font-mono opacity-30 truncate leading-tight">
+                            {item.table}
+                          </span>
+                        )}
+                      </span>
+                    )}
                     {active && !collapsed && (
-                      <span className="ml-auto w-1 h-4 rounded-full bg-[#C9A96E]" />
+                      <span className="ml-auto w-1 h-4 rounded-full bg-[#C9A96E] shrink-0" />
                     )}
                   </Link>
                 );
