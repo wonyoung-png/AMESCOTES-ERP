@@ -151,11 +151,11 @@ export default function SalesManagement() {
     toast.success('삭제되었습니다');
   };
 
-  const statTabItems: { key: StatTab; label: string; icon: React.ReactNode }[] = [
-    { key: 'monthly', label: '월별', icon: <Calendar className="w-3.5 h-3.5" /> },
-    { key: 'buyer', label: '브랜드별', icon: <Users className="w-3.5 h-3.5" /> },
-    { key: 'factory', label: '공장별', icon: <Building2 className="w-3.5 h-3.5" /> },
-    { key: 'style', label: '스타일별', icon: <Tag className="w-3.5 h-3.5" /> },
+  const statTabItems: { key: StatTab; label: string; icon: React.ReactNode; table: string }[] = [
+    { key: 'monthly', label: '월별', icon: <Calendar className="w-3.5 h-3.5" />, table: 'ames_sales · 월집계' },
+    { key: 'buyer', label: '브랜드별', icon: <Users className="w-3.5 h-3.5" />, table: 'ames_sales · 브랜드집계' },
+    { key: 'factory', label: '공장별', icon: <Building2 className="w-3.5 h-3.5" />, table: 'ames_sales · 공장집계' },
+    { key: 'style', label: '스타일별', icon: <Tag className="w-3.5 h-3.5" />, table: 'ames_sales · 스타일집계' },
   ];
 
   return (
@@ -213,23 +213,25 @@ export default function SalesManagement() {
       <div className="flex gap-2 border-b border-stone-200">
         <button
           onClick={() => setActiveTab('list')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`flex flex-col items-start px-4 py-2 border-b-2 -mb-[2px] transition-colors ${
             activeTab === 'list'
               ? 'border-amber-700 text-amber-700'
               : 'border-transparent text-stone-500 hover:text-stone-700'
           }`}
         >
-          매출 내역
+          <span className="text-sm font-medium">매출 내역</span>
+          <span className="text-[9px] font-mono opacity-40 leading-tight">local: ames_sales</span>
         </button>
         <button
           onClick={() => setActiveTab('stats')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+          className={`flex flex-col items-start px-4 py-2 border-b-2 -mb-[2px] transition-colors ${
             activeTab === 'stats'
               ? 'border-amber-700 text-amber-700'
               : 'border-transparent text-stone-500 hover:text-stone-700'
           }`}
         >
-          <BarChart3 className="w-4 h-4" />통계
+          <span className="text-sm font-medium flex items-center gap-1.5"><BarChart3 className="w-4 h-4" />통계</span>
+          <span className="text-[9px] font-mono opacity-40 leading-tight">local: ames_sales (집계 전용)</span>
         </button>
       </div>
 
@@ -357,13 +359,14 @@ export default function SalesManagement() {
               <button
                 key={tab.key}
                 onClick={() => setStatTab(tab.key)}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   statTab === tab.key
                     ? 'bg-amber-700 text-white'
                     : 'text-stone-500 hover:bg-stone-50'
                 }`}
               >
-                {tab.icon}{tab.label}
+                <span className="flex items-center gap-1.5">{tab.icon}{tab.label}</span>
+                <span className={`text-[8px] font-mono leading-tight ${statTab === tab.key ? 'opacity-60' : 'opacity-30'}`}>{tab.table}</span>
               </button>
             ))}
           </div>
