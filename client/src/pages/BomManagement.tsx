@@ -3316,40 +3316,47 @@ export default function BomManagement() {
           <div className="flex items-center border-b-2 border-stone-200">
             <button
               onClick={() => setMainTab('pre')}
-              className={`flex items-center gap-2 px-6 py-3 text-sm font-bold border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
+              className={`flex flex-col items-start px-6 py-2.5 border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
                 mainTab === 'pre'
                   ? 'border-emerald-500 text-emerald-700'
                   : 'border-transparent text-stone-400 hover:text-stone-600'
               }`}
             >
-              사전원가
-              {(editBom.colorBoms || []).length > 0 && (
-                <Badge className="text-[10px] py-0 h-4 bg-emerald-100 text-emerald-700 border-emerald-300">{(editBom.colorBoms || []).length}컬러</Badge>
-              )}
+              <div className="flex items-center gap-2 text-sm font-bold">
+                사전원가
+                {(editBom.colorBoms || []).length > 0 && (
+                  <Badge className="text-[10px] py-0 h-4 bg-emerald-100 text-emerald-700 border-emerald-300">{(editBom.colorBoms || []).length}컬러</Badge>
+                )}
+              </div>
+              <span className="text-[9px] font-mono opacity-40 leading-tight">boms · pre_materials · color_boms</span>
             </button>
             <button
               onClick={() => setMainTab('post')}
-              className={`flex items-center gap-2 px-6 py-3 text-sm font-bold border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
+              className={`flex flex-col items-start px-6 py-2.5 border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
                 mainTab === 'post'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-stone-400 hover:text-stone-600'
               }`}
             >
-              <Factory className="w-4 h-4" />
-              사후원가
-              {(editBom.postColorBoms || []).length > 0 && (
-                <Badge className="text-[10px] py-0 h-4 bg-blue-100 text-blue-700 border-blue-300">{(editBom.postColorBoms || []).length}컬러</Badge>
-              )}
+              <div className="flex items-center gap-2 text-sm font-bold">
+                <Factory className="w-4 h-4" />
+                사후원가
+                {(editBom.postColorBoms || []).length > 0 && (
+                  <Badge className="text-[10px] py-0 h-4 bg-blue-100 text-blue-700 border-blue-300">{(editBom.postColorBoms || []).length}컬러</Badge>
+                )}
+              </div>
+              <span className="text-[9px] font-mono opacity-40 leading-tight">boms · post_materials · post_color_boms</span>
             </button>
             <button
               onClick={() => setMainTab('yardage')}
-              className={`flex items-center gap-2 px-6 py-3 text-sm font-bold border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
+              className={`flex flex-col items-start px-6 py-2.5 border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
                 mainTab === 'yardage'
                   ? 'border-amber-500 text-amber-700'
                   : 'border-transparent text-stone-400 hover:text-stone-600'
               }`}
             >
-              소요량 계산
+              <span className="text-sm font-bold">소요량 계산</span>
+              <span className="text-[9px] font-mono opacity-40 leading-tight">boms (계산 전용)</span>
             </button>
           </div>
 

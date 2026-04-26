@@ -29,7 +29,7 @@ const navGroups: NavGroup[] = [
   {
     label: '',
     items: [
-      { path: '/', label: '대시보드', icon: <BarChart3 size={17} /> },
+      { path: '/', label: '대시보드', icon: <BarChart3 size={17} />, table: 'items · boms' },
     ]
   },
   {
@@ -58,11 +58,11 @@ const navGroups: NavGroup[] = [
   {
     label: '정산',
     items: [
-      { path: '/trade-statement', label: '거래명세표', icon: <FileText size={17} /> },
-      { path: '/sales', label: '매출 관리', icon: <TrendingUp size={17} /> },
-      { path: '/settlement', label: '정산 / 미수금', icon: <Receipt size={17} /> },
-      { path: '/expense', label: '지출 전표', icon: <CreditCard size={17} /> },
-      { path: '/documents', label: '서류 출력', icon: <FileText size={17} /> },
+      { path: '/trade-statement', label: '거래명세표', icon: <FileText size={17} />, table: 'local: ames_trade_statements' },
+      { path: '/sales', label: '매출 관리', icon: <TrendingUp size={17} />, table: 'local: ames_sales' },
+      { path: '/settlement', label: '정산 / 미수금', icon: <Receipt size={17} />, table: 'local: ames_settlements' },
+      { path: '/expense', label: '지출 전표', icon: <CreditCard size={17} />, table: 'local: ames_expenses' },
+      { path: '/documents', label: '서류 출력', icon: <FileText size={17} />, table: '출력 전용 (DB 없음)' },
     ]
   },
   {
@@ -74,7 +74,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'AI',
     items: [
-      { path: '/agent', label: 'AI 어시스턴트', icon: <Bot size={17} /> },
+      { path: '/agent', label: 'AI 어시스턴트', icon: <Bot size={17} />, table: 'AI API (DB 없음)' },
     ]
   },
 ];
