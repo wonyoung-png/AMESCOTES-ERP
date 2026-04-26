@@ -91,16 +91,16 @@ function calcBomCosts(bom: any): { productCost: number; totalCostKrw: number; fa
     const v = Math.round(bom.simplePostCostKrw);
     return { productCost: v, totalCostKrw: v, factoryUnitCostKrw: v };
   }
-  // BomManagement PostCostSummary와 완전 동일:
-  //   1) postMaterials(컬럼) 우선 — 처리비도 postProcessingFee(컬럼) 사용
-  //   2) postMaterials 없을 때만 lines가 있는 첫 번째 postColorBom 탭으로 폴백
-  const hasMaterials = (bom.postMaterials || []).length > 0;
-  const postColorBom = !hasMaterials
-    ? (bom.postColorBoms || []).find((cb: any) => (cb.lines || []).some((l: any) => l.itemName || l.unitPriceCny > 0))
-    : undefined;
-  const materials: any[] = hasMaterials
-    ? (bom.postMaterials || [])
-    : (postColorBom ? (postColorBom.lines || []) : []);
+  // BomManagement handleSave와 동일: postColorBoms 우선 (현재 편집 데이터),
+  //   없을 때만 postMaterials 폴백 (구형/마이그레이션 전 BOM)
+  // convertBomFromDB: post_color_boms 없으면 postMaterials로 '기본' 탭 자동생성하므로
+  //   postColorBoms가 항상 최신 소스임
+  const postColorBom = (bom.postColorBoms || []).find((cb: any) =>
+    (cb.lines || []).some((l: any) => l.itemName || l.unitPriceCny > 0)
+  );
+  const materials: any[] = postColorBom
+    ? (postColorBom.lines || [])
+    : (bom.postMaterials || []);
   if (materials.length === 0) return { productCost: 0, totalCostKrw: 0, factoryUnitCostKrw: 0 };
   // 환율 (BomManagement calcPostSummary와 동일)
   const postCur = bom.currency || 'CNY';
@@ -113,14 +113,13 @@ function calcBomCosts(bom: any): { productCost: number; totalCostKrw: number; fa
   // 본사제공 자재
   const hqMaterialCny = materials.reduce((s: number, l: any) =>
     l.isHqProvided ? s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) : s, 0);
-  // 처리비: postMaterials 사용 시 bom 레벨 컬럼값, 탭 사용 시 탭의 값
-  const processingCny = hasMaterials
-    ? (bom.postProcessingFee || 0)
-    : (postColorBom ? (postColorBom.processingFee ?? 0) : (bom.postProcessingFee || 0));
-  // 후가공: postMaterials 사용 시 bom 레벨, 탭 사용 시 탭의 값
-  const postProcLines: any[] = hasMaterials
-    ? (bom.postProcessLines || [])
-    : (postColorBom ? (postColorBom.postProcessLines ?? []) : (bom.postProcessLines || []));
+  // 처리비·후가공: postColorBom 탭 우선, 없으면 bom 레벨 폴백
+  const processingCny = postColorBom
+    ? (postColorBom.processingFee ?? 0)
+    : (bom.postProcessingFee || 0);
+  const postProcLines: any[] = postColorBom
+    ? (postColorBom.postProcessLines ?? [])
+    : (bom.postProcessLines || []);
   const postProcessCny = postProcLines.reduce((s: number, l: any) => s + (l.netQty || 0) * (l.unitPrice || 0), 0);
   const processingKrw = processingCny * rate;
   const customsKrw = processingKrw * ((bom.customsRate || 0) / 100);

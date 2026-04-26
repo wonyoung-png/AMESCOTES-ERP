@@ -99,7 +99,7 @@ export function convertBomFromDB(row: any) {
     postColorBoms = [{
       color: '기본',
       lines: postMaterials,
-      postProcessLines: [],
+      postProcessLines: postProcessLines, // bom 레벨 후가공비 포함 (구형 BOM 호환)
       processingFee: row.post_processing_fee ?? 0,
     }];
   } else {
