@@ -1,9 +1,12 @@
-import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
-import agentRoutes from "./agent-routes.js";
+import dotenv from "dotenv";
+import yardageOcrRouter from "./yardage-ocr.js";
+
+// .env 파일 로드 (override: true → 쉘에 빈 값이 있어도 .env 값으로 덮어쓰기)
+dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,19 +15,13 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // JSON 파싱 미들웨어
-  app.use(express.json());
+  // JSON 파싱
+  app.use(express.json({ limit: "10mb" }));
 
-  // 요청 로깅 미들웨어
-  app.use((req, _res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    next();
-  });
+  // API 라우터 (정적 파일보다 먼저 마운트)
+  app.use(yardageOcrRouter);
 
-  // AI 에이전트 API 라우터
-  app.use(agentRoutes);
-
-  // Serve static files from dist/public in production
+  // Serve static files
   const staticPath =
     process.env.NODE_ENV === "production"
       ? path.resolve(__dirname, "public")
@@ -32,15 +29,16 @@ async function startServer() {
 
   app.use(express.static(staticPath));
 
-  // Handle client-side routing - serve index.html for all routes
+  // Client-side routing fallback
   app.get("*", (_req, res) => {
     res.sendFile(path.join(staticPath, "index.html"));
   });
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 4000;
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    console.log(`Anthropic API key loaded: ${!!process.env.ANTHROPIC_API_KEY}`);
   });
 }
 
