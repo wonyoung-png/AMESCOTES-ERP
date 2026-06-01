@@ -29,7 +29,7 @@ function simpleHash(str: string): string {
 //  자동 마이그레이션 — 기기별 최초 1회 기존 데모 계정 삭제
 // ─────────────────────────────────────────────────────────────
 const AUTH_VERSION_KEY = 'auth_version';
-const CURRENT_VERSION = '2026-04-16-team';
+const CURRENT_VERSION = '2026-06-01-pwreset';
 
 function runMigrationIfNeeded(): void {
   const currentVersion = localStorage.getItem(AUTH_VERSION_KEY);
@@ -48,12 +48,20 @@ export function initDefaultUsers(): void {
   runMigrationIfNeeded();
 
   const existing = store.getUsers();
-  if (existing.length > 0) return;
+  if (existing.length > 0) {
+    // 캐시/마이그레이션 타이밍과 무관하게 대표 계정 비번을 항상 최신값으로 보정
+    // (비번: atlm2026 → simpleHash = '5a33sm')
+    const rep = existing.find(u => u.email === 'wonyoung@atlm.kr');
+    if (rep && rep.passwordHash !== '5a33sm') {
+      store.updateUser(rep.id, { passwordHash: '5a33sm' });
+    }
+    return;
+  }
 
   // passwordHash = simpleHash(평문비밀번호) 결과를 사전 계산한 값
   // 평문은 10_팀원비밀번호_대표님보관용.md 참조
   const defaults: Omit<AppUser, 'id' | 'createdAt'>[] = [
-    { email: 'wonyoung@atlm.kr',      passwordHash: '833w2r', name: '이원영',       role: '대표',         isActive: true },
+    { email: 'wonyoung@atlm.kr',      passwordHash: '5a33sm', name: '이원영',       role: '대표',         isActive: true }, // 비번: atlm2026 (2026-06-01 재설정)
     { email: 'pm@atlm.kr',            passwordHash: '27io5c', name: '생산관리팀장',  role: '생산관리팀장',  isActive: true },
     { email: 'mgr@atlm.kr',           passwordHash: 'xkvehy', name: '부관리 주임',   role: '부관리 주임',   isActive: true },
     { email: 'staff@atlm.kr',         passwordHash: '8nuuz1', name: '사원',         role: '사원',         isActive: true },
