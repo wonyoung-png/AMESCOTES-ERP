@@ -1,0 +1,1207 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLM 통합 ERP</title>
+<style>
+:root{
+  --bg:#FFFFFF; --surface:#FFFFFF; --sidebar:#FAFAFA;
+  --ink:#0A0A0A; --strong:#171717; --muted:#525252; --faint:#A3A3A3;
+  --line:#E5E5E5; --line2:#F0F0F0; --track:#EDEDED;
+  --accent:#20E39B; --on-accent:#0A0A0A; --accent-soft:rgba(32,227,155,.13); --accent-line:rgba(32,227,155,.5);
+  --neg:#C2352B; --neg-soft:#FBEDEB;
+  --pos:#0F9D6E;
+  --radius:11px; --radius-sm:8px;
+  --font:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif;
+}
+:root[data-theme="dark"]{
+  --bg:#0A0A0A; --surface:#141414; --sidebar:#0E0E0E;
+  --ink:#FAFAFA; --strong:#F0F0F0; --muted:#A3A3A3; --faint:#6B6B6B;
+  --line:#262626; --line2:#1B1B1B; --track:#1E1E1E;
+  --accent:#20E39B; --on-accent:#0A0A0A; --accent-soft:rgba(32,227,155,.14); --accent-line:rgba(32,227,155,.45);
+  --neg:#E5675C; --neg-soft:#2A1614; --pos:#3BD79E;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.55;-webkit-font-smoothing:antialiased;letter-spacing:-0.005em}
+.tnum{font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;letter-spacing:inherit}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}::-webkit-scrollbar-track{background:transparent}
+
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* SIDEBAR */
+.sidebar{width:224px;min-width:224px;background:var(--sidebar);border-right:1px solid var(--line);display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.sb-brand{padding:20px 20px 14px;display:flex;align-items:center;gap:10px}
+.sb-logo{width:28px;height:28px;border-radius:7px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;letter-spacing:-.02em}
+.sb-brand b{font-size:13.5px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.sb-brand span{font-size:10.5px;color:var(--faint);display:block;margin-top:1px;font-weight:400}
+.ws-switch{margin:2px 14px 14px;background:var(--track);border-radius:9px;padding:3px;display:flex;gap:2px}
+.ws-pill{flex:1;font-size:11.5px;font-weight:500;padding:6px 4px;border-radius:6px;color:var(--muted);text-align:center;transition:.15s}
+.ws-pill.active{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.sb-inbox{margin:0 14px 10px;padding:9px 13px;border-radius:8px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;gap:9px;font-weight:600;font-size:12.5px}
+.sb-inbox .badge{margin-left:auto;background:rgba(0,0,0,.15);color:var(--on-accent);border-radius:10px;padding:0 7px;font-size:11px;font-weight:600}
+.sb-group{padding:10px 14px 2px}
+.sb-label{font-size:10px;font-weight:600;color:var(--faint);letter-spacing:.07em;text-transform:uppercase;padding:0 10px 6px}
+.nav-item{display:flex;align-items:center;padding:7px 11px;border-radius:7px;color:var(--muted);font-size:12.5px;transition:.12s;width:100%;text-align:left;font-weight:450}
+.nav-item:hover{background:var(--line2);color:var(--ink)}
+.nav-item.active{background:var(--accent-soft);color:var(--ink);font-weight:600}
+.nav-item .tag{margin-left:auto;font-size:10px;color:var(--muted);font-weight:600}
+.nav-item.dim{opacity:.4;pointer-events:none}
+.sb-foot{margin-top:auto;padding:14px 24px;font-size:10.5px;color:var(--faint);display:flex;align-items:center;gap:7px;border-top:1px solid var(--line2)}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--accent)}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:56px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 24px;gap:8px;background:var(--bg);flex-shrink:0}
+.tb-crumb{font-size:12.5px;color:var(--ink);font-weight:500}
+.tb-search{margin-left:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:12px;color:var(--faint);display:flex;align-items:center;gap:8px;width:220px}
+.tb-search kbd{margin-left:auto;font-size:10px;color:var(--faint);font-family:var(--font)}
+.tb-btn{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);position:relative}
+.tb-btn:hover{background:var(--line2);color:var(--ink)}
+.tb-btn .rd{position:absolute;top:8px;right:9px;width:5px;height:5px;border-radius:50%;background:var(--neg)}
+.tb-user{width:30px;height:30px;border-radius:50%;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;margin-left:4px}
+svg.ic{width:16px;height:16px;stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+.content{flex:1;overflow-y:auto;padding:28px 32px}
+.screen{display:none;max-width:1140px}
+.screen.active{display:block;animation:fade .3s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.page-h{margin-bottom:24px}
+.page-h h1{font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+.page-h p{color:var(--muted);font-size:12.5px;margin-top:4px;font-weight:400}
+.row{display:flex;gap:16px}
+.spacer{flex:1}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+.card-h{padding:14px 18px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--line2)}
+.card-h h3{font-size:12.5px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
+.card-h .cnt{font-size:11px;color:var(--muted);font-weight:600}
+.card-h .cnt.alert{color:var(--neg)}
+.card-h .more{margin-left:auto;font-size:11px;color:var(--faint);font-weight:400}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 16px}
+.kpi .lb{font-size:11.5px;color:var(--muted);font-weight:500}
+.kpi .vl{font-size:20px;font-weight:600;margin-top:10px;letter-spacing:-.02em;color:var(--ink)}
+.kpi .sub{font-size:11px;margin-top:6px;color:var(--faint);font-weight:400}
+.up{color:var(--pos);font-weight:500}.down{color:var(--neg);font-weight:500}
+
+/* INBOX */
+.inbox-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.ib-item{padding:11px 18px;border-bottom:1px solid var(--line2);display:flex;align-items:flex-start;gap:11px;font-size:12.5px}
+.ib-item:last-child{border-bottom:none}
+.ib-item .t{font-weight:500;color:var(--ink);letter-spacing:-.01em}
+.ib-item .m{font-size:11px;color:var(--faint);margin-top:2px;font-weight:400}
+.ib-item .when{margin-left:auto;font-size:10.5px;color:var(--faint);white-space:nowrap;padding-top:1px}
+.dd{font-size:10.5px;font-weight:600;white-space:nowrap;padding-top:1px}
+.dd.neg{color:var(--neg)}.dd.mut{color:var(--faint)}
+.act{margin-left:auto;font-size:10.5px;font-weight:600;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 9px;white-space:nowrap}
+.act.urgent{border-color:var(--neg);color:var(--neg)}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:10px;color:var(--faint);font-weight:600;text-align:left;padding:10px 18px;border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.tbl td{padding:12px 18px;border-bottom:1px solid var(--line2);font-size:12.5px;vertical-align:middle;color:var(--ink)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--line2)}
+.code{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;color:var(--muted);letter-spacing:0}
+.mini{font-size:11px;color:var(--faint);font-weight:400}
+.wtag{font-size:10px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:1px 7px;letter-spacing:.02em}
+
+/* AI card */
+.ai-card{background:var(--surface);border:1px solid var(--line);border-left:2px solid var(--accent);border-radius:var(--radius);padding:4px 0;margin-bottom:18px}
+.ai-h{display:flex;align-items:center;gap:9px;font-weight:600;font-size:12.5px;color:var(--ink);padding:14px 18px 10px}
+.ai-badge{font-size:9.5px;background:var(--accent-soft);color:var(--pos);border-radius:5px;padding:2px 7px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+.ai-row{display:flex;align-items:center;gap:14px;padding:11px 18px;border-top:1px solid var(--line2);font-size:12.5px}
+.ai-row b{color:var(--ink);font-weight:600}
+.btn{padding:6px 13px;border-radius:7px;font-size:12px;font-weight:600;border:1px solid var(--line);color:var(--ink);background:var(--surface)}
+.btn:hover{background:var(--line2)}
+.btn.pri{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.btn.pri:hover{filter:brightness(.96)}
+.btn.sm{padding:4px 10px;font-size:11px}
+
+/* progress / approval */
+.prog{height:5px;background:var(--line2);border-radius:5px;overflow:hidden}
+.prog>i{display:block;height:100%;background:var(--accent);border-radius:5px;transition:width .3s}
+.approve-flow{display:flex;align-items:center;flex-wrap:wrap;gap:2px}
+.step{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:500;white-space:nowrap;color:var(--faint)}
+.step.done{color:var(--muted)}.step.done::before{content:"✓ ";color:var(--pos)}
+.step.now{background:var(--accent-soft);color:var(--ink);font-weight:600}
+.step-arw{color:var(--faint);font-size:10px;padding:0 2px}
+
+/* CALENDAR */
+.cal-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.seg{display:flex;background:var(--track);border-radius:8px;padding:3px;gap:2px}
+.seg button{padding:5px 12px;font-size:11.5px;color:var(--muted);font-weight:500;border-radius:6px}
+.seg button.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.cal-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+table.cal{border-collapse:collapse;width:100%;min-width:840px}
+table.cal th{font-size:10.5px;font-weight:600;color:var(--muted);padding:11px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line2);text-align:center;background:var(--bg)}
+table.cal th:last-child{border-right:none}
+table.cal td{border-bottom:1px solid var(--line2);border-right:1px solid var(--line2);padding:6px;vertical-align:top;height:48px}
+table.cal td:last-child{border-right:none}
+table.cal td.chan{font-size:11.5px;font-weight:500;color:var(--ink);background:var(--bg);white-space:nowrap;text-align:left;padding-left:16px;min-width:104px}
+.ev{display:block;width:100%;font-size:11px;font-weight:500;padding:4px 8px;border-radius:6px;margin-bottom:3px;text-align:left;line-height:1.3;background:var(--line2);color:var(--strong);border-left:2px solid var(--line)}
+.ev.hi{background:var(--accent-soft);color:var(--ink);border-left-color:var(--accent);font-weight:600}
+.ev:hover{filter:brightness(.98)}
+
+/* NOTICE */
+.nt-item{display:flex;align-items:center;gap:14px;padding:15px 18px;border-bottom:1px solid var(--line2);cursor:pointer}
+.nt-item:last-child{border-bottom:none}
+.nt-item:hover{background:var(--line2)}
+.nt-item .dt{font-size:11px;color:var(--faint);width:52px;font-weight:400}
+.nt-item .ti{font-weight:600;font-size:13px;color:var(--ink);letter-spacing:-.01em}
+.nt-item .ti .fix{font-size:10px;color:var(--muted);font-weight:600;border:1px solid var(--line);border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px}
+.nt-chk{margin-left:auto;font-size:11px;font-weight:600}
+.nt-chk.no{color:var(--neg)}
+.nt-chk.yes{color:var(--faint)}
+.nt-chk.no::before{content:"● ";font-size:8px;vertical-align:2px}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(10,10,10,.4);display:none;align-items:center;justify-content:center;z-index:100;padding:24px;backdrop-filter:blur(3px)}
+.overlay.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:14px;max-width:600px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.22)}
+.modal-h{padding:20px 22px 16px;border-bottom:1px solid var(--line2);display:flex;align-items:flex-start;gap:12px}
+.modal-h h2{font-size:16px;font-weight:600;letter-spacing:-.02em;margin-top:7px}
+.modal-h .kk{font-size:10.5px;color:var(--muted);font-weight:600;letter-spacing:.03em}
+.modal-h .x{margin-left:auto;font-size:20px;color:var(--faint);line-height:1;font-weight:300}
+.modal-b{padding:20px 22px}
+.task-row{display:flex;align-items:center;gap:13px;padding:11px 0;border-bottom:1px solid var(--line2)}
+.task-row:last-child{border-bottom:none}
+.task-row .team{font-size:10.5px;font-weight:600;color:var(--muted);white-space:nowrap;min-width:52px}
+.chk{width:18px;height:18px;border-radius:6px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--on-accent);font-size:11px;cursor:pointer}
+.chk.on{background:var(--accent);border-color:var(--accent)}
+.task-row.on .tt{color:var(--faint);text-decoration:line-through}
+.tt{flex:1;font-size:12.5px;color:var(--ink)}
+
+@media(max-width:920px){.inbox-grid,.kpi-grid{grid-template-columns:1fr 1fr}.sidebar{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo">AT</div>
+      <div><b>ATLM ERP</b><span>아메스코테스</span></div>
+    </div>
+    <div class="ws-switch">
+      <button class="ws-pill active" data-ws="OEM" onclick="setWs(this)">OEM</button>
+      <button class="ws-pill" data-ws="LUMEN" onclick="setWs(this)">LUMEN</button>
+      <button class="ws-pill" data-ws="AETALOOF" onclick="setWs(this)">AETALOOF</button>
+    </div>
+    <button class="sb-inbox" onclick="go('inbox',this)">Inbox <span class="badge">9</span></button>
+
+    <div class="sb-group">
+      <div class="sb-label">대시보드</div>
+      <button class="nav-item" onclick="go('dash',this)">경영 현황</button>
+      <button class="nav-item" onclick="go('stddash',this)">표준 대시보드</button>
+    </div>
+    <div class="sb-group">
+      <div class="sb-label">제조</div>
+      <button class="nav-item" onclick="go('vendors',this)">거래처 마스터</button>
+      <button class="nav-item" onclick="go('items',this)">품목 마스터</button>
+      <button class="nav-item" onclick="go('materials',this)">자재 마스터</button>
+      <button class="nav-item" onclick="go('samples',this)">샘플 관리</button>
+      <button class="nav-item" onclick="go('bom',this)">BOM · 원가</button>
+      <button class="nav-item" onclick="go('orders',this)">생산 발주</button>
+      <button class="nav-item" onclick="go('receiving',this)">입고 · 납품</button>
+      <button class="nav-item" onclick="go('purchase',this)">자재 구매</button>
+    </div>
+    <div class="sb-group brand-grp">
+      <div class="sb-label">브랜드 운영</div>
+      <button class="nav-item" onclick="go('cal',this)">운영 캘린더 · 기획전</button>
+      <button class="nav-item" onclick="go('reorder',this)">리오더<span class="tag">AI</span></button>
+      <button class="nav-item" onclick="go('channels',this)">채널 판매</button>
+      <button class="nav-item" onclick="go('inventory',this)">재고 현황</button>
+      <button class="nav-item" onclick="go('wholesale',this)">홀세일 · 도매</button>
+      <button class="nav-item" onclick="go('showroom',this)">쇼룸</button>
+      <button class="nav-item" onclick="go('cs',this)">CS 관리</button>
+    </div>
+    <div class="sb-group">
+      <div class="sb-label">정산 · 회계</div>
+      <button class="nav-item" onclick="go('settlement',this)">매입 · 매출 정산</button>
+      <button class="nav-item" onclick="go('receivables',this)">미수금 · 미지급</button>
+      <button class="nav-item" onclick="go('taxinvoice',this)">세금계산서</button>
+    </div>
+    <div class="sb-group">
+      <div class="sb-label">협업</div>
+      <button class="nav-item" onclick="go('notice',this)">공지 게시판</button>
+      <button class="nav-item" onclick="go('meetings',this)">회의록</button>
+      <button class="nav-item" onclick="go('files',this)">자료실</button>
+    </div>
+    <div class="sb-foot"><span class="dot"></span> v0.1 · Online</div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <div class="tb-crumb" id="crumb">Inbox</div>
+      <div class="tb-search">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
+        검색 <kbd>⌘K</kbd>
+      </div>
+      <button class="tb-btn" onclick="toggleTheme()" title="테마"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"></path></svg></button>
+      <button class="tb-btn" title="알림"><svg class="ic" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg><span class="rd"></span></button>
+      <div class="tb-user">이원</div>
+    </header>
+    <div class="content">
+
+      <!-- INBOX -->
+      <section class="screen active" id="screen-inbox">
+        <div class="page-h"><h1>Inbox</h1><p>오늘 처리해야 할 모든 것을 한 곳에서.</p></div>
+        <div class="inbox-grid">
+          <div class="card">
+            <div class="card-h"><h3>미확인 공지</h3><span class="cnt alert">3</span></div>
+            <div class="ib-item"><div><div class="t">[공지] 26FW 1차 프리뷰 일정 확정</div><div class="m">대표 · 8/11 프리뷰</div></div><span class="when">오늘</span></div>
+            <div class="ib-item"><div><div class="t">[안내] 여름 휴가 신청 오픈</div><div class="m">경영관리</div></div><span class="when">어제</span></div>
+            <div class="ib-item"><div><div class="t">[HR] 하반기 워크샵 안내</div><div class="m">양양 · 참석 회신 요망</div></div><span class="when">2일</span></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>내 승인 대기</h3><span class="cnt alert">2</span></div>
+            <div class="ib-item"><div><div class="t">리오더 · 봉발롱 (창성9차)</div><div class="m">시어링블랙 27개 · 디자인팀장 → 대표</div></div><button class="act urgent">승인</button></div>
+            <div class="ib-item"><div><div class="t">지출결의서 · 부자재 결제</div><div class="m tnum">₩1,240,000 · 물류CS</div></div><button class="act urgent">승인</button></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>불량 차감 대기</h3><span class="cnt">1</span></div>
+            <div class="ib-item"><div><div class="t">창성 · 파니에 프티 불량 3건</div><div class="m tnum">₩142,000 · 다음 결제 시 자동 차감 예정</div></div><span class="dd mut">대기</span></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>미수금 연체</h3><span class="cnt alert">2</span></div>
+            <div class="ib-item"><div><div class="t">W컨셉 5월 정산</div><div class="m tnum">₩12,100,000 · 입금 예정 초과</div></div><span class="dd neg">D+4</span></div>
+            <div class="ib-item"><div><div class="t">iQuest · 일본 홀세일</div><div class="m tnum">₩9,900,000</div></div><span class="dd mut">D−3</span></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>납기 임박</h3><span class="cnt">3</span></div>
+            <div class="ib-item"><div><div class="t">NOTHING WRITTEN · 밀란백</div><div class="m">청도 공장 · 입고 예정</div></div><span class="dd mut">D−5</span></div>
+            <div class="ib-item"><div><div class="t">OSOI · 미드 시저링</div><div class="m">선적중</div></div><span class="dd mut">D−6</span></div>
+            <div class="ib-item"><div><div class="t">봉발롱 (창성9차)</div><div class="m">생산중</div></div><span class="dd mut">D−7</span></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>멘션 · 응답 필요</h3><span class="cnt">1</span></div>
+            <div class="ib-item"><div><div class="t">@이원 — 센텀 오픈100일 기획전</div><div class="m">"사은품 수량 컨펌 부탁드려요" · MD 양리라</div></div><span class="when">1시간</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DASHBOARD -->
+      <section class="screen" id="screen-dash">
+        <div class="page-h"><h1>경영 현황</h1><p>핵심 경영 지표 · 2026년 7월</p></div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="lb">이번 달 매출</div><div class="vl tnum">₩284.6M</div><div class="sub"><span class="up">▲ 12.4%</span> 지난달 대비</div></div>
+          <div class="kpi"><div class="lb">영업이익률</div><div class="vl tnum">31.2%</div><div class="sub"><span class="up">▲ 1.8%p</span></div></div>
+          <div class="kpi"><div class="lb">미수금 총액</div><div class="vl tnum">₩68.2M</div><div class="sub"><span class="down">연체 ₩12.1M</span></div></div>
+          <div class="kpi"><div class="lb">재고 자산</div><div class="vl tnum">₩412M</div><div class="sub">3PL · 창고</div></div>
+        </div>
+        <div class="row" style="margin-bottom:18px">
+          <div class="card" style="flex:1.5">
+            <div class="card-h"><h3>사업 · 브랜드별 매출</h3><span class="more">이번 달</span></div>
+            <table class="tbl">
+              <tr><td><span class="wtag">OEM</span> AMESCOTES</td><td class="tnum" style="text-align:right;font-weight:600">₩148.0M</td><td class="mini" style="width:140px">NW · OSOI · 러기지텍</td></tr>
+              <tr><td><span class="wtag">LUMEN</span> 자체브랜드</td><td class="tnum" style="text-align:right;font-weight:600">₩121.4M</td><td class="mini">자사몰 · W컨셉 · 29CM · 쇼룸</td></tr>
+              <tr><td><span class="wtag">AETALOOF</span></td><td class="tnum" style="text-align:right;font-weight:600">₩15.2M</td><td class="mini">런칭 초기</td></tr>
+            </table>
+          </div>
+          <div class="card" style="flex:1">
+            <div class="card-h"><h3>채널별 수익성 · LUMEN</h3></div>
+            <table class="tbl">
+              <tr><td>쇼룸 (직영)</td><td class="tnum" style="text-align:right">42.1%</td></tr>
+              <tr><td>자사몰</td><td class="tnum" style="text-align:right">38.4%</td></tr>
+              <tr><td>29CM</td><td class="tnum" style="text-align:right">24.6%</td></tr>
+              <tr><td>W컨셉</td><td class="tnum" style="text-align:right">23.8%</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>최근 거래</h3><span class="more">전체</span></div>
+          <table class="tbl">
+            <tr><td class="mini" style="width:96px">2026.07.09</td><td>범아글로벌 · 물류비 (31CT)</td><td class="mini">매입 · CBM 배분</td><td class="tnum down" style="text-align:right">−₩960,395</td></tr>
+            <tr><td class="mini">2026.07.06</td><td>W컨셉 · 6월 정산 입금</td><td class="mini">매출</td><td class="tnum up" style="text-align:right">+₩16,540,000</td></tr>
+            <tr><td class="mini">2026.07.06</td><td>창성 · 봉발롱 발주 결제</td><td class="mini">매입 · 임가공비</td><td class="tnum down" style="text-align:right">−₩4,180,000</td></tr>
+          </table>
+        </div>
+      </section>
+
+      <!-- CALENDAR -->
+      <section class="screen" id="screen-cal">
+        <div class="page-h"><h1>운영 캘린더 · 기획전</h1><p>팀별 따로가 아니라 하나로. 기획전 클릭 시 팀별 업무가 전개됩니다.</p></div>
+        <div class="cal-toolbar">
+          <div class="seg"><button>연간</button><button>반기</button><button class="on">월</button><button>주</button></div>
+          <div class="seg"><button class="on">2026.07</button><button>08</button><button>09</button></div>
+          <span class="spacer"></span>
+          <div class="seg"><button class="on">전체</button><button>내 팀</button><button>내 담당</button></div>
+          <button class="btn sm">기획전 추가</button>
+        </div>
+        <div class="cal-wrap">
+          <table class="cal">
+            <thead><tr><th style="min-width:104px">채널</th><th>1주 · 7.1–7</th><th>2주 · 7.8–14</th><th>3주 · 7.15–21</th><th>4주 · 7.22–31</th></tr></thead>
+            <tbody>
+              <tr><td class="chan">자사몰</td>
+                <td><span class="ev" onclick="openEv('summer')">Lumen with SUMMER</span></td>
+                <td><span class="ev" onclick="openEv('summer')">SUMMER 2차</span></td><td></td>
+                <td><span class="ev">시즌오프</span></td></tr>
+              <tr><td class="chan">신세계 센텀</td><td></td>
+                <td><span class="ev hi" onclick="openEv('centum')">오픈100일 · 시즌오프</span></td>
+                <td><span class="ev hi" onclick="openEv('centum')">오픈100일</span></td><td></td></tr>
+              <tr><td class="chan">29CM</td>
+                <td><span class="ev">바캉스 기획전</span></td><td></td><td></td>
+                <td><span class="ev">시즌오프</span></td></tr>
+              <tr><td class="chan">W컨셉</td><td></td>
+                <td><span class="ev">W ONLY · 72H 특가</span></td><td></td><td></td></tr>
+              <tr><td class="chan">해외 · 영문</td><td></td>
+                <td><span class="ev">Summer 프로모션</span></td>
+                <td><span class="ev">Summer 2차</span></td><td></td></tr>
+              <tr><td class="chan">쇼룸 한남</td>
+                <td><span class="ev">Lumen with SUMMER</span></td><td></td><td></td>
+                <td><span class="ev">시즌오프</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="mini" style="margin-top:12px"><b style="color:var(--muted)">센텀 오픈100일</b> 또는 <b style="color:var(--muted)">SUMMER</b>를 클릭하면 팀별 업무 체크리스트가 열립니다.</p>
+      </section>
+
+      <!-- REORDER -->
+      <section class="screen" id="screen-reorder">
+        <div class="page-h"><h1>리오더 · AI 수요예측</h1><p>5년 판매 데이터 · 시즌 · 날씨 · 기획전을 조합한 추천. 6단계 승인.</p></div>
+        <div class="ai-card">
+          <div class="ai-h"><span class="ai-badge">AI 수요예측</span> 지금 리오더가 필요한 품목</div>
+          <div class="ai-row"><span class="code">LLL6F13EB</span><div style="flex:1"><b>파니에 쁘띠</b> · 에뚜프브라운 <span class="mini">재고 8일치 · SUMMER 기획전 반영</span></div><b class="tnum">추천 120개</b><button class="btn pri sm">리오더 작성</button></div>
+          <div class="ai-row"><span class="code">LLL6F99SB</span><div style="flex:1"><b>MOON BAG</b> · 소프트블랙 <span class="mini">판매 스파이크 감지 · 평소 2 → 어제 18</span></div><b class="tnum">추천 80개</b><button class="btn pri sm">리오더 작성</button></div>
+          <div class="ai-row"><span class="code">LSL6F45VB</span><div style="flex:1"><b>문미러참</b> · 빈티지브라운 <span class="mini">장마철 소품 수요 상승 패턴</span></div><b class="tnum">추천 200개</b><button class="btn pri sm">리오더 작성</button></div>
+        </div>
+        <div class="card" style="margin-bottom:18px">
+          <div class="card-h"><h3>진행 중 리오더 · 승인 대기</h3><span class="cnt alert">2</span></div>
+          <div style="padding:16px 18px">
+            <div class="row" style="align-items:center;margin-bottom:11px;gap:10px"><b style="font-weight:600">봉발롱 · 창성9차</b> <span class="code">LLL6F39SB</span> <span class="mini">시어링블랙 14 + 중국 납품 10 = 24개 · 창성 공장</span></div>
+            <div class="approve-flow">
+              <span class="step done">MD 작성</span><span class="step-arw">→</span>
+              <span class="step done">생산팀 납기</span><span class="step-arw">→</span>
+              <span class="step done">MD 재확인</span><span class="step-arw">→</span>
+              <span class="step done">MD팀장</span><span class="step-arw">→</span>
+              <span class="step now">디자인팀장</span><span class="step-arw">→</span>
+              <span class="step">대표 승인</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>제품별 리오더 현황</h3></div>
+          <table class="tbl">
+            <thead><tr><th>품목코드</th><th>제품</th><th>차수</th><th style="text-align:right">누적수량</th><th>단가 추이</th><th>최근 발주</th></tr></thead>
+            <tr><td><span class="code">LLL6F39SB</span></td><td>봉발롱</td><td>9차</td><td class="tnum" style="text-align:right">5,240</td><td class="mini">¥52 → ¥48 <span class="up">▼8%</span></td><td class="mini">2026.07</td></tr>
+            <tr><td><span class="code">LLL6F13EB</span></td><td>파니에 쁘띠</td><td>5차</td><td class="tnum" style="text-align:right">3,100</td><td class="mini">¥47 → ¥47</td><td class="mini">2026.06</td></tr>
+            <tr><td><span class="code">LLL6F92SB</span></td><td>LOG LARGE BAG</td><td>신규</td><td class="tnum" style="text-align:right">800</td><td class="mini">¥103</td><td class="mini">2026.07</td></tr>
+          </table>
+        </div>
+      </section>
+
+      <!-- NOTICE -->
+      <section class="screen" id="screen-notice">
+        <div class="page-h"><h1>공지 게시판</h1><p>전사 공지 · 모든 인원 확인 체크로 누락 방지</p></div>
+        <div class="cal-toolbar"><div class="seg"><button class="on">전체</button><button>미확인 3</button></div></div>
+        <div class="card">
+          <div class="nt-item" onclick="openNotice()"><span class="dt">26.7.9</span><div><div class="ti">[공지] 26FW 1차 프리뷰 일정 확정<span class="fix">고정</span></div><div class="mini">대표 · 확인 12 / 35명</div></div><span class="nt-chk no">미확인</span></div>
+          <div class="nt-item"><span class="dt">26.7.6</span><div><div class="ti">[HR] 여름 휴가 신청 오픈</div><div class="mini">경영관리 · 확인 28 / 35명</div></div><span class="nt-chk yes">확인함</span></div>
+          <div class="nt-item"><span class="dt">26.7.6</span><div><div class="ti">[안내] 신규 매체 리포트 템플릿 배포</div><div class="mini">마케팅 · 확인 9 / 35명</div></div><span class="nt-chk no">미확인</span></div>
+        </div>
+      </section>
+
+<section class="screen" id="screen-vendors">
+  <div class="page-h"><h1>거래처 마스터</h1><p>공장·자재·바이어·물류 통합 관리 — 발주·정산 화면과 코드로 연동</p></div>
+  <div class="seg"><button class="on">전체</button><button>공장</button><button>자재</button><button>바이어</button><button>물류</button></div>
+  <div class="card">
+    <div class="card-h"><h3>거래처 목록</h3><span class="cnt">7</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead><tr><th>구분</th><th>거래처명</th><th>코드</th><th>국가</th><th>통화</th><th>리드타임</th><th>최근거래</th></tr></thead>
+      <tr><td><span class="wtag">공장</span></td><td>창성 <span class="mini">봉발롱 창성9차 진행 · 미지급 ₩8.3M</span></td><td><span class="code">CS</span></td><td>중국</td><td>CNY</td><td class="tnum">30일</td><td>2026-07-08 <span class="mini">발주 3건</span></td></tr>
+      <tr><td><span class="wtag">자재</span></td><td>다산 <span class="mini">소가죽·시어링램스킨 공급 · 미지급 ₩3.1M</span></td><td><span class="code">DS</span></td><td>한국</td><td>KRW</td><td class="tnum">14일</td><td>2026-07-05 <span class="mini">발주 4건</span></td></tr>
+      <tr><td><span class="wtag">공장</span></td><td>청도통야 <span class="mini">밀란백(NW) 생산</span></td><td><span class="code">TY</span></td><td>중국</td><td>CNY</td><td class="tnum">35일</td><td>2026-06-28 <span class="mini">발주 1건</span></td></tr>
+      <tr><td><span class="wtag">바이어</span></td><td>NOTHING WRITTEN <span class="mini">아쎄르더비백·밀란백미디엄</span></td><td><span class="code">NW</span></td><td>한국</td><td>KRW</td><td class="tnum">—</td><td>2026-07-01 <span class="mini">OEM 2건</span></td></tr>
+      <tr><td><span class="wtag">바이어</span></td><td>OSOI <span class="mini">미드시저링</span></td><td><span class="code">OS</span></td><td>한국</td><td>KRW</td><td class="tnum">—</td><td>2026-06-20 <span class="mini">OEM 1건</span></td></tr>
+      <tr><td><span class="wtag">바이어</span></td><td>iQuest <span class="mini">일본 홀세일 · 미수 ₩9.9M</span></td><td><span class="code">IQ</span></td><td>일본</td><td>JPY</td><td class="tnum">—</td><td>2026-07-03 <span class="mini">수주 2건</span></td></tr>
+      <tr><td><span class="wtag">물류</span></td><td>범아글로벌 <span class="mini">청구 ₩960,395 · CBM 배분 대기</span></td><td><span class="code">BA</span></td><td>한국</td><td>KRW</td><td class="tnum">—</td><td>2026-07-09 <span class="mini">청구 1건</span></td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="screen" id="screen-items">
+  <div class="page-h"><h1>품목 마스터</h1><p>LUMEN 자사 · OEM 통합 SKU — 발주·재고·채널 화면이 동일 코드 참조</p></div>
+  <div class="seg"><button class="on">전체</button><button>LUMEN</button><button>OEM</button></div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="lb">등록 품목</div><div class="vl tnum">8</div><div class="sub">LUMEN 5 · OEM 3</div></div>
+    <div class="kpi"><div class="lb">활성 SKU</div><div class="vl tnum">7</div><div class="sub"><span class="up">1</span> 신규 문미러참</div></div>
+    <div class="kpi"><div class="lb">리오더 대상</div><div class="vl tnum">2</div><div class="sub"><span class="down">봉발롱 · 파니에쁘띠</span></div></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>품목 목록</h3><span class="cnt">8</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead><tr><th>품목코드</th><th>제품</th><th>컬러</th><th>시즌</th><th style="text-align:right">원가(¥)</th><th style="text-align:right">납품가</th><th>바이어</th><th>BOM</th></tr></thead>
+      <tr><td><span class="code">LLL6F39SB</span></td><td>봉발롱 <span class="mini">창성9차 리오더</span></td><td>시어링블랙</td><td>26FW</td><td class="tnum" style="text-align:right">¥48</td><td class="tnum" style="text-align:right">₩168,000</td><td>자사몰</td><td>有</td></tr>
+      <tr><td><span class="code">LLL6F13EB</span></td><td>파니에쁘띠 <span class="mini">불량차감 3건 대기</span></td><td>에뚜프브라운</td><td>26FW</td><td class="tnum" style="text-align:right">¥47</td><td class="tnum" style="text-align:right">₩159,000</td><td>자사몰</td><td>有</td></tr>
+      <tr><td><span class="code">LLL6F92SB</span></td><td>LOG LARGE BAG</td><td>소프트블랙</td><td>26FW</td><td class="tnum" style="text-align:right">¥103</td><td class="tnum" style="text-align:right">₩298,000</td><td>자사몰</td><td>有</td></tr>
+      <tr><td><span class="code">LLL6F99SB</span></td><td>MOON BAG</td><td>소프트블랙</td><td>26FW</td><td class="tnum" style="text-align:right">¥55</td><td class="tnum" style="text-align:right">₩189,000</td><td>자사몰</td><td><span class="mini">준비중</span></td></tr>
+      <tr><td><span class="code">LSL6F45VB</span></td><td>문미러참</td><td>—</td><td>26FW</td><td class="tnum" style="text-align:right">¥12</td><td class="tnum" style="text-align:right">₩49,000</td><td>자사몰</td><td>有</td></tr>
+      <tr><td><span class="code">AT26HB001</span></td><td>아쎄르더비백 <span class="wtag">OEM</span></td><td>—</td><td>26FW</td><td class="tnum" style="text-align:right">¥88</td><td class="tnum" style="text-align:right">₩142,000</td><td>NOTHING WRITTEN</td><td>有</td></tr>
+      <tr><td><span class="code">MB26M001</span></td><td>밀란백 미디엄 <span class="wtag">OEM</span></td><td>—</td><td>26FW</td><td class="tnum" style="text-align:right">¥76</td><td class="tnum" style="text-align:right">₩128,000</td><td>NOTHING WRITTEN</td><td>有</td></tr>
+      <tr><td><span class="code">MS26S001</span></td><td>미드 시저링 <span class="wtag">OEM</span></td><td>—</td><td>26FW</td><td class="tnum" style="text-align:right">¥64</td><td class="tnum" style="text-align:right">₩112,000</td><td>OSOI</td><td><span class="mini">개발중</span></td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="screen" id="screen-materials">
+  <div class="page-h"><h1>자재 마스터</h1><p>가죽·부자재 원장 — BOM·발주 화면이 자재코드로 소요량 산출</p></div>
+  <div class="card">
+    <div class="card-h"><h3>자재 목록</h3><span class="cnt">8</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead><tr><th>자재코드</th><th>자재명</th><th>규격</th><th>단위</th><th style="text-align:right">단가(¥)</th><th>주공급처</th><th style="text-align:right">재고</th></tr></thead>
+      <tr><td><span class="code">MT-LE01</span></td><td>아이보리 소가죽</td><td>1.4mm</td><td>SF</td><td class="tnum" style="text-align:right">¥6.5</td><td>다산 <span class="code">DS</span></td><td class="tnum" style="text-align:right">420</td></tr>
+      <tr><td><span class="code">MT-LE02</span></td><td>에뚜프브라운 소가죽</td><td>1.4mm</td><td>SF</td><td class="tnum" style="text-align:right">¥6.8</td><td>다산 <span class="code">DS</span></td><td class="tnum" style="text-align:right">260</td></tr>
+      <tr><td><span class="code">MT-SH01</span></td><td>시어링 램스킨 <span class="mini">봉발롱 소요</span></td><td>12mm 파일</td><td>장</td><td class="tnum" style="text-align:right">¥42</td><td>다산 <span class="code">DS</span></td><td class="tnum" style="text-align:right"><span class="down">38</span></td></tr>
+      <tr><td><span class="code">MT-ZP01</span></td><td>YKK 지퍼</td><td>5CN 20cm</td><td>EA</td><td class="tnum" style="text-align:right">¥3.2</td><td>창성 <span class="code">CS</span></td><td class="tnum" style="text-align:right">1,250</td></tr>
+      <tr><td><span class="code">MT-BK01</span></td><td>브라스 버클</td><td>25mm</td><td>EA</td><td class="tnum" style="text-align:right">¥5.4</td><td>창성 <span class="code">CS</span></td><td class="tnum" style="text-align:right">640</td></tr>
+      <tr><td><span class="code">MT-MG01</span></td><td>자석 스냅버튼</td><td>18mm</td><td>EA</td><td class="tnum" style="text-align:right">¥1.8</td><td>창성 <span class="code">CS</span></td><td class="tnum" style="text-align:right">2,100</td></tr>
+      <tr><td><span class="code">MT-LN01</span></td><td>코튼 안감</td><td>140cm 폭</td><td>M</td><td class="tnum" style="text-align:right">¥2.4</td><td>다산 <span class="code">DS</span></td><td class="tnum" style="text-align:right">180</td></tr>
+      <tr><td><span class="code">MT-TH01</span></td><td>폴리 봉사</td><td>#20 블랙</td><td>콘</td><td class="tnum" style="text-align:right">¥1.2</td><td>창성 <span class="code">CS</span></td><td class="tnum" style="text-align:right">95</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="screen" id="screen-samples">
+  <div class="page-h"><h1>샘플 관리</h1><p>OEM·자사 샘플 개발 단계 추적 — 승인 시 품목·BOM 마스터로 연결</p></div>
+  <div class="seg"><button class="on">전체</button><button>개발·의뢰</button><button>수정·확인</button><button>승인</button><button>보류</button></div>
+  <div class="card">
+    <div class="card-h"><h3>선택 샘플 승인 경로 · 아쎄르더비백</h3><span class="more">이력</span></div>
+    <div class="approve-flow"><span class="step done">디자인</span><span class="step-arw">→</span><span class="step done">1차 샘플</span><span class="step-arw">→</span><span class="step done">바이어 컨펌</span><span class="step-arw">→</span><span class="step now">양산 승인</span></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>샘플 목록</h3><span class="cnt">6</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead><tr><th>스타일코드</th><th>제품</th><th>바이어</th><th>단계</th><th>의뢰일</th><th>담당</th><th>샘플원가</th></tr></thead>
+      <tr><td><span class="code">AT26HB001</span></td><td>아쎄르더비백</td><td>NOTHING WRITTEN</td><td>승인 <span class="mini">BOM 연결됨</span></td><td>2026-05-12</td><td>김도현</td><td class="tnum">¥88</td></tr>
+      <tr><td><span class="code">LSL6F45VB</span></td><td>문미러참</td><td>자사(LUMEN)</td><td>승인 <span class="mini">BOM 연결됨</span></td><td>2026-05-28</td><td>이서연</td><td class="tnum">¥12</td></tr>
+      <tr><td><span class="code">MB26M001</span></td><td>밀란백 미디엄</td><td>NOTHING WRITTEN</td><td>수정·확인 <span class="mini">청도통야 검토</span></td><td>2026-06-02</td><td>김도현</td><td class="tnum">¥76</td></tr>
+      <tr><td><span class="code">MS26S001</span></td><td>미드 시저링</td><td>OSOI</td><td>개발</td><td>2026-06-18</td><td>박지우</td><td class="tnum">¥64</td></tr>
+      <tr><td><span class="code">LLL6F99SB</span></td><td>MOON BAG</td><td>자사(LUMEN)</td><td>의뢰</td><td>2026-07-01</td><td>이서연</td><td class="tnum">¥55</td></tr>
+      <tr><td><span class="code">LLL6F39SB-V2</span></td><td>봉발롱 미니</td><td>자사(LUMEN)</td><td><span class="down">보류</span> <span class="mini">원가 재검토</span></td><td>2026-06-25</td><td>이서연</td><td class="tnum">¥44</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="screen" id="screen-bom">
+  <div class="page-h">
+    <h1>BOM · 원가</h1>
+    <p>품목별 자재명세와 착지원가 · 사전/사후원가 비교 · 환율 CNY 190원</p>
+  </div>
+
+  <div class="row" style="margin-bottom:18px">
+    <div class="card" style="max-width:280px">
+      <div class="card-h"><h3>품목 선택</h3><span class="more">전체 5</span></div>
+      <div class="ib-item">
+        <div><div class="t">봉발롱 <span class="wtag">LUMEN</span></div><div class="m"><span class="code">LLL6F39SB</span> 시어링블랙</div></div>
+        <span class="dd mut">선택</span>
+      </div>
+      <div class="ib-item">
+        <div><div class="t">파니에쁘띠</div><div class="m"><span class="code">LLL6F13EB</span> 에뚜프브라운 ¥47</div></div>
+      </div>
+      <div class="ib-item">
+        <div><div class="t">LOG LARGE BAG</div><div class="m"><span class="code">LLL6F92SB</span> 소프트블랙 ¥103</div></div>
+      </div>
+      <div class="ib-item">
+        <div><div class="t">MOON BAG</div><div class="m"><span class="code">LLL6F99SB</span> 소프트블랙</div></div>
+      </div>
+      <div class="ib-item">
+        <div><div class="t">문미러참</div><div class="m"><span class="code">LSL6F45VB</span></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">
+        <h3>봉발롱 자재명세 (BOM)</h3>
+        <span class="spacer"></span>
+        <div class="seg"><button class="on">사전원가</button><button>사후원가</button></div>
+      </div>
+      <div class="mini" style="margin-bottom:10px">품목 <span class="code">LLL6F39SB</span> · 공장 창성(CS) · 제품 패킹사이즈 32×24×14cm · 착지단가 산정 기준</div>
+      <table class="tbl">
+        <thead><tr>
+          <th>구분</th><th>자재</th><th>규격</th><th>단위</th>
+          <th style="text-align:right">단가¥</th><th style="text-align:right">NET</th>
+          <th style="text-align:right">LOSS</th><th style="text-align:right">소요량</th><th style="text-align:right">금액¥</th>
+        </tr></thead>
+        <tr><td>주자재</td><td>시어링램스킨 <span class="mini">DS</span></td><td>블랙</td><td>SF</td><td class="tnum" style="text-align:right">6.50</td><td class="tnum" style="text-align:right">4.50</td><td class="tnum" style="text-align:right">8%</td><td class="tnum" style="text-align:right">4.86</td><td class="tnum" style="text-align:right">31.59</td></tr>
+        <tr><td>주자재</td><td>아이보리소가죽 <span class="mini">DS</span></td><td>내피</td><td>SF</td><td class="tnum" style="text-align:right">4.20</td><td class="tnum" style="text-align:right">2.00</td><td class="tnum" style="text-align:right">5%</td><td class="tnum" style="text-align:right">2.10</td><td class="tnum" style="text-align:right">8.82</td></tr>
+        <tr><td>부자재</td><td>YKK지퍼 <span class="mini">CS</span></td><td>20cm</td><td>EA</td><td class="tnum" style="text-align:right">1.80</td><td class="tnum" style="text-align:right">1.00</td><td class="tnum" style="text-align:right">2%</td><td class="tnum" style="text-align:right">1.02</td><td class="tnum" style="text-align:right">1.84</td></tr>
+        <tr><td>부자재</td><td>브라스버클 <span class="mini">CS</span></td><td>25mm</td><td>EA</td><td class="tnum" style="text-align:right">2.40</td><td class="tnum" style="text-align:right">2.00</td><td class="tnum" style="text-align:right">1%</td><td class="tnum" style="text-align:right">2.02</td><td class="tnum" style="text-align:right">4.85</td></tr>
+        <tr><td>부자재</td><td>브랜드메탈라벨</td><td>메탈</td><td>EA</td><td class="tnum" style="text-align:right">0.90</td><td class="tnum" style="text-align:right">1.00</td><td class="tnum" style="text-align:right">0%</td><td class="tnum" style="text-align:right">1.00</td><td class="tnum" style="text-align:right">0.90</td></tr>
+        <tr><td>부자재</td><td>봉제사·접착</td><td>일식</td><td>SET</td><td class="tnum" style="text-align:right">1.20</td><td class="tnum" style="text-align:right">1.00</td><td class="tnum" style="text-align:right">0%</td><td class="tnum" style="text-align:right">1.00</td><td class="tnum" style="text-align:right">1.20</td></tr>
+        <tr><td>포장</td><td>더스트백+박스 <span class="mini">32×24×14</span></td><td>패킹</td><td>SET</td><td class="tnum" style="text-align:right">7.00</td><td class="tnum" style="text-align:right">1.00</td><td class="tnum" style="text-align:right">0%</td><td class="tnum" style="text-align:right">1.00</td><td class="tnum" style="text-align:right">7.00</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="row" style="margin-bottom:0">
+    <div class="card">
+      <div class="card-h"><h3>원가 요약</h3><span class="mini">단위 CNY ¥ · ₩ 환산 190원</span></div>
+      <table class="tbl">
+        <tr><td>자재비 (BOM 합계)</td><td class="tnum" style="text-align:right">¥56.20</td><td class="tnum" style="text-align:right">₩10,678</td></tr>
+        <tr><td>임가공비 <span class="mini">창성 CS</span></td><td class="tnum" style="text-align:right">¥48.00</td><td class="tnum" style="text-align:right">₩9,120</td></tr>
+        <tr><td>후가공 (엣지·도금)</td><td class="tnum" style="text-align:right">¥5.00</td><td class="tnum" style="text-align:right">₩950</td></tr>
+        <tr><td>물류비 (CBM 배분)</td><td class="tnum" style="text-align:right">¥6.40</td><td class="tnum" style="text-align:right">₩1,216</td></tr>
+        <tr><td style="font-weight:600">착지원가</td><td class="tnum" style="text-align:right;font-weight:600">¥115.60</td><td class="tnum" style="text-align:right;font-weight:600">₩21,964</td></tr>
+      </table>
+      <div class="mini" style="margin-top:10px">물류비는 사전 추정치. 사후원가는 범아글로벌 CBM 실적 ₩19,208/개 반영 → 착지원가 재산정.</div>
+    </div>
+    <div class="card" style="max-width:320px">
+      <div class="card-h"><h3>마진</h3></div>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="lb">착지원가</div><div class="vl tnum">₩21,964</div><div class="sub">원가율 8.5%</div></div>
+        <div class="kpi"><div class="lb">소비자가</div><div class="vl tnum">₩259,000</div><div class="sub">자사몰 기준</div></div>
+        <div class="kpi"><div class="lb">공급가(도매)</div><div class="vl tnum">₩116,550</div><div class="sub">iQuest 45%</div></div>
+        <div class="kpi"><div class="lb">마진율</div><div class="vl tnum">81.2%</div><div class="sub"><span class="up">+2.1%</span> 사전대비</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="screen-orders">
+  <div class="page-h">
+    <h1>생산 발주</h1>
+    <p>진행 중 발주 · 공장별 생산 현황 · 자재조달 방식(사급/완사입)</p>
+  </div>
+
+  <div class="kpi-grid" style="margin-bottom:18px">
+    <div class="kpi"><div class="lb">진행 발주</div><div class="vl tnum">7건</div><div class="sub">발주액 ₩2.4M</div></div>
+    <div class="kpi"><div class="lb">생산중</div><div class="vl tnum">4건</div><div class="sub">창성 2 · 청도통야 2</div></div>
+    <div class="kpi"><div class="lb">입고 예정(30일)</div><div class="vl tnum">3건</div><div class="sub">최근 07-28</div></div>
+    <div class="kpi"><div class="lb">납기 지연</div><div class="vl tnum">1건</div><div class="sub">밀란백 07-24</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-h"><h3>봉발롱 창성 9차 · 리오더 전환</h3><span class="wtag">리오더</span><span class="spacer"></span><span class="more">발주서</span></div>
+    <div class="mini" style="margin-bottom:10px">리오더 분석 → 발주 전환 · 발주번호 <span class="code">LLL6F39SB-R9</span> · 공장 창성(CS)</div>
+    <table class="tbl">
+      <tr><td>품목</td><td>봉발롱 / 시어링블랙</td><td>단가</td><td class="tnum" style="text-align:right">¥48 · ₩9,120</td></tr>
+      <tr><td>발주수량</td><td class="tnum">24</td><td>자재조달</td><td>사급 <span class="mini">시어링램스킨·YKK지퍼</span></td></tr>
+      <tr><td>브랜드몰 배정</td><td class="tnum">14</td><td>중국 납품</td><td class="tnum">10</td></tr>
+      <tr><td>납기</td><td>2026-07-28</td><td>발주액</td><td class="tnum" style="text-align:right">¥1,152 · ₩218,880</td></tr>
+    </table>
+    <div class="approve-flow" style="margin-top:12px"><span class="step done">MD</span><span class="step-arw">→</span><span class="step done">팀장</span><span class="step-arw">→</span><span class="step now">대표</span></div>
+    <div class="prog" style="margin-top:10px"><i style="width:55%"></i></div>
+    <div class="mini" style="margin-top:6px">생산 진행 55% · 재단 완료, 봉제 진행</div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>발주 목록</h3><span class="cnt">7</span><span class="spacer"></span><div class="seg"><button class="on">전체</button><button>LUMEN</button><button>OEM</button></div></div>
+    <table class="tbl">
+      <thead><tr>
+        <th>발주번호</th><th>품목</th><th>공장</th>
+        <th style="text-align:right">수량</th><th style="text-align:right">단가</th>
+        <th>상태</th><th>납기</th><th>자재조달</th>
+      </tr></thead>
+      <tr><td><span class="code">LLL6F39SB-R9</span> <span class="wtag">리오더</span></td><td>봉발롱</td><td>창성</td><td class="tnum" style="text-align:right">24</td><td class="tnum" style="text-align:right">¥48</td><td>생산중</td><td>07-28</td><td>사급</td></tr>
+      <tr><td><span class="code">LLL6F13EB-R4</span></td><td>파니에쁘띠</td><td>창성</td><td class="tnum" style="text-align:right">30</td><td class="tnum" style="text-align:right">¥47</td><td>자재준비</td><td>08-05</td><td>사급</td></tr>
+      <tr><td><span class="code">LLL6F92SB-R2</span></td><td>LOG LARGE BAG</td><td>창성</td><td class="tnum" style="text-align:right">12</td><td class="tnum" style="text-align:right">¥103</td><td>발주확정</td><td>08-12</td><td>완사입</td></tr>
+      <tr><td><span class="code">LLL6F99SB-R1</span></td><td>MOON BAG</td><td>창성</td><td class="tnum" style="text-align:right">16</td><td class="tnum" style="text-align:right">¥96</td><td>샘플확정</td><td>08-20</td><td>사급</td></tr>
+      <tr><td><span class="code">AT26HB001</span> <span class="wtag">NW</span></td><td>아쎄르더비백</td><td>청도통야</td><td class="tnum" style="text-align:right">20</td><td class="tnum" style="text-align:right">¥185</td><td>생산중</td><td>07-30</td><td>완사입</td></tr>
+      <tr><td><span class="code">MLN-M-01</span> <span class="wtag">NW</span></td><td>밀란백미디엄</td><td>청도통야</td><td class="tnum" style="text-align:right">15</td><td class="tnum" style="text-align:right">¥142</td><td>지연</td><td>07-24</td><td>완사입</td></tr>
+      <tr><td><span class="code">MID-SH-01</span> <span class="wtag">OSOI</span></td><td>미드시저링</td><td>창성</td><td class="tnum" style="text-align:right">18</td><td class="tnum" style="text-align:right">¥88</td><td>생산중</td><td>08-02</td><td>사급</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="screen" id="screen-receiving">
+  <div class="page-h">
+    <h1>입고 · 납품</h1>
+    <p>발주 대비 입고 실적 · 불량 검수 · 물류비 CBM 배분</p>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-h"><h3>입고 내역</h3><span class="cnt">6</span><span class="spacer"></span><div class="seg"><button class="on">전체</button><button>대기</button><button>완료</button></div></div>
+    <table class="tbl">
+      <thead><tr>
+        <th>발주</th><th>품목</th>
+        <th style="text-align:right">발주수량</th><th style="text-align:right">입고수량</th>
+        <th style="text-align:right">불량</th><th>입고일</th><th>상태</th>
+      </tr></thead>
+      <tr><td><span class="code">LLL6F39SB-R8</span></td><td>봉발롱 8차</td><td class="tnum" style="text-align:right">20</td><td class="tnum" style="text-align:right">20</td><td class="tnum" style="text-align:right">0</td><td>06-28</td><td>완료</td></tr>
+      <tr><td><span class="code">LLL6F13EB-R3</span></td><td>파니에쁘띠</td><td class="tnum" style="text-align:right">30</td><td class="tnum" style="text-align:right">27</td><td class="tnum" style="text-align:right"><span class="dd neg">3</span></td><td>07-02</td><td>완료</td></tr>
+      <tr><td><span class="code">LLL6F92SB-R1</span></td><td>LOG LARGE BAG</td><td class="tnum" style="text-align:right">12</td><td class="tnum" style="text-align:right">12</td><td class="tnum" style="text-align:right">0</td><td>07-05</td><td>완료</td></tr>
+      <tr><td><span class="code">LLL6F39SB-R9</span></td><td>봉발롱 9차</td><td class="tnum" style="text-align:right">24</td><td class="tnum" style="text-align:right">—</td><td class="tnum" style="text-align:right">—</td><td>예정 07-28</td><td><span class="dd mut">대기</span></td></tr>
+      <tr><td><span class="code">AT26HB001</span></td><td>아쎄르더비백 <span class="mini">NW</span></td><td class="tnum" style="text-align:right">20</td><td class="tnum" style="text-align:right">—</td><td class="tnum" style="text-align:right">—</td><td>예정 07-30</td><td><span class="dd mut">대기</span></td></tr>
+      <tr><td><span class="code">MID-SH-01</span></td><td>미드시저링 <span class="mini">OSOI</span></td><td class="tnum" style="text-align:right">18</td><td class="tnum" style="text-align:right">—</td><td class="tnum" style="text-align:right">—</td><td>예정 08-02</td><td><span class="dd mut">대기</span></td></tr>
+    </table>
+    <div class="mini" style="margin-top:10px">파니에쁘띠 불량 3건 → 창성 결제 차감 ₩142,000 대기 (자재 구매 · 정산 연동)</div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>물류비 CBM 배분 · 범아글로벌</h3><span class="spacer"></span><span class="more">청구서</span></div>
+    <div class="mini" style="margin-bottom:10px">청구서 ₩960,395 · 31CT / 2.25CBM · 부가세 ₩342,170 별도(배분 제외) · CBM 비율 배분</div>
+    <table class="tbl">
+      <thead><tr>
+        <th>스타일</th><th style="text-align:right">CT</th><th style="text-align:right">CBM</th>
+        <th style="text-align:right">비율</th><th style="text-align:right">배분액</th><th style="text-align:right">개당</th>
+      </tr></thead>
+      <tr><td>봉발롱 <span class="mini">LLL6F39SB</span></td><td class="tnum" style="text-align:right">13</td><td class="tnum" style="text-align:right">0.90</td><td class="tnum" style="text-align:right">40.0%</td><td class="tnum" style="text-align:right">₩384,158</td><td class="tnum" style="text-align:right">₩19,208</td></tr>
+      <tr><td>파니에쁘띠 <span class="mini">LLL6F13EB</span></td><td class="tnum" style="text-align:right">9</td><td class="tnum" style="text-align:right">0.68</td><td class="tnum" style="text-align:right">30.2%</td><td class="tnum" style="text-align:right">₩290,253</td><td class="tnum" style="text-align:right">₩10,750</td></tr>
+      <tr><td>LOG LARGE BAG <span class="mini">LLL6F92SB</span></td><td class="tnum" style="text-align:right">6</td><td class="tnum" style="text-align:right">0.45</td><td class="tnum" style="text-align:right">20.0%</td><td class="tnum" style="text-align:right">₩192,079</td><td class="tnum" style="text-align:right">₩16,007</td></tr>
+      <tr><td>아쎄르더비백 <span class="mini">AT26HB001</span></td><td class="tnum" style="text-align:right">3</td><td class="tnum" style="text-align:right">0.22</td><td class="tnum" style="text-align:right">9.8%</td><td class="tnum" style="text-align:right">₩93,905</td><td class="tnum" style="text-align:right">₩4,695</td></tr>
+      <tr><td style="font-weight:600">합계</td><td class="tnum" style="text-align:right;font-weight:600">31</td><td class="tnum" style="text-align:right;font-weight:600">2.25</td><td class="tnum" style="text-align:right;font-weight:600">100%</td><td class="tnum" style="text-align:right;font-weight:600">₩960,395</td><td class="tnum" style="text-align:right">—</td></tr>
+    </table>
+    <div class="mini" style="margin-top:10px">봉발롱 개당 배분 ₩19,208 → BOM 사후원가 물류비로 반영</div>
+  </div>
+</section>
+
+<section class="screen" id="screen-purchase">
+  <div class="page-h">
+    <h1>자재 구매</h1>
+    <p>발주 합산 자재 소요 · 재고 대비 발주 필요 · 거래처별 묶음</p>
+  </div>
+
+  <div class="kpi-grid" style="margin-bottom:18px">
+    <div class="kpi"><div class="lb">미발주 자재</div><div class="vl tnum">3종</div><div class="sub">재고 부족</div></div>
+    <div class="kpi"><div class="lb">발주 필요액</div><div class="vl tnum">₩172,159</div><div class="sub">¥906 · 3개 발주 합산</div></div>
+    <div class="kpi"><div class="lb">거래처</div><div class="vl tnum">다산 · 창성</div><div class="sub">가죽 2 · 부자재 1</div></div>
+    <div class="kpi"><div class="lb">부족 임박</div><div class="vl tnum">시어링램스킨</div><div class="sub"><span class="down">재고 30SF</span> 소요 116.6</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-h"><h3>미발주 자재 소요 현황</h3><span class="cnt alert">3</span><span class="spacer"></span><span class="mini">봉발롱R9 · 파니에R4 · LOG R2 합산 (코드기준)</span></div>
+    <table class="tbl">
+      <thead><tr>
+        <th>자재코드</th><th>자재명</th><th>거래처</th>
+        <th style="text-align:right">소요량</th><th style="text-align:right">재고</th>
+        <th style="text-align:right">발주필요</th><th style="text-align:right">단가¥</th>
+      </tr></thead>
+      <tr><td><span class="code">MDS-SHR-BK01</span></td><td>시어링램스킨 <span class="mini">R9 4.86×24</span></td><td>다산</td><td class="tnum" style="text-align:right">116.6 SF</td><td class="tnum" style="text-align:right">30</td><td class="tnum" style="text-align:right"><span class="dd neg">86.6</span></td><td class="tnum" style="text-align:right">6.50</td></tr>
+      <tr><td><span class="code">MDS-LEA-IV01</span></td><td>아이보리소가죽 <span class="mini">R9·R4 합산</span></td><td>다산</td><td class="tnum" style="text-align:right">84.0 SF</td><td class="tnum" style="text-align:right">40</td><td class="tnum" style="text-align:right"><span class="dd neg">44.0</span></td><td class="tnum" style="text-align:right">4.20</td></tr>
+      <tr><td><span class="code">MCS-BKL-BR25</span></td><td>브라스버클 <span class="mini">R9 48+R4 30+R2 18</span></td><td>창성</td><td class="tnum" style="text-align:right">96 EA</td><td class="tnum" style="text-align:right">30</td><td class="tnum" style="text-align:right"><span class="dd neg">66</span></td><td class="tnum" style="text-align:right">2.40</td></tr>
+      <tr><td><span class="code">MCS-ZIP-YKK20</span></td><td>YKK지퍼 20cm</td><td>창성</td><td class="tnum" style="text-align:right">78 EA</td><td class="tnum" style="text-align:right">120</td><td class="tnum" style="text-align:right">0</td><td class="tnum" style="text-align:right">1.80</td></tr>
+      <tr><td><span class="code">MCS-LBL-MT01</span></td><td>브랜드메탈라벨</td><td>창성</td><td class="tnum" style="text-align:right">54 EA</td><td class="tnum" style="text-align:right">200</td><td class="tnum" style="text-align:right">0</td><td class="tnum" style="text-align:right">0.90</td></tr>
+    </table>
+  </div>
+
+  <div class="row" style="margin-bottom:0">
+    <div class="card">
+      <div class="card-h"><h3>거래처별 발주 묶음</h3></div>
+      <table class="tbl">
+        <thead><tr><th>거래처</th><th>자재</th><th style="text-align:right">발주필요액</th><th></th></tr></thead>
+        <tr><td>다산 <span class="mini">가죽자재</span></td><td>시어링램스킨 · 아이보리소가죽</td><td class="tnum" style="text-align:right">¥747.7 · ₩142,063</td><td><button class="btn pri sm">발주</button></td></tr>
+        <tr><td>창성 <span class="mini">공장</span></td><td>브라스버클</td><td class="tnum" style="text-align:right">¥158.4 · ₩30,096</td><td><button class="btn sm">발주</button></td></tr>
+      </table>
+      <div class="mini" style="margin-top:10px">창성 결제 시 파니에 불량차감 ₩142,000 반영 · 미지급 잔액 ₩8,300,000</div>
+    </div>
+    <div class="card" style="max-width:300px">
+      <div class="card-h"><h3>다산 발주 진행</h3><span class="more">내역</span></div>
+      <div class="mini" style="margin-bottom:10px">미지급 ₩3,100,000 · 리드타임 7일</div>
+      <div class="approve-flow"><span class="step done">구매</span><span class="step-arw">→</span><span class="step now">팀장</span><span class="step-arw">→</span><span class="step">대표</span></div>
+      <div class="prog" style="margin-top:12px"><i style="width:35%"></i></div>
+      <div class="mini" style="margin-top:6px">발주서 작성 완료 · 승인 대기</div>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="screen-channels">
+  <div class="page-h"><h1>채널 판매</h1><p>자사몰·마켓플레이스·오프라인 통합 판매 현황 · 2026-07-10</p></div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="lb">오늘 매출</div><div class="vl tnum">₩8.40M</div><div class="sub"><span class="up">▲ 9%</span> 전일 대비</div></div>
+    <div class="kpi"><div class="lb">오늘 주문</div><div class="vl tnum">34건</div><div class="sub"><span class="up">▲ 4건</span> 전일 대비</div></div>
+    <div class="kpi"><div class="lb">반품 · 취소</div><div class="vl tnum">2건</div><div class="sub"><span class="down">▲ 1건</span> 반품률 5.9%</div></div>
+    <div class="kpi"><div class="lb">객단가</div><div class="vl tnum">₩247K</div><div class="sub"><span class="up">▲ 3%</span> 실판매가 기준</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>채널별 오늘 판매</h3><span class="cnt">5</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead><tr><th>채널</th><th style="text-align:right">오늘 매출</th><th style="text-align:right">주문수</th><th>연동방식</th><th>동기화</th></tr></thead>
+      <tr><td>자사몰 <span class="mini">Cafe24</span></td><td style="text-align:right" class="tnum">₩2,840,000</td><td style="text-align:right" class="tnum">11</td><td><span class="wtag">API</span></td><td><span class="mini">실시간</span></td></tr>
+      <tr><td>해외자사몰 <span class="mini">Shopify</span></td><td style="text-align:right" class="tnum">₩1,920,000</td><td style="text-align:right" class="tnum">6</td><td><span class="wtag">API</span></td><td><span class="mini">실시간</span></td></tr>
+      <tr><td>W컨셉</td><td style="text-align:right" class="tnum">₩2,180,000</td><td style="text-align:right" class="tnum">9</td><td><span class="wtag">파일</span></td><td><span class="mini">09:40 업로드</span></td></tr>
+      <tr><td>29CM</td><td style="text-align:right" class="tnum">₩1,120,000</td><td style="text-align:right" class="tnum">5</td><td><span class="wtag">파일</span></td><td><span class="mini">09:40 업로드</span></td></tr>
+      <tr><td>신세계센텀 <span class="mini">POS</span></td><td style="text-align:right" class="tnum">₩340,000</td><td style="text-align:right" class="tnum">3</td><td><span class="wtag">파일</span></td><td><span class="mini">일마감 정산</span></td></tr>
+      <tr><td>합계</td><td style="text-align:right" class="tnum">₩8,400,000</td><td style="text-align:right" class="tnum">34</td><td></td><td></td></tr>
+    </table>
+    <div class="mini" style="margin-top:10px">매출은 실판매가(할인·쿠폰 반영 순매출) 기준. W컨셉·29CM은 오전 파일 수신분이라 당일 최종 정산 시 변동될 수 있음.</div>
+  </div>
+
+  <div class="row" style="margin-bottom:18px">
+    <div class="card">
+      <div class="card-h"><h3>진행 기획전</h3><span class="cnt">4</span></div>
+      <div class="ib-item"><div><div class="t">Lumen with SUMMER</div><div class="m">자사몰 · Shopify</div></div><span class="dd mut">D-6</span></div>
+      <div class="ib-item"><div><div class="t">W ONLY</div><div class="m">W컨셉 단독</div></div><span class="when">진행중</span></div>
+      <div class="ib-item"><div><div class="t">바캉스</div><div class="m">29CM</div></div><span class="when">진행중</span></div>
+      <div class="ib-item"><div><div class="t">센텀 오픈100일</div><div class="m">신세계센텀</div></div><span class="dd mut">D-12</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>정산 대기 · 채널</h3><span class="cnt alert">1</span></div>
+      <div class="ib-item"><div><div class="t">W컨셉 미수금</div><div class="m">6월 판매분</div></div><span class="dd neg">₩12.10M · D+4</span></div>
+      <div class="ib-item"><div><div class="t">29CM 미수금</div><div class="m">6월 판매분</div></div><span class="dd mut">₩4.20M</span></div>
+      <div class="ib-item"><div><div class="t">자사몰 PG 정산</div><div class="m">Cafe24 · 주간</div></div><span class="when">예정</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="screen-inventory">
+  <div class="page-h"><h1>재고 현황</h1><p>품목별 총재고 및 채널 할당 · 안전재고 모니터링</p></div>
+
+  <div class="seg">
+    <button class="on">전체</button><button>자사몰</button><button>W컨셉</button><button>29CM</button><button>쇼룸한남</button>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>LUMEN 재고</h3><span class="cnt alert">2</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead><tr><th>품목코드</th><th>제품</th><th style="text-align:right">총재고</th><th style="text-align:right">자사몰</th><th style="text-align:right">W컨셉</th><th style="text-align:right">29CM</th><th style="text-align:right">쇼룸</th><th style="text-align:right">안전</th></tr></thead>
+      <tr><td><span class="code">LLL6F39SB</span></td><td>봉발롱 / 시어링블랙</td><td style="text-align:right" class="tnum">42</td><td style="text-align:right" class="tnum">18</td><td style="text-align:right" class="tnum">12</td><td style="text-align:right" class="tnum">6</td><td style="text-align:right" class="tnum">6</td><td style="text-align:right" class="tnum">15</td></tr>
+      <tr><td><span class="code">LLL6F13EB</span></td><td>파니에쁘띠 / 에뚜프브라운</td><td style="text-align:right" class="tnum"><span class="down">9</span></td><td style="text-align:right" class="tnum">4</td><td style="text-align:right" class="tnum">3</td><td style="text-align:right" class="tnum">1</td><td style="text-align:right" class="tnum">1</td><td style="text-align:right" class="tnum">12</td></tr>
+      <tr><td><span class="code">LLL6F92SB</span></td><td>LOG LARGE BAG / 소프트블랙</td><td style="text-align:right" class="tnum">27</td><td style="text-align:right" class="tnum">12</td><td style="text-align:right" class="tnum">8</td><td style="text-align:right" class="tnum">4</td><td style="text-align:right" class="tnum">3</td><td style="text-align:right" class="tnum">10</td></tr>
+      <tr><td><span class="code">LLL6F99SB</span></td><td>MOON BAG / 소프트블랙</td><td style="text-align:right" class="tnum"><span class="down">6</span></td><td style="text-align:right" class="tnum">3</td><td style="text-align:right" class="tnum">2</td><td style="text-align:right" class="tnum">0</td><td style="text-align:right" class="tnum">1</td><td style="text-align:right" class="tnum">10</td></tr>
+      <tr><td><span class="code">LSL6F45VB</span></td><td>문미러참</td><td style="text-align:right" class="tnum">88</td><td style="text-align:right" class="tnum">40</td><td style="text-align:right" class="tnum">28</td><td style="text-align:right" class="tnum">12</td><td style="text-align:right" class="tnum">8</td><td style="text-align:right" class="tnum">20</td></tr>
+    </table>
+    <div class="mini" style="margin-top:10px">봉발롱 창성9차(<span class="code">LLL6F39SB-R9</span>) 입고예정 +14 (브랜드분) · 발주 24개 중 중국납품 10개 별도. 파니에쁘띠·MOON BAG 안전재고 미달 — 보충 발주 검토.</div>
+  </div>
+
+  <div class="row" style="margin-bottom:18px">
+    <div class="card">
+      <div class="card-h"><h3>포장 부자재</h3><span class="cnt alert">1</span></div>
+      <div class="ib-item"><div><div class="t">더스트백 (로고)</div><div class="m">공용 · 창성 공급</div></div><span class="dd mut">320개</span></div>
+      <div class="ib-item"><div><div class="t">행택 · 케어카드</div><div class="m">브랜드택 세트</div></div><span class="dd neg">90세트</span></div>
+      <div class="ib-item"><div><div class="t">쇼핑백 (중/대)</div><div class="m">쇼룸 · 오프라인</div></div><span class="dd mut">210개</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>입출고 예정</h3><span class="cnt">3</span></div>
+      <div class="ib-item"><div><div class="t">창성 9차 입고</div><div class="m">봉발롱 <span class="code">LLL6F39SB-R9</span> +14</div></div><span class="dd mut">D-5</span></div>
+      <div class="ib-item"><div><div class="t">iQuest 출고</div><div class="m">봉발롱 30 · LOG LARGE 15</div></div><span class="when">07-18</span></div>
+      <div class="ib-item"><div><div class="t">W컨셉 보충</div><div class="m">파니에쁘띠 +6</div></div><span class="dd neg">지연</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="screen-wholesale">
+  <div class="page-h"><h1>홀세일 · 도매</h1><p>해외 홀세일 오더 · 인보이스 · 패킹리스트 · 미수금 관리</p></div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="lb">진행 오더</div><div class="vl tnum">4건</div><div class="sub">iQuest · STORiES</div></div>
+    <div class="kpi"><div class="lb">이달 출고액</div><div class="vl tnum">₩23.8M</div><div class="sub"><span class="up">+18%</span> 전월 대비</div></div>
+    <div class="kpi"><div class="lb">미수금 합계</div><div class="vl tnum">₩9.90M</div><div class="sub">iQuest 전액</div></div>
+    <div class="kpi"><div class="lb">PL 미발행</div><div class="vl tnum">1건</div><div class="sub"><span class="down">납기 임박</span></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>도매 오더</h3><span class="cnt">4</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead><tr><th>바이어</th><th>품목</th><th style="text-align:right">수량</th><th style="text-align:right">단가</th><th>인보이스</th><th>패킹리스트</th><th>납기</th><th style="text-align:right">미수금</th></tr></thead>
+      <tr><td>iQuest <span class="wtag">JP</span></td><td>봉발롱 <span class="code">LLL6F39SB</span></td><td style="text-align:right" class="tnum">30</td><td style="text-align:right" class="tnum">¥19,800</td><td>IQ-2606 발행</td><td>발행</td><td>07-18</td><td style="text-align:right" class="tnum">₩5,400,000</td></tr>
+      <tr><td>iQuest <span class="wtag">JP</span></td><td>LOG LARGE <span class="code">LLL6F92SB</span></td><td style="text-align:right" class="tnum">15</td><td style="text-align:right" class="tnum">¥42,000</td><td>IQ-2607 발행</td><td><span class="down">준비</span></td><td>07-25</td><td style="text-align:right" class="tnum">₩4,500,000</td></tr>
+      <tr><td>STORiES <span class="wtag">SG</span></td><td>파니에쁘띠 <span class="code">LLL6F13EB</span></td><td style="text-align:right" class="tnum">20</td><td style="text-align:right" class="tnum">$148</td><td>ST-2604 발행</td><td>발행</td><td>07-30</td><td style="text-align:right" class="tnum"><span class="mini">완납</span></td></tr>
+      <tr><td>STORiES <span class="wtag">SG</span></td><td>문미러참 <span class="code">LSL6F45VB</span></td><td style="text-align:right" class="tnum">40</td><td style="text-align:right" class="tnum">$38</td><td>ST-2605 준비</td><td><span class="down">미발행</span></td><td>08-05</td><td style="text-align:right" class="tnum"><span class="mini">선결제</span></td></tr>
+    </table>
+    <div class="mini" style="margin-top:10px">iQuest 미수금 ₩9,900,000(₩5.40M + ₩4.50M) 회수 대기. LOG LARGE 건 PL 준비 지연 — 07-25 납기 전 마감 필요.</div>
+  </div>
+
+  <div class="row" style="margin-bottom:18px">
+    <div class="card">
+      <div class="card-h"><h3>OEM 파이프라인</h3><span class="cnt">3</span></div>
+      <div class="ib-item"><div><div class="t">아쎄르더비백 <span class="code">AT26HB001</span></div><div class="m">NOTHING WRITTEN · 청도통야</div></div><span class="wtag">OEM</span></div>
+      <div class="ib-item"><div><div class="t">밀란백 미디엄</div><div class="m">NOTHING WRITTEN · 청도통야</div></div><span class="dd mut">샘플확정</span></div>
+      <div class="ib-item"><div><div class="t">미드시저링</div><div class="m">OSOI · 창성</div></div><span class="dd neg">패턴수정</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>홀세일 미수 · 정산</h3><span class="cnt">2</span></div>
+      <div class="ib-item"><div><div class="t">iQuest</div><div class="m">봉발롱 · LOG LARGE</div></div><span class="dd mut">₩9.90M</span></div>
+      <div class="ib-item"><div><div class="t">STORiES</div><div class="m">파니에쁘띠 · 문미러참</div></div><span class="when">선결제</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="screen-showroom">
+  <div class="page-h"><h1>쇼룸</h1><p>쇼룸한남 · 페이히어 POS 판매 및 매장 재고</p></div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="lb">오늘 매출</div><div class="vl tnum">₩1.68M</div><div class="sub"><span class="up">+6%</span> 전주 동요일</div></div>
+    <div class="kpi"><div class="lb">거래 건수</div><div class="vl tnum">6건</div><div class="sub">페이히어 POS</div></div>
+    <div class="kpi"><div class="lb">객단가</div><div class="vl tnum">₩280K</div><div class="sub">실판매가 기준</div></div>
+    <div class="kpi"><div class="lb">월 누적</div><div class="vl tnum">₩24.6M</div><div class="sub"><span class="up">+11%</span> 목표 84%</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>POS 판매 내역</h3><span class="cnt">6</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead><tr><th>일자</th><th>품목</th><th style="text-align:right">수량</th><th style="text-align:right">실판매가</th><th>결제수단</th></tr></thead>
+      <tr><td>07-10 15:10</td><td>봉발롱 / 시어링블랙 <span class="code">LLL6F39SB</span></td><td style="text-align:right" class="tnum">1</td><td style="text-align:right" class="tnum">₩328,000</td><td>카드</td></tr>
+      <tr><td>07-10 14:05</td><td>LOG LARGE BAG <span class="code">LLL6F92SB</span></td><td style="text-align:right" class="tnum">1</td><td style="text-align:right" class="tnum">₩458,000</td><td>카드</td></tr>
+      <tr><td>07-10 13:20</td><td>파니에쁘띠 <span class="code">LLL6F13EB</span></td><td style="text-align:right" class="tnum">1</td><td style="text-align:right" class="tnum">₩268,000</td><td>현금</td></tr>
+      <tr><td>07-10 12:35</td><td>문미러참 <span class="code">LSL6F45VB</span></td><td style="text-align:right" class="tnum">2</td><td style="text-align:right" class="tnum">₩178,000</td><td>카드</td></tr>
+      <tr><td>07-10 11:50</td><td>MOON BAG <span class="code">LLL6F99SB</span></td><td style="text-align:right" class="tnum">1</td><td style="text-align:right" class="tnum">₩358,000</td><td>카드</td></tr>
+      <tr><td>07-10 11:15</td><td>문미러참 <span class="code">LSL6F45VB</span></td><td style="text-align:right" class="tnum">1</td><td style="text-align:right" class="tnum">₩89,000</td><td>간편결제</td></tr>
+      <tr><td>합계</td><td></td><td style="text-align:right" class="tnum">7</td><td style="text-align:right" class="tnum">₩1,679,000</td><td></td></tr>
+    </table>
+    <div class="mini" style="margin-top:10px">페이히어 POS 실시간 연동. 실판매가는 쇼룸 프로모션(문미러참 세트) 반영 금액.</div>
+  </div>
+
+  <div class="row" style="margin-bottom:18px">
+    <div class="card">
+      <div class="card-h"><h3>매장 재고 · 쇼룸한남</h3><span class="cnt alert">2</span></div>
+      <div class="ib-item"><div><div class="t">봉발롱 시어링 <span class="code">LLL6F39SB</span></div><div class="m">디스플레이 2 · 창고 4</div></div><span class="dd mut">6</span></div>
+      <div class="ib-item"><div><div class="t">문미러참 <span class="code">LSL6F45VB</span></div><div class="m">참 · 액세서리</div></div><span class="dd mut">8</span></div>
+      <div class="ib-item"><div><div class="t">파니에쁘띠 <span class="code">LLL6F13EB</span></div><div class="m">에뚜프브라운</div></div><span class="dd neg">1</span></div>
+      <div class="ib-item"><div><div class="t">MOON BAG <span class="code">LLL6F99SB</span></div><div class="m">소프트블랙</div></div><span class="dd neg">1</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>온라인 주문 픽업</h3><span class="cnt">3</span></div>
+      <div class="ib-item"><div><div class="t">자사몰 #C24-8842</div><div class="m">봉발롱 시어링 · 픽업대기</div></div><span class="when">오늘</span></div>
+      <div class="ib-item"><div><div class="t">Shopify #SH-2261</div><div class="m">LOG LARGE · 준비완료</div></div><span class="when">오늘</span></div>
+      <div class="ib-item"><div><div class="t">자사몰 #C24-8830</div><div class="m">문미러참 · 수령완료</div></div><span class="dd mut">완료</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="screen-cs">
+  <div class="page-h"><h1>CS 관리</h1><p>채널 통합 문의 · 리뷰 · 취소반품 · AS 처리</p></div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="lb">미처리 문의</div><div class="vl tnum">7건</div><div class="sub"><span class="down">2건 지연</span> SLA 24h</div></div>
+    <div class="kpi"><div class="lb">신규 리뷰</div><div class="vl tnum">12건</div><div class="sub">W컨셉 · 29CM</div></div>
+    <div class="kpi"><div class="lb">AS 진행</div><div class="vl tnum">3건</div><div class="sub">수선 · 부속교체</div></div>
+    <div class="kpi"><div class="lb">취소 · 반품</div><div class="vl tnum">4건</div><div class="sub"><span class="up">감소 1건</span> 전주 대비</div></div>
+  </div>
+
+  <div class="seg">
+    <button class="on">문의</button><button>리뷰</button><button>취소·반품</button><button>AS</button>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>CS 접수 내역</h3><span class="cnt alert">2</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead><tr><th>접수일</th><th>유형</th><th>채널</th><th>제품</th><th>상태</th><th>담당</th></tr></thead>
+      <tr><td>07-10</td><td>문의</td><td>카카오</td><td>봉발롱 <span class="code">LLL6F39SB</span></td><td><span class="down">답변대기</span></td><td>김하늘</td></tr>
+      <tr><td>07-10</td><td>문의</td><td>W컨셉</td><td>파니에쁘띠 <span class="code">LLL6F13EB</span></td><td><span class="down">답변지연</span></td><td>이서준</td></tr>
+      <tr><td>07-09</td><td>취소·반품</td><td>29CM</td><td>LOG LARGE <span class="code">LLL6F92SB</span></td><td>반품수거중</td><td>김하늘</td></tr>
+      <tr><td>07-09</td><td>AS</td><td>자사몰</td><td>봉발롱 <span class="code">LLL6F39SB</span></td><td>수선접수 <span class="mini">스트랩</span></td><td>박도윤</td></tr>
+      <tr><td>07-08</td><td>리뷰</td><td>W컨셉</td><td>MOON BAG <span class="code">LLL6F99SB</span></td><td>답글완료</td><td>이서준</td></tr>
+      <tr><td>07-08</td><td>AS</td><td>쇼룸한남</td><td>문미러참 <span class="code">LSL6F45VB</span></td><td>부속교체</td><td>박도윤</td></tr>
+      <tr><td>07-07</td><td>문의</td><td>카카오</td><td>LOG LARGE <span class="code">LLL6F92SB</span></td><td>완료</td><td>김하늘</td></tr>
+      <tr><td>07-07</td><td>취소·반품</td><td>자사몰</td><td>파니에쁘띠 <span class="code">LLL6F13EB</span></td><td>환불완료</td><td>이서준</td></tr>
+    </table>
+    <div class="mini">지연 2건(카카오·W컨셉)은 SLA 24h 초과 임박 — 우선 처리. 리뷰는 W컨셉·29CM 등 채널 유입분 관리(자사몰 리뷰 섹션 미운영).</div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <div class="card-h"><h3>AS 진행</h3><span class="cnt">3</span></div>
+      <div class="ib-item"><div><div class="t">봉발롱 스트랩 수선</div><div class="m">자사몰 · 창성 이관</div></div><span class="dd mut">진행</span></div>
+      <div class="ib-item"><div><div class="t">문미러참 부속교체</div><div class="m">쇼룸한남 접수</div></div><span class="when">D-2</span></div>
+      <div class="ib-item"><div><div class="t">파니에쁘띠 지퍼</div><div class="m">YKK지퍼 교체</div></div><span class="dd neg">부품대기</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>취소 · 반품</h3><span class="cnt">4</span></div>
+      <div class="ib-item"><div><div class="t">LOG LARGE 반품</div><div class="m">29CM · 단순변심</div></div><span class="dd mut">수거중</span></div>
+      <div class="ib-item"><div><div class="t">파니에쁘띠 환불</div><div class="m">자사몰 · 완료</div></div><span class="when">완료</span></div>
+      <div class="ib-item"><div><div class="t">봉발롱 교환</div><div class="m">W컨셉 · 색상변경</div></div><span class="dd mut">처리중</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="screen-settlement">
+  <div class="page-h"><h1>매입 · 매출 정산</h1><p>2026년 7월 · 월중 집계 · 6월 마감 확정 · CNY 190원 기준</p></div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="lb">이번 달 매출</div><div class="vl tnum">₩284.6M</div><div class="sub"><span class="up">▲ 12%</span> 전월 ₩254.2M</div></div>
+    <div class="kpi"><div class="lb">이번 달 매입</div><div class="vl tnum">₩176.2M</div><div class="sub">원가율 61.9% · 전월 ₩163.1M</div></div>
+    <div class="kpi"><div class="lb">순이익</div><div class="vl tnum">₩108.4M</div><div class="sub"><span class="up">▲ 19%</span> 마진 38.1%</div></div>
+  </div>
+
+  <div class="row" style="margin-bottom:18px">
+    <div class="card">
+      <div class="card-h"><h3>매출 · 바이어 · 채널별</h3><span class="cnt">9</span><span class="more">전체</span></div>
+      <table class="tbl">
+        <thead><tr><th>거래처 · 채널</th><th>구분</th><th style="text-align:right">금액</th><th style="text-align:right">비중</th></tr></thead>
+        <tr><td>W컨셉</td><td><span class="wtag">채널</span></td><td style="text-align:right" class="tnum">₩58.2M</td><td style="text-align:right" class="tnum">20.4%</td></tr>
+        <tr><td>iQuest</td><td><span class="wtag">홀세일</span></td><td style="text-align:right" class="tnum">₩46.3M</td><td style="text-align:right" class="tnum">16.3%</td></tr>
+        <tr><td>자사몰 (Cafe24)</td><td><span class="wtag">D2C</span></td><td style="text-align:right" class="tnum">₩42.7M</td><td style="text-align:right" class="tnum">15.0%</td></tr>
+        <tr><td>29CM</td><td><span class="wtag">채널</span></td><td style="text-align:right" class="tnum">₩31.4M</td><td style="text-align:right" class="tnum">11.0%</td></tr>
+        <tr><td>해외자사몰 (Shopify)</td><td><span class="wtag">D2C</span></td><td style="text-align:right" class="tnum">₩27.9M</td><td style="text-align:right" class="tnum">9.8%</td></tr>
+        <tr><td>NOTHING WRITTEN</td><td><span class="wtag">OEM</span></td><td style="text-align:right" class="tnum">₩26.4M</td><td style="text-align:right" class="tnum">9.3%</td></tr>
+        <tr><td>신세계센텀</td><td><span class="wtag">위탁</span></td><td style="text-align:right" class="tnum">₩22.8M</td><td style="text-align:right" class="tnum">8.0%</td></tr>
+        <tr><td>쇼룸 한남</td><td><span class="wtag">오프라인</span></td><td style="text-align:right" class="tnum">₩14.5M</td><td style="text-align:right" class="tnum">5.1%</td></tr>
+        <tr><td>OSOI</td><td><span class="wtag">OEM</span></td><td style="text-align:right" class="tnum">₩14.4M</td><td style="text-align:right" class="tnum">5.1%</td></tr>
+      </table>
+      <div class="mini">6월 마감 엑셀 · 채널 정산서 AI 파싱 완료 · 시스템 대비 편차 0.3%</div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>매입 · 공장 · 자재처별</h3><span class="cnt">4</span><span class="more">전체</span></div>
+      <table class="tbl">
+        <thead><tr><th>거래처</th><th>구분</th><th style="text-align:right">금액</th><th style="text-align:right">비중</th></tr></thead>
+        <tr><td>창성 <span class="code">CS</span></td><td><span class="wtag">공장</span></td><td style="text-align:right" class="tnum">₩82.6M</td><td style="text-align:right" class="tnum">46.9%</td></tr>
+        <tr><td>다산 <span class="code">DS</span></td><td><span class="wtag">가죽자재</span></td><td style="text-align:right" class="tnum">₩41.2M</td><td style="text-align:right" class="tnum">23.4%</td></tr>
+        <tr><td>청도통야 <span class="code">TY</span></td><td><span class="wtag">공장</span></td><td style="text-align:right" class="tnum">₩38.1M</td><td style="text-align:right" class="tnum">21.6%</td></tr>
+        <tr><td>범아글로벌</td><td><span class="wtag">물류</span></td><td style="text-align:right" class="tnum">₩14.3M</td><td style="text-align:right" class="tnum">8.1%</td></tr>
+      </table>
+      <div class="prog"><i style="width:61.9%"></i></div>
+      <div class="mini">원가율 61.9% · 창성 불량차감 ₩142,000 (파니에프티 3건)은 다음 결제분에서 상계</div>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="screen-receivables">
+  <div class="page-h"><h1>미수금 · 미지급</h1><p>2026-07-10 기준 · 채널 정산 매월 10일 · 공장 결제 익월 말</p></div>
+
+  <div class="row">
+    <div class="card">
+      <div class="card-h"><h3>미수금</h3><span class="cnt alert">3</span><span class="more">전체</span></div>
+      <div class="ib-item"><div><div class="t">W컨셉</div><div class="m">₩12,100,000 · 매월 10일 입금 · 6월 정산분</div></div><span class="dd neg">D+4 연체</span></div>
+      <div class="ib-item"><div><div class="t">iQuest</div><div class="m">₩9,900,000 · 일본 홀세일 · 봉발롱 외 3종</div></div><span class="dd mut">오늘</span></div>
+      <div class="ib-item"><div><div class="t">29CM</div><div class="m">₩4,200,000 · 위탁 정산 · 매월 10일</div></div><span class="dd mut">오늘</span></div>
+      <div class="ib-item"><div><div class="t">합계 미수</div><div class="m">3건 · 연체 1건 포함</div></div><span class="when tnum">₩26,200,000</span></div>
+      <div class="mini">W컨셉 연체분 재알림 발송 예정 · 확정 시 순이익 반영</div>
+      <button class="btn sm">입금 대사</button><span class="spacer"></span><button class="btn sm">연체 알림</button>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>미지급</h3><span class="cnt">2</span><span class="more">전체</span></div>
+      <div class="ib-item"><div><div class="t">창성 <span class="code">CS</span></div><div class="m">₩8,300,000 · 봉발롱 창성9차 외 · 불량차감 ₩142,000 대기</div></div><span class="dd mut">D-5</span></div>
+      <div class="ib-item"><div><div class="t">다산 <span class="code">DS</span></div><div class="m">₩3,100,000 · 아이보리소가죽 · 시어링램스킨</div></div><span class="dd mut">D-8</span></div>
+      <div class="ib-item"><div><div class="t">합계 미지급</div><div class="m">2건 · 불량차감 반영 전</div></div><span class="when tnum">₩11,400,000</span></div>
+      <div class="mini">창성 순지급 예정 ₩8,158,000 (파니에프티 불량 3건 ₩142,000 상계 후)</div>
+      <button class="btn sm">지급 예약</button><span class="spacer"></span><button class="btn pri sm">차감 승인</button>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="screen-taxinvoice">
+  <div class="page-h"><h1>세금계산서</h1><p>2026년 7월 · 전자세금계산서 발행 · 홈택스 연동</p></div>
+
+  <div class="seg"><button class="on">매출</button><button>매입</button></div>
+
+  <div class="card">
+    <div class="card-h"><h3>매출 세금계산서</h3><span class="cnt">6</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead><tr><th>발행일</th><th>거래처</th><th>품목</th><th style="text-align:right">공급가</th><th style="text-align:right">세액</th><th style="text-align:right">합계</th><th>상태</th></tr></thead>
+      <tr><td class="tnum">07-08</td><td>NOTHING WRITTEN</td><td><span class="code">AT26HB001</span> 아쎄르더비백 외</td><td style="text-align:right" class="tnum">24,000,000</td><td style="text-align:right" class="tnum">2,400,000</td><td style="text-align:right" class="tnum">26,400,000</td><td>발행완료</td></tr>
+      <tr><td class="tnum">07-05</td><td>iQuest</td><td><span class="code">LLL6F39SB</span> 봉발롱 외 3종</td><td style="text-align:right" class="tnum">42,090,909</td><td style="text-align:right" class="tnum">4,209,091</td><td style="text-align:right" class="tnum">46,300,000</td><td>발행완료</td></tr>
+      <tr><td class="tnum">07-03</td><td>W컨셉</td><td><span class="code">LLL6F92SB</span> LOG LARGE BAG 외</td><td style="text-align:right" class="tnum">52,909,091</td><td style="text-align:right" class="tnum">5,290,909</td><td style="text-align:right" class="tnum">58,200,000</td><td>발행완료</td></tr>
+      <tr><td class="tnum">07-01</td><td>29CM</td><td><span class="code">LLL6F13EB</span> 파니에쁘띠 외</td><td style="text-align:right" class="tnum">28,545,455</td><td style="text-align:right" class="tnum">2,854,545</td><td style="text-align:right" class="tnum">31,400,000</td><td>발행완료</td></tr>
+      <tr><td class="tnum">06-30</td><td>신세계센텀</td><td>LUMEN 위탁정산 6월</td><td style="text-align:right" class="tnum">20,727,273</td><td style="text-align:right" class="tnum">2,072,727</td><td style="text-align:right" class="tnum">22,800,000</td><td>발행완료</td></tr>
+      <tr><td class="tnum">07-09</td><td>OSOI</td><td><span class="code">미드시저링</span> OEM</td><td style="text-align:right" class="tnum">13,090,909</td><td style="text-align:right" class="tnum">1,309,091</td><td style="text-align:right" class="tnum">14,400,000</td><td><span class="mini">발행대기</span></td></tr>
+      <tr><td></td><td>합계</td><td><span class="mini">6건</span></td><td style="text-align:right" class="tnum">181,363,637</td><td style="text-align:right" class="tnum">18,136,363</td><td style="text-align:right" class="tnum">199,500,000</td><td></td></tr>
+    </table>
+    <div class="mini">매입 세금계산서 8건 · 창성 · 다산 · 범아글로벌 · 성원애드피아(부자재 인쇄) · 홈택스 전자세금계산서 XML 세무 export</div>
+    <button class="btn sm">홈택스 발행</button><span class="spacer"></span><button class="btn sm">세무 export</button>
+  </div>
+</section>
+
+<section class="screen" id="screen-meetings">
+  <div class="page-h">
+    <h1>회의록</h1>
+    <p>팀별 회의 기록과 액션아이템 배분을 한 곳에서 관리</p>
+  </div>
+
+  <div class="seg">
+    <button class="on">전체</button>
+    <button>내 팀</button>
+    <button>내 담당</button>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>회의록</h3><span class="cnt">6</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead>
+        <tr><th>일자</th><th>제목</th><th>팀</th><th>참석</th><th>액션</th><th>확인</th></tr>
+      </thead>
+      <tr><td class="tnum">07-09</td><td>2607 주간 생산회의 · 봉발롱 창성9차 진행점검</td><td>생산물류</td><td class="tnum">4</td><td class="tnum">5</td><td><span class="dd neg">2 미완</span></td></tr>
+      <tr><td class="tnum">07-08</td><td>2607 정산 마감회의 · 미수/미지급 점검</td><td>재무회계</td><td class="tnum">5</td><td class="tnum">4</td><td><span class="mini">확인</span></td></tr>
+      <tr><td class="tnum">07-07</td><td>하반기 기획전 킥오프 · 센텀 오픈100일</td><td>마케팅</td><td class="tnum">6</td><td class="tnum">7</td><td><span class="dd neg">3 미완</span></td></tr>
+      <tr><td class="tnum">07-04</td><td>OEM 품평회 · 아쎄르더비백/밀란백 샘플</td><td>디자인</td><td class="tnum">3</td><td class="tnum">3</td><td><span class="mini">확인</span></td></tr>
+      <tr><td class="tnum">07-03</td><td>채널 주간회의 · W컨셉/29CM 재고배분</td><td>커머스</td><td class="tnum">4</td><td class="tnum">2</td><td><span class="mini">확인</span></td></tr>
+      <tr><td class="tnum">07-01</td><td>2607 월초 전사회의 · 상반기 결산 공유</td><td>전사</td><td class="tnum">9</td><td class="tnum">8</td><td><span class="dd neg">1 미완</span></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>액션아이템 담당 배분</h3><span class="cnt alert">6</span><span class="more">전체</span></div>
+    <div class="ib-item"><div><div class="t">봉발롱 창성9차 발주서 확정 <span class="code">LLL6F39SB-R9</span></div><div class="m">2607 주간 생산회의 · 담당 생산 · 창성(CS)</div></div><span class="dd neg">D-1</span></div>
+    <div class="ib-item"><div><div class="t">다산 아이보리소가죽 입고 검수</div><div class="m">2607 주간 생산회의 · 담당 자재 · 다산(DS)</div></div><span class="dd mut">오늘</span></div>
+    <div class="ib-item"><div><div class="t">범아 청구서 CBM 배분표 작성 ₩960,395</div><div class="m">2607 정산 마감회의 · 담당 물류 · 범아글로벌</div></div><span class="dd mut">D-2</span></div>
+    <div class="ib-item"><div><div class="t">W컨셉 미수금 ₩12,100,000 회수 독촉</div><div class="m">2607 정산 마감회의 · 담당 재무 · D+4 연체</div></div><span class="dd neg">D+4</span></div>
+    <div class="ib-item"><div><div class="t">창성 불량차감 ₩142,000 결제 반영</div><div class="m">2607 정산 마감회의 · 담당 재무 · 파니에프티 3건</div></div><span class="dd mut">D-3</span></div>
+    <div class="ib-item"><div><div class="t">센텀 오픈100일 기획전 상품 구성</div><div class="m">하반기 기획전 킥오프 · 담당 마케팅 · 신세계센텀</div></div><span class="dd mut">D-5</span></div>
+  </div>
+</section>
+
+<section class="screen" id="screen-files">
+  <div class="page-h">
+    <h1>자료실</h1>
+    <p>팀별 폴더와 최근 업로드 문서를 관리</p>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <div class="card-h"><h3>디자인</h3><span class="cnt">42</span></div>
+      <div class="mini">사양서 · 도식화 · 컬러웨이 · 샘플 품평</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>마케팅</h3><span class="cnt">68</span></div>
+      <div class="mini">기획전 · 콘텐츠 · 광고소재 · 룩북</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>생산물류</h3><span class="cnt">55</span></div>
+      <div class="mini">발주서 · BOM · 원가마스터 · 청구서</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <div class="card-h"><h3>재무회계</h3><span class="cnt">37</span></div>
+      <div class="mini">정산표 · 세금계산서 · 미수미지급</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>원산지 FTA</h3><span class="cnt">19</span></div>
+      <div class="mini">원산지증명 · 수출서류 · HS코드</div>
+    </div>
+    <span class="spacer"></span>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>최근 파일</h3><span class="cnt">8</span><span class="more">전체</span></div>
+    <table class="tbl">
+      <thead>
+        <tr><th>파일명</th><th>유형</th><th>업로더</th><th>일자</th></tr>
+      </thead>
+      <tr><td>범아글로벌_청구서_2607.pdf</td><td><span class="wtag">PDF</span></td><td>물류팀</td><td class="tnum">07-09</td></tr>
+      <tr><td>LUMEN_원가마스터_v9.xlsx</td><td><span class="wtag">XLSX</span></td><td>생산팀</td><td class="tnum">07-08</td></tr>
+      <tr><td>봉발롱_창성9차_발주서.pdf <span class="code">LLL6F39SB-R9</span></td><td><span class="wtag">PDF</span></td><td>생산팀</td><td class="tnum">07-07</td></tr>
+      <tr><td>아쎄르더비백_사양서.pdf <span class="code">AT26HB001</span></td><td><span class="wtag">PDF</span></td><td>디자인팀</td><td class="tnum">07-05</td></tr>
+      <tr><td>센텀_오픈100일_기획전_기획안.pptx</td><td><span class="wtag">PPTX</span></td><td>마케팅팀</td><td class="tnum">07-04</td></tr>
+      <tr><td>FTA_원산지증명_iQuest_2607.pdf</td><td><span class="wtag">PDF</span></td><td>재무팀</td><td class="tnum">07-03</td></tr>
+      <tr><td>BOM_파니에쁘띠.xlsx <span class="code">LLL6F13EB</span></td><td><span class="wtag">XLSX</span></td><td>생산팀</td><td class="tnum">07-02</td></tr>
+      <tr><td>미수미지급_정산표_2606.xlsx</td><td><span class="wtag">XLSX</span></td><td>재무팀</td><td class="tnum">07-01</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="screen" id="screen-stddash">
+  <div class="page-h">
+    <h1>표준 대시보드</h1>
+    <p>위젯 조립형 · 진행 현황과 최근 활동 요약</p>
+  </div>
+
+  <div class="seg">
+    <button class="on">표준</button>
+    <button>생산</button>
+    <button>재무</button>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="lb">진행 발주</div><div class="vl tnum">3건</div><div class="sub"><span class="up">▲ 1</span> 전주대비</div></div>
+    <div class="kpi"><div class="lb">샘플 진행</div><div class="vl tnum">2건</div><div class="sub"><span class="mini">품평 07-04 완료</span></div></div>
+    <div class="kpi"><div class="lb">미수금</div><div class="vl tnum">₩26.2M</div><div class="sub"><span class="down">▲ D+4</span> W컨셉 연체</div></div>
+    <div class="kpi"><div class="lb">리오더 대기</div><div class="vl tnum">2건</div><div class="sub"><span class="mini">봉발롱 · 파니에쁘띠</span></div></div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <div class="card-h"><h3>발주 상태별 현황</h3><span class="cnt">3</span><span class="more">전체</span></div>
+      <div class="ib-item"><div><div class="t">봉발롱 창성9차 <span class="code">LLL6F39SB-R9</span> <span class="wtag">LUMEN</span></div><div class="m">창성(CS) · 24개(브랜드14+중국10) · 생산중</div><div class="prog"><i style="width:60%"></i></div></div><span class="when">D-1</span></div>
+      <div class="ib-item"><div><div class="t">밀란백 미디엄 <span class="wtag">OEM</span></div><div class="m">NOTHING WRITTEN · 청도통야(TY) · 승인대기</div><div class="approve-flow"><span class="step done">MD</span><span class="step-arw">→</span><span class="step now">팀장</span><span class="step-arw">→</span><span class="step">대표</span></div></div><span class="when">D-3</span></div>
+      <div class="ib-item"><div><div class="t">미드시저링 <span class="wtag">OEM</span></div><div class="m">OSOI(OS) · 샘플확정 · 발주 예정</div></div><span class="dd mut">대기</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>최근 활동 로그</h3><span class="more">전체</span></div>
+      <div class="ib-item"><div><div class="t">범아 청구서 등록 ₩960,395</div><div class="m">31CT / 2.25CBM · CBM 배분 대기</div></div><span class="when">오늘</span></div>
+      <div class="ib-item"><div><div class="t">창성 불량차감 ₩142,000 등록</div><div class="m">파니에쁘띠 3건 · 다음 결제 차감</div></div><span class="when">오늘</span></div>
+      <div class="ib-item"><div><div class="t">W컨셉 미수 연체 알림</div><div class="m">₩12,100,000 · D+4 경과</div></div><span class="dd neg">연체</span></div>
+      <div class="ib-item"><div><div class="t">다산 아이보리소가죽 입고</div><div class="m">봉발롱 창성9차 자재 · 검수완료</div></div><span class="when">어제</span></div>
+      <div class="ib-item"><div><div class="t">봉발롱 창성9차 발주 승인</div><div class="m">대표 최종승인 · LLL6F39SB-R9</div></div><span class="when">07-08</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h3>정산 요약 위젯</h3><span class="more">전체</span></div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="lb">미수금 합계</div><div class="vl tnum">₩26.2M</div><div class="sub"><span class="mini">W컨셉 · iQuest · 29CM</span></div></div>
+      <div class="kpi"><div class="lb">미지급 합계</div><div class="vl tnum">₩11.4M</div><div class="sub"><span class="mini">창성 · 다산</span></div></div>
+    </div>
+  </div>
+</section>
+
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: 기획전 -->
+<div class="overlay" id="ov-ev" onclick="if(event.target===this)close_('ov-ev')">
+  <div class="modal">
+    <div class="modal-h"><div><div class="kk" id="ev-tag">신세계 센텀</div><h2 id="ev-title">오픈 100일 · 시즌오프</h2><div class="mini" id="ev-meta" style="margin-top:3px">[7.10–20] · 시즌오프 up to 50% + 전상품 15% · GIFT 사은품 · 럭키드로우</div></div><button class="x" onclick="close_('ov-ev')">×</button></div>
+    <div class="modal-b">
+      <div class="row" style="align-items:center;margin-bottom:12px"><b style="font-size:12.5px;font-weight:600">팀별 업무</b><span class="spacer"></span><span class="mini">진행률 <b style="color:var(--ink)" id="ev-pct">3 / 6</b></span></div>
+      <div class="prog" style="margin-bottom:16px"><i id="ev-bar" style="width:50%"></i></div>
+      <div id="ev-tasks"></div>
+      <div class="row" style="align-items:center;margin-top:18px;padding-top:15px;border-top:1px solid var(--line2)">
+        <span class="mini">맥락 코멘트 · @멘션 → 슬랙 알림</span><span class="spacer"></span><button class="btn sm">회의록</button><button class="btn pri sm">코멘트</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: 공지 -->
+<div class="overlay" id="ov-nt" onclick="if(event.target===this)close_('ov-nt')">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-h"><div><div class="kk">고정 · 사내공지</div><h2>[공지] 26FW 1차 프리뷰 일정 확정</h2><div class="mini" style="margin-top:3px">대표 · 2026.07.09</div></div><button class="x" onclick="close_('ov-nt')">×</button></div>
+    <div class="modal-b">
+      <p style="font-size:13px;line-height:1.75;color:var(--strong)">26FW 1차 프리뷰를 8/11 진행합니다. 자사몰 8/18 오픈 예정이며, 각 팀 상품컷 · 상세페이지 · 광고 소재를 8/8까지 준비 바랍니다. 확인 후 아래 버튼을 눌러주세요.</p>
+      <div class="row" style="align-items:center;margin-top:20px;padding-top:15px;border-top:1px solid var(--line2)">
+        <span class="mini">확인한 인원 <b style="color:var(--ink)" id="nt-cnt">12</b> / 35명</span><span class="spacer"></span>
+        <button class="btn pri" id="nt-btn" onclick="ackNotice()">확인함 표시</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var TASKS={
+  centum:{tag:'신세계 센텀',title:'오픈 100일 · 시즌오프',meta:'[7.10–20] · 시즌오프 up to 50% + 전상품 15% · GIFT 사은품 · 럭키드로우',
+    tasks:[['MD','할인율 설정 · 대상상품 선정 · 판매가',1],['비주얼','센텀 배너 · 상세페이지 · 사이트 반영',1],['디자인','사은품 · 네임택 각인 디자인',1],['마케팅','카카오 발송 · SNS 예고',0],['물류CS','사은품 준비 · 재고 확인 · 럭키드로우',0],['쇼룸','센텀 매장 세팅 · POS 할인 등록',0]]},
+  summer:{tag:'자사몰 · 전 채널',title:'Lumen with SUMMER',meta:'[7.6–12] · 트위그 · 라피아 · 그리드 · 오브 크로쉐 · 썸머슈즈 20%',
+    tasks:[['MD','대상 SKU 선정 · 쿠폰 기획',1],['비주얼','자사몰 배너 · 상세 · 썸네일',1],['마케팅','인스타 · 샤오홍슈 예고 · 시딩',0],['디자인','썸머 컷 누끼 · 보정',1],['물류CS','재고 채널 배분 · 품절 체크',0],['쇼룸','한남 SUMMER 디피',0]]}
+};
+function renderTasks(k){
+  var d=TASKS[k];document.getElementById('ev-tag').textContent=d.tag;document.getElementById('ev-title').textContent=d.title;document.getElementById('ev-meta').textContent=d.meta;
+  var box=document.getElementById('ev-tasks');box.innerHTML='';
+  d.tasks.forEach(function(t){
+    var done=t[2]===1;
+    var row=document.createElement('div');row.className='task-row'+(done?' on':'');
+    row.innerHTML='<span class="chk'+(done?' on':'')+'">'+(done?'✓':'')+'</span><span class="team">'+t[0]+'</span><span class="tt">'+t[1]+'</span>';
+    row.querySelector('.chk').onclick=function(){var on=row.classList.toggle('on');var c=row.querySelector('.chk');c.classList.toggle('on',on);c.textContent=on?'✓':'';updPct();};
+    box.appendChild(row);
+  });
+  updPct();
+}
+function updPct(){var rows=document.querySelectorAll('#ev-tasks .task-row');var on=document.querySelectorAll('#ev-tasks .task-row.on').length;document.getElementById('ev-pct').textContent=on+' / '+rows.length;document.getElementById('ev-bar').style.width=(on/rows.length*100)+'%';}
+function openEv(k){renderTasks(k);document.getElementById('ov-ev').classList.add('show');}
+function openNotice(){document.getElementById('ov-nt').classList.add('show');}
+function close_(id){document.getElementById(id).classList.remove('show');}
+var acked=false;
+function ackNotice(){var b=document.getElementById('nt-btn');if(!acked){acked=true;document.getElementById('nt-cnt').textContent='13';b.textContent='확인 완료';b.classList.remove('pri');}}
+
+var SCREENS={inbox:'Inbox',dash:'경영 현황',cal:'운영 캘린더 · 기획전',reorder:'리오더 · AI 수요예측',notice:'공지 게시판',vendors:'거래처 마스터',items:'품목 마스터',materials:'자재 마스터',samples:'샘플 관리',bom:'BOM · 원가',orders:'생산 발주',receiving:'입고 · 납품',purchase:'자재 구매',channels:'채널 판매',inventory:'재고 현황',wholesale:'홀세일 · 도매',showroom:'쇼룸',cs:'CS 관리',settlement:'매입 · 매출 정산',receivables:'미수금 · 미지급',taxinvoice:'세금계산서',meetings:'회의록',files:'자료실',stddash:'표준 대시보드'};
+function go(s,el){
+  document.querySelectorAll('.screen').forEach(function(x){x.classList.remove('active')});
+  document.getElementById('screen-'+s).classList.add('active');
+  document.getElementById('crumb').textContent=SCREENS[s];
+  document.querySelectorAll('.nav-item').forEach(function(x){x.classList.remove('active')});
+  if(el&&el.classList.contains('nav-item'))el.classList.add('active');
+  document.querySelector('.content').scrollTop=0;
+}
+function setWs(el){
+  document.querySelectorAll('.ws-pill').forEach(function(x){x.classList.remove('active')});el.classList.add('active');
+  document.querySelectorAll('.brand-grp .nav-item').forEach(function(x){x.classList.toggle('dim',el.dataset.ws==='OEM')});
+}
+function toggleTheme(){var r=document.documentElement;r.setAttribute('data-theme',r.getAttribute('data-theme')==='dark'?'light':'dark');}
+</script>
+</body>
+</html>

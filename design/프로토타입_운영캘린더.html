@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLM · 운영 캘린더</title>
+<style>
+:root{
+  --bg:#FFFFFF;--surface:#FFFFFF;--panel:#FAFAFA;
+  --ink:#0A0A0A;--strong:#171717;--muted:#525252;--faint:#A3A3A3;
+  --line:#E5E5E5;--line2:#F0F0F0;--track:#EDEDED;
+  --accent:#20E39B;--on-accent:#0A0A0A;--accent-soft:rgba(32,227,155,.14);
+  --neg:#C2352B;--wk:#FAFAF8;--today:rgba(32,227,155,.5);
+  --font:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif;
+  --lbl:150px;
+}
+:root[data-theme="dark"]{
+  --bg:#0A0A0A;--surface:#141414;--panel:#0E0E0E;--ink:#FAFAFA;--strong:#F0F0F0;--muted:#A3A3A3;--faint:#6B6B6B;
+  --line:#262626;--line2:#1B1B1B;--track:#1E1E1E;--wk:#121212;--accent-soft:rgba(32,227,155,.15);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:13px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding:26px 28px}
+.page-h{margin-bottom:20px}
+.page-h h1{font-size:19px;font-weight:600;letter-spacing:-.02em}
+.page-h p{color:var(--muted);font-size:12.5px;margin-top:4px}
+
+/* toolbar */
+.tools{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.seg{display:flex;background:var(--track);border-radius:8px;padding:3px;gap:2px}
+.seg button{padding:6px 13px;font-size:12px;color:var(--muted);font-weight:500;border-radius:6px}
+.seg button.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.nav{display:flex;align-items:center;gap:2px}
+.nav button{width:30px;height:30px;border-radius:7px;color:var(--muted);font-size:15px;display:flex;align-items:center;justify-content:center}
+.nav button:hover{background:var(--line2);color:var(--ink)}
+.nav .today{width:auto;padding:0 12px;font-size:12px;font-weight:500;border:1px solid var(--line);border-radius:7px;height:30px}
+.period{font-size:14px;font-weight:600;letter-spacing:-.01em;min-width:180px}
+.spacer{flex:1}
+.btn{padding:7px 13px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid var(--line);color:var(--ink)}
+.btn.pri{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.hint{font-size:11.5px;color:var(--faint);margin-bottom:10px}
+.hint b{color:var(--muted);font-weight:600}
+
+/* timeline */
+.tl{border:1px solid var(--line);border-radius:12px;overflow:auto;background:var(--surface);max-height:70vh}
+.tl-inner{position:relative}
+.trow{display:flex;border-bottom:1px solid var(--line2);position:relative}
+.trow:last-child{border-bottom:none}
+.tl-head{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.lbl{width:var(--lbl);min-width:var(--lbl);position:sticky;left:0;z-index:4;background:var(--surface);border-right:1px solid var(--line);padding:0 14px;display:flex;align-items:center;font-size:12.5px;font-weight:500}
+.tl-head .lbl{background:var(--panel);font-size:11px;color:var(--muted);font-weight:600}
+.cells{position:relative;flex:1}
+.hcell{position:absolute;top:0;height:100%;border-right:1px solid var(--line2);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10.5px;color:var(--muted);cursor:pointer;user-select:none}
+.cells{flex:none}
+.lane-area{flex:none}
+.hcell:hover{background:var(--line2)}
+.hcell .d{font-size:12.5px;font-weight:600;color:var(--ink)}
+.hcell .w{font-size:9.5px;color:var(--faint);margin-top:1px}
+.hcell.sun .d{color:var(--neg)}
+.hcell.wknd{background:var(--wk)}
+.hcell.today .d{color:var(--accent);}
+.hcell.today::after{content:"오늘";font-size:8px;color:var(--accent);font-weight:700}
+.lane-area{position:relative;flex:1;min-height:44px;background-image:repeating-linear-gradient(90deg,transparent,transparent calc(var(--cw) - 1px),var(--line2) calc(var(--cw) - 1px),var(--line2) var(--cw))}
+.wkbg{position:absolute;top:0;height:100%;background:var(--wk);pointer-events:none}
+.todayline{position:absolute;top:0;width:2px;height:100%;background:var(--today);pointer-events:none;z-index:2}
+.ev{position:absolute;height:22px;border-radius:6px;padding:0 8px;font-size:11px;font-weight:500;line-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;background:var(--line2);color:var(--strong);border-left:2px solid var(--faint);z-index:3}
+.ev.hi{background:var(--accent-soft);color:var(--ink);border-left-color:var(--accent);font-weight:600}
+.ev:hover{filter:brightness(.97);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.drag-sel{position:absolute;top:0;height:100%;background:var(--accent-soft);border:1px dashed var(--accent);border-radius:6px;pointer-events:none;z-index:1}
+.mono{font-variant-numeric:tabular-nums}
+
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(10,10,10,.4);display:none;align-items:center;justify-content:center;z-index:100;padding:24px;backdrop-filter:blur(3px)}
+.ov.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:14px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.22)}
+.modal-h{padding:20px 22px 16px;border-bottom:1px solid var(--line2);display:flex;align-items:flex-start;gap:12px}
+.modal-h .kk{font-size:10.5px;color:var(--muted);font-weight:600}
+.modal-h h2{font-size:16px;font-weight:600;margin-top:6px}
+.modal-h .x{margin-left:auto;font-size:20px;color:var(--faint);font-weight:300}
+.modal-b{padding:20px 22px}
+.mini{font-size:11.5px;color:var(--faint)}
+.task-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line2)}
+.task-row:last-child{border-bottom:none}
+.task-row .team{font-size:10.5px;font-weight:600;color:var(--muted);min-width:52px}
+.chk{width:18px;height:18px;border-radius:6px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--on-accent);font-size:11px}
+.chk.on{background:var(--accent);border-color:var(--accent)}
+.task-row.on .tt{color:var(--faint);text-decoration:line-through}
+.tt{flex:1;font-size:12.5px}
+.prog{height:5px;background:var(--line2);border-radius:5px;overflow:hidden;margin-bottom:14px}
+.prog>i{display:block;height:100%;background:var(--accent)}
+.fld{display:block;margin:10px 0}
+.fld label{font-size:11px;color:var(--muted);font-weight:600;display:block;margin-bottom:4px}
+.fld input,.fld select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--ink)}
+.row2{display:flex;gap:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="page-h"><h1>운영 캘린더 · 기획전</h1><p>채널별 기획전을 날짜 정밀 타임라인으로. 드래그로 기간을 그어 새 기획전을 만드세요.</p></div>
+
+  <div class="tools">
+    <div class="seg" id="viewSeg">
+      <button data-v="year">연간</button>
+      <button data-v="half">반기</button>
+      <button data-v="quarter">분기</button>
+      <button data-v="month" class="on">월</button>
+      <button data-v="week">주</button>
+      <button data-v="day">일</button>
+    </div>
+    <div class="nav">
+      <button onclick="shift(-1)">‹</button>
+      <button class="today" onclick="goToday()">오늘</button>
+      <button onclick="shift(1)">›</button>
+    </div>
+    <div class="period" id="period"></div>
+    <span class="spacer"></span>
+    <button class="btn pri" onclick="quickAdd()">+ 기획전</button>
+  </div>
+  <div class="hint" id="hint"></div>
+
+  <div class="tl"><div class="tl-inner" id="tl"></div></div>
+</div>
+
+<!-- 기획전 상세 -->
+<div class="ov" id="ov-ev" onclick="if(event.target===this)hide('ov-ev')">
+  <div class="modal">
+    <div class="modal-h"><div><div class="kk" id="ev-ch"></div><h2 id="ev-title"></h2><div class="mini" id="ev-range" style="margin-top:3px"></div></div><button class="x" onclick="hide('ov-ev')">×</button></div>
+    <div class="modal-b">
+      <div style="display:flex;align-items:center;margin-bottom:10px"><b style="font-size:12.5px">팀별 업무</b><span class="spacer" style="flex:1"></span><span class="mini">진행률 <b style="color:var(--ink)" id="ev-pct"></b></span></div>
+      <div class="prog"><i id="ev-bar"></i></div>
+      <div id="ev-tasks"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 새 기획전 -->
+<div class="ov" id="ov-new" onclick="if(event.target===this)hide('ov-new')">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-h"><div><div class="kk">새 기획전</div><h2>기획전 추가</h2></div><button class="x" onclick="hide('ov-new')">×</button></div>
+    <div class="modal-b">
+      <div class="fld"><label>기획전 이름</label><input id="n-title" placeholder="예: 여름 시즌오프"></div>
+      <div class="fld"><label>채널</label><select id="n-ch"></select></div>
+      <div class="row2">
+        <div class="fld" style="flex:1"><label>시작일</label><input id="n-start" type="date"></div>
+        <div class="fld" style="flex:1"><label>종료일</label><input id="n-end" type="date"></div>
+      </div>
+      <button class="btn pri" style="width:100%;margin-top:8px" onclick="createEvent()">추가</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var CH=['자사몰','신세계 센텀','29CM','W컨셉','해외 (영문)','쇼룸 한남'];
+var TODAY=new Date(2026,6,10);
+var view='month', anchor=new Date(2026,6,1);
+var uid=100;
+var events=[
+  {id:1,ch:'자사몰',title:'Lumen with SUMMER',start:'2026-07-06',end:'2026-07-12',hi:false},
+  {id:2,ch:'자사몰',title:'SUMMER 2차',start:'2026-07-17',end:'2026-07-23',hi:false},
+  {id:3,ch:'자사몰',title:'시즌오프',start:'2026-07-24',end:'2026-07-31',hi:false},
+  {id:4,ch:'신세계 센텀',title:'오픈100일 · 시즌오프',start:'2026-07-10',end:'2026-07-20',hi:true},
+  {id:5,ch:'29CM',title:'바캉스 기획전',start:'2026-07-01',end:'2026-07-07',hi:false},
+  {id:6,ch:'29CM',title:'시즌오프',start:'2026-07-24',end:'2026-07-31',hi:false},
+  {id:7,ch:'W컨셉',title:'W ONLY · 72H 특가',start:'2026-07-06',end:'2026-07-12',hi:false},
+  {id:8,ch:'해외 (영문)',title:'Summer 프로모션',start:'2026-07-09',end:'2026-07-23',hi:false},
+  {id:9,ch:'쇼룸 한남',title:'Lumen with SUMMER',start:'2026-07-06',end:'2026-07-12',hi:false},
+  {id:10,ch:'쇼룸 한남',title:'시즌오프',start:'2026-07-24',end:'2026-07-31',hi:false},
+  {id:11,ch:'자사몰',title:'26FW 1차 프리뷰',start:'2026-08-11',end:'2026-08-11',hi:true},
+  {id:12,ch:'자사몰',title:'26FW 1차 오픈',start:'2026-08-18',end:'2026-08-24',hi:true},
+  {id:13,ch:'신세계 센텀',title:'센텀 여름 마감',start:'2026-06-20',end:'2026-06-30',hi:false}
+];
+var TASKS={
+  '오픈100일 · 시즌오프':[['MD','할인율 · 대상상품 · 판매가',1],['비주얼','센텀 배너 · 상세 · 사이트',1],['디자인','사은품 · 네임택 각인',1],['마케팅','카카오 · SNS 예고',0],['물류CS','사은품 · 재고 · 럭키드로우',0],['쇼룸','매장 세팅 · POS 할인',0]],
+  'Lumen with SUMMER':[['MD','대상 SKU · 쿠폰 기획',1],['비주얼','배너 · 상세 · 썸네일',1],['마케팅','인스타 · 샤오홍슈 · 시딩',0],['디자인','썸머 컷 누끼',1],['물류CS','재고 채널 배분',0],['쇼룸','한남 디피',0]]
+};
+
+var VLABEL={year:'연간',half:'반기',quarter:'분기',month:'월',week:'주',day:'일'};
+function ymd(dt){return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}
+function D(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+function addD(dt,n){var x=new Date(dt);x.setDate(x.getDate()+n);return x;}
+function diffD(a,b){return Math.round((b-a)/86400000);}
+function startWeek(dt){var x=new Date(dt);var w=(x.getDay()+6)%7;x.setDate(x.getDate()-w);return x;}
+function monIdx(dt){return dt.getFullYear()*12+dt.getMonth();}
+function WD(dt){return ['월','화','수','목','금','토','일'][(dt.getDay()+6)%7];}
+var isSun=function(dt){return dt.getDay()===0;}, isWknd=function(dt){return dt.getDay()===0||dt.getDay()===6;};
+
+function monthBand(start,count,mincw){var c=[];for(var i=0;i<count;i++)c.push(new Date(start.getFullYear(),start.getMonth()+i,1));return{unit:'month',start:start,cols:c,mincw:mincw};}
+function getBands(){
+  if(view==='day'){return[{unit:'day',start:new Date(anchor),cols:[new Date(anchor)],mincw:200}];}
+  if(view==='week'){var s=startWeek(anchor);var cols=[];for(var i=0;i<7;i++)cols.push(addD(s,i));return[{unit:'day',start:s,cols:cols,mincw:96}];}
+  if(view==='month'){var s=new Date(anchor.getFullYear(),anchor.getMonth(),1);var days=new Date(anchor.getFullYear(),anchor.getMonth()+1,0).getDate();var cols=[];for(var i=0;i<days;i++)cols.push(addD(s,i));return[{unit:'day',start:s,cols:cols,mincw:34}];}
+  if(view==='quarter'){var q=Math.floor(anchor.getMonth()/3);return[monthBand(new Date(anchor.getFullYear(),q*3,1),3,150)];}
+  if(view==='half'){return[monthBand(new Date(anchor.getFullYear(),anchor.getMonth()<6?0:6,1),6,120)];}
+  // 연간 → 두 줄: 1~6월 / 7~12월
+  var y=anchor.getFullYear();
+  return[monthBand(new Date(y,0,1),6,120), monthBand(new Date(y,6,1),6,120)];
+}
+function periodLabel(){
+  var y=anchor.getFullYear();
+  if(view==='day')return y+'년 '+(anchor.getMonth()+1)+'월 '+anchor.getDate()+'일 ('+WD(anchor)+')';
+  if(view==='week'){var s=startWeek(anchor);var e=addD(s,6);return ymd(s).slice(0,10)+' – '+ymd(e).slice(5);}
+  if(view==='month')return y+'년 '+(anchor.getMonth()+1)+'월';
+  if(view==='quarter')return y+'년 '+(Math.floor(anchor.getMonth()/3)+1)+'분기';
+  if(view==='half')return y+'년 '+(anchor.getMonth()<6?'상반기':'하반기');
+  return y+'년';
+}
+function evPos(ev,R){
+  var s=D(ev.start),e=D(ev.end);
+  var si,ei;
+  if(R.unit==='day'){si=diffD(R.start,s);ei=diffD(R.start,e);}
+  else {si=monIdx(s)-monIdx(R.start);ei=monIdx(e)-monIdx(R.start);}
+  var n=R.cols.length;
+  if(ei<0||si>n-1)return null;
+  si=Math.max(0,si);ei=Math.min(n-1,ei);
+  return{s:si,e:ei};
+}
+function assignLanes(list){
+  list.sort(function(a,b){return a._s-b._s||a._e-b._e;});
+  var lanes=[];
+  list.forEach(function(e){
+    var put=-1;
+    for(var i=0;i<lanes.length;i++){if(lanes[i]<e._s){put=i;break;}}
+    if(put<0){put=lanes.length;lanes.push(0);}
+    e._lane=put;lanes[put]=e._e;
+  });
+  return lanes.length||1;
+}
+
+function buildBand(band,cw){
+  var cols=band.cols,n=cols.length,unit=band.unit,html='';
+  html+='<div class="trow tl-head"><div class="lbl">채널</div><div class="cells" style="height:44px;width:'+(n*cw)+'px">';
+  cols.forEach(function(c,i){
+    var cls='hcell',lab='',sub='';
+    if(unit==='day'){
+      cls+=isSun(c)?' sun':'';cls+=isWknd(c)?' wknd':'';
+      if(ymd(c)===ymd(TODAY))cls+=' today';
+      lab=c.getDate();sub=WD(c);
+      if(view==='day'){lab=(c.getMonth()+1)+'월 '+c.getDate()+'일';sub=WD(c)+'요일';}
+    } else {lab=(c.getMonth()+1)+'월';sub=c.getFullYear();}
+    html+='<div class="'+cls+'" style="left:'+(i*cw)+'px;width:'+cw+'px" onclick="zoom(\''+ymd(c)+'\')"><span class="d">'+lab+'</span><span class="w">'+sub+'</span></div>';
+  });
+  html+='</div></div>';
+  CH.forEach(function(ch){
+    var evs=[];
+    events.filter(function(e){return e.ch===ch;}).forEach(function(e){var p=evPos(e,band);if(p){e._s=p.s;e._e=p.e;evs.push(e);}});
+    var lanes=assignLanes(evs);var rowH=lanes*26+10;
+    html+='<div class="trow"><div class="lbl">'+ch+'</div>';
+    html+='<div class="lane-area" data-ch="'+ch+'" style="--cw:'+cw+'px;width:'+(n*cw)+'px;height:'+rowH+'px">';
+    if(unit==='day'){
+      cols.forEach(function(c,i){if(isWknd(c))html+='<div class="wkbg" style="left:'+(i*cw)+'px;width:'+cw+'px"></div>';});
+      var ti=diffD(band.start,TODAY);if(ti>=0&&ti<n)html+='<div class="todayline" style="left:'+(ti*cw+cw/2)+'px"></div>';
+    }
+    evs.forEach(function(e){
+      var left=e._s*cw+2, w=(e._e-e._s+1)*cw-4, top=e._lane*26+5;
+      var rng=e.start.slice(5)+(e.start!==e.end?'–'+e.end.slice(5):'');
+      html+='<div class="ev'+(e.hi?' hi':'')+'" style="left:'+left+'px;width:'+w+'px;top:'+top+'px" onclick="openEv('+e.id+')" title="'+e.title+' ('+rng+')">'+e.title+'</div>';
+    });
+    html+='</div></div>';
+  });
+  return html;
+}
+function render(){
+  var bands=getBands();var n0=bands[0].cols.length;
+  var availW=(document.querySelector('.tl').clientWidth||1120)-154;
+  var cw=Math.max(bands[0].mincw, availW/n0);
+  document.getElementById('period').textContent=periodLabel();
+  document.getElementById('hint').innerHTML = (bands[0].unit==='day')
+    ? '빈 칸을 <b>드래그</b>하면 기간이 그어져 새 기획전이 만들어집니다 · 날짜 헤더 클릭 시 확대 · 막대 클릭 시 팀별 업무'
+    : '월 단위 개요 · 막대/헤더를 클릭하면 해당 월로 <b>확대</b>' + (bands.length>1?' · 위 1–6월 / 아래 7–12월':'');
+  var tl=document.getElementById('tl');
+  tl.innerHTML=bands.map(function(b,i){return (i>0?'<div style="height:18px"></div>':'')+buildBand(b,cw);}).join('');
+  tl.style.width=(150+n0*cw)+'px';
+  if(bands[0].unit==='day')attachDrag(bands[0],cw);
+}
+
+/* 드래그로 기간 선택 → 생성 */
+function attachDrag(R,cw){
+  document.querySelectorAll('.lane-area').forEach(function(area){
+    area.addEventListener('mousedown',function(ev){
+      if(ev.target.classList.contains('ev'))return;
+      var rect=area.getBoundingClientRect();
+      var c0=Math.floor((ev.clientX-rect.left)/cw);
+      var sel=document.createElement('div');sel.className='drag-sel';area.appendChild(sel);
+      var ch=area.dataset.ch;
+      function mv(e){
+        var c1=Math.floor((e.clientX-rect.left)/cw);
+        var a=Math.max(0,Math.min(c0,c1)),b=Math.min(R.cols.length-1,Math.max(c0,c1));
+        sel.style.left=(a*cw)+'px';sel.style.width=((b-a+1)*cw)+'px';sel._a=a;sel._b=b;
+      }
+      function up(e){
+        document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);
+        var a=sel._a,b=sel._b;area.removeChild(sel);
+        if(a==null)a=c0,b=c0;
+        openNew(ch,ymd(R.cols[a]),ymd(R.cols[b]));
+      }
+      document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
+      mv(ev);
+    });
+  });
+}
+
+function zoom(ds){
+  anchor=D(ds);
+  if(view==='year'||view==='half'||view==='quarter')view='month';
+  else if(view==='month'||view==='week')view='day';
+  else return;
+  syncSeg();render();
+}
+function shift(dir){
+  if(view==='day')anchor=addD(anchor,dir);
+  else if(view==='week')anchor=addD(anchor,7*dir);
+  else if(view==='month')anchor=new Date(anchor.getFullYear(),anchor.getMonth()+dir,1);
+  else if(view==='quarter')anchor=new Date(anchor.getFullYear(),anchor.getMonth()+3*dir,1);
+  else if(view==='half')anchor=new Date(anchor.getFullYear(),anchor.getMonth()+6*dir,1);
+  else anchor=new Date(anchor.getFullYear()+dir,anchor.getMonth(),1);
+  render();
+}
+function goToday(){anchor=new Date(TODAY);render();}
+function syncSeg(){document.querySelectorAll('#viewSeg button').forEach(function(b){b.classList.toggle('on',b.dataset.v===view);});}
+
+/* 상세 */
+function openEv(id){
+  var e=events.find(function(x){return x.id===id;});
+  document.getElementById('ev-ch').textContent=e.ch;
+  document.getElementById('ev-title').textContent=e.title;
+  document.getElementById('ev-range').textContent='['+e.start+' – '+e.end+']';
+  var t=TASKS[e.title]||[['MD','기획 상세 작성',0],['비주얼','비주얼 소재',0],['마케팅','채널 홍보',0],['물류CS','재고·사은품',0]];
+  var box=document.getElementById('ev-tasks');box.innerHTML='';
+  t.forEach(function(r){
+    var done=r[2]===1;var div=document.createElement('div');div.className='task-row'+(done?' on':'');
+    div.innerHTML='<span class="chk'+(done?' on':'')+'">'+(done?'✓':'')+'</span><span class="team">'+r[0]+'</span><span class="tt">'+r[1]+'</span>';
+    div.querySelector('.chk').onclick=function(){var on=div.classList.toggle('on');var c=div.querySelector('.chk');c.classList.toggle('on',on);c.textContent=on?'✓':'';pct();};
+    box.appendChild(div);
+  });
+  pct();document.getElementById('ov-ev').classList.add('show');
+}
+function pct(){var rows=document.querySelectorAll('#ev-tasks .task-row');var on=document.querySelectorAll('#ev-tasks .task-row.on').length;document.getElementById('ev-pct').textContent=on+' / '+rows.length;document.getElementById('ev-bar').style.width=(on/rows.length*100)+'%';}
+
+/* 생성 */
+function openNew(ch,s,e){
+  var sel=document.getElementById('n-ch');sel.innerHTML=CH.map(function(c){return '<option'+(c===ch?' selected':'')+'>'+c+'</option>';}).join('');
+  document.getElementById('n-title').value='';document.getElementById('n-start').value=s;document.getElementById('n-end').value=e;
+  document.getElementById('ov-new').classList.add('show');setTimeout(function(){document.getElementById('n-title').focus();},50);
+}
+function quickAdd(){var s=ymd(anchor);openNew(CH[0],s,s);}
+function createEvent(){
+  var t=document.getElementById('n-title').value.trim()||'새 기획전';
+  events.push({id:++uid,ch:document.getElementById('n-ch').value,title:t,start:document.getElementById('n-start').value,end:document.getElementById('n-end').value,hi:false});
+  hide('ov-new');render();
+}
+function hide(id){document.getElementById(id).classList.remove('show');}
+
+document.getElementById('viewSeg').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;view=b.dataset.v;syncSeg();render();});
+var rz;window.addEventListener('resize',function(){clearTimeout(rz);rz=setTimeout(render,120);});
+render();
+</script>
+</body>
+</html>
