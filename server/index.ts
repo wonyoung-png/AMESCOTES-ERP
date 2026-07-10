@@ -15,6 +15,28 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
+  // ─── 공개 배포 접근 보호 (SHARE_PASS 설정 시에만 활성) ───
+  // 외부 URL로 열 때 원가·거래처·재무 데이터 노출 방지용 1차 관문.
+  // 로컬/사내 LAN에서는 SHARE_PASS 미설정 → 게이트 없음(그대로 접속).
+  const SHARE_USER = process.env.SHARE_USER || "atlm";
+  const SHARE_PASS = process.env.SHARE_PASS;
+  if (SHARE_PASS) {
+    app.use((req, res, next) => {
+      const header = req.headers.authorization || "";
+      const [scheme, encoded] = header.split(" ");
+      if (scheme === "Basic" && encoded) {
+        const decoded = Buffer.from(encoded, "base64").toString("utf8");
+        const sep = decoded.indexOf(":");
+        const user = decoded.slice(0, sep);
+        const pass = decoded.slice(sep + 1);
+        if (user === SHARE_USER && pass === SHARE_PASS) return next();
+      }
+      res.set("WWW-Authenticate", 'Basic realm="AMESCOTES ERP", charset="UTF-8"');
+      res.status(401).send("접근하려면 인증이 필요합니다. (Authorization required)");
+    });
+    console.log("🔒 공개 접근 보호 활성화 (Basic Auth)");
+  }
+
   // JSON 파싱 미들웨어
   app.use(express.json({ limit: "10mb" }));
 
