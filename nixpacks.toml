@@ -1,0 +1,13 @@
+# Railway/Nixpacks 빌드 설정
+# 목적: pnpm 자동선택을 차단하고 npm(.npmrc legacy-peer-deps)으로 설치 강제 + Node 고정
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["npm install --legacy-peer-deps"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run start"
