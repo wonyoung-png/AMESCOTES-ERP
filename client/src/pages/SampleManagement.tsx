@@ -1,5 +1,6 @@
 // AMESCOTES ERP — 샘플 관리 (Phase 1 전면 재작성)
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { useLocation, useSearch } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -82,6 +83,11 @@ function createTempItem(styleName: string, season: Season): Item {
     material: '',
     salePriceKrw: 0,
     hasBom: false,
+    colors: [
+      { name: '블랙', leatherColor: 'BLK' },
+      { name: '브라운', leatherColor: 'BRN' },
+      { name: '샌드베이지', leatherColor: 'SB' },
+    ],
     createdAt: now.toISOString(),
   };
 }
@@ -103,15 +109,15 @@ export default function SampleManagement() {
 
   // 월별 통계 상태 + 필터
   const [statMonth, setStatMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [statFilterSalesPerson, setStatFilterSalesPerson] = useState('all');
-  const [statFilterAssignee, setStatFilterAssignee] = useState('all');
-  const [statFilterBuyer, setStatFilterBuyer] = useState('all');
-  const [statFilterSeason, setStatFilterSeason] = useState('all');
+  const [statFilterSalesPerson, setStatFilterSalesPerson] = usePersistedState('samples.statFilterSalesPerson', 'all');
+  const [statFilterAssignee, setStatFilterAssignee] = usePersistedState('samples.statFilterAssignee', 'all');
+  const [statFilterBuyer, setStatFilterBuyer] = usePersistedState('samples.statFilterBuyer', 'all');
+  const [statFilterSeason, setStatFilterSeason] = usePersistedState('samples.statFilterSeason', 'all');
 
-  const [search, setSearch] = useState('');
-  const [filterStage, setFilterStage] = useState('진행중');
-  const [filterBilling, setFilterBilling] = useState('all');
-  const [filterSeason, setFilterSeason] = useState('all');
+  const [search, setSearch] = usePersistedState('samples.search', '');
+  const [filterStage, setFilterStage] = usePersistedState('samples.filterStage', '진행중');
+  const [filterBilling, setFilterBilling] = usePersistedState('samples.filterBilling', 'all');
+  const [filterSeason, setFilterSeason] = usePersistedState('samples.filterSeason', 'all');
   const [filterBuyer, setFilterBuyer] = useState('all');
   const [filterAssignee, setFilterAssignee] = useState('all');
   // 정렬: 의뢰일 최신순 기본값

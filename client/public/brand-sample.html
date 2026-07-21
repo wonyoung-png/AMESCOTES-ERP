@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLM 통합 ERP — 구성 샘플</title>
+<style>
+:root{
+  --bg:#FAFAFA;--surface:#FFF;--sidebar:#FFF;--ink:#0A0A0A;--muted:#525252;--faint:#A3A3A3;
+  --line:#E5E5E5;--line2:#F0F0F0;--track:#EDEDED;
+  --accent:#20E39B;--on-accent:#0A0A0A;--accent-soft:rgba(32,227,155,.12);
+  --neg:#DC2626;--neg-soft:#FEE2E2;--pos:#059669;--warn:#D97706;
+  --radius:10px;--font:'Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.5}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:220px;min-width:220px;background:var(--sidebar);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto}
+.sb-brand{padding:18px 16px 12px;display:flex;align-items:center;gap:10px}
+.sb-logo{width:30px;height:30px;border-radius:8px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+.sb-brand b{font-size:13px;font-weight:600}
+.sb-brand span{font-size:10px;color:var(--faint);display:block}
+.ws-switch{margin:0 12px 12px;background:var(--track);border-radius:8px;padding:3px;display:flex;gap:2px}
+.ws-pill{flex:1;font-size:11px;padding:6px 2px;border-radius:6px;color:var(--muted);text-align:center;font-weight:500}
+.ws-pill.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.sb-inbox{margin:0 12px 10px;padding:9px 12px;border-radius:8px;background:var(--accent);color:var(--on-accent);font-weight:600;font-size:12px;display:flex;align-items:center}
+.sb-inbox .badge{margin-left:auto;background:rgba(0,0,0,.12);border-radius:10px;padding:1px 7px;font-size:10px}
+.sb-label{font-size:9px;font-weight:600;color:var(--faint);letter-spacing:.08em;text-transform:uppercase;padding:8px 16px 4px}
+.nav-item{display:flex;align-items:center;width:calc(100% - 16px);margin:1px 8px;padding:7px 10px;border-radius:7px;font-size:12px;color:var(--muted);text-align:left}
+.nav-item:hover{background:var(--line2);color:var(--ink)}
+.nav-item.on{background:var(--accent-soft);color:var(--ink);font-weight:600}
+.nav-item .tag{margin-left:auto;font-size:9px;background:var(--accent-soft);color:var(--pos);padding:1px 5px;border-radius:4px;font-weight:600}
+.nav-item.off{opacity:.35}
+.nav-oem,.nav-brand{display:none}
+.nav-oem.show,.nav-brand.show{display:block}
+.wtag{font-size:9px;padding:1px 6px;border-radius:4px;background:var(--line2);color:var(--muted);font-weight:600}
+.wtag.oem{background:#E0E7FF;color:#3730A3}
+.wtag.brand{background:var(--accent-soft);color:#065F46}
+.approve-flow{display:flex;align-items:center;gap:2px;margin-top:6px;font-size:9px}
+.step{padding:2px 6px;border-radius:4px;background:var(--line2);color:var(--faint)}
+.step.done{background:var(--accent-soft);color:var(--pos)}
+.step.now{background:#FEF3C7;color:#92400E;font-weight:600}
+.step-arw{color:var(--faint);font-size:8px}
+.sb-foot{margin-top:auto;padding:12px 16px;font-size:10px;color:var(--faint);border-top:1px solid var(--line2)}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 20px;gap:8px;background:var(--surface)}
+.tb-crumb{font-size:13px;font-weight:600}
+.tb-search{margin-left:auto;background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 10px;font-size:11px;color:var(--faint);width:200px}
+.tb-user{width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600}
+.content{flex:1;overflow-y:auto;padding:24px 28px}
+.screen{display:none;animation:fade .25s ease}
+.screen.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.page-h{margin-bottom:20px}
+.page-h h1{font-size:18px;font-weight:600;letter-spacing:-.02em}
+.page-h p{font-size:12px;color:var(--muted);margin-top:3px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.kpi .lb{font-size:11px;color:var(--muted)}
+.kpi .vl{font-size:20px;font-weight:600;margin-top:6px;letter-spacing:-.02em}
+.kpi .sub{font-size:10px;color:var(--faint);margin-top:4px}
+.up{color:var(--pos)}.down{color:var(--neg)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px}
+.card-h{padding:12px 16px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:8px}
+.card-h h3{font-size:12px;font-weight:600}
+.card-h .more{margin-left:auto;font-size:10px;color:var(--faint)}
+.row{display:flex;gap:14px}
+.row>.card{flex:1}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:9px;color:var(--faint);font-weight:600;text-align:left;padding:8px 14px;border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.04em}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--line2);font-size:12px}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--line2)}
+.code{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted)}
+.pill{font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;display:inline-block}
+.pill.g{background:#D1FAE5;color:#065F46}
+.pill.y{background:#FEF3C7;color:#92400E}
+.pill.r{background:var(--neg-soft);color:var(--neg)}
+.pill.b{background:#DBEAFE;color:#1D4ED8}
+.pill.m{background:var(--line2);color:var(--muted)}
+.seg{display:inline-flex;background:var(--track);border-radius:7px;padding:2px;gap:1px}
+.seg button{padding:5px 11px;font-size:11px;color:var(--muted);border-radius:5px;font-weight:500}
+.seg button.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.filters select,.filters input{border:1px solid var(--line);border-radius:6px;padding:5px 9px;font-size:11px;background:var(--surface)}
+.kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.kcol{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);min-height:280px}
+.kcol-h{padding:10px 12px;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.kcard{margin:8px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:11.5px;cursor:pointer}
+.kcard:hover{border-color:var(--accent)}
+.kcard .t{font-weight:600;margin-bottom:4px}
+.kcard .m{font-size:10px;color:var(--faint)}
+.kcard .tags{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
+.tag{font-size:9px;padding:1px 6px;border-radius:4px;background:var(--line2);color:var(--muted);font-weight:600}
+.tag.rev{background:#FEF3C7;color:#92400E}
+.tag.late{background:var(--neg-soft);color:var(--neg)}
+.ring{width:36px;height:36px;border-radius:50%;background:conic-gradient(var(--accent) 0 72%,var(--line2) 72% 100%);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
+.ring i{width:26px;height:26px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center}
+.cal-ev{display:block;font-size:10px;padding:4px 7px;border-radius:5px;margin-bottom:3px;border-left:2px solid var(--line);background:var(--line2);cursor:pointer}
+.cal-ev.on{border-left-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.cal-ev.draft{opacity:.55;border-style:dashed}
+.cal-ev.closed{opacity:.5}
+.widget-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+.wg{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.wg.span6{grid-column:span 6}.wg.span4{grid-column:span 4}.wg.span8{grid-column:span 8}.wg.span12{grid-column:span 12}
+.wg-title{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:10px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:99;padding:20px}
+.overlay.show{display:flex}
+.modal{background:var(--surface);border-radius:12px;max-width:720px;width:100%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal-h{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:12px}
+.modal-h h2{font-size:16px;font-weight:600}
+.modal-h .x{margin-left:auto;font-size:18px;color:var(--faint);cursor:pointer}
+.modal-b{padding:16px 20px;overflow-y:auto;flex:1}
+.team-tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}
+.team-tab{padding:5px 12px;border-radius:6px;font-size:11px;color:var(--muted);border:1px solid var(--line)}
+.team-tab.on{background:var(--accent-soft);border-color:var(--accent);color:var(--ink);font-weight:600}
+.note-row{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line2);font-size:12px;align-items:flex-start}
+.note-row .lbl{min-width:100px;font-weight:600;color:var(--muted)}
+.banner{position:fixed;top:0;left:0;right:0;background:#1C1C1E;color:#fff;text-align:center;padding:6px;font-size:11px;z-index:200}
+.banner b{color:var(--accent)}
+.app{margin-top:28px;height:calc(100vh - 28px)}
+@media(max-width:900px){.sidebar{display:none}.kpi-grid{grid-template-columns:1fr 1fr}.kanban{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="banner">구성 <b>샘플</b> — 상단 OEM / LUMEN / AETALOOP 전환 · 클릭해서 화면 확인</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sb-brand"><div class="sb-logo">AT</div><div><b>ATLM ERP</b><span id="sb-sub">통합 ERP 구성 샘플</span></div></div>
+    <div class="ws-switch">
+      <button class="ws-pill" data-ws="OEM" onclick="setWs(this)">OEM</button>
+      <button class="ws-pill on" data-ws="LUMEN" onclick="setWs(this)">LUMEN</button>
+      <button class="ws-pill" data-ws="AETALOOP" onclick="setWs(this)">AETALOOP</button>
+    </div>
+    <button class="sb-inbox" id="sb-inbox" onclick="inboxGo()">📥 Inbox <span class="badge" id="inbox-badge">7</span></button>
+
+    <div class="nav-oem" id="nav-oem">
+      <div class="sb-label">OEM 생산</div>
+      <button class="nav-item" data-nav data-ws="OEM" onclick="go('oem-dash')">생산 대시보드</button>
+      <button class="nav-item" data-nav data-ws="OEM" onclick="go('oem-vendors')">거래처 마스터</button>
+      <button class="nav-item" data-nav data-ws="OEM" onclick="go('oem-items')">품목 마스터</button>
+      <button class="nav-item" data-nav data-ws="OEM" onclick="go('oem-samples')">샘플 관리</button>
+      <button class="nav-item" data-nav data-ws="OEM" onclick="go('oem-bom')">BOM · 원가</button>
+      <button class="nav-item" data-nav data-ws="OEM" onclick="go('oem-orders')">생산 발주</button>
+      <button class="nav-item" data-nav data-ws="OEM" onclick="go('oem-purchase')">자재 구매</button>
+      <button class="nav-item" data-nav data-ws="OEM" onclick="go('oem-receiving')">입고 · OEM 출고</button>
+      <div class="sb-label">OEM 정산</div>
+      <button class="nav-item" data-nav data-ws="OEM" onclick="go('oem-project-pl')">프로젝트 손익</button>
+      <button class="nav-item" data-nav data-ws="OEM" onclick="go('oem-cost')">생산비용 분석</button>
+    </div>
+
+    <div class="nav-brand show" id="nav-brand">
+      <div class="sb-label">내 화면</div>
+      <button class="nav-item on" data-nav data-ws="BRAND" onclick="go('dash')">내 대시보드</button>
+      <button class="nav-item" data-nav data-ws="BRAND" onclick="go('work')">업무 허브</button>
+      <div class="sb-label">브랜드 운영</div>
+      <button class="nav-item" data-nav data-ws="BRAND" onclick="go('cal')">운영 캘린더 · 기획전</button>
+      <button class="nav-item" data-nav data-ws="BRAND" onclick="go('reorder')">리오더 <span class="tag">AI</span></button>
+      <button class="nav-item" data-nav data-ws="BRAND" onclick="go('channels')">채널 설정 · 판매</button>
+      <button class="nav-item" data-nav data-ws="BRAND" onclick="go('product-pl')">제품 손익</button>
+      <button class="nav-item" data-nav data-ws="BRAND" onclick="go('campaign-pl')">기획전 손익</button>
+      <button class="nav-item" data-nav data-ws="BRAND" onclick="go('settle')">월 마감 · 정산</button>
+      <button class="nav-item" data-nav data-ws="BRAND" onclick="go('wholesale')">홀세일 (해외)</button>
+      <div class="sb-label">브랜드 생산</div>
+      <button class="nav-item" data-nav data-ws="BRAND" onclick="go('brand-orders')">브랜드 발주 · 승인</button>
+      <button class="nav-item" data-nav data-ws="BRAND" onclick="go('brand-project-pl')">프로젝트 손익</button>
+    </div>
+
+    <div class="sb-foot">OEM + 브랜드 통합 샘플</div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="tb-crumb" id="crumb">내 대시보드 · LUMEN</div>
+      <div class="tb-search">검색 ⌘K</div>
+      <div class="tb-user">MD</div>
+    </header>
+    <div class="content">
+
+      <!-- MD DASHBOARD -->
+      <section class="screen on" id="s-dash">
+        <div class="page-h"><h1>내 대시보드</h1><p>위젯 조립 — 팀 기본 + 개인 커스터마이즈 (샘플)</p></div>
+        <div class="widget-grid">
+          <div class="wg span4"><div class="wg-title">오늘 판매 · LUMEN</div><div class="vl" style="font-size:22px;font-weight:600">₩4.2M</div><div class="sub"><span class="up">▲ 18%</span> 어제 대비</div></div>
+          <div class="wg span4"><div class="wg-title">품절 임박 SKU</div><div class="vl" style="font-size:22px;font-weight:600;color:var(--neg)">3건</div><div class="sub">Panier Petit SB · Lune Forme OB …</div></div>
+          <div class="wg span4"><div class="wg-title">기획전 D-7 이내</div><div class="vl" style="font-size:22px;font-weight:600">2건</div><div class="sub">센텀 오픈100일 · 여름 시즌오프</div></div>
+          <div class="wg span6">
+            <div class="wg-title">채널별 오늘</div>
+            <table class="tbl"><tr><td>W컨셉</td><td style="text-align:right;font-weight:600">₩1.8M</td><td class="code">실판매가</td></tr>
+            <tr><td>29CM</td><td style="text-align:right;font-weight:600">₩1.1M</td></tr>
+            <tr><td>자사몰</td><td style="text-align:right;font-weight:600">₩980K</td></tr>
+            <tr><td>쇼룸</td><td style="text-align:right;font-weight:600">₩320K</td></tr></table>
+          </div>
+          <div class="wg span6">
+            <div class="wg-title">내 할 일 · 미완료 5</div>
+            <div style="font-size:12px;padding:4px 0">🔴 인스타 스토리 — 센텀 기획전 <span class="pill r">D-1</span></div>
+            <div style="font-size:12px;padding:4px 0">🟡 선발주 확인 — Panier 시리즈 <span class="pill y">D-49</span></div>
+            <div style="font-size:12px;padding:4px 0">⚪ W컨셉 3월 정산 확인</div>
+          </div>
+          <div class="wg span8">
+            <div class="wg-title">AI 리오더 추천</div>
+            <table class="tbl"><tr><th>상품코드</th><th>재고일수</th><th>추천</th><th></th></tr>
+            <tr><td class="code">LLL6F92SB</td><td>12일</td><td><b>200개</b></td><td><button style="font-size:10px;padding:3px 8px;border:1px solid var(--line);border-radius:5px">발주에 추가</button></td></tr>
+            <tr><td class="code">LLL1F01MW</td><td>8일</td><td><b>150개</b></td><td><button style="font-size:10px;padding:3px 8px;border:1px solid var(--line);border-radius:5px">발주에 추가</button></td></tr></table>
+          </div>
+          <div class="wg span4">
+            <div class="wg-title">승인 대기 R3</div>
+            <div style="font-size:12px;padding:6px 0;border-bottom:1px solid var(--line2)">6월 2주차 리오더 <span class="pill y">④ MD팀장</span></div>
+            <div style="font-size:12px;padding:6px 0">LUM-260610-01</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- INBOX -->
+      <section class="screen" id="s-inbox">
+        <div class="page-h"><h1>Inbox</h1><p>지연 · 승인 · 멘션 · 품절 · 선발주</p></div>
+        <div class="kpi-grid">
+          <div class="card"><div class="card-h"><h3>🔴 지연</h3><span class="pill r">2</span></div>
+            <div style="padding:12px 16px;font-size:12px">마케팅 · 인스타 스토리 (센텀) — 어제 마감</div>
+            <div style="padding:12px 16px;font-size:12px;border-top:1px solid var(--line2)">물류 · 3PL 입고 확인 — D+2</div></div>
+          <div class="card"><div class="card-h"><h3>승인 대기</h3><span class="pill y">1</span></div>
+            <div style="padding:12px 16px;font-size:12px">리오더 배치 LUM-260610-01 → MD팀장</div></div>
+          <div class="card"><div class="card-h"><h3>선발주 알림</h3></div>
+            <div style="padding:12px 16px;font-size:12px">센텀 오픈100일 D-49 · 푸시 SKU 12개</div></div>
+          <div class="card"><div class="card-h"><h3>미수금 D-3</h3></div>
+            <div style="padding:12px 16px;font-size:12px">W컨셉 3월 · ₩18.2M · 7/10 입금</div></div>
+        </div>
+      </section>
+
+      <!-- WORK HUB -->
+      <section class="screen" id="s-work">
+        <div class="page-h"><h1>업무 허브</h1><p>팀 · 담당 · 프로젝트 · 상태 필터 — 칸반 3단계</p></div>
+        <div class="filters">
+          <div class="seg"><button class="on">내 업무</button><button>팀 업무</button><button>전체</button></div>
+          <select><option>팀: 전체</option><option>MD</option><option>마케팅</option><option>비주얼</option></select>
+          <select><option>프로젝트: 센텀 오픈100일</option><option>여름 시즌오프</option></select>
+          <select><option>온보딩: 진행중</option><option>온보딩됨</option><option>미온보딩</option><option>마감</option></select>
+          <span class="pill m">리스트</span><span class="pill g">칸반</span><span class="pill m">캘린더</span>
+        </div>
+        <div class="kanban">
+          <div class="kcol"><div class="kcol-h">할 일 <span>3</span></div>
+            <div class="kcard"><div class="t">카카오채널 푸시 문구</div><div class="m">마케팅 · @김OO · D-3</div></div>
+            <div class="kcard"><div class="t">푸시 SKU 선발주</div><div class="m">MD · Panier 3종</div><div class="tags"><span class="tag late">D-49</span></div></div>
+            <div class="kcard"><div class="t">메인 배너 시안</div><div class="m">비주얼 · W/29CM/자사몰</div></div>
+          </div>
+          <div class="kcol"><div class="kcol-h">진행 중 <span>2</span></div>
+            <div class="kcard" onclick="openModal()"><div class="t">인스타 스토리</div><div class="m">마케팅 · 센텀 기획전</div><div class="tags"><span class="tag rev">검토필요</span><span class="tag late">지연</span></div></div>
+            <div class="kcard"><div class="t">상세페이지 업데이트</div><div class="m">비주얼</div><div class="tags"><span class="tag">F/U</span></div></div>
+          </div>
+          <div class="kcol"><div class="kcol-h">완료 <span>8</span></div>
+            <div class="kcard" style="opacity:.6"><div class="t">할인율 확정 20%</div><div class="m">MD · 완료 7/5</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CALENDAR -->
+      <section class="screen" id="s-cal">
+        <div class="page-h"><h1>운영 캘린더 · 기획전</h1><p>온보딩 상태 · 완료율 링</p></div>
+        <div class="filters">
+          <div class="seg"><button>연간</button><button class="on">월</button><button>주</button></div>
+          <div class="seg"><button class="on">전체</button><button>진행중</button><button>온보딩됨</button><button>미온보딩</button><button>마감</button></div>
+          <button style="margin-left:auto;font-size:11px;padding:6px 12px;background:var(--accent);border-radius:6px;font-weight:600">+ 기획전</button>
+        </div>
+        <div class="row">
+          <div class="card" style="flex:2">
+            <div class="card-h"><h3>2026년 7월 · 채널 × 주</h3></div>
+            <div style="padding:14px">
+              <div style="display:grid;grid-template-columns:100px repeat(4,1fr);gap:6px;font-size:10px">
+                <div style="font-weight:600;color:var(--faint)">채널</div><div style="text-align:center;color:var(--faint)">1주</div><div style="text-align:center;color:var(--faint)">2주</div><div style="text-align:center;color:var(--faint)">3주</div><div style="text-align:center;color:var(--faint)">4주</div>
+                <div style="padding:8px 0;font-weight:500">자사몰</div><div><span class="cal-ev on" onclick="openModal()">여름 시즌오프 68%</span></div><div></div><div><span class="cal-ev on">2차 45%</span></div><div></div>
+                <div style="padding:8px 0;font-weight:500">센텀</div><div></div><div><span class="cal-ev on" onclick="openModal()">오픈100일 82%</span></div><div><span class="cal-ev on">시즌오프</span></div><div></div>
+                <div style="padding:8px 0;font-weight:500">W컨셉</div><div><span class="cal-ev">MD추천</span></div><div></div><div></div><div><span class="cal-ev">가을 프리뷰</span></div>
+                <div style="padding:8px 0;font-weight:500;color:var(--faint)">—</div><div><span class="cal-ev draft">(미온보딩) 가을 대형</span></div><div></div><div></div><div></div>
+              </div>
+            </div>
+          </div>
+          <div class="card" style="flex:1">
+            <div class="card-h"><h3>진행중 프로젝트</h3></div>
+            <table class="tbl">
+              <tr><td>센텀 오픈100일</td><td><div class="ring"><i>82%</i></div></td><td><span class="pill g">진행중</span></td></tr>
+              <tr><td>여름 시즌오프</td><td><div class="ring" style="background:conic-gradient(var(--accent) 0 68%,var(--line2) 68%)"><i>68%</i></div></td><td><span class="pill g">진행중</span></td></tr>
+              <tr><td>가을 대형 (안)</td><td>—</td><td><span class="pill m">미온보딩</span></td></tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- REORDER -->
+      <section class="screen" id="s-reorder">
+        <div class="page-h"><h1>리오더</h1><p>상품코드 기준 · 가방/슈즈/의류 필터</p></div>
+        <div class="filters"><div class="seg"><button class="on">가방</button><button>슈즈</button><button>의류</button><button>전체</button></div></div>
+        <div class="card"><table class="tbl">
+          <tr><th>상품코드</th><th>상품명</th><th>재고일수</th><th>AI추천</th><th>발주수량</th><th>생산지</th></tr>
+          <tr><td class="code">LLL6F92SB</td><td>Panier Petit Soft Black</td><td>12일</td><td>200</td><td><input value="200" style="width:60px;border:1px solid var(--line);border-radius:4px;padding:3px;font-size:11px"></td><td><span class="pill m">중국</span></td></tr>
+          <tr><td class="code">LLL1F01MW</td><td>Fantine Misty White</td><td>8일</td><td>150</td><td><input value="150" style="width:60px;border:1px solid var(--line);border-radius:4px;padding:3px;font-size:11px"></td><td><span class="pill b">국내</span></td></tr>
+        </table></div>
+        <button style="margin-top:8px;padding:8px 16px;background:var(--accent);border-radius:7px;font-weight:600;font-size:12px">발주서 작성 → LUM-260710-01</button>
+      </section>
+
+      <!-- CHANNELS -->
+      <section class="screen" id="s-channels">
+        <div class="page-h"><h1>채널 설정 · 판매</h1><p>입금일 · 수수료 · 상품코드 매핑 (LUMEN/AETALOOP만)</p></div>
+        <div class="card"><table class="tbl">
+          <tr><th>채널</th><th>입금</th><th>수수료</th><th>수집</th><th>매핑</th></tr>
+          <tr><td>W컨셉</td><td>매월 10일</td><td>~30%</td><td>월 정산 AI</td><td>142 SKU</td></tr>
+          <tr><td>29CM</td><td>매월 10일</td><td>~30%</td><td>월 정산 AI</td><td>138 SKU</td></tr>
+          <tr><td>자사몰</td><td>D+3</td><td>3.9%</td><td>API</td><td>자동</td></tr>
+          <tr><td>쇼룸</td><td>D+3</td><td>3.4%</td><td>이지어드민</td><td>—</td></tr>
+        </table></div>
+        <div class="card"><div class="card-h"><h3>채널 ↔ 상품코드 매핑</h3></div><table class="tbl">
+          <tr><th>채널</th><th>채널코드</th><th>ERP 코드</th><th>상품명</th></tr>
+          <tr><td>W컨셉</td><td class="code">301756891</td><td class="code">LLL6F92SB</td><td>Panier Petit Soft Black</td></tr>
+          <tr><td>29CM</td><td class="code">3424420</td><td class="code">LLL6F92TB</td><td>Panier Petit Tan Brown</td></tr>
+        </table></div>
+      </section>
+
+      <!-- PRODUCT P&L -->
+      <section class="screen" id="s-product-pl">
+        <div class="page-h"><h1>제품 손익</h1><p>상품코드 · 채널별 실판매 · 마진 · GMROI</p></div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="lb">이번 달 실판매</div><div class="vl">₩84.2M</div></div>
+          <div class="kpi"><div class="lb">평균 마진율</div><div class="vl">38.2%</div></div>
+          <div class="kpi"><div class="lb">평균 GMROI</div><div class="vl">1.84</div></div>
+          <div class="kpi"><div class="lb">반품률</div><div class="vl">4.1%</div></div>
+        </div>
+        <div class="card"><table class="tbl">
+          <tr><th>상품코드</th><th>판매량</th><th>실판매</th><th>원가</th><th>마진</th><th>GMROI</th><th>재고일</th></tr>
+          <tr style="cursor:pointer"><td class="code">LLL6F92SB</td><td>142</td><td>₩28.4M</td><td>₩6.9M</td><td><span class="up">53%</span></td><td>2.4</td><td>18일</td></tr>
+          <tr><td class="code">LLL1F01MW</td><td>98</td><td>₩18.1M</td><td>₩5.5M</td><td>42%</td><td>1.9</td><td>24일</td></tr>
+        </table></div>
+      </section>
+
+      <!-- CAMPAIGN P&L -->
+      <section class="screen" id="s-campaign-pl">
+        <div class="page-h"><h1>기획전 손익</h1><p>푸시 SKU · 기간 · 채널 cross-check</p></div>
+        <div class="card"><div class="card-h"><h3>센텀 오픈100일 · 7/8–7/21</h3><span class="pill g">진행중</span></div>
+          <div class="kpi-grid" style="padding:14px;margin:0">
+            <div class="kpi" style="border:none;background:var(--bg)"><div class="lb">푸시 SKU 매출</div><div class="vl">₩12.4M</div></div>
+            <div class="kpi" style="border:none;background:var(--bg)"><div class="lb">할인 영향</div><div class="vl">−₩2.1M</div></div>
+            <div class="kpi" style="border:none;background:var(--bg)"><div class="lb">캠페인 마진</div><div class="vl">₩4.8M</div></div>
+            <div class="kpi" style="border:none;background:var(--bg)"><div class="lb">광고비</div><div class="vl" style="color:var(--faint)">연동 예정</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTLEMENT -->
+      <section class="screen" id="s-settle">
+        <div class="page-h"><h1>월 마감 · 정산</h1><p>정산서 업로드 → AI 파싱 → 실판매가 확정</p></div>
+        <div class="filters"><button style="padding:6px 14px;border:1px dashed var(--line);border-radius:6px;font-size:11px">+ W컨셉 3월 정산서.xlsx</button><button style="padding:6px 14px;border:1px dashed var(--line);border-radius:6px;font-size:11px">+ 29CM 3월 정산서.xlsx</button></div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="lb">3월 확정 매출</div><div class="vl">₩124M</div><div class="sub">실판매가 기준</div></div>
+          <div class="kpi"><div class="lb">수수료</div><div class="vl">₩37.2M</div></div>
+          <div class="kpi"><div class="lb">입금 예정</div><div class="vl">₩86.8M</div><div class="sub">4/10</div></div>
+          <div class="kpi"><div class="lb">파싱 상태</div><div class="vl" style="font-size:14px">✅ 2/2</div></div>
+        </div>
+      </section>
+
+      <!-- WHOLESALE -->
+      <section class="screen" id="s-wholesale">
+        <div class="page-h"><h1>홀세일 (해외)</h1><p>인보이스 · 패킹리스트 · 이지어드민 출고</p></div>
+        <div class="card"><table class="tbl">
+          <tr><th>바이어</th><th>project_no</th><th>상태</th><th>금액</th></tr>
+          <tr><td>iQuest Japan</td><td class="code">LUM-WS-260601-01</td><td><span class="pill y">출고대기</span></td><td>$24,500</td></tr>
+        </table></div>
+      </section>
+
+      <!-- BRAND ORDERS -->
+      <section class="screen" id="s-brand-orders">
+        <div class="page-h"><h1>브랜드 발주 · 승인</h1><p>MD 묶음 발주 → R3 승인 → 생산팀 분할</p></div>
+        <div class="card"><div class="card-h"><h3>LUM-260610-01 · 6월 2주차 리오더</h3><span class="pill y">④ MD팀장</span></div>
+          <table class="tbl">
+            <tr><th>상품코드</th><th>수량</th><th>생산지</th><th>납기(참고)</th></tr>
+            <tr><td class="code">LLL6F92SB</td><td>200</td><td><span class="pill m">중국</span></td><td>8/15</td></tr>
+            <tr><td class="code">LLL1F01MW</td><td>150</td><td><span class="pill b">국내</span></td><td>8/20</td></tr>
+          </table>
+          <div class="approve-flow" style="padding:12px 16px">
+            <span class="step done">① MD</span><span class="step-arw">→</span>
+            <span class="step done">② 생산납기</span><span class="step-arw">→</span>
+            <span class="step done">③ 디자인</span><span class="step-arw">→</span>
+            <span class="step now">④ MD팀장</span><span class="step-arw">→</span>
+            <span class="step">⑤ 대표</span><span class="step-arw">→</span>
+            <span class="step">⑥ 생산</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- BRAND PROJECT P&L -->
+      <section class="screen" id="s-brand-project-pl">
+        <div class="page-h"><h1>프로젝트 손익 (브랜드)</h1><p>BOM vs 실제 생산비 — 채널 매출 제외</p></div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="lb">BOM 원가</div><div class="vl">₩12.4M</div></div>
+          <div class="kpi"><div class="lb">실제 생산비</div><div class="vl">₩13.1M</div><div class="sub down">+5.6%</div></div>
+          <div class="kpi"><div class="lb">발주 수량</div><div class="vl">350개</div></div>
+          <div class="kpi"><div class="lb">project_no</div><div class="vl" style="font-size:14px" class="code">LUM-260610-01</div></div>
+        </div>
+      </section>
+
+      <!-- ========== OEM SCREENS ========== -->
+
+      <section class="screen" id="s-oem-dash">
+        <div class="page-h"><h1>생산 대시보드</h1><p>OEM · AMESCOTES — 바이어별 생산 현황</p></div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="lb">이번 달 OEM 매출</div><div class="vl">₩148.0M</div><div class="sub"><span class="up">▲ 8.2%</span></div></div>
+          <div class="kpi"><div class="lb">진행중 발주</div><div class="vl">12건</div></div>
+          <div class="kpi"><div class="lb">납기 임박</div><div class="vl" style="color:var(--warn)">3건</div></div>
+          <div class="kpi"><div class="lb">승인 대기</div><div class="vl">2건</div></div>
+        </div>
+        <div class="row">
+          <div class="card" style="flex:1.5">
+            <div class="card-h"><h3>바이어별 진행</h3></div>
+            <table class="tbl">
+              <tr><td><span class="wtag oem">NW</span> NOTHING WRITTEN</td><td>아쎄르더비백 · 밀란백</td><td><span class="pill y">생산중</span></td><td>D-5</td></tr>
+              <tr><td><span class="wtag oem">OS</span> OSOI</td><td>미드 시저링</td><td><span class="pill b">선적중</span></td><td>D-6</td></tr>
+              <tr><td><span class="wtag oem">LT</span> 러기지텍</td><td>트래블 파우치</td><td><span class="pill g">입고완료</span></td><td>—</td></tr>
+            </table>
+          </div>
+          <div class="card" style="flex:1">
+            <div class="card-h"><h3>생산지 필터</h3></div>
+            <div style="padding:14px;display:flex;gap:8px">
+              <span class="pill g">국내 4건</span>
+              <span class="pill m">중국 8건</span>
+            </div>
+            <div style="padding:0 14px 14px;font-size:11px;color:var(--muted)">LUMEN/AETALOOP 발주도 동일 파이프라인에서 처리</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s-oem-inbox">
+        <div class="page-h"><h1>Inbox · OEM</h1><p>승인 · 납기 · 불량차감 · 멘션</p></div>
+        <div class="kpi-grid">
+          <div class="card"><div class="card-h"><h3>승인 대기</h3><span class="pill y">2</span></div>
+            <div style="padding:12px 16px;font-size:12px">밀란백 미디엄 <span class="wtag oem">NW</span> — 팀장 승인 대기</div>
+            <div style="padding:12px 16px;font-size:12px;border-top:1px solid var(--line2)">자재구매 — 창성 임가공비 ₩4.18M</div></div>
+          <div class="card"><div class="card-h"><h3>납기 임박</h3><span class="pill r">3</span></div>
+            <div style="padding:12px 16px;font-size:12px">NW · 아쎄르더비백 — 청도통야 · D-5</div></div>
+          <div class="card"><div class="card-h"><h3>불량 차감 대기</h3></div>
+            <div style="padding:12px 16px;font-size:12px">창성 · 파니에 프티 불량 3건 · ₩142K</div></div>
+          <div class="card"><div class="card-h"><h3>브랜드 발주 승인</h3></div>
+            <div style="padding:12px 16px;font-size:12px">LUM-260610-01 리오더 → 생산 분할 대기</div></div>
+        </div>
+      </section>
+
+      <section class="screen" id="s-oem-vendors">
+        <div class="page-h"><h1>거래처 마스터</h1><p>바이어 · 공장 · 자재업체</p></div>
+        <div class="card"><table class="tbl">
+          <tr><th>구분</th><th>거래처</th><th>코드</th><th>통화</th><th>최근발주</th></tr>
+          <tr><td><span class="wtag oem">바이어</span></td><td>NOTHING WRITTEN</td><td class="code">NW</td><td>KRW</td><td>2026-07-01</td></tr>
+          <tr><td><span class="wtag oem">바이어</span></td><td>OSOI</td><td class="code">OS</td><td>KRW</td><td>2026-06-20</td></tr>
+          <tr><td>공장</td><td>청도통야(TY)</td><td class="code">TY</td><td>CNY</td><td>2026-07-08</td></tr>
+          <tr><td>공장</td><td>창성9차</td><td class="code">CS9</td><td>KRW</td><td>2026-07-06</td></tr>
+        </table></div>
+      </section>
+
+      <section class="screen" id="s-oem-items">
+        <div class="page-h"><h1>품목 마스터</h1><p>OEM · 브랜드 통합 SKU</p></div>
+        <div class="filters"><div class="seg"><button class="on">전체</button><button>OEM</button><button>LUMEN</button><button>AETALOOP</button></div></div>
+        <div class="card"><table class="tbl">
+          <tr><th>품목코드</th><th>품명</th><th>구분</th><th>바이어/브랜드</th><th>공장단가</th><th>BOM</th></tr>
+          <tr><td class="code">AT26HB001</td><td>아쎄르더비백</td><td><span class="wtag oem">OEM</span></td><td>NOTHING WRITTEN</td><td>₩142,000</td><td>有</td></tr>
+          <tr><td class="code">MB26M001</td><td>밀란백 미디엄</td><td><span class="wtag oem">OEM</span></td><td>NOTHING WRITTEN</td><td>₩128,000</td><td>有</td></tr>
+          <tr><td class="code">LLL6F92SB</td><td>Panier Petit SB</td><td><span class="wtag brand">LUMEN</span></td><td>LUMEN</td><td>₩48,200</td><td>有</td></tr>
+        </table></div>
+      </section>
+
+      <section class="screen" id="s-oem-samples">
+        <div class="page-h"><h1>샘플 관리</h1><p>개발 단계 → 승인 시 품목·BOM 연결</p></div>
+        <div class="card"><table class="tbl">
+          <tr><th>샘플</th><th>바이어</th><th>단계</th><th>담당</th></tr>
+          <tr><td>미드 시저링</td><td>OSOI</td><td><span class="pill y">샘플확정</span></td><td>디자인</td></tr>
+          <tr><td>아쎄르더비백 26FW</td><td>NOTHING WRITTEN</td><td><span class="pill g">발주전환</span></td><td>생산</td></tr>
+        </table></div>
+      </section>
+
+      <section class="screen" id="s-oem-bom">
+        <div class="page-h"><h1>BOM · 원가</h1><p>사후원가 우선 · 공장단가 = 구매자재+임가공+후가공</p></div>
+        <div class="card"><div class="card-h"><h3>AT26HB001 · 아쎄르더비백</h3><span class="code">NW2026-003</span></div>
+          <table class="tbl">
+            <tr><th>구분</th><th>자재</th><th>소요량</th><th>단가</th><th>금액</th></tr>
+            <tr><td>공장구매</td><td>가죽 A</td><td>1.2㎡</td><td>¥42</td><td>¥50.4</td></tr>
+            <tr><td>임가공</td><td>창성</td><td>1</td><td>¥28</td><td>¥28</td></tr>
+            <tr><td>후가공</td><td>도금</td><td>1</td><td>¥10</td><td>¥10</td></tr>
+            <tr><td colspan="4" style="text-align:right;font-weight:600">공장단가</td><td style="font-weight:600">¥88 → ₩142,000</td></tr>
+          </table>
+        </div>
+      </section>
+
+      <section class="screen" id="s-oem-orders">
+        <div class="page-h"><h1>생산 발주</h1><p>발주번호 · project_no · 생산지 필터</p></div>
+        <div class="filters">
+          <div class="seg"><button class="on">전체</button><button>OEM</button><button>LUMEN</button><button>AETALOOP</button></div>
+          <select><option>생산지: 전체</option><option>국내</option><option>중국</option></select>
+        </div>
+        <div class="card"><table class="tbl">
+          <tr><th>발주번호</th><th>project_no</th><th>품목</th><th>바이어</th><th>공장</th><th>수량</th><th>상태</th><th>납기</th></tr>
+          <tr><td class="code">PO-260708-01</td><td class="code">NW2026-003</td><td>아쎄르더비백</td><td>NW</td><td>청도통야</td><td>500</td><td><span class="pill y">생산중</span></td><td>7/15</td></tr>
+          <tr><td class="code">PO-260701-02</td><td class="code">OS2026-001</td><td>미드시저링</td><td>OSOI</td><td>창성9차</td><td>300</td><td><span class="pill b">선적중</span></td><td>7/12</td></tr>
+          <tr><td class="code">PO-260610-03</td><td class="code">LUM-260610-01</td><td>Panier Petit SB</td><td><span class="wtag brand">LUMEN</span></td><td>청도통야</td><td>200</td><td><span class="pill m">승인대기</span></td><td>8/15</td></tr>
+        </table></div>
+      </section>
+
+      <section class="screen" id="s-oem-purchase">
+        <div class="page-h"><h1>자재 구매</h1><p>발주 확정 → 자재마스터 + 구매매칭</p></div>
+        <div class="card"><table class="tbl">
+          <tr><th>자재</th><th>발주연결</th><th>거래처</th><th>수량</th><th>상태</th></tr>
+          <tr><td>가죽 A (블랙)</td><td class="code">PO-260708-01</td><td>○○가죽</td><td>600㎡</td><td><span class="pill g">발주완료</span></td></tr>
+          <tr><td>지퍼 YKK</td><td class="code">PO-260701-02</td><td>YKK</td><td>350개</td><td><span class="pill y">발주중</span></td></tr>
+        </table></div>
+      </section>
+
+      <section class="screen" id="s-oem-receiving">
+        <div class="page-h"><h1>입고 · OEM 출고</h1><p>부분입고 · 거래명세표 · 3PL 연동</p></div>
+        <div class="filters"><div class="seg"><button class="on">입고</button><button>OEM 출고</button><button>거래명세표</button></div></div>
+        <div class="card"><table class="tbl">
+          <tr><th>일자</th><th>발주</th><th>품목</th><th>입고/출고</th><th>수량</th><th>잔량</th></tr>
+          <tr><td>07-08</td><td class="code">PO-260708-01</td><td>아쎄르더비백</td><td>입고</td><td>200/500</td><td>300</td></tr>
+          <tr><td>07-09</td><td class="code">PO-260701-02</td><td>미드시저링</td><td>OEM출고→NW</td><td>300</td><td>—</td></tr>
+        </table></div>
+      </section>
+
+      <section class="screen" id="s-oem-project-pl">
+        <div class="page-h"><h1>프로젝트 손익 (OEM)</h1><p>매출 · 매입 · AP — project_no 기준</p></div>
+        <div class="card"><div class="card-h"><h3>NW2026-003 · 아쎄르더비백</h3></div>
+          <div class="kpi-grid" style="padding:14px;margin:0">
+            <div class="kpi" style="border:none;background:var(--bg)"><div class="lb">매출 (납품)</div><div class="vl">₩71.0M</div></div>
+            <div class="kpi" style="border:none;background:var(--bg)"><div class="lb">생산원가</div><div class="vl">₩58.2M</div></div>
+            <div class="kpi" style="border:none;background:var(--bg)"><div class="lb">마진</div><div class="vl up">18.0%</div></div>
+            <div class="kpi" style="border:none;background:var(--bg)"><div class="lb">미수금</div><div class="vl">₩12.4M</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="s-oem-cost">
+        <div class="page-h"><h1>생산비용 분석</h1><p>기간 · 품목 · 공장 필터 — BOM vs 실제</p></div>
+        <div class="filters">
+          <select><option>2026년 7월</option></select>
+          <select><option>공장: 전체</option><option>청도통야</option><option>창성9차</option></select>
+        </div>
+        <div class="card"><table class="tbl">
+          <tr><th>품목</th><th>BOM</th><th>실제</th><th>차이</th><th>원인</th></tr>
+          <tr><td>아쎄르더비백</td><td>₩142,000</td><td>₩148,200</td><td class="down">+4.4%</td><td>가죽 단가 상승</td></tr>
+          <tr><td>밀란백 미디엄</td><td>₩128,000</td><td>₩127,400</td><td class="up">−0.5%</td><td>—</td></tr>
+        </table></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- PROJECT MODAL -->
+<div class="overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-h">
+      <div><div style="font-size:10px;color:var(--muted);font-weight:600">LUMEN · 진행중 · 82%</div><h2>센텀 오픈100일 · 시즌오프</h2><div style="font-size:11px;color:var(--faint);margin-top:4px">7/8 – 7/21 · W컨셉/29CM/센텀 · 할인 20%</div></div>
+      <div class="ring" style="width:44px;height:44px;flex-shrink:0"><i style="width:32px;height:32px;font-size:10px">82%</i></div>
+      <span class="x" onclick="closeModal()">×</span>
+    </div>
+    <div class="modal-b">
+      <div style="font-size:11px;margin-bottom:12px"><b>푸시 SKU:</b> <span class="code">LLL6F92SB</span> <span class="code">LLL1F01MW</span> +10 … <span style="color:var(--faint)">전 팀 공개</span></div>
+      <div class="team-tabs">
+        <button class="team-tab">MD</button><button class="team-tab on">마케팅</button><button class="team-tab">비주얼</button><button class="team-tab">물류</button><button class="team-tab">디자인</button>
+      </div>
+      <div class="note-row"><span class="lbl">카카오채널</span><span>7/7 발송 · 오픈100일 20% …</span><span class="pill g" style="margin-left:auto">✅</span></div>
+      <div class="note-row"><span class="lbl">인스타 스토리</span><span>시안 검토 중 @비주얼</span><span class="pill r" style="margin-left:auto">지연</span></div>
+      <div class="note-row"><span class="lbl">메타 광고</span><span>예산 ₩500K · 타겟 25–34</span><span class="pill y" style="margin-left:auto">진행</span></div>
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <button style="padding:6px 12px;border:1px solid var(--line);border-radius:6px;font-size:11px" onclick="go('campaign-pl');closeModal()">기획전 손익 →</button>
+        <button style="padding:6px 12px;border:1px solid var(--line);border-radius:6px;font-size:11px" onclick="go('work');closeModal()">업무 허브 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const titles={
+  dash:'내 대시보드',inbox:'Inbox',work:'업무 허브',cal:'운영 캘린더 · 기획전',
+  reorder:'리오더',channels:'채널 설정 · 판매','product-pl':'제품 손익','campaign-pl':'기획전 손익',
+  settle:'월 마감 · 정산',wholesale:'홀세일 (해외)','brand-orders':'브랜드 발주 · 승인','brand-project-pl':'프로젝트 손익',
+  'oem-dash':'생산 대시보드','oem-inbox':'Inbox','oem-vendors':'거래처 마스터','oem-items':'품목 마스터',
+  'oem-samples':'샘플 관리','oem-bom':'BOM · 원가','oem-orders':'생산 발주','oem-purchase':'자재 구매',
+  'oem-receiving':'입고 · OEM 출고','oem-project-pl':'프로젝트 손익','oem-cost':'생산비용 분석'
+};
+let currentWs='LUMEN';
+function getWs(){return document.querySelector('.ws-pill.on')?.dataset.ws||'LUMEN'}
+function inboxGo(){go(getWs()==='OEM'?'oem-inbox':'inbox')}
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.getElementById('s-'+id)?.classList.add('on');
+  document.querySelectorAll('[data-nav]').forEach(n=>n.classList.remove('on'));
+  document.querySelector(`[data-nav][onclick="go('${id}')"]`)?.classList.add('on');
+  const ws=getWs();
+  document.getElementById('crumb').textContent=(titles[id]||id)+' · '+ws;
+}
+function setWs(el){
+  document.querySelectorAll('.ws-pill').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  currentWs=el.dataset.ws;
+  const isOem=currentWs==='OEM';
+  document.getElementById('nav-oem').classList.toggle('show',isOem);
+  document.getElementById('nav-brand').classList.toggle('show',!isOem);
+  document.getElementById('inbox-badge').textContent=isOem?'9':'7';
+  document.getElementById('sb-sub').textContent=isOem?'AMESCOTES OEM':'브랜드 운영';
+  document.querySelector('.tb-user').textContent=isOem?'생산':'MD';
+  if(isOem) go('oem-dash');
+  else go('dash');
+}
+function openModal(){document.getElementById('modal').classList.add('show')}
+function closeModal(){document.getElementById('modal').classList.remove('show')}
+</script>
+</body>
+</html>

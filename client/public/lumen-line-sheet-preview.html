@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LUMEN · Line Sheet Preview (임시)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1a1816;
+      --muted: #6b6560;
+      --line: #e5e0d8;
+      --paper: #f7f4ef;
+      --card: #fffdf9;
+      --accent: #8b7355;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "DM Sans", system-ui, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #efe6d8 0%, transparent 55%),
+        linear-gradient(180deg, #f3efe8 0%, var(--paper) 40%, #efeae2 100%);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1360px; margin: 0 auto; padding: 28px 20px 64px; }
+    .banner {
+      display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+      gap: 16px; margin-bottom: 18px;
+      border-bottom: 1px solid var(--line); padding-bottom: 16px;
+    }
+    .brand {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 42px; font-weight: 600; letter-spacing: 0.18em; margin: 0;
+    }
+    .sub { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+    .pill {
+      display: inline-block; margin-top: 8px; font-size: 11px; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--accent);
+      border: 1px solid #d4c4ae; padding: 4px 10px; border-radius: 999px; background: #fff;
+    }
+    .note {
+      font-size: 12px; color: var(--muted); margin: 0 0 14px;
+      padding: 10px 12px; background: #fff8e8; border: 1px solid #ead9a8; border-radius: 8px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(300px, 380px) 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(40, 30, 20, 0.04);
+      overflow: hidden;
+    }
+    .panel h2 {
+      margin: 0; padding: 12px 14px; font-size: 13px; font-weight: 600;
+      border-bottom: 1px solid var(--line); background: #faf6f0;
+    }
+    .panel-body { padding: 12px 14px; }
+    .hint {
+      font-size: 11px; color: var(--muted); line-height: 1.45; margin: 0 0 10px;
+    }
+    .hint b { color: #5c4a32; }
+    .controls {
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: end;
+      margin-bottom: 12px;
+    }
+    .field label {
+      display: block; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 5px;
+    }
+    select, input[type="number"], input[type="text"], input[type="search"] {
+      height: 34px; border: 1px solid var(--line); border-radius: 8px;
+      padding: 0 10px; font: inherit; background: #fff; color: var(--ink); min-width: 110px;
+      width: 100%;
+    }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    button.chip {
+      border: 1px solid var(--line); background: #fff; color: var(--ink);
+      border-radius: 999px; padding: 5px 10px; font-size: 11px; cursor: pointer;
+    }
+    button.chip:hover { border-color: var(--accent); color: var(--accent); }
+    button.chip.primary {
+      background: #1f1c19; color: #f5f0e8; border-color: #1f1c19;
+    }
+    button.chip.primary:hover { background: #3d3429; }
+    .src {
+      font-size: 11px; color: var(--muted); margin-bottom: 8px;
+    }
+    .src.ok { color: #3d6b4f; }
+    .src.warn { color: #9a6b1a; }
+    .picker-filters {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;
+    }
+    .picker-filters .full { grid-column: 1 / -1; }
+    .item-list {
+      max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 8px;
+    }
+    .item-row {
+      display: grid; grid-template-columns: 22px 40px 1fr auto;
+      gap: 8px; align-items: center; padding: 7px 8px;
+      border-bottom: 1px solid var(--line); font-size: 12px;
+    }
+    .item-row:hover { background: #faf6f0; }
+    .item-row img {
+      width: 36px; height: 36px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line);
+      background: #eee;
+    }
+    .item-row .meta { color: var(--muted); font-size: 10px; }
+    .item-row .price { font-variant-numeric: tabular-nums; font-size: 11px; white-space: nowrap; }
+    .sel-count {
+      font-size: 12px; margin-top: 8px; color: var(--muted);
+    }
+    .sel-count strong { color: var(--ink); }
+    .summary {
+      margin-left: auto; display: grid; grid-template-columns: auto auto; gap: 4px 16px;
+      font-size: 13px; align-items: center;
+    }
+    .summary strong { font-variant-numeric: tabular-nums; }
+    .sheet-wrap { overflow: auto; max-height: 70vh; }
+    table { width: 100%; border-collapse: collapse; min-width: 1080px; font-size: 12px; }
+    thead th {
+      position: sticky; top: 0; z-index: 1;
+      background: #1f1c19; color: #f5f0e8; font-weight: 500;
+      text-align: left; padding: 10px 8px; white-space: nowrap;
+    }
+    thead th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    thead th.hl { background: #3d3429; color: #f0e2c4; }
+    tbody td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    tbody tr:hover { background: #faf6f0; }
+    .photo {
+      width: 44px; height: 44px; object-fit: cover; border-radius: 6px;
+      border: 1px solid var(--line); background: #eee; display: block;
+    }
+    .model { font-weight: 600; }
+    .colour { color: var(--muted); }
+    .qty {
+      width: 72px; height: 30px; text-align: right; border: 1px solid var(--line);
+      border-radius: 6px; padding: 0 8px; font: inherit; min-width: 0;
+    }
+    .ws { font-weight: 600; color: #5c4a32; }
+    .empty {
+      padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13px;
+    }
+    footer {
+      margin-top: 16px; font-size: 11px; color: var(--muted);
+      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="banner">
+      <div>
+        <h1 class="brand">LUMEN</h1>
+        <p class="sub">27SS · Wholesale Line Sheet · 임시 미리보기</p>
+        <span class="pill">품목 다중선택 · 환율 · 반올림</span>
+      </div>
+      <div id="marketMeta" style="text-align:right;font-size:13px;color:var(--muted)"></div>
+    </header>
+
+    <p class="note">
+      품목은 ERP <b>품목 마스터</b>(같은 브라우저 localStorage <code>ames_items</code>)에서 불러옵니다.
+      라인시트에 넣으려면 왼쪽에서 체크한 뒤 표가 갱신됩니다. 컬러가 있으면 <b>컬러별 행</b>으로 펼칩니다.
+    </p>
+
+    <div class="layout">
+      <!-- 품목 선택 -->
+      <aside class="panel">
+        <h2>품목 지정</h2>
+        <div class="panel-body">
+          <p class="hint">
+            <b>추천 선택 방식</b><br/>
+            ① 검색/시즌/카테고리로 좁힌 뒤 「필터 전체 선택」<br/>
+            ② 「시즌 일괄」「카테고리 일괄」로 빠르게 채우기<br/>
+            ③ 개별 체크 + 「선택 반전」으로 보완<br/>
+            ④ 「KMSRP 있는 것만」으로 가격 준비된 SKU만
+          </p>
+          <div id="dataSrc" class="src">데이터 로딩…</div>
+
+          <div class="picker-filters">
+            <div class="field full">
+              <label>검색 (스타일·품명)</label>
+              <input type="search" id="itemSearch" placeholder="FRAME, LLL…" />
+            </div>
+            <div class="field">
+              <label>시즌</label>
+              <select id="filterSeason"><option value="all">전체</option></select>
+            </div>
+            <div class="field">
+              <label>카테고리</label>
+              <select id="filterCat">
+                <option value="all">전체</option>
+                <option value="HB">HB</option>
+                <option value="ACC">ACC</option>
+                <option value="SHOES">SHOES</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button type="button" class="chip primary" id="btnSelectFiltered">필터 전체 선택</button>
+            <button type="button" class="chip" id="btnClear">선택 해제</button>
+            <button type="button" class="chip" id="btnInvert">선택 반전</button>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="chip" id="btnSeasonAll">시즌 일괄</button>
+            <button type="button" class="chip" id="btnCatAll">카테고리 일괄</button>
+            <button type="button" class="chip" id="btnWithKmsrp">KMSRP 있는 것만</button>
+            <button type="button" class="chip" id="btnWithImage">이미지 있는 것만</button>
+          </div>
+
+          <div class="item-list" id="itemList"></div>
+          <div class="sel-count">선택 <strong id="selCount">0</strong> 품목 · 라인시트 행 <strong id="rowCount">0</strong></div>
+        </div>
+      </aside>
+
+      <!-- 시트 -->
+      <section>
+        <div class="panel" style="margin-bottom:12px">
+          <h2>마켓 / 환율 / 할인 / 반올림</h2>
+          <div class="panel-body">
+            <div class="controls">
+              <div class="field">
+                <label>Market</label>
+                <select id="market"></select>
+              </div>
+              <div class="field">
+                <label>환율 (1 KRW → Local)</label>
+                <input id="fx" type="number" min="0" step="any" />
+              </div>
+              <div class="field">
+                <label>Discount %</label>
+                <input id="discount" type="number" min="0" max="90" step="1" value="50" />
+              </div>
+              <div class="field">
+                <label>반올림</label>
+                <select id="roundMode">
+                  <option value="d0">정수 (0자리)</option>
+                  <option value="d1">소수 1자리</option>
+                  <option value="d2" selected>소수 2자리</option>
+                  <option value="u10">10 단위</option>
+                  <option value="u100">100 단위</option>
+                  <option value="u1000">1,000 단위</option>
+                </select>
+              </div>
+              <div class="summary">
+                <span>Total pcs</span><strong id="totalPcs">0</strong>
+                <span>Total (Local)</span><strong id="totalLocal">—</strong>
+                <span>Total (KRW)</span><strong id="totalKrw">—</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Line Sheet</h2>
+          <div class="sheet-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Season</th>
+                  <th>Photo</th>
+                  <th>SKU</th>
+                  <th>Model</th>
+                  <th>Colour</th>
+                  <th>COO</th>
+                  <th class="num">KMSRP<br/>KRW</th>
+                  <th class="num">Global<br/>KRW</th>
+                  <th class="num" id="thLocal">MSRP<br/>Local</th>
+                  <th class="num hl" id="thWs">Wholesale<br/>Local</th>
+                  <th class="num">In-Stock</th>
+                  <th class="num hl">Submit Qty</th>
+                </tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+            <div class="empty" id="emptyMsg">왼쪽에서 품목을 선택하세요.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      <div>Wholesale = round(Global × FX × (1 − Discount)). 품목 마스터에 로그인·동기화된 같은 브라우저에서 열어주세요.</div>
+      <div><code>/lumen-line-sheet-preview.html</code></div>
+    </footer>
+  </div>
+
+  <script>
+    const MARKETS = {
+      ID: { name: 'Indonesia', currency: 'IDR', symbol: 'Rp', fx: 16.65, roundDefault: 'u1000' },
+      JP: { name: 'Japan', currency: 'JPY', symbol: '¥', fx: 0.111, roundDefault: 'u10' },
+      SG: { name: 'Singapore', currency: 'SGD', symbol: 'S$', fx: 0.00098, roundDefault: 'd2' },
+      EU: { name: 'EU', currency: 'EUR', symbol: '€', fx: 0.00066, roundDefault: 'd2' },
+      US: { name: 'USA', currency: 'USD', symbol: '$', fx: 0.00072, roundDefault: 'd2' },
+    };
+
+    const FALLBACK = [
+      { id: 'fb1', styleNo: 'LLL2607FB01', name: '프레임 백', nameEn: 'FRAME BAG', season: '27SS', erpCategory: 'HB',
+        imageUrl: '/lumen-27ss/frame-bag.png', confirmedSalePrice: 308000, colors: [{ name: 'SOFT BLACK' }, { name: 'GREY' }] },
+      { id: 'fb2', styleNo: 'LLL2607FN01', name: '파인 백', nameEn: 'FINE BAG', season: '27SS', erpCategory: 'HB',
+        imageUrl: '/lumen-27ss/fine-bag.png', confirmedSalePrice: 358000, colors: [{ name: 'SOFT BLACK' }, { name: 'DARK BROWN' }] },
+      { id: 'fb3', styleNo: 'LLL2607TP01', name: '템포 컷아웃 백', nameEn: 'TEMPO CUTOUT BAG', season: '27SS', erpCategory: 'HB',
+        imageUrl: '/lumen-27ss/tempo-cutout-bag.png', confirmedSalePrice: 238000, colors: [{ name: 'SUEDE SAND' }, { name: 'SUEDE BLACK' }] },
+    ];
+
+    let catalog = [];
+    let selected = new Set();
+    const qtys = {};
+
+    const marketEl = document.getElementById('market');
+    const fxEl = document.getElementById('fx');
+    const discountEl = document.getElementById('discount');
+    const roundEl = document.getElementById('roundMode');
+    const searchEl = document.getElementById('itemSearch');
+    const seasonEl = document.getElementById('filterSeason');
+    const catEl = document.getElementById('filterCat');
+
+    Object.entries(MARKETS).forEach(([code, m]) => {
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.textContent = `${m.name} (${m.currency})`;
+      marketEl.appendChild(opt);
+    });
+    marketEl.value = 'ID';
+
+    function readLS(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch { return []; }
+    }
+
+    function normalizeColors(colors) {
+      if (!Array.isArray(colors) || colors.length === 0) return [{ name: '-' }];
+      return colors.map(c => typeof c === 'string' ? { name: c } : { name: (c && c.name) || '-' });
+    }
+
+    function resolveKmsrp(item, bomMap) {
+      const bom = bomMap.get(item.id) || bomMap.get(item.styleNo);
+      const fromBom = bom?.pnl?.confirmedSalePrice || bom?.pnl_data?.confirmedSalePrice;
+      const v = Number(fromBom || item.confirmedSalePrice || item.deliveryPrice || 0);
+      return v > 0 ? v : 0;
+    }
+
+    function resolveGlobal(item, bomMap, kmsrp) {
+      const bom = bomMap.get(item.id) || bomMap.get(item.styleNo);
+      const g = Number(bom?.pnl?.globalSalePrice || 0);
+      if (g > 0) return g;
+      const markup = Number(bom?.pnl?.globalMarkup || 1.3);
+      return kmsrp > 0 ? Math.round(kmsrp * markup) : 0;
+    }
+
+    function loadCatalog() {
+      const items = readLS('ames_items');
+      const boms = readLS('ames_boms');
+      const bomMap = new Map();
+      boms.forEach(b => {
+        if (b.styleId) bomMap.set(b.styleId, b);
+        if (b.styleNo) bomMap.set(b.styleNo, b);
+        if (b.pnl && typeof b.pnl === 'string') {
+          try { b.pnl = JSON.parse(b.pnl); } catch { /* */ }
+        }
+        if (!b.pnl && b.pnl_data) {
+          try { b.pnl = typeof b.pnl_data === 'string' ? JSON.parse(b.pnl_data) : b.pnl_data; } catch { /* */ }
+        }
+      });
+
+      const lumenish = items.filter(i => {
+        if (i.erpCategory === 'PACK') return false;
+        const buyer = (i.buyerId || '') + (i.memo || '') + (i.styleNo || '');
+        // LUMEN 위주: style LLL / season / 전체 완제품
+        return true;
+      }).filter(i => ['HB', 'ACC', 'SHOES'].includes(i.erpCategory || 'HB') || !i.erpCategory);
+
+      let list = (lumenish.length ? lumenish : items).map(i => {
+        const kmsrp = resolveKmsrp(i, bomMap);
+        return {
+          id: i.id,
+          styleNo: i.styleNo || '',
+          name: i.name || '',
+          nameEn: i.nameEn || '',
+          season: i.season || '',
+          erpCategory: i.erpCategory || 'HB',
+          imageUrl: i.imageUrl || '',
+          colors: normalizeColors(i.colors),
+          kmsrp,
+          global: resolveGlobal(i, bomMap, kmsrp),
+          coo: 'China',
+          stock: 0,
+        };
+      });
+
+      const src = document.getElementById('dataSrc');
+      if (list.length === 0) {
+        list = FALLBACK.map(i => ({
+          ...i,
+          colors: normalizeColors(i.colors),
+          kmsrp: i.confirmedSalePrice,
+          global: Math.round(i.confirmedSalePrice * 1.3),
+          coo: 'China',
+          stock: 50,
+        }));
+        src.className = 'src warn';
+        src.textContent = `품목 마스터 없음 → 샘플 ${list.length}건 사용. ERP(localhost:4000)에서 로그인·동기화 후 새로고침하세요.`;
+      } else {
+        src.className = 'src ok';
+        src.textContent = `품목 마스터 ${list.length}건 로드 (ames_items)`;
+      }
+
+      catalog = list.sort((a, b) => (a.styleNo || '').localeCompare(b.styleNo || ''));
+
+      const seasons = [...new Set(catalog.map(i => i.season).filter(Boolean))].sort();
+      seasonEl.innerHTML = '<option value="all">전체</option>';
+      seasons.forEach(s => {
+        const o = document.createElement('option');
+        o.value = s; o.textContent = s;
+        seasonEl.appendChild(o);
+      });
+      if (seasons.includes('27SS')) seasonEl.value = '27SS';
+    }
+
+    function filteredCatalog() {
+      const q = (searchEl.value || '').trim().toLowerCase();
+      const season = seasonEl.value;
+      const cat = catEl.value;
+      return catalog.filter(i => {
+        if (season !== 'all' && i.season !== season) return false;
+        if (cat !== 'all' && i.erpCategory !== cat) return false;
+        if (!q) return true;
+        return (
+          (i.styleNo || '').toLowerCase().includes(q)
+          || (i.name || '').toLowerCase().includes(q)
+          || (i.nameEn || '').toLowerCase().includes(q)
+        );
+      });
+    }
+
+    function renderPicker() {
+      const list = filteredCatalog();
+      const el = document.getElementById('itemList');
+      if (list.length === 0) {
+        el.innerHTML = '<div class="empty" style="padding:24px">조건에 맞는 품목 없음</div>';
+        return;
+      }
+      el.innerHTML = list.map(i => `
+        <label class="item-row">
+          <input type="checkbox" data-id="${i.id}" ${selected.has(i.id) ? 'checked' : ''} />
+          <img src="${i.imageUrl || ''}" alt="" onerror="this.style.opacity=.2" />
+          <div>
+            <div>${i.nameEn || i.name}</div>
+            <div class="meta">${i.styleNo} · ${i.season || '-'} · ${i.erpCategory} · ${i.colors.length} color</div>
+          </div>
+          <div class="price">${i.kmsrp ? '₩' + i.kmsrp.toLocaleString() : '—'}</div>
+        </label>
+      `).join('');
+
+      el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          if (cb.checked) selected.add(cb.dataset.id);
+          else selected.delete(cb.dataset.id);
+          updateCounts();
+          renderSheet();
+        });
+      });
+      updateCounts();
+    }
+
+    function selectedItems() {
+      return catalog.filter(i => selected.has(i.id));
+    }
+
+    function expandRows() {
+      const rows = [];
+      selectedItems().forEach(item => {
+        item.colors.forEach((c, idx) => {
+          const key = item.id + '::' + (c.name || idx);
+          rows.push({
+            key,
+            season: item.season,
+            img: item.imageUrl,
+            sku: item.styleNo + (item.colors.length > 1 ? '-' + String(c.name).slice(0, 3).toUpperCase() : ''),
+            model: item.nameEn || item.name,
+            colour: c.name || '-',
+            coo: item.coo || 'China',
+            kmsrp: item.kmsrp,
+            global: item.global || (item.kmsrp ? Math.round(item.kmsrp * 1.3) : 0),
+            stock: item.stock || 0,
+          });
+        });
+      });
+      return rows;
+    }
+
+    function updateCounts() {
+      document.getElementById('selCount').textContent = String(selected.size);
+      document.getElementById('rowCount').textContent = String(expandRows().length);
+    }
+
+    function applyMarketDefaults() {
+      const m = MARKETS[marketEl.value];
+      fxEl.value = m.fx;
+      roundEl.value = m.roundDefault;
+    }
+
+    function roundMoney(n, mode) {
+      if (!Number.isFinite(n)) return 0;
+      switch (mode) {
+        case 'd1': return Math.round(n * 10) / 10;
+        case 'd2': return Math.round(n * 100) / 100;
+        case 'u10': return Math.round(n / 10) * 10;
+        case 'u100': return Math.round(n / 100) * 100;
+        case 'u1000': return Math.round(n / 1000) * 1000;
+        default: return Math.round(n);
+      }
+    }
+    function displayDecimals(mode) {
+      if (mode === 'd1') return 1;
+      if (mode === 'd2') return 2;
+      return 0;
+    }
+    function fmtKrw(n) {
+      if (!n) return '—';
+      return '₩' + Math.round(n).toLocaleString('en-US');
+    }
+    function fmtLocal(n, m, mode) {
+      const dec = displayDecimals(mode);
+      const v = roundMoney(n, mode);
+      return m.symbol + v.toLocaleString('en-US', {
+        minimumFractionDigits: dec,
+        maximumFractionDigits: dec,
+      });
+    }
+
+    function renderSheet() {
+      const rows = expandRows();
+      const empty = document.getElementById('emptyMsg');
+      const tbody = document.getElementById('tbody');
+      empty.style.display = rows.length ? 'none' : 'block';
+
+      const m = MARKETS[marketEl.value];
+      const fx = Number(fxEl.value);
+      const rate = Number.isFinite(fx) && fx > 0 ? fx : m.fx;
+      const disc = Math.min(90, Math.max(0, Number(discountEl.value) || 0)) / 100;
+      const mode = roundEl.value;
+      const roundLabel = roundEl.options[roundEl.selectedIndex]?.text || mode;
+
+      document.getElementById('marketMeta').innerHTML =
+        `<div><b>${m.name}</b> · 1 KRW = <b>${rate}</b> ${m.currency}</div>` +
+        `<div>R-${Math.round(disc * 100)}% · ${roundLabel}</div>`;
+      document.getElementById('thLocal').innerHTML = `MSRP<br/>${m.currency}`;
+      document.getElementById('thWs').innerHTML = `Wholesale<br/>${m.currency}`;
+
+      let pcs = 0, sumLocal = 0, sumKrw = 0;
+      tbody.innerHTML = '';
+
+      rows.forEach(row => {
+        const localMsrp = roundMoney(row.global * rate, mode);
+        const wsLocal = roundMoney(row.global * rate * (1 - disc), mode);
+        const wsKrw = roundMoney(row.global * (1 - disc), 'd0');
+        const q = qtys[row.key] || 0;
+        pcs += q;
+        sumLocal += wsLocal * q;
+        sumKrw += wsKrw * q;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${row.season || '—'}</td>
+          <td><img class="photo" src="${row.img || ''}" alt="" onerror="this.style.opacity=.2" /></td>
+          <td>${row.sku}</td>
+          <td><div class="model">${row.model}</div></td>
+          <td class="colour">${row.colour}</td>
+          <td>${row.coo}</td>
+          <td class="num">${fmtKrw(row.kmsrp)}</td>
+          <td class="num">${fmtKrw(row.global)}</td>
+          <td class="num">${row.global ? fmtLocal(localMsrp, m, mode) : '—'}</td>
+          <td class="num ws">${row.global ? fmtLocal(wsLocal, m, mode) : '—'}</td>
+          <td class="num">${row.stock || '—'}</td>
+          <td class="num"><input class="qty" type="number" min="0" data-key="${row.key}" value="${q || ''}" placeholder="0" /></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll('.qty').forEach(inp => {
+        inp.addEventListener('input', () => {
+          qtys[inp.dataset.key] = Math.max(0, Number(inp.value) || 0);
+          renderSheet();
+          const el = tbody.querySelector(`.qty[data-key="${inp.dataset.key}"]`);
+          if (el) { el.focus(); el.selectionStart = el.value.length; }
+        });
+      });
+
+      document.getElementById('totalPcs').textContent = pcs + ' pcs';
+      document.getElementById('totalLocal').textContent = pcs ? fmtLocal(sumLocal, m, mode) : '—';
+      document.getElementById('totalKrw').textContent = pcs ? fmtKrw(sumKrw) : '—';
+      updateCounts();
+    }
+
+    // selection helpers
+    document.getElementById('btnSelectFiltered').onclick = () => {
+      filteredCatalog().forEach(i => selected.add(i.id));
+      renderPicker(); renderSheet();
+    };
+    document.getElementById('btnClear').onclick = () => {
+      selected.clear();
+      renderPicker(); renderSheet();
+    };
+    document.getElementById('btnInvert').onclick = () => {
+      const ids = new Set(filteredCatalog().map(i => i.id));
+      ids.forEach(id => { if (selected.has(id)) selected.delete(id); else selected.add(id); });
+      renderPicker(); renderSheet();
+    };
+    document.getElementById('btnSeasonAll').onclick = () => {
+      const s = seasonEl.value;
+      if (s === 'all') {
+        alert('시즌을 먼저 선택하세요 (예: 27SS)');
+        return;
+      }
+      catalog.filter(i => i.season === s).forEach(i => selected.add(i.id));
+      renderPicker(); renderSheet();
+    };
+    document.getElementById('btnCatAll').onclick = () => {
+      const c = catEl.value;
+      if (c === 'all') {
+        alert('카테고리를 먼저 선택하세요 (HB / ACC / SHOES)');
+        return;
+      }
+      catalog.filter(i => i.erpCategory === c).forEach(i => selected.add(i.id));
+      renderPicker(); renderSheet();
+    };
+    document.getElementById('btnWithKmsrp').onclick = () => {
+      filteredCatalog().filter(i => i.kmsrp > 0).forEach(i => selected.add(i.id));
+      renderPicker(); renderSheet();
+    };
+    document.getElementById('btnWithImage').onclick = () => {
+      filteredCatalog().filter(i => !!i.imageUrl).forEach(i => selected.add(i.id));
+      renderPicker(); renderSheet();
+    };
+
+    searchEl.addEventListener('input', renderPicker);
+    seasonEl.addEventListener('change', renderPicker);
+    catEl.addEventListener('change', renderPicker);
+    marketEl.addEventListener('change', () => { applyMarketDefaults(); renderSheet(); });
+    fxEl.addEventListener('input', renderSheet);
+    discountEl.addEventListener('input', renderSheet);
+    roundEl.addEventListener('change', renderSheet);
+
+    loadCatalog();
+    applyMarketDefaults();
+    renderPicker();
+    renderSheet();
+  </script>
+</body>
+</html>

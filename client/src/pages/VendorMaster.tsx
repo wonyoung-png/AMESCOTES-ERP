@@ -1,5 +1,6 @@
 // AMESCOTES ERP — 거래처 마스터 (Phase 1 개편)
 import { useState, useMemo, useRef, useCallback } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { store, genId, type Vendor, type VendorType, type Currency, type BillingType } from '@/lib/store';
@@ -13,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Pencil, Trash2, Building2, Clock, Loader2, Paperclip, Upload } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, Clock, Loader2, Paperclip, Upload, Sparkles, Factory, ShoppingBag, Users } from 'lucide-react';
 
 const VENDOR_TYPES: VendorType[] = ['바이어', '자재거래처', '공장', '해외공장', '물류업체', '기타'];
 const CURRENCIES: Currency[] = ['KRW', 'USD', 'CNY'];
@@ -43,13 +44,40 @@ const EMPTY_VENDOR: Partial<Vendor> = {
   customMaterialType: '',
 };
 
+type AiVendorDraft = {
+  suggestedType?: VendorType | null;
+  typeHint?: string;
+  name?: string;
+  nameEn?: string;
+  nameCn?: string;
+  companyName?: string;
+  bizRegNo?: string;
+  address?: string;
+  country?: string;
+  currency?: Currency;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  billingEmail?: string;
+  wechatId?: string;
+  bankInfo?: Vendor['bankInfo'];
+  memo?: string;
+};
+
+const AI_TYPE_CHOICES: { type: VendorType; label: string; desc: string; icon: typeof Factory }[] = [
+  { type: '공장', label: '생산공장 (국내)', desc: 'OEM · 봉제 · 국내 생산', icon: Factory },
+  { type: '해외공장', label: '생산공장 (해외)', desc: '중국 등 해외 OEM', icon: Factory },
+  { type: '자재거래처', label: '자재업체', desc: '원단·가죽·부자재 공급', icon: ShoppingBag },
+  { type: '바이어', label: '바이어', desc: '브랜드 · 발주처', icon: Users },
+];
+
 export default function VendorMaster() {
   const queryClient = useQueryClient();
   const { data: vendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const setVendors = (_v: Vendor[]) => {}; // no-op, replaced by useQuery
-  const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<string>('all');
-  const [filterMaterialType, setFilterMaterialType] = useState<string>('all');
+  const [search, setSearch] = usePersistedState('vendors.search', '');
+  const [filterType, setFilterType] = usePersistedState<string>('vendors.filterType', 'all');
+  const [filterMaterialType, setFilterMaterialType] = usePersistedState<string>('vendors.filterMaterialType', 'all');
   const [showModal, setShowModal] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [editVendor, setEditVendor] = useState<Partial<Vendor>>({ ...EMPTY_VENDOR });
@@ -62,7 +90,104 @@ export default function VendorMaster() {
   const [isDirty, setIsDirty] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
 
+  // AI 자동등록
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiStep, setAiStep] = useState<'upload' | 'type' | 'review'>('upload');
+  const [aiFiles, setAiFiles] = useState<File[]>([]);
+  const [aiNotes, setAiNotes] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiDraft, setAiDraft] = useState<AiVendorDraft>({});
+  const [aiType, setAiType] = useState<VendorType | ''>('');
+  const aiFileRef = useRef<HTMLInputElement>(null);
+
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['vendors'] });
+
+  const openAiRegister = () => {
+    setAiStep('upload');
+    setAiFiles([]);
+    setAiNotes('');
+    setAiDraft({});
+    setAiType('');
+    setAiLoading(false);
+    setShowAiModal(true);
+  };
+
+  const runAiVendorOcr = async () => {
+    if (aiFiles.length === 0 && !aiNotes.trim()) {
+      toast.error('서류 사진 또는 텍스트(이메일·연락처)를 넣어주세요');
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const fd = new FormData();
+      aiFiles.forEach(f => fd.append('images', f));
+      if (aiNotes.trim()) fd.append('notes', aiNotes.trim());
+      const res = await fetch('/api/vendor/ocr', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'OCR 실패');
+      setAiDraft(data as AiVendorDraft);
+      const st = (data as AiVendorDraft).suggestedType;
+      if (st && VENDOR_TYPES.includes(st)) setAiType(st);
+      else setAiType('');
+      setAiStep('type');
+      toast.success('서류 분석 완료 — 거래처 유형을 선택하세요');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'AI 분석 실패');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const confirmAiType = () => {
+    if (!aiType) { toast.error('생산공장 / 자재업체 / 바이어 중 선택해주세요'); return; }
+    setAiDraft(d => ({ ...d, suggestedType: aiType }));
+    setAiStep('review');
+  };
+
+  const saveAiVendor = async () => {
+    if (!aiType) { toast.error('거래처 유형을 선택해주세요'); return; }
+    const name = (aiDraft.name || aiDraft.companyName || '').trim();
+    if (!name) { toast.error('거래처명이 없습니다. 수정 후 저장하세요'); return; }
+    const dup = vendors.find((v: Vendor) => v.name.trim() === name);
+    if (dup) { toast.error(`'${name}'은(는) 이미 등록된 거래처입니다`); return; }
+
+    const country = (aiDraft.country as string) || '한국';
+    const currency = (aiDraft.currency as Currency) || (country === '중국' ? 'CNY' : country === '미국' ? 'USD' : 'KRW');
+    const vendorData: Vendor = {
+      id: genId(),
+      name,
+      nameEn: aiDraft.nameEn,
+      nameCn: aiDraft.nameCn,
+      companyName: aiDraft.companyName || name,
+      bizRegNo: aiDraft.bizRegNo,
+      address: aiDraft.address,
+      type: aiType,
+      country,
+      currency,
+      contactName: aiDraft.contactName,
+      contactPhone: aiDraft.contactPhone,
+      contactEmail: aiDraft.contactEmail,
+      billingEmail: aiDraft.billingEmail || aiDraft.contactEmail,
+      wechatId: aiDraft.wechatId,
+      bankInfo: aiDraft.bankInfo,
+      memo: [aiDraft.memo, 'AI 서류 자동등록'].filter(Boolean).join(' · '),
+      contactHistory: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      await upsertVendor(vendorData);
+      toast.success(`"${name}" (${aiType}) 자동 등록 완료`);
+      setShowAiModal(false);
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '저장 실패');
+    }
+  };
+
+  const patchAiDraft = (field: keyof AiVendorDraft, value: string) => {
+    setAiDraft(d => ({ ...d, [field]: value }));
+  };
 
   const filtered = useMemo(() => {
     let list = vendors;
@@ -495,9 +620,18 @@ export default function VendorMaster() {
           <h1 className="text-2xl font-bold text-stone-800">거래처 마스터</h1>
           <p className="text-sm text-stone-500 mt-0.5">바이어 · 자재거래처 · 공장 · 물류업체</p>
         </div>
-        <Button onClick={openAdd} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">
-          <Plus className="w-4 h-4" />거래처 등록
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={openAiRegister}
+            className="border-violet-300 text-violet-700 hover:bg-violet-50 gap-2"
+          >
+            <Sparkles className="w-4 h-4" />AI 자동등록
+          </Button>
+          <Button onClick={openAdd} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">
+            <Plus className="w-4 h-4" />거래처 등록
+          </Button>
+        </div>
       </div>
 
       {/* 유형별 통계 */}
@@ -1060,6 +1194,185 @@ export default function VendorMaster() {
             <Button variant="outline" onClick={() => handleModalClose(true)}>취소</Button>
             <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">저장</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI 서류 자동등록 */}
+      <Dialog open={showAiModal} onOpenChange={(o) => { if (!o && !aiLoading) setShowAiModal(false); }}>
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-violet-600" />
+              AI 거래처 자동등록
+            </DialogTitle>
+          </DialogHeader>
+
+          {aiStep === 'upload' && (
+            <div className="space-y-4 py-2">
+                <p className="text-sm text-stone-600">
+                사업자등록증 · 통장사본 · 명함 사진/PDF와 계산서용 이메일·연락처 텍스트를 넣으면 AI가 채웁니다.
+              </p>
+              <div>
+                <input
+                  ref={aiFileRef}
+                  type="file"
+                  accept="image/*,.pdf,application/pdf"
+                  multiple
+                  className="hidden"
+                  onChange={e => {
+                    const list = Array.from(e.target.files || []);
+                    if (list.length) setAiFiles(prev => [...prev, ...list].slice(0, 8));
+                    if (aiFileRef.current) aiFileRef.current.value = '';
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-24 border-dashed border-2 border-violet-200 text-violet-700 hover:bg-violet-50 flex flex-col gap-1"
+                  onClick={() => aiFileRef.current?.click()}
+                >
+                  <Upload className="w-6 h-6" />
+                  <span className="text-sm font-medium">서류 추가 (최대 8개)</span>
+                  <span className="text-[10px] text-stone-400">jpg / png / webp / pdf</span>
+                </Button>
+                {aiFiles.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {aiFiles.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="flex items-center justify-between text-xs bg-stone-50 rounded px-2 py-1.5">
+                        <span className="truncate text-stone-700">{f.name}</span>
+                        <button
+                          type="button"
+                          className="text-red-500 shrink-0 ml-2"
+                          onClick={() => setAiFiles(prev => prev.filter((_, j) => j !== i))}
+                        >
+                          삭제
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label>추가 정보 (이메일 · 연락처 · 메모)</Label>
+                <textarea
+                  value={aiNotes}
+                  onChange={e => setAiNotes(e.target.value)}
+                  className="w-full min-h-[100px] text-sm border border-stone-200 rounded-lg p-3 resize-y"
+                  placeholder={"예)\n계산서 이메일: tax@example.com\n담당자: 김○○ / 010-1234-5678\n위챗: wechat_id"}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAiModal(false)}>취소</Button>
+                <Button
+                  onClick={runAiVendorOcr}
+                  disabled={aiLoading}
+                  className="bg-violet-600 hover:bg-violet-700 text-white gap-2"
+                >
+                  {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {aiLoading ? '분석 중…' : 'AI 분석'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {aiStep === 'type' && (
+            <div className="space-y-4 py-2">
+              <div className="bg-violet-50 border border-violet-100 rounded-lg p-3 text-sm">
+                <p className="font-medium text-violet-900">이 거래처는 무엇인가요?</p>
+                {aiDraft.typeHint && (
+                  <p className="text-xs text-violet-700 mt-1">AI 힌트: {aiDraft.typeHint}</p>
+                )}
+                {aiDraft.name || aiDraft.companyName ? (
+                  <p className="text-xs text-stone-600 mt-1">추출명: {aiDraft.name || aiDraft.companyName}</p>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {AI_TYPE_CHOICES.map(c => {
+                  const Icon = c.icon;
+                  const selected = aiType === c.type;
+                  return (
+                    <button
+                      key={c.type}
+                      type="button"
+                      onClick={() => setAiType(c.type)}
+                      className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-colors ${
+                        selected
+                          ? 'border-violet-500 bg-violet-50 ring-1 ring-violet-300'
+                          : 'border-stone-200 hover:border-violet-200 hover:bg-stone-50'
+                      }`}
+                    >
+                      <Icon className={`w-5 h-5 mt-0.5 shrink-0 ${selected ? 'text-violet-600' : 'text-stone-400'}`} />
+                      <div>
+                        <p className="text-sm font-semibold text-stone-800">{c.label}</p>
+                        <p className="text-xs text-stone-500">{c.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setAiStep('upload')}>← 서류 다시</Button>
+                <Button onClick={confirmAiType} className="bg-violet-600 hover:bg-violet-700 text-white">다음 · 내용 확인</Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {aiStep === 'review' && (
+            <div className="space-y-3 py-2">
+              <p className="text-sm text-stone-600">
+                유형: <span className="font-semibold text-violet-700">{aiType}</span> — 틀린 값은 수정 후 등록하세요.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  ['name', '거래처명*'],
+                  ['companyName', '사업자 상호'],
+                  ['bizRegNo', '사업자번호'],
+                  ['contactName', '담당자'],
+                  ['contactPhone', '연락처'],
+                  ['contactEmail', '이메일'],
+                  ['billingEmail', '계산서 이메일'],
+                  ['address', '주소'],
+                  ['country', '국가'],
+                ] as Array<[keyof AiVendorDraft, string]>).map(([key, label]) => (
+                  <div key={key} className="space-y-1">
+                    <Label className="text-xs">{label}</Label>
+                    <Input
+                      value={(aiDraft[key] as string) || ''}
+                      onChange={e => patchAiDraft(key, e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-stone-100 pt-3 space-y-2">
+                <p className="text-xs font-medium text-stone-600">계좌 정보</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ['bankName', '은행명'],
+                    ['bankAccount', '계좌번호'],
+                    ['beneficiary', '예금주'],
+                    ['swiftCode', 'SWIFT'],
+                  ] as const).map(([key, label]) => (
+                    <div key={key} className="space-y-1">
+                      <Label className="text-xs">{label}</Label>
+                      <Input
+                        value={aiDraft.bankInfo?.[key] || ''}
+                        onChange={e => setAiDraft(d => ({
+                          ...d,
+                          bankInfo: { ...(d.bankInfo || {}), [key]: e.target.value },
+                        }))}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setAiStep('type')}>← 유형 다시</Button>
+                <Button onClick={saveAiVendor} className="bg-amber-700 hover:bg-amber-800 text-white">거래처 등록</Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

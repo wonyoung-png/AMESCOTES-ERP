@@ -1,0 +1,524 @@
+[
+  {
+    "enName": "FINE BAG",
+    "koName": "파인 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "DARK BROWN",
+        "leatherColor": "다크 브라운"
+      }
+    ],
+    "kmsrp": 358000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "TEMPO CUTOUT BAG",
+    "koName": "템포 컷아웃 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SUEDE SAND",
+        "leatherColor": "스웨이드 샌드"
+      },
+      {
+        "name": "SUEDE BLACK",
+        "leatherColor": "스웨이드 블랙"
+      },
+      {
+        "name": "SUEDE TAN",
+        "leatherColor": "스웨이드 탄"
+      }
+    ],
+    "kmsrp": 238000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "MOSSY CROSSBODY BAG",
+    "koName": "모시 크로스바디백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "크로스백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "IVORY",
+        "leatherColor": "아이보리"
+      }
+    ],
+    "kmsrp": 218000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "URBAN MINI BAG",
+    "koName": "얼반 미니 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "VINTAGE BROWN",
+        "leatherColor": "빈티지 브라운"
+      }
+    ],
+    "kmsrp": 188000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "MONO SHOULDER BAG",
+    "koName": "모노 숄더 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "VINTAGE BROWN",
+        "leatherColor": "빈티지 브라운"
+      }
+    ],
+    "kmsrp": 338000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "MONO TOTE BAG",
+    "koName": "모노 토트 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "토트백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "VINTAGE BROWN",
+        "leatherColor": "빈티지 브라운"
+      },
+      {
+        "name": "EGG BEIGE",
+        "leatherColor": "에그 베이지"
+      }
+    ],
+    "kmsrp": 288000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "PANIER SLIM BAG",
+    "koName": "파니에 슬림 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "ETOUPE BROWN",
+        "leatherColor": "에토프 브라운"
+      },
+      {
+        "name": "OLIVE GREEN",
+        "leatherColor": "올리브 그린"
+      }
+    ],
+    "kmsrp": 208000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "CURVE HOBO BAG",
+    "koName": "커브 호보 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "DARK BROWN",
+        "leatherColor": "다크 브라운"
+      }
+    ],
+    "kmsrp": 298000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "CURVE HOBO LARGE BAG",
+    "koName": "커브 호보 라지 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "IVORY",
+        "leatherColor": "아이보리"
+      }
+    ],
+    "kmsrp": 338000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "FRAME MINI BAG",
+    "koName": "프레임 미니 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "IVORY",
+        "leatherColor": "아이보리"
+      }
+    ],
+    "kmsrp": 258000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "FRAME BAG",
+    "koName": "프레임 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      }
+    ],
+    "kmsrp": 308000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "CITY SHOULDER BAG",
+    "koName": "시티 숄더백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "ROTI YELLOW",
+        "leatherColor": "로티 옐로우"
+      }
+    ],
+    "kmsrp": 378000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "FADE SHOULDER BAG",
+    "koName": "페이드 숄더 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "PORCELAIN WHITE",
+        "leatherColor": "포슬린 화이트"
+      }
+    ],
+    "kmsrp": 338000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "NET LEATHER BAG",
+    "koName": "네트 레더 백",
+    "season": "27SS",
+    "erpCategory": "HB",
+    "category": "숄더백",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "CARMINE RED",
+        "leatherColor": "카민 레드"
+      },
+      {
+        "name": "TAN BROWN",
+        "leatherColor": "탄 브라운"
+      }
+    ],
+    "kmsrp": 238000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "FRAME LIP CASE",
+    "koName": "프레임 립 케이스",
+    "season": "27SS",
+    "erpCategory": "ACC",
+    "category": "지갑",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "IVORY",
+        "leatherColor": "아이보리"
+      }
+    ],
+    "kmsrp": 108000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "CROC LEATHER BELT",
+    "koName": "크록 레더 벨트",
+    "season": "27SS",
+    "erpCategory": "ACC",
+    "category": "기타",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      }
+    ],
+    "kmsrp": 75000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "FRAME CHAIN WALLET",
+    "koName": "프레임 체인 월렛",
+    "season": "27SS",
+    "erpCategory": "ACC",
+    "category": "지갑",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      }
+    ],
+    "kmsrp": 128000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "FLOWER LEATHER CHARM",
+    "koName": "플라워 레더 참",
+    "season": "27SS",
+    "erpCategory": "ACC",
+    "category": "키링",
+    "colors": [],
+    "kmsrp": 48000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "FOLDING FAN",
+    "koName": "폴딩 팬",
+    "season": "27SS",
+    "erpCategory": "ACC",
+    "category": "키링",
+    "colors": [],
+    "kmsrp": 0,
+    "memoExtra": ""
+  },
+  {
+    "enName": "CROC CARD CASE",
+    "koName": "크록 카드 케이스",
+    "season": "27SS",
+    "erpCategory": "ACC",
+    "category": "지갑",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "OFF WHITE",
+        "leatherColor": "오프 화이트"
+      }
+    ],
+    "kmsrp": 58000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "CURVE CARD WALLET",
+    "koName": "커브 카드 월렛",
+    "season": "27SS",
+    "erpCategory": "ACC",
+    "category": "지갑",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "소프트 블랙"
+      },
+      {
+        "name": "IVORY",
+        "leatherColor": "아이보리"
+      },
+      {
+        "name": "CERULEAN BLUE",
+        "leatherColor": "세루리안 블루"
+      }
+    ],
+    "kmsrp": 78000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "SHELL CHARM",
+    "koName": "쉘 참",
+    "season": "27SS",
+    "erpCategory": "ACC",
+    "category": "키링",
+    "colors": [],
+    "kmsrp": 48000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "CLAM CHARM",
+    "koName": "클램 참",
+    "season": "27SS",
+    "erpCategory": "ACC",
+    "category": "키링",
+    "colors": [],
+    "kmsrp": 48000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "KEY CHARM",
+    "koName": "키 참",
+    "season": "27SS",
+    "erpCategory": "ACC",
+    "category": "키링",
+    "colors": [],
+    "kmsrp": 48000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "WASHED ROUND FLATS",
+    "koName": "워시드 라운드 플랫",
+    "season": "27SS",
+    "erpCategory": "SHOES",
+    "category": "로퍼",
+    "colors": [
+      {
+        "name": "SOFT BLACK",
+        "leatherColor": "블랙"
+      }
+    ],
+    "kmsrp": 258000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "SHIRRING BALLET FLAT",
+    "koName": "셔링 발렛 플랫",
+    "season": "27SS",
+    "erpCategory": "SHOES",
+    "category": "로퍼",
+    "colors": [
+      {
+        "name": "SATIN BLACK",
+        "leatherColor": "새틴 블랙"
+      },
+      {
+        "name": "SATIN CHARCOAL",
+        "leatherColor": "새틴 차콜"
+      },
+      {
+        "name": "SATIN SAGE GREEN",
+        "leatherColor": "새틴 세이지 그린"
+      }
+    ],
+    "kmsrp": 218000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "쪼리 샌들",
+    "koName": "쪼리 샌들",
+    "season": "27SS",
+    "erpCategory": "SHOES",
+    "category": "샌들",
+    "colors": [
+      {
+        "name": "블랙"
+      },
+      {
+        "name": "아이보리"
+      },
+      {
+        "name": "레드"
+      }
+    ],
+    "kmsrp": 208000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "쪼리힐",
+    "koName": "쪼리힐",
+    "season": "27SS",
+    "erpCategory": "SHOES",
+    "category": "샌들",
+    "colors": [
+      {
+        "name": "블랙"
+      },
+      {
+        "name": "탄브라운"
+      }
+    ],
+    "kmsrp": 218000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "슬링백",
+    "koName": "슬링백",
+    "season": "27SS",
+    "erpCategory": "SHOES",
+    "category": "힐",
+    "colors": [
+      {
+        "name": "블랙"
+      }
+    ],
+    "kmsrp": 238000,
+    "memoExtra": ""
+  },
+  {
+    "enName": "펌프스",
+    "koName": "펌프스",
+    "season": "27SS",
+    "erpCategory": "SHOES",
+    "category": "힐",
+    "colors": [
+      {
+        "name": "블랙"
+      }
+    ],
+    "kmsrp": 238000,
+    "memoExtra": ""
+  }
+]

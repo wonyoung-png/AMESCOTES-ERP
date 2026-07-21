@@ -40,7 +40,6 @@ export default function Dashboard() {
   const [selectedSample, setSelectedSample] = useState<Sample | null>(null);
   const [, navigate] = useLocation();
   const settlements = store.getSettlements();
-  const salesRecords = store.getSalesRecords();
   const items = store.getItems();
   const settings = store.getSettings();
   const tradeStatements = store.getTradeStatements();
@@ -48,12 +47,11 @@ export default function Dashboard() {
   const now = new Date();
   const thisMonth = now.toISOString().slice(0, 7);
 
-  // ── KPI 계산 ──
-  const monthSales = salesRecords
-    .filter(r => r.saleDate?.startsWith(thisMonth))
-    .reduce((s, r) => s + (r.totalKrw || 0), 0);
+  // ── KPI 계산 (제조/OEM 중심) ──
+  const monthBilledCount = useMemo(() =>
+    store.getTradeStatements().filter(ts => ts.issueDate.startsWith(thisMonth)).length,
+    [thisMonth]);
 
-  // 이번 달 청구 금액 (거래명세표 기준)
   const monthBilledAmount = useMemo(() => {
     return store.getTradeStatements()
       .filter(ts => ts.issueDate.startsWith(thisMonth))
@@ -136,18 +134,19 @@ export default function Dashboard() {
     return stages;
   }, [orders, samples]);
 
-  // 월별 매출
-  const monthlyData = useMemo(() => {
+  // 월별 OEM 청구 (거래명세표)
+  const monthlyBillingData = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const r of salesRecords) {
-      if (!r.saleDate) continue;
-      const m = r.saleDate.slice(0, 7);
-      map[m] = (map[m] || 0) + (r.totalKrw || 0);
+    for (const ts of tradeStatements) {
+      if (!ts.issueDate) continue;
+      const m = ts.issueDate.slice(0, 7);
+      const total = ts.lines.reduce((ls, l) => ls + l.qty * l.unitPrice * (1 + l.taxRate), 0);
+      map[m] = (map[m] || 0) + total;
     }
     return Object.entries(map).sort().slice(-6).map(([month, total]) => ({
       month: month.slice(5) + '월', total,
     }));
-  }, [salesRecords]);
+  }, [tradeStatements]);
 
   // 미수금 연체 건
   const overdueSettlements = useMemo(() =>
@@ -161,8 +160,8 @@ export default function Dashboard() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-stone-800">대시보드</h1>
-        <p className="text-sm text-stone-500 mt-0.5">AMESCOTES 운영 현황 — 납기 위험 중심</p>
+        <h1 className="text-2xl font-bold text-stone-800">생산 대시보드</h1>
+        <p className="text-sm text-stone-500 mt-0.5">ATLM 제조 ERP — OEM 생산·납기·정산 현황</p>
       </div>
 
       {/* ── KPI 7개 ── */}
@@ -177,9 +176,9 @@ export default function Dashboard() {
         <KpiCard
           icon={<TrendingUp className="w-5 h-5 text-green-600" />}
           bg="bg-green-50"
-          label="이달 매출"
-          value={formatKRW(monthSales)}
-          sub={`${salesRecords.filter(r => r.saleDate?.startsWith(thisMonth)).length}건`}
+          label="이달 청구"
+          value={formatKRW(monthBilledAmount)}
+          sub={`거래명세 ${monthBilledCount}건`}
         />
         <KpiCard
           icon={<Activity className="w-5 h-5 text-amber-700" />}
@@ -230,7 +229,7 @@ export default function Dashboard() {
               <AlertTriangle className="w-4 h-4 text-red-500" />
               🚨 납기 위험 현황
             </h3>
-            <Link href="/deadline" className="text-xs text-stone-500 hover:text-stone-700 flex items-center gap-1">
+            <Link href="/orders" className="text-xs text-stone-500 hover:text-stone-700 flex items-center gap-1">
               전체 <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -351,21 +350,21 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 이달 매출 / 연체 미수금 */}
+        {/* 이달 청구 / 연체 미수금 */}
         <div className="bg-white rounded-xl border border-stone-200 p-5">
-          <h3 className="text-sm font-semibold text-stone-700 mb-3">월별 매출 추이</h3>
-          {monthlyData.length === 0 ? (
+          <h3 className="text-sm font-semibold text-stone-700 mb-3">월별 OEM 청구 추이</h3>
+          {monthlyBillingData.length === 0 ? (
             <div className="h-[140px] flex items-center justify-center text-stone-400 text-sm">
-              매출 데이터가 없습니다
+              거래명세 청구 데이터가 없습니다
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={140}>
-              <BarChart data={monthlyData}>
+              <BarChart data={monthlyBillingData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0ece8" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`} />
                 <Tooltip formatter={(v: number) => formatKRW(v)} />
-                <Bar dataKey="total" name="매출" fill="#C9A96E" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="total" name="청구" fill="#C9A96E" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

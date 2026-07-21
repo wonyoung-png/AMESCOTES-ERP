@@ -418,7 +418,7 @@ export default function CostSheetPrint() {
                   ))}
                   {bom.pnl.confirmedSalePrice && (
                     <div className="flex justify-between py-1.5 border-t-2 border-stone-300">
-                      <span className="font-semibold text-stone-700">확정 판매가</span>
+                      <span className="font-semibold text-stone-700">KMSRP (확정판매가)</span>
                       <span className="font-bold text-stone-800 tabular-nums">{fmtKrw(bom.pnl.confirmedSalePrice)}</span>
                     </div>
                   )}
@@ -431,7 +431,7 @@ export default function CostSheetPrint() {
                   <h4 className="text-xs font-semibold text-stone-600 mb-3">영업이익 분석 (P&L)</h4>
                   <div className="space-y-1">
                     {[
-                      { no: '①', label: '정가 (확정판매가)', desc: '', val: bom.pnl.confirmedSalePrice, color: 'text-stone-800', bold: false },
+                      { no: '①', label: '정가 (KMSRP · 확정판매가)', desc: '', val: bom.pnl.confirmedSalePrice, color: 'text-stone-800', bold: false },
                       { no: '②', label: '(-) 할인', desc: `${Math.round(bom.pnl.discountRate * 100)}%`, val: -(bom.pnl.confirmedSalePrice * bom.pnl.discountRate), color: 'text-red-500', bold: false },
                       { no: '③', label: '실판가 (Net Sale)', desc: '', val: postPnlResultSheet.netSale, color: 'text-stone-700', bold: true },
                       { no: '④', label: '(-) 플랫폼 수수료', desc: `${Math.round(bom.pnl.platformFeeRate * 100)}%`, val: -(postPnlResultSheet.netSale * bom.pnl.platformFeeRate), color: 'text-red-500', bold: false },
@@ -474,7 +474,7 @@ export default function CostSheetPrint() {
                 </div>
               ) : (
                 <div className="text-center text-stone-400 text-xs py-4 bg-stone-50 rounded-lg border border-stone-200 border-dashed">
-                  확정 판매가를 입력하면 영업이익 P&L 분석이 표시됩니다
+                  KMSRP(확정판매가)를 입력하면 영업이익 P&L 분석이 표시됩니다
                 </div>
               )}
             </div>

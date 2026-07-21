@@ -1,5 +1,7 @@
 // AMESCOTES ERP — 자재 구매 매칭
 import React, { useState, useMemo, useEffect } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
+import { useSearch } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchPurchaseItems, upsertPurchaseItem, deletePurchaseItem as deletePurchaseItemSB,
@@ -10,6 +12,7 @@ import {
   type PurchaseItem, type Currency, type ExpenseType, type Expense, type ExpenseCategory,
   type ExpenseLine, type CartItem,
 } from '@/lib/store';
+import { phase1, type Payable } from '@/lib/phase1';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -70,8 +73,8 @@ export default function PurchaseMatching() {
   const vendors = allVendorsData.filter((v: any) => v.type === '자재거래처');
   const allVendors = store.getVendors();
   const settings = store.getSettings();
-  const [filterOrder, setFilterOrder] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterOrder, setFilterOrder] = usePersistedState('purchase.filterOrder', 'all');
+  const [filterStatus, setFilterStatus] = usePersistedState('purchase.filterStatus', 'all');
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const toggleGroup = (key: string) => {
     setOpenGroups(prev => {
@@ -147,13 +150,14 @@ export default function PurchaseMatching() {
   const [form, setForm] = useState<Partial<PurchaseItem>>({});
   const [editId, setEditId] = useState<string | null>(null);
 
-  // 지출전표 모달 상태
+  // 지출결의 모달 상태
   const [expenseModal, setExpenseModal] = useState(false);
   const [expenseForm, setExpenseForm] = useState<ExpenseFormState>(DEFAULT_EXPENSE_FORM);
-  // 지출전표 상세보기 모달
+  // 지출결의/구전표 상세
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
-  // 생성된 전표 (바로보기용)
-  const [justCreatedExpense, setJustCreatedExpense] = useState<Expense | null>(null);
+  const [selectedPayable, setSelectedPayable] = useState<Payable | null>(null);
+  // 생성된 결의 (바로보기용)
+  const [justCreatedPayable, setJustCreatedPayable] = useState<Payable | null>(null);
 
   // 기존전표 연결 모달 상태 (작업 2)
   const [linkExpenseModal, setLinkExpenseModal] = useState(false);
@@ -204,6 +208,19 @@ export default function PurchaseMatching() {
   // 자재 장바구니 모달 상태
   const [cartModal, setCartModal] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>(() => store.getMaterialCart());
+  const searchStr = useSearch();
+
+  // 품목마스터 일괄발주 완료 → "자재 장바구니 확인"으로 진입 시 모달 자동 오픈
+  useEffect(() => {
+    const fromQuery = /(?:^|[?&])cart=1(?:&|$)/.test(searchStr) || searchStr === '?cart=1' || searchStr.includes('cart=1');
+    let fromFlag = false;
+    try { fromFlag = localStorage.getItem('ames_open_material_cart') === '1'; } catch { /* ignore */ }
+    if (!fromQuery && !fromFlag) return;
+    try { localStorage.removeItem('ames_open_material_cart'); } catch { /* ignore */ }
+    setCartItems(store.getMaterialCart());
+    setCartModal(true);
+  }, [searchStr]);
+
   // 거래처별 발주서 모달 상태
   const [vendorOrderModal, setVendorOrderModal] = useState(false);
   // 이메일 입력 모달 상태
@@ -337,7 +354,7 @@ export default function PurchaseMatching() {
     refresh();
   };
 
-  // ── 지출전표 생성 ──────────────────────────────────────────
+  // ── 지출결의(Payable) 생성 ──────────────────────────────────────────
   const openExpenseModal = (item: PurchaseItem) => {
     setExpenseForm({
       purchaseItemId: item.id,
@@ -355,113 +372,108 @@ export default function PurchaseMatching() {
     setExpenseModal(true);
   };
 
+  const resolvePurchaseProject = (item?: PurchaseItem) => {
+    if (!item) return { projectNo: undefined as string | undefined, styleNo: undefined as string | undefined };
+    if (item.projectNo || item.styleNo) return { projectNo: item.projectNo, styleNo: item.styleNo };
+    const order = (orders as Array<{ id: string; orderNo: string; projectNo?: string; styleNo?: string }>)
+      .find(o => o.id === item.orderId || o.orderNo === item.orderNo)
+      || store.getOrders().find(o => o.id === item.orderId || o.orderNo === item.orderNo);
+    return { projectNo: order?.projectNo, styleNo: order?.styleNo || item.styleNo };
+  };
+
   const handleSaveExpense = async () => {
     if (!expenseForm.description) { toast.error('내용을 입력해주세요'); return; }
     if (!expenseForm.amountKrw) { toast.error('금액을 입력해주세요'); return; }
 
-    const expenseId = genId();
-    // 자재구매 항목을 lines로 자동 구성 (작업 1)
     const item = purchases.find(p => p.id === expenseForm.purchaseItemId);
-    const expenseLines = item ? [{
-      id: genId(),
-      description: item.itemName,
-      qty: item.qty,
-      unit: item.unit,
-      unitPrice: item.amountKrw && item.qty ? Math.round(item.amountKrw / item.qty) : 0,
-      amountKrw: item.amountKrw || expenseForm.amountKrw,
-    }] : undefined;
-
-    const expense: Expense = {
-      id: expenseId,
-      expenseDate: expenseForm.expenseDate,
-      expenseType: expenseForm.expenseType,
-      category: expenseForm.category,
-      lines: expenseLines,
-      description: expenseForm.description,
-      amountKrw: expenseForm.amountKrw,
-      orderId: expenseForm.orderId || undefined,
-      orderNo: expenseForm.orderNo || undefined,
-      vendorName: expenseForm.vendorName || undefined,
-      hasTaxInvoice: expenseForm.hasTaxInvoice,
-      memo: expenseForm.memo || undefined,
-      createdAt: new Date().toISOString(),
-    };
-
-    store.addExpense(expense);
-
-    // PurchaseItem의 statementNo에 expenseId 연결 (Supabase)
-    await upsertPurchaseItem({
-      ...purchases.find(p => p.id === expenseForm.purchaseItemId),
+    const { projectNo, styleNo } = resolvePurchaseProject(item);
+    const payable = phase1.createPayableFromPurchase({
       id: expenseForm.purchaseItemId,
-      statementNo: expenseId,
+      orderId: expenseForm.orderId || item?.orderId,
+      orderNo: expenseForm.orderNo || item?.orderNo,
+      itemName: item?.itemName,
+      amountKrw: expenseForm.amountKrw,
+      vendorId: item?.vendorId,
+      vendorName: expenseForm.vendorName || item?.vendorName,
+      purchaseDate: expenseForm.expenseDate,
+      projectNo,
+      styleNo,
+    });
+    if (!payable) { toast.error('지출결의 생성 실패'); return; }
+
+    await upsertPurchaseItem({
+      ...item,
+      id: expenseForm.purchaseItemId,
+      statementNo: payable.id,
+      projectNo: projectNo || item?.projectNo,
+      styleNo: styleNo || item?.styleNo,
+      amountKrw: expenseForm.amountKrw,
+      vendorName: expenseForm.vendorName || item?.vendorName,
+      purchaseDate: expenseForm.expenseDate,
     });
 
-    toast.success('지출전표가 생성되었습니다');
+    toast.success('지출결의(자재)가 생성되었습니다 — /payables 에서 결제');
     refresh();
     setExpenseModal(false);
-    setJustCreatedExpense(expense);
+    setJustCreatedPayable(payable);
   };
 
   const viewLinkedExpense = (statementNo: string) => {
-    const expenses = store.getExpenses();
-    const expense = expenses.find(e => e.id === statementNo);
-    if (!expense) { toast.error('연결된 전표를 찾을 수 없습니다'); return; }
+    const payable = phase1.getPayables().find(p => p.id === statementNo);
+    if (payable) { setSelectedPayable(payable); return; }
+    const expense = store.getExpenses().find(e => e.id === statementNo);
+    if (!expense) { toast.error('연결된 결의/전표를 찾을 수 없습니다'); return; }
     setSelectedExpense(expense);
   };
 
-  // ── 기존전표 연결 (작업 2) ──────────────────────────────────
+  // ── 기존 결의/전표 연결 ──────────────────────────────────
   const openLinkExpenseModal = (itemId: string) => {
     setLinkTargetItemId(itemId);
     setLinkSearchText('');
     setLinkExpenseModal(true);
   };
 
-  const handleLinkExpense = async (expenseId: string) => {
+  const handleLinkExpense = async (docId: string) => {
     if (!linkTargetItemId) return;
-    // statementNo만 업데이트, orderNo 변경 없이
     await updatePurchaseItemStatus(linkTargetItemId, purchases.find(p => p.id === linkTargetItemId)?.purchaseStatus || '미발주', {
-      statement_no: expenseId,
+      statement_no: docId,
     });
     refresh();
     setLinkExpenseModal(false);
     setLinkTargetItemId(null);
-    toast.success('전표 연결 완료');
+    toast.success('결의 연결 완료');
   };
 
-  // 그룹 전표 일괄발행 (작업 4)
+  // 그룹 전표 일괄발행 — 항목별 Payable
   const handleGroupBulkExpense = async (orderNo: string, groupItems: PurchaseItem[]) => {
     const unpaidItems = groupItems.filter(i => !i.statementNo);
-    if (unpaidItems.length === 0) { toast.error('이미 모든 항목에 전표가 있습니다'); return; }
-    const totalKrw = unpaidItems.reduce((s, i) => s + i.amountKrw, 0);
-    const vendorName = unpaidItems[0]?.vendorName || '';
-    const expenseId = genId();
-    const expenseLines = unpaidItems.map(item => ({
-      id: genId(),
-      description: item.itemName,
-      qty: item.qty,
-      unit: item.unit,
-      unitPrice: item.amountKrw && item.qty ? Math.round(item.amountKrw / item.qty) : 0,
-      amountKrw: item.amountKrw || 0,
-    }));
-    const expense: import('@/lib/store').Expense = {
-      id: expenseId,
-      expenseDate: new Date().toISOString().split('T')[0],
-      expenseType: '계좌이체',
-      category: '자재구매',
-      lines: expenseLines,
-      description: `[${orderNo}] 자재구매 일괄 ${unpaidItems.length}종`,
-      amountKrw: totalKrw,
-      orderNo,
-      vendorName: vendorName || undefined,
-      hasTaxInvoice: false,
-      createdAt: new Date().toISOString(),
-    };
-    store.addExpense(expense);
+    if (unpaidItems.length === 0) { toast.error('이미 모든 항목에 결의가 있습니다'); return; }
+    let count = 0;
+    let totalKrw = 0;
     for (const item of unpaidItems) {
-      await updatePurchaseItemStatus(item.id, item.purchaseStatus, { statement_no: expenseId });
+      const { projectNo, styleNo } = resolvePurchaseProject(item);
+      const payable = phase1.createPayableFromPurchase({
+        id: item.id,
+        orderId: item.orderId,
+        orderNo: item.orderNo || orderNo,
+        itemName: item.itemName,
+        amountKrw: item.amountKrw,
+        vendorId: item.vendorId,
+        vendorName: item.vendorName,
+        purchaseDate: item.purchaseDate || new Date().toISOString().split('T')[0],
+        projectNo,
+        styleNo,
+      });
+      if (!payable) continue;
+      await updatePurchaseItemStatus(item.id, item.purchaseStatus, {
+        statement_no: payable.id,
+        ...(projectNo ? { project_no: projectNo } : {}),
+      });
+      count++;
+      totalKrw += item.amountKrw;
     }
     refresh();
-    toast.success(`[${orderNo}] 전표 일괄발행 완료 — ${unpaidItems.length}종 / ${formatKRW(totalKrw)}`);
+    toast.success(`[${orderNo}] 지출결의 일괄발행 — ${count}종 / ${formatKRW(totalKrw)}`);
   };
 
   // 이메일 발송
@@ -730,9 +742,9 @@ export default function PurchaseMatching() {
                         </td>
                         <td className="px-3 py-3 text-center w-20">
                           {p.statementNo ? (
-                            <span title="지출전표 연결됨" className="text-emerald-600 text-sm">📄</span>
+                            <span title="지출결의 연결됨" className="text-emerald-600 text-sm">📄</span>
                           ) : (
-                            <span title="지출전표 미생성" className="text-stone-300 text-sm">—</span>
+                            <span title="지출결의 미생성" className="text-stone-300 text-sm">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -1307,13 +1319,13 @@ export default function PurchaseMatching() {
         </DialogContent>
       </Dialog>
 
-      {/* ── 지출전표 생성 모달 ── */}
+      {/* ── 지출결의 생성 모달 ── */}
       <Dialog open={expenseModal} onOpenChange={setExpenseModal}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-amber-700" />
-              지출전표 생성
+              지출결의 생성 (자재)
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1413,46 +1425,55 @@ export default function PurchaseMatching() {
         </DialogContent>
       </Dialog>
 
-      {/* ── 기존전표 연결 모달 (작업 2) ── */}
+      {/* ── 기존 결의 연결 모달 ── */}
       <Dialog open={linkExpenseModal} onOpenChange={setLinkExpenseModal}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              📄 기존 지출전표 연결
+              📄 기존 지출결의 연결
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <Input
-              placeholder="전표 검색 (내용, 거래처, 발주번호)"
+              placeholder="검색 (메모, 거래처, 발주번호)"
               value={linkSearchText}
               onChange={e => setLinkSearchText(e.target.value)}
               className="h-9 text-sm"
             />
             <div className="space-y-1 max-h-80 overflow-y-auto">
-              {store.getExpenses()
-                .filter(e => {
+              {phase1.getPayables()
+                .filter(p => p.sourceType === 'purchase' || p.sourceType === 'manual')
+                .filter(p => {
                   const q = linkSearchText.toLowerCase();
-                  return !q || e.description.toLowerCase().includes(q) || (e.vendorName || '').toLowerCase().includes(q) || (e.orderNo || '').toLowerCase().includes(q);
+                  return !q
+                    || (p.memo || '').toLowerCase().includes(q)
+                    || (p.vendorName || '').toLowerCase().includes(q)
+                    || (p.orderNo || '').toLowerCase().includes(q)
+                    || (p.projectNo || '').toLowerCase().includes(q);
                 })
-                .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate))
-                .map(e => (
+                .sort((a, b) => (b.dueDate || '').localeCompare(a.dueDate || ''))
+                .map(p => (
                   <div
-                    key={e.id}
+                    key={p.id}
                     className="flex items-center justify-between p-3 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"
-                    onClick={() => handleLinkExpense(e.id)}
+                    onClick={() => handleLinkExpense(p.id)}
                   >
                     <div className="space-y-0.5 flex-1 min-w-0">
-                      <p className="text-sm font-medium text-stone-800 truncate">{e.description}</p>
-                      <p className="text-xs text-stone-500">{e.expenseDate} · {e.expenseType} · {e.vendorName || '거래처 미지정'} {e.orderNo ? `· ${e.orderNo}` : ''}</p>
+                      <p className="text-sm font-medium text-stone-800 truncate">{p.memo || p.vendorName}</p>
+                      <p className="text-xs text-stone-500">
+                        {p.dueDate} · {p.vendorName || '거래처 미지정'}
+                        {p.orderNo ? ` · ${p.orderNo}` : ''}
+                        {p.projectNo ? ` · ${p.projectNo}` : ''}
+                      </p>
                     </div>
                     <div className="text-right ml-3">
-                      <p className="text-sm font-semibold text-stone-800">{formatKRW(e.amountKrw)}</p>
-                      <span className="text-xs bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded">{e.category}</span>
+                      <p className="text-sm font-semibold text-stone-800">{formatKRW(p.amountKrw)}</p>
+                      <span className="text-xs bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded">{p.status}</span>
                     </div>
                   </div>
                 ))}
-              {store.getExpenses().length === 0 && (
-                <p className="text-center py-8 text-stone-400 text-sm">등록된 지출전표가 없습니다</p>
+              {phase1.getPayables().filter(p => p.sourceType === 'purchase').length === 0 && (
+                <p className="text-center py-8 text-stone-400 text-sm">등록된 자재 지출결의가 없습니다</p>
               )}
             </div>
           </div>
@@ -1543,45 +1564,69 @@ export default function PurchaseMatching() {
         </DialogContent>
       </Dialog>
 
-      {/* 생성된 전표 바로보기 알림 */}
-      <Dialog open={!!justCreatedExpense} onOpenChange={() => setJustCreatedExpense(null)}>
+      {/* 생성된 결의 바로보기 알림 */}
+      <Dialog open={!!justCreatedPayable} onOpenChange={() => setJustCreatedPayable(null)}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-green-600" />
-              지출전표가 생성되었습니다
+              지출결의가 생성되었습니다
             </DialogTitle>
           </DialogHeader>
-          {justCreatedExpense && (
+          {justCreatedPayable && (
             <div className="space-y-3 py-2">
               <div className="bg-stone-50 rounded-lg p-3 text-sm space-y-1">
                 <p><span className="text-stone-500 text-xs">내용</span></p>
-                <p className="font-medium text-stone-800">{justCreatedExpense.description}</p>
-                <p className="text-stone-600">{justCreatedExpense.expenseDate} · {justCreatedExpense.expenseType}</p>
-                {justCreatedExpense.vendorName && <p className="text-stone-600">거래처: {justCreatedExpense.vendorName}</p>}
-                {justCreatedExpense.orderNo && <p className="text-stone-600">발주번호: {justCreatedExpense.orderNo}</p>}
-                <p className="font-bold text-amber-700 text-base">{formatKRW(justCreatedExpense.amountKrw)}</p>
+                <p className="font-medium text-stone-800">{justCreatedPayable.memo}</p>
+                <p className="text-stone-600">{justCreatedPayable.dueDate} · {justCreatedPayable.status}</p>
+                {justCreatedPayable.vendorName && <p className="text-stone-600">거래처: {justCreatedPayable.vendorName}</p>}
+                {justCreatedPayable.orderNo && <p className="text-stone-600">발주번호: {justCreatedPayable.orderNo}</p>}
+                {justCreatedPayable.projectNo && <p className="text-stone-600">프로젝트: {justCreatedPayable.projectNo}</p>}
+                <p className="font-bold text-amber-700 text-base">{formatKRW(justCreatedPayable.amountKrw)}</p>
               </div>
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setJustCreatedExpense(null)}>닫기</Button>
+            <Button variant="outline" onClick={() => setJustCreatedPayable(null)}>닫기</Button>
             <Button
               className="bg-amber-700 hover:bg-amber-800 text-white gap-1"
               onClick={() => {
-                if (justCreatedExpense) {
-                  setSelectedExpense(justCreatedExpense);
-                  setJustCreatedExpense(null);
+                if (justCreatedPayable) {
+                  setSelectedPayable(justCreatedPayable);
+                  setJustCreatedPayable(null);
                 }
               }}
             >
-              <Eye className="w-4 h-4" />전표 보기
+              <Eye className="w-4 h-4" />결의 보기
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* 지출전표 상세보기 모달 (인라인) */}
+      {/* 지출결의 상세 */}
+      {selectedPayable && (
+        <Dialog open={!!selectedPayable} onOpenChange={() => setSelectedPayable(null)}>
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>지출결의 상세</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 text-sm py-2">
+              <p className="font-medium">{selectedPayable.memo}</p>
+              <p className="text-stone-600">거래처: {selectedPayable.vendorName}</p>
+              <p className="text-stone-600">프로젝트: {selectedPayable.projectNo || '—'}</p>
+              <p className="text-stone-600">발주: {selectedPayable.orderNo || '—'} · 품목: {selectedPayable.styleNo || '—'}</p>
+              <p className="text-stone-600">상태: {selectedPayable.status} · 지급예정: {selectedPayable.dueDate}</p>
+              <p className="font-bold text-lg">{formatKRW(selectedPayable.amountKrw)}</p>
+              <p className="text-xs text-stone-400">결제·미지급 관리는 지출결의(/payables) 메뉴에서 진행합니다</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelectedPayable(null)}>닫기</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* 구 지출전표 상세보기 (레거시) */}
       {selectedExpense && (
         <ExpenseDetailInlineModal
           expense={selectedExpense}

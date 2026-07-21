@@ -2,6 +2,7 @@
 // 앱 시작 시 한 번 실행. 실패해도 localStorage 데이터 그대로 유지.
 
 import { supabase } from './supabase';
+import { syncPhase1FromSupabase } from './phase1';
 
 // snake_case → camelCase 변환 (shallow, 최상위 키만)
 function toCamelCase(obj: Record<string, any>): Record<string, any> {
@@ -270,22 +271,42 @@ export async function syncFromSupabase(): Promise<void> {
           localItems.forEach(item => { if (item.id) localById.set(item.id, item); });
           
           const merged = converted.map(remote => {
-            const local = localById.get(remote.id);
-            if (!local) return remote;
-            // 로컬에 colors/hasBom/baseCostKrw가 있으면 우선 적용 (BOM 저장 결과 보존)
+            const local = localById.get(remote.id)
+              || localItems.find(l => l.styleNo && l.styleNo === remote.styleNo);
+            if (!local) {
+              // LPKG / [PACK] memo → UI PACK
+              if (String(remote.styleNo || '').startsWith('LPKG-') || String(remote.memo || '').includes('[PACK]')) {
+                return { ...remote, erpCategory: 'PACK', materialType: remote.materialType || '부재료' };
+              }
+              return remote;
+            }
+            const isPack =
+              local.erpCategory === 'PACK' ||
+              String(local.styleNo || remote.styleNo || '').startsWith('LPKG-') ||
+              String(local.memo || remote.memo || '').includes('[PACK]');
             return {
               ...remote,
+              ...(!isPack ? {} : {
+                erpCategory: 'PACK',
+                packingSize: local.packingSize ?? remote.packingSize,
+                category: local.category || remote.category,
+                materialType: '부재료',
+                baseCostKrw: local.baseCostKrw || remote.baseCostKrw,
+                deliveryPrice: local.deliveryPrice || remote.deliveryPrice,
+              }),
               colors: (local.colors && local.colors.length > 0) ? local.colors : remote.colors,
               hasBom: local.hasBom !== undefined ? local.hasBom : remote.hasBom,
               baseCostKrw: local.baseCostKrw || remote.baseCostKrw,
             };
           });
-          // 로컬에만 있는 것 추가
+          // 로컬에만 있는 것 추가 (PACK 포함)
           localItems.forEach(local => {
-            if (!converted.find(r => r.id === local.id)) merged.push(local);
+            if (!converted.find(r => r.id === local.id || (r.styleNo && r.styleNo === local.styleNo))) {
+              merged.push(local);
+            }
           });
           localStorage.setItem(key, JSON.stringify(merged));
-          console.log(`[syncFromSupabase] items 스마트 병합 완료 (${merged.length}건, colors/hasBom 보존)`);
+          console.log(`[syncFromSupabase] items 스마트 병합 완료 (${merged.length}건, colors/hasBom/PACK 보존)`);
         } catch (e) {
           localStorage.setItem(key, JSON.stringify(converted));
         }
@@ -296,5 +317,12 @@ export async function syncFromSupabase(): Promise<void> {
     } catch (err) {
       console.warn(`[syncFromSupabase] ${table} 동기화 중 오류:`, err);
     }
+  }
+
+  try {
+    await syncPhase1FromSupabase();
+    console.log('[syncFromSupabase] Phase1 테이블 동기화 완료');
+  } catch (e) {
+    console.warn('[syncFromSupabase] Phase1 동기화 스킵 (테이블 미생성 시 migration 실행):', e);
   }
 }

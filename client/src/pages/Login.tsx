@@ -2,6 +2,7 @@
 // 2026-04-16: 데모 계정 안내 블록 제거 (보안)
 import { useState } from 'react';
 import { login, initDefaultUsers } from '@/lib/auth';
+import { ensureErpBootstrap } from '@/lib/ensureErpBootstrap';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +10,7 @@ import { toast } from 'sonner';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 
 interface LoginProps {
-  onLogin: () => void;
+  onLogin: (seeded?: boolean) => void;
 }
 
 export default function Login({ onLogin }: LoginProps) {
@@ -21,20 +22,27 @@ export default function Login({ onLogin }: LoginProps) {
   // 최초 실행 시 기본 계정 초기화 (+ 팀 버전 자동 마이그레이션)
   initDefaultUsers();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) { toast.error('이메일과 비밀번호를 입력해주세요'); return; }
     setLoading(true);
-    setTimeout(() => {
-      const user = login(email, password);
+    const user = login(email, password);
+    if (!user) {
       setLoading(false);
-      if (user) {
-        toast.success(`${user.name}님, 환영합니다`);
-        onLogin();
-      } else {
-        toast.error('이메일 또는 비밀번호가 올바르지 않습니다');
-      }
-    }, 300);
+      toast.error('이메일 또는 비밀번호가 올바르지 않습니다');
+      return;
+    }
+    try {
+      const boot = await ensureErpBootstrap();
+      if (boot.seeded) toast.success(boot.message, { duration: 5000 });
+      toast.success(`${user.name}님, 환영합니다`);
+      onLogin(boot.seeded);
+    } catch {
+      toast.success(`${user.name}님, 환영합니다`);
+      onLogin(false);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

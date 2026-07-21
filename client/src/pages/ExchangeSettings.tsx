@@ -7,8 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { toast } from 'sonner';
-import { RefreshCw, History, TrendingUp, DollarSign, Trash2, Save } from 'lucide-react';
+import { RefreshCw, History, TrendingUp, DollarSign, Trash2, Save, Database } from 'lucide-react';
 import { manualFetchExchangeRate } from '@/hooks/useAutoExchangeRate';
+import { seedDemoIntegrationData, DEMO, DEMO_SEED_FLAG } from '@/lib/seedDemoData';
+import { seedLumenPackingData, getPackKits } from '@/lib/seedLumenPacking';
+import { applyColorTestData } from '@/lib/fillItemColorsForTest';
+import { seedLumen27ssRrp, getLumen27ssProductCount, LUMEN_27SS_SEED_FLAG } from '@/lib/seedLumen27ssRrp';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 
@@ -18,8 +22,15 @@ export default function ExchangeSettings() {
   const [cnyInput, setCnyInput] = useState(String(settings.cnyKrw));
   const [historyMemo, setHistoryMemo] = useState('');
   const [isFetching, setIsFetching] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [isPackSeeding, setIsPackSeeding] = useState(false);
+  const [isColorApplying, setIsColorApplying] = useState(false);
+  const [isLumen27Seeding, setIsLumen27Seeding] = useState(false);
+  const [packKits, setPackKits] = useState(() => getPackKits());
 
   const lastAutoDate = localStorage.getItem('erp_exchange_last_date');
+  const lastDemoSeed = localStorage.getItem(DEMO_SEED_FLAG);
+  const lastLumen27 = localStorage.getItem(LUMEN_27SS_SEED_FLAG);
 
   const handleAutoFetch = async () => {
     setIsFetching(true);
@@ -131,6 +142,84 @@ export default function ExchangeSettings() {
     store.clearAll();
     toast.success('데이터가 초기화되었습니다. 페이지를 새로고침해주세요.');
     setTimeout(() => window.location.reload(), 1500);
+  };
+
+  const handleSeedDemo = async () => {
+    if (!confirm('전 탭 연동 확인용 데모 데이터를 생성합니다.\n기존 demo-* 데이터는 덮어씁니다. 계속할까요?')) return;
+    setIsSeeding(true);
+    try {
+      const result = await seedDemoIntegrationData();
+      if (result.errors.length) {
+        toast.warning(`데모 생성 완료 (Supabase 일부 실패 ${result.errors.length}건)`);
+        console.warn('[seedDemo]', result.errors);
+      } else {
+        toast.success('데모 데이터 생성 + Supabase 동기화 완료');
+      }
+      setPackKits(getPackKits());
+      toast.info(`핵심 연동: ${DEMO.orderNoOem} → ${DEMO.projectOem}`, { duration: 6000 });
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e) {
+      toast.error('데모 생성 실패');
+      console.error(e);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  const handleSeedPacking = async () => {
+    if (!confirm('LUMEN·AETALOOP PACKAGE SS~XL 키트를 생성합니다.\n소모품은 자재 마스터(포장재)에 넣고, PACKAGE 품목 BOM으로 연결합니다.\n기존 LPKG-* 소모품 품목은 목록에서 제거됩니다. 계속할까요?')) return;
+    setIsPackSeeding(true);
+    try {
+      const result = await seedLumenPackingData();
+      setPackKits(result.kits);
+      if (result.errors.length) {
+        toast.warning(`PACKAGE ${result.itemCount}건 (일부 동기화 실패)`);
+      } else {
+        toast.success(`PACKAGE ${result.itemCount}건 · 포장재 ${result.materialCount}건`);
+      }
+      result.kits.forEach(k => toast.message(`${k.styleNo}: ₩${k.totalCostKrw.toLocaleString('ko-KR')}`));
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (e) {
+      toast.error('패킹 데이터 생성 실패');
+      console.error(e);
+    } finally {
+      setIsPackSeeding(false);
+    }
+  };
+
+  const handleApplyColors = () => {
+    if (!confirm('품목 컬러 + 발주 colorQtys + 기본/미지정 입고를 실제 컬러로 재적용합니다. 계속할까요?')) return;
+    setIsColorApplying(true);
+    try {
+      const r = applyColorTestData();
+      toast.success(`컬러 재적용 · 품목 ${r.itemsUpdated} · 발주 ${r.ordersUpdated} · 입고 ${r.receiptsRemapped}`);
+      setTimeout(() => window.location.reload(), 800);
+    } catch (e) {
+      toast.error('컬러 재적용 실패');
+      console.error(e);
+    } finally {
+      setIsColorApplying(false);
+    }
+  };
+
+  const handleSeedLumen27 = async () => {
+    if (!confirm(`LUMEN 바이어 + 27SS RRP 품목 ${getLumen27ssProductCount()}건을 등록합니다.\n(컬러 합산 · KMSRP=확정판매가 · 원가 미입력)\n계속할까요?`)) return;
+    setIsLumen27Seeding(true);
+    try {
+      localStorage.removeItem(LUMEN_27SS_SEED_FLAG);
+      const r = await seedLumen27ssRrp(true);
+      if (r.errors.length) {
+        toast.warning(`LUMEN 27SS: 신규 ${r.created} · 갱신 ${r.updated} (오류 ${r.errors.length})`);
+      } else {
+        toast.success(`LUMEN 27SS 등록 완료 · 신규 ${r.created} · 갱신 ${r.updated} / ${r.total}`);
+      }
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e) {
+      toast.error('LUMEN 27SS 등록 실패');
+      console.error(e);
+    } finally {
+      setIsLumen27Seeding(false);
+    }
   };
 
   const sortedHistory = [...settings.exchangeHistory].sort((a, b) => b.date.localeCompare(a.date));
@@ -293,7 +382,7 @@ export default function ExchangeSettings() {
           데이터 관리
         </h2>
         <p className="text-sm text-stone-500 mb-4">모든 데이터는 브라우저 localStorage에 저장됩니다. 정기적으로 백업하세요.</p>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button variant="outline" onClick={handleBackup}>
             <Save className="w-4 h-4 mr-1.5" />데이터 백업
           </Button>
@@ -305,7 +394,56 @@ export default function ExchangeSettings() {
               </span>
             </Button>
           </label>
+          <Button onClick={handleSeedDemo} disabled={isSeeding} className="bg-[#C9A96E] hover:bg-[#b8985f] text-white">
+            <Database className={`w-4 h-4 mr-1.5 ${isSeeding ? 'animate-pulse' : ''}`} />
+            {isSeeding ? '생성 중...' : '연동 데모 데이터 생성'}
+          </Button>
+          <Button onClick={handleSeedPacking} disabled={isPackSeeding} variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-50">
+            <Database className={`w-4 h-4 mr-1.5 ${isPackSeeding ? 'animate-pulse' : ''}`} />
+            {isPackSeeding ? '생성 중...' : 'PACKAGE 키트 생성 (자재 BOM)'}
+          </Button>
+          <Button onClick={handleApplyColors} disabled={isColorApplying} variant="outline" className="border-violet-300 text-violet-800 hover:bg-violet-50">
+            <Database className={`w-4 h-4 mr-1.5 ${isColorApplying ? 'animate-pulse' : ''}`} />
+            {isColorApplying ? '적용 중...' : '컬러 테스트 데이터 재적용'}
+          </Button>
+          <Button onClick={handleSeedLumen27} disabled={isLumen27Seeding} variant="outline" className="border-rose-300 text-rose-800 hover:bg-rose-50">
+            <Database className={`w-4 h-4 mr-1.5 ${isLumen27Seeding ? 'animate-pulse' : ''}`} />
+            {isLumen27Seeding ? '등록 중...' : `LUMEN 27SS RRP 품목등록 (${getLumen27ssProductCount()})`}
+          </Button>
         </div>
+        {lastDemoSeed && (
+          <p className="text-xs text-stone-400 mt-3">
+            마지막 데모 생성: {new Date(lastDemoSeed).toLocaleString('ko-KR')} · 발주 {DEMO.orderNoOem} / 프로젝트 {DEMO.projectOem}
+          </p>
+        )}
+        {lastLumen27 && (
+          <p className="text-xs text-stone-400 mt-1">
+            마지막 LUMEN 27SS 등록: {new Date(lastLumen27).toLocaleString('ko-KR')}
+          </p>
+        )}
+        {packKits.length > 0 && (
+          <div className="mt-4 border border-amber-200 rounded-lg overflow-hidden">
+            <div className="bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">PACKAGE 키트 원가 (자재마스터 BOM 합산)</div>
+            <table className="w-full text-sm">
+              <thead className="bg-white text-xs text-stone-500">
+                <tr>
+                  <th className="text-left px-3 py-2">스타일</th>
+                  <th className="text-left px-3 py-2">구성</th>
+                  <th className="text-right px-3 py-2">키트원가</th>
+                </tr>
+              </thead>
+              <tbody>
+                {packKits.map(k => (
+                  <tr key={k.id} className="border-t border-amber-100">
+                    <td className="px-3 py-2 font-mono font-semibold text-amber-800">{k.styleNo || k.packingSize}</td>
+                    <td className="px-3 py-2 text-xs text-stone-500">{k.lines.length}개 자재</td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums">₩{k.totalCostKrw.toLocaleString('ko-KR')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* 위험 구역 */}

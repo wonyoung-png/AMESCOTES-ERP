@@ -1,5 +1,6 @@
 // AMESCOTES ERP — 정산 / 미수금 관리
 import { useState, useMemo } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import {
   store, genId, formatKRW, formatNumber,
   type Settlement, type SettlementStatus, type SettlementChannel, type Vendor,
@@ -34,9 +35,9 @@ function calcStatus(dueDate: string, collected: number, billed: number): Settlem
 export default function SettlementManagement() {
   const [settlements, setSettlements] = useState<Settlement[]>(() => store.getSettlements());
   const [buyers] = useState<Vendor[]>(() => store.getVendors().filter(v => v.type === '바이어'));
-  const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterChannel, setFilterChannel] = useState('all');
+  const [search, setSearch] = usePersistedState('settlement.search', '');
+  const [filterStatus, setFilterStatus] = usePersistedState('settlement.filterStatus', 'all');
+  const [filterChannel, setFilterChannel] = usePersistedState('settlement.filterChannel', 'all');
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<Partial<Settlement>>({});
   const [editId, setEditId] = useState<string | null>(null);

@@ -1,5 +1,6 @@
 // AMESCOTES ERP — 자재 마스터 (Supabase 전환 완료)
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
 import { fetchMaterials, upsertMaterial, deleteMaterial as deleteMaterialSB, fetchVendors, updateMaterialStatus } from '@/lib/supabaseQueries';
@@ -52,8 +53,8 @@ export default function MaterialMaster() {
   }, []);
   const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const vendors = allVendors.filter((v: Vendor) => v.type === '자재거래처');
-  const [search, setSearch] = useState('');
-  const [filterCat, setFilterCat] = useState('all');
+  const [search, setSearch] = usePersistedState('materials.search', '');
+  const [filterCat, setFilterCat] = usePersistedState('materials.filterCat', 'all');
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Material>>({ ...emptyForm });

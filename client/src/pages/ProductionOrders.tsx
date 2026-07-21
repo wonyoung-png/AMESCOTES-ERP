@@ -1,14 +1,16 @@
 // AMESCOTES ERP — 생산 발주 관리 (BOM 연동)
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems, fetchMaterials, upsertMaterial, fetchPurchaseItems, upsertPurchaseItem } from '@/lib/supabaseQueries';
+import { phase1 } from '@/lib/phase1';
 import {
   store, genId, calcDDay, dDayLabel, dDayColor, formatNumber, formatKRW, normalizeColors,
   getBomForOrderFromList,
   type ProductionOrder, type OrderStatus, type Season, type Item, type Bom,
   type HqSupplyItem, type ColorQty, type CartItem,
   type TradeStatement, type TradeStatementLine,
-  type ExpenseType, type ExpenseCategory, type Expense, type SalesRecord,
+  type ExpenseType, type ExpenseCategory, type SalesRecord,
 } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,11 +23,12 @@ import { toast } from 'sonner';
 import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
-const ORDER_STATUSES: OrderStatus[] = ['발주생성', '생산중', '입고완료'];
+const ORDER_STATUSES: OrderStatus[] = ['발주생성', '생산중', '생산완료', '입고완료'];
 
 const STATUS_COLOR: Record<OrderStatus, string> = {
   '발주생성': 'bg-stone-50 text-stone-600 border-stone-200',
   '생산중': 'bg-amber-50 text-amber-700 border-amber-200',
+  '생산완료': 'bg-blue-50 text-blue-700 border-blue-200',
   '입고완료': 'bg-green-50 text-green-700 border-green-200',
 };
 
@@ -51,16 +54,16 @@ export default function ProductionOrders() {
   const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const buyers = allVendors.filter((v: any) => v.type === '바이어');
   const factories = allVendors.filter((v: any) => v.type === '공장' || v.type === '해외공장');
-  const [search, setSearch] = useState('');
-  const [filterBuyer, setFilterBuyer] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterSeason, setFilterSeason] = useState('all');
-  const [filterFactory, setFilterFactory] = useState('all');
-  const [filterStyle, setFilterStyle] = useState('all');
-  const [filterDeadline, setFilterDeadline] = useState('all'); // 'all' | 'urgent' | 'week' | 'overdue'
-  const [sortBy, setSortBy] = useState('createdAt'); // 'createdAt' | 'deliveryDate' | 'orderNo'
-  const [filterExpense, setFilterExpense] = useState('all'); // 'all' | 'done' | 'none'
-  const [filterUrgent, setFilterUrgent] = useState(false);
+  const [search, setSearch] = usePersistedState('orders.search', '');
+  const [filterBuyer, setFilterBuyer] = usePersistedState('orders.filterBuyer', 'all');
+  const [filterStatus, setFilterStatus] = usePersistedState('orders.filterStatus', 'all');
+  const [filterSeason, setFilterSeason] = usePersistedState('orders.filterSeason', 'all');
+  const [filterFactory, setFilterFactory] = usePersistedState('orders.filterFactory', 'all');
+  const [filterStyle, setFilterStyle] = usePersistedState('orders.filterStyle', 'all');
+  const [filterDeadline, setFilterDeadline] = usePersistedState('orders.filterDeadline', 'all'); // 'all' | 'urgent' | 'week' | 'overdue'
+  const [sortBy, setSortBy] = usePersistedState('orders.sortBy', 'createdAt'); // 'createdAt' | 'deliveryDate' | 'orderNo'
+  const [filterExpense, setFilterExpense] = usePersistedState('orders.filterExpense', 'all'); // 'all' | 'done' | 'none'
+  const [filterUrgent, setFilterUrgent] = usePersistedState('orders.filterUrgent', false);
   const [showModal, setShowModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editOrderId, setEditOrderId] = useState<string | null>(null);
@@ -123,6 +126,63 @@ export default function ProductionOrders() {
   // 자재 장바구니 모달 상태
   const [cartModal, setCartModal] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>(() => store.getMaterialCart());
+  const orderBackfillDone = useRef(new Set<string>());
+
+  // 공장단가 / bomId 누락 보완 — BOM 화면과 동일 기준으로 공장단가 연동
+  useEffect(() => {
+    if (!orders.length) return;
+    let cancelled = false;
+    (async () => {
+      let changed = false;
+      for (const o of orders as ProductionOrder[]) {
+        if (orderBackfillDone.current.has(o.id)) continue;
+        const needPrice = !(o.factoryUnitPriceKrw && o.factoryUnitPriceKrw > 0);
+        const needBomMeta = !o.bomId || !o.bomType;
+        if (!needPrice && !needBomMeta) {
+          orderBackfillDone.current.add(o.id);
+          continue;
+        }
+
+        await store.fetchAndCacheBom(o.styleNo);
+        const fromList = getBomForOrderFromList(boms as Bom[], o.styleNo, o.styleId);
+        const local = fromList.bom ? fromList : store.getBomForOrder(o.styleNo);
+
+        // BOM이 아직 없으면 다음에 재시도
+        if (!local.bom) continue;
+
+        const updates: Partial<ProductionOrder> = {};
+        if (!o.bomId) updates.bomId = local.bom.id;
+        if (!o.bomType && local.type) updates.bomType = local.type;
+
+        if (needPrice) {
+          const resolved = store.resolveFactoryUnitFromBom(local.bom, o.colorQtys);
+          if (resolved.factoryUnitPriceKrw > 0) {
+            updates.factoryUnitPriceKrw = resolved.factoryUnitPriceKrw;
+            updates.factoryUnitPriceCny = resolved.factoryUnitPriceCny;
+            updates.factoryCurrency = o.factoryCurrency || 'CNY';
+            if (!o.bomType) updates.bomType = local.type || 'post';
+          }
+        }
+
+        // 가격이 필요한데 여전히 0이면(원가 미입력 BOM) 완료 표시 — 무한 재시도 방지
+        orderBackfillDone.current.add(o.id);
+        if (Object.keys(updates).length === 0) continue;
+        try {
+          await upsertOrder({ ...o, ...updates, updatedAt: new Date().toISOString() });
+          changed = true;
+        } catch (e) {
+          console.warn('[orders] backfill failed', o.orderNo, e);
+          orderBackfillDone.current.delete(o.id);
+        }
+        if (cancelled) return;
+      }
+      if (changed && !cancelled) {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, boms, items, allVendors]);
 
   // 공장구매/본사제공 자재 카테고리 접기/펼치기 상태
   const CATEGORY_ORDER = ['원자재', '장식', '지퍼', '보강재', '봉사·접착제', '포장재', '철형', '후가공', '기타'];
@@ -174,29 +234,32 @@ export default function ProductionOrders() {
   const handleSaveExpense = () => {
     if (!expenseForm.description) { toast.error('내용을 입력해주세요'); return; }
     if (!expenseForm.amountKrw) { toast.error('금액을 입력해주세요'); return; }
-    const expenseId = genId();
-    const expense: Expense = {
-      id: expenseId,
-      expenseDate: expenseForm.expenseDate,
-      expenseType: expenseForm.expenseType,
-      category: expenseForm.category,
-      description: expenseForm.description,
-      amountKrw: expenseForm.amountKrw,
-      orderId: expenseForm.orderId || undefined,
-      orderNo: expenseForm.orderNo || undefined,
-      vendorName: expenseForm.vendorName || undefined,
-      hasTaxInvoice: expenseForm.hasTaxInvoice,
-      memo: expenseForm.memo || undefined,
-      createdAt: new Date().toISOString(),
-    };
-    store.addExpense(expense);
-    toast.success('지출전표가 생성되었습니다');
+    const order = (orders as ProductionOrder[]).find(o => o.id === expenseForm.orderId);
+    const payable = phase1.createPayableFromProcessingOrder({
+      id: expenseForm.orderId,
+      orderNo: expenseForm.orderNo,
+      styleNo: expenseForm.styleNo,
+      styleName: order?.styleName,
+      qty: order?.qty,
+      factoryUnitPriceKrw: order?.factoryUnitPriceKrw,
+      vendorId: order?.vendorId,
+      vendorName: expenseForm.vendorName || order?.vendorName,
+      projectNo: order?.projectNo,
+      receivedDate: expenseForm.expenseDate,
+    }, expenseForm.amountKrw);
+    if (!payable) { toast.error('지출결의 생성 실패 (금액 확인)'); return; }
+    if (order) {
+      upsertOrder({ ...order, expenseId: payable.id, updatedAt: new Date().toISOString() })
+        .then(() => refresh())
+        .catch(() => {});
+    }
+    toast.success('지출결의(임가공)가 생성되었습니다 — /payables 에서 결제');
     setExpenseModal(false);
   };
 
   const EXPENSE_PAYMENT_METHODS: ExpenseType[] = ['법인카드', '계좌이체', '현금'];
 
-  // 기존전표 연결 모달 상태
+  // 기존 결의 연결 모달 상태
   const [linkExpenseModal, setLinkExpenseModal] = useState(false);
   const [linkExpenseOrderId, setLinkExpenseOrderId] = useState<string | null>(null);
   const [linkExpenseSearch, setLinkExpenseSearch] = useState('');
@@ -207,11 +270,17 @@ export default function ProductionOrders() {
     setLinkExpenseModal(true);
   };
 
-  const handleLinkExpenseToOrder = (expenseId: string) => {
+  const handleLinkExpenseToOrder = (payableId: string) => {
     if (!linkExpenseOrderId) return;
-    store.updateOrder(linkExpenseOrderId, { expenseId });
-    queryClient.invalidateQueries({ queryKey: ['orders'] });
-    toast.success('기존 지출전표가 연결되었습니다');
+    const order = (orders as ProductionOrder[]).find(o => o.id === linkExpenseOrderId);
+    if (order) {
+      upsertOrder({ ...order, expenseId: payableId, updatedAt: new Date().toISOString() })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['orders'] });
+          toast.success('지출결의가 연결되었습니다');
+        })
+        .catch((e: Error) => toast.error(e.message));
+    }
     setLinkExpenseModal(false);
     setLinkExpenseOrderId(null);
   };
@@ -397,8 +466,7 @@ export default function ProductionOrders() {
   };
   const _doRecalcBom = (styleNo: string, qty: number) => {
     if (!styleNo || qty <= 0) return;
-    const settings = store.getSettings();
-    const cnyKrw = settings.cnyKrw || 191;
+    const { bom } = store.getBomForOrder(styleNo);
     const result = store.calcMaterialRequirements(styleNo, qty, colorQtys.length > 0 ? colorQtys : undefined);
 
     if (result.bomType === null) {
@@ -411,8 +479,13 @@ export default function ProductionOrders() {
       return;
     }
 
-    const factoryUnitPriceCny = result.factoryUnitPriceCny;
-    const factoryUnitPriceKrw = Math.round(factoryUnitPriceCny * cnyKrw);
+    const resolved = store.resolveFactoryUnitFromBom(bom, colorQtys.length > 0 ? colorQtys : undefined);
+    const factoryUnitPriceKrw = resolved.factoryUnitPriceKrw > 0
+      ? resolved.factoryUnitPriceKrw
+      : Math.round(result.factoryUnitPriceCny * (resolved.rate || store.getSettings().cnyKrw || 191));
+    const factoryUnitPriceCny = resolved.factoryUnitPriceCny > 0
+      ? resolved.factoryUnitPriceCny
+      : result.factoryUnitPriceCny;
     const totalFactoryAmountKrw = factoryUnitPriceKrw * qty;
 
     setBomCalc({
@@ -626,9 +699,11 @@ export default function ProductionOrders() {
       return `${form.styleNo}-R${nextRevision}`;
     })();
 
+    // 손익·전표 연결 키 = 발주번호. OEM은 project_no 미발급
     const order: ProductionOrder = {
       id: genId(),
       orderNo: finalOrderNo,
+      workspace: 'OEM',
       styleId: form.styleId || '',
       styleNo: form.styleNo || '',
       styleName: form.styleName || '',
@@ -1199,9 +1274,21 @@ export default function ProductionOrders() {
               </td></tr>
             ) : filtered.map(o => {
               const totalAmtKrw = (o.factoryUnitPriceKrw || 0) * o.qty;
-              // BOM 실제 존재 여부 확인 (items.hasBom 또는 BOM 레코드 존재)
+              // BOM 실제 존재 여부: 발주 메타 + 품목 hasBom + Supabase bom 목록
               const itemForOrder = items.find(i => i.styleNo === o.styleNo || i.id === o.styleId);
-              const hasBom = !!o.bomId || o.bomType === 'post' || o.bomType === 'pre' || !!(itemForOrder as any)?.hasBom;
+              const { bom: matchedBom } = getBomForOrderFromList(
+                boms as Bom[],
+                o.styleNo,
+                o.styleId || itemForOrder?.id,
+              );
+              const hasBom = !!o.bomId
+                || o.bomType === 'post'
+                || o.bomType === 'pre'
+                || !!(itemForOrder as any)?.hasBom
+                || !!matchedBom;
+              const displayFactoryKrw = (o.factoryUnitPriceKrw && o.factoryUnitPriceKrw > 0)
+                ? o.factoryUnitPriceKrw
+                : 0;
               return (
                 <tr key={o.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${selectedIds.has(o.id) ? 'bg-amber-50/30' : ''}`}>
                   <td className="w-10 px-3 py-3 text-center">
@@ -1248,8 +1335,8 @@ export default function ProductionOrders() {
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-stone-700 font-medium">{o.vendorName}</p>
-                    {o.factoryUnitPriceKrw && o.factoryUnitPriceKrw > 0 ? (
-                      <p className="text-xs text-stone-500 font-mono">{formatKRW(o.factoryUnitPriceKrw)}/PCS
+                    {displayFactoryKrw > 0 ? (
+                      <p className="text-xs text-stone-500 font-mono">{formatKRW(displayFactoryKrw)}/PCS
                         {o.bomType === 'manual' && <span className="text-amber-600 ml-1">(수동)</span>}
                       </p>
                     ) : (
@@ -1319,10 +1406,10 @@ export default function ProductionOrders() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-40">
                                 <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openLinkExpenseForOrder(o)}>
-                                  📄 기존전표 연결
+                                  📄 기존결의 연결
                                 </DropdownMenuItem>
                                 <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openExpenseModal(o)}>
-                                  🧾 새전표 생성
+                                  🧾 지출결의 생성
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -3355,6 +3442,8 @@ export default function ProductionOrders() {
                       id: genId(),
                       orderId: postOrderInfo?.order?.id || '',
                       orderNo: currentOrderNo,
+                      projectNo: postOrderInfo?.order?.projectNo,
+                      styleNo: postOrderInfo?.order?.styleNo,
                       purchaseDate: today,
                       itemName: item.materialName,
                       qty: orderQty,
@@ -3388,46 +3477,55 @@ export default function ProductionOrders() {
         </DialogContent>
       </Dialog>
 
-      {/* ── 기존전표 연결 모달 ── */}
+      {/* ── 기존 결의 연결 모달 ── */}
       <Dialog open={linkExpenseModal} onOpenChange={setLinkExpenseModal}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              📄 기존 지출전표 연결
+              📄 기존 지출결의 연결
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <Input
-              placeholder="전표 검색 (내용, 거래처, 발주번호)"
+              placeholder="검색 (메모, 거래처, 발주번호)"
               value={linkExpenseSearch}
               onChange={e => setLinkExpenseSearch(e.target.value)}
               className="h-9 text-sm"
             />
             <div className="space-y-1 max-h-80 overflow-y-auto">
-              {store.getExpenses()
-                .filter(e => {
+              {phase1.getPayables()
+                .filter(p => p.sourceType === 'processing' || p.sourceType === 'order_receipt' || p.sourceType === 'manual')
+                .filter(p => {
                   const q = linkExpenseSearch.toLowerCase();
-                  return !q || e.description.toLowerCase().includes(q) || (e.vendorName || '').toLowerCase().includes(q) || (e.orderNo || '').toLowerCase().includes(q);
+                  return !q
+                    || (p.memo || '').toLowerCase().includes(q)
+                    || (p.vendorName || '').toLowerCase().includes(q)
+                    || (p.orderNo || '').toLowerCase().includes(q)
+                    || (p.projectNo || '').toLowerCase().includes(q);
                 })
-                .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate))
-                .map(e => (
+                .sort((a, b) => (b.dueDate || '').localeCompare(a.dueDate || ''))
+                .map(p => (
                   <div
-                    key={e.id}
+                    key={p.id}
                     className="flex items-center justify-between p-3 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"
-                    onClick={() => handleLinkExpenseToOrder(e.id)}
+                    onClick={() => handleLinkExpenseToOrder(p.id)}
                   >
                     <div className="space-y-0.5 flex-1 min-w-0">
-                      <p className="text-sm font-medium text-stone-800 truncate">{e.description}</p>
-                      <p className="text-xs text-stone-500">{e.expenseDate} · {e.expenseType} · {e.vendorName || '거래처 미지정'} {e.orderNo ? `· ${e.orderNo}` : ''}</p>
+                      <p className="text-sm font-medium text-stone-800 truncate">{p.memo || p.vendorName}</p>
+                      <p className="text-xs text-stone-500">
+                        {p.dueDate} · {p.vendorName || '공장 미지정'}
+                        {p.orderNo ? ` · ${p.orderNo}` : ''}
+                        {p.projectNo ? ` · ${p.projectNo}` : ''}
+                      </p>
                     </div>
                     <div className="text-right ml-3">
-                      <p className="text-sm font-semibold text-stone-800">{formatKRW(e.amountKrw)}</p>
-                      <span className="text-xs bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded">{e.category}</span>
+                      <p className="text-sm font-semibold text-stone-800">{formatKRW(p.amountKrw)}</p>
+                      <span className="text-xs bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded">{p.sourceType}</span>
                     </div>
                   </div>
                 ))}
-              {store.getExpenses().length === 0 && (
-                <p className="text-center py-8 text-stone-400 text-sm">등록된 지출전표가 없습니다</p>
+              {phase1.getPayables().filter(p => p.sourceType === 'processing' || p.sourceType === 'order_receipt').length === 0 && (
+                <p className="text-center py-8 text-stone-400 text-sm">등록된 공장 지출결의가 없습니다</p>
               )}
             </div>
           </div>
@@ -3437,13 +3535,13 @@ export default function ProductionOrders() {
         </DialogContent>
       </Dialog>
 
-      {/* ── 입고완료 전표생성 모달 ── */}
+      {/* ── 입고완료 지출결의 모달 ── */}
       <Dialog open={expenseModal} onOpenChange={setExpenseModal}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-green-700" />
-              지출전표 생성 — 입고완료
+              지출결의 생성 — 임가공(입고)
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">

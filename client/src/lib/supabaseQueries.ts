@@ -1,7 +1,84 @@
 // AMESCOTES ERP — Supabase 직접 쿼리 함수 모음
-// localStorage 캐시 없이 Supabase에서 직접 읽기/쓰기
+// Supabase 우선 · 비어있거나 실패 시 localStorage 폴백
 
 import { supabase } from './supabase';
+import { store } from './store';
+
+async function withLocalFallback<T>(remote: () => Promise<T[]>, local: () => T[]): Promise<T[]> {
+  try {
+    const rows = await remote();
+    if (rows.length > 0) return rows;
+  } catch (e) {
+    console.warn('[supabaseQueries] 원격 조회 실패 → localStorage 폴백', e);
+  }
+  const cached = local();
+  if (cached.length > 0) console.info('[supabaseQueries] localStorage 폴백', cached.length, '건');
+  return cached;
+}
+
+/** LPKG-* / PACK 로컬 전용 품목 정규화 (DB에 PACK enum 없어도 UI에 PACK으로 표시) */
+function normalizePackFields<T extends Record<string, any>>(item: T): T {
+  const styleNo = String(item.styleNo || '');
+  const isPack =
+    item.erpCategory === 'PACK' ||
+    styleNo.startsWith('LPKG-') ||
+    styleNo.startsWith('BOX-') ||
+    styleNo.startsWith('PACKAGE-') ||
+    String(item.memo || '').includes('[PACK]');
+  if (!isPack) return item;
+  return {
+    ...item,
+    erpCategory: 'PACK',
+    materialType: item.materialType || '부재료',
+  };
+}
+
+/** 원격 + 로컬 병합 — 로컬에만 있는 품목(PACK 등)을 목록에 포함 */
+function mergeByIdStyleNo<T extends { id?: string; styleNo?: string }>(
+  remote: T[],
+  local: T[],
+): T[] {
+  if (local.length === 0) return remote.map(r => normalizePackFields(r as any));
+  if (remote.length === 0) return local.map(r => normalizePackFields(r as any));
+
+  const remoteIds = new Set(remote.map(r => r.id).filter(Boolean) as string[]);
+  const remoteStyles = new Set(remote.map(r => r.styleNo).filter(Boolean) as string[]);
+
+  const merged = remote.map(r => {
+    const loc = local.find(l =>
+      (l.id && r.id && l.id === r.id) ||
+      (l.styleNo && r.styleNo && l.styleNo === r.styleNo),
+    );
+    if (!loc) return normalizePackFields(r as any);
+    const L = loc as Record<string, unknown>;
+    const R = r as Record<string, unknown>;
+    const styleNo = String(R.styleNo || L.styleNo || '');
+    const preferLocalPack =
+      L.erpCategory === 'PACK' ||
+      styleNo.startsWith('LPKG-') ||
+      styleNo.startsWith('BOX-') ||
+      styleNo.startsWith('PACKAGE-') ||
+      String(L.memo || '').includes('[PACK]');
+    return normalizePackFields({
+      ...loc,
+      ...r,
+      packingSize: L.packingSize ?? R.packingSize,
+      erpCategory: preferLocalPack ? 'PACK' : (R.erpCategory ?? L.erpCategory),
+      category: preferLocalPack ? (L.category ?? R.category) : (R.category ?? L.category),
+      baseCostKrw: R.baseCostKrw || L.baseCostKrw,
+      materialType: preferLocalPack ? '부재료' : (R.materialType ?? L.materialType),
+      memo: R.memo || L.memo,
+      deliveryPrice: R.deliveryPrice || L.deliveryPrice,
+    } as T);
+  });
+
+  for (const loc of local) {
+    if (loc.id && remoteIds.has(loc.id)) continue;
+    if (loc.styleNo && remoteStyles.has(loc.styleNo)) continue;
+    merged.push(normalizePackFields(loc as any));
+  }
+  return merged;
+}
 
 // ─── camelCase → snake_case 변환 헬퍼 ───
 function toSnakeCase(obj: Record<string, any>): Record<string, any> {
@@ -138,6 +215,24 @@ export function convertBomFromDB(row: any) {
     logisticsCostKrw: row.logistics_cost_krw ?? 0,
     packagingCostKrw: row.packaging_cost_krw ?? 0,
     packingCostKrw: row.packing_cost_krw ?? 0,
+    packingItemId: (() => {
+      try {
+        if (row.pnl_data) {
+          const p = typeof row.pnl_data === 'string' ? JSON.parse(row.pnl_data) : row.pnl_data;
+          return p.packingItemId || undefined;
+        }
+      } catch {}
+      return undefined;
+    })(),
+    packingItemStyleNo: (() => {
+      try {
+        if (row.pnl_data) {
+          const p = typeof row.pnl_data === 'string' ? JSON.parse(row.pnl_data) : row.pnl_data;
+          return p.packingItemStyleNo || undefined;
+        }
+      } catch {}
+      return undefined;
+    })(),
     productImage: row.product_image ?? undefined,
     pnl: (() => {
       try {
@@ -205,7 +300,8 @@ const TABLE_COLUMNS: Record<string, string[]> = {
                       'factory_currency', 'color_qtys', 'delivery_date', 'style_id', 'revision',
                       'is_reorder', 'season', 'bom_id', 'bom_type', 'hq_supply_items',
                       'nego_history', 'received_qty', 'defect_qty', 'defect_note', 'received_date',
-                      'trade_statement_id', 'expense_id',
+                      'trade_statement_id', 'expense_id', 'project_no', 'workspace', 'production_origin',
+                      'brand_batch_id', 'shipped_qty', 'is_employee_purchase', 'milestones',
                       'created_at', 'updated_at'],
   materials: ['id', 'item_code', 'name', 'name_en', 'spec', 'unit', 'unit_price', 'unit_price_cny', 'unit_price_krw',
               'currency', 'vendor_id', 'category', 'stock_qty', 'memo',
@@ -224,6 +320,7 @@ function filterForTable(table: string, row: Record<string, any>): Record<string,
 // ─────────────────────────────────────────────
 
 export async function fetchVendors() {
+  return withLocalFallback(async () => {
   const { data, error } = await supabase
     .from('vendors')
     .select('*')
@@ -250,6 +347,7 @@ export async function fetchVendors() {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
+  }, () => store.getVendors());
 }
 
 export async function upsertVendor(vendor: Record<string, any>) {
@@ -281,6 +379,7 @@ export async function deleteVendor(id: string) {
 // ─────────────────────────────────────────────
 
 export async function fetchItems() {
+  const remote = await withLocalFallback(async () => {
   const { data, error } = await supabase
     .from('items')
     .select('*')
@@ -310,29 +409,62 @@ export async function fetchItems() {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
+  }, () => []);
+  // Supabase에 없어도 로컬 PACK(LPKG-*) 등은 항상 목록에 표시
+  return mergeByIdStyleNo(remote, store.getItems() as any[]);
 }
 
 export async function upsertItem(item: Record<string, any>) {
+  // 1) 로컬 먼저 저장 — 네트워크 장애여도 품목 등록 가능
+  try {
+    const list = store.getItems();
+    const idx = list.findIndex(x => x.id === item.id || x.styleNo === item.styleNo);
+    const full = {
+      ...(idx >= 0 ? list[idx] : {}),
+      ...item,
+      updatedAt: new Date().toISOString(),
+      createdAt: item.createdAt || (idx >= 0 ? (list[idx] as any).createdAt : new Date().toISOString()),
+    } as any;
+    if (idx >= 0) {
+      list[idx] = full;
+      store.setItems([...list]);
+    } else {
+      store.setItems([...list, full]);
+    }
+  } catch (e) {
+    console.warn('[upsertItem] localStorage 저장 실패', e);
+  }
+
+  // 2) Supabase 동기화 시도 (실패해도 로컬 저장은 유지)
   const row = filterForTable('items', {
     id: item.id,
     style_no: item.styleNo,
     name: item.name,
-    erp_category: item.erpCategory,
-    buyer_id: item.buyerId,
+    name_en: item.nameEn,
+    erp_category: item.erpCategory === 'PACK' ? 'ACC' : item.erpCategory,
+    sub_category: item.category,
+    buyer_id: item.buyerId || null,
     season: item.season,
     designer: item.designer,
     material: item.material,
     delivery_price: item.deliveryPrice,
     margin_amount: item.marginAmount,
     margin_rate: item.marginRate,
-    memo: item.memo,
+    memo: item.erpCategory === 'PACK' ? `[PACK] ${item.memo || ''}`.trim() : item.memo,
     image_url: item.imageUrl,
-    has_bom: item.hasBom,
+    has_bom: item.hasBom ?? false,
     base_cost_krw: item.baseCostKrw,
-    colors: item.colors,
+    confirmed_sale_price: item.confirmedSalePrice,
+    colors: item.colors ?? [],
   });
-  const { error } = await supabase.from('items').upsert(row);
-  if (error) throw error;
+  try {
+    const { error } = await supabase.from('items').upsert(row);
+    if (error) {
+      console.warn('[upsertItem] Supabase 동기화 실패 (로컬에는 저장됨):', error.message);
+    }
+  } catch (e) {
+    console.warn('[upsertItem] Supabase 네트워크 오류 (로컬에는 저장됨):', e);
+  }
 }
 
 // 사후원가/확정판매가 전용 업데이트 (마이그레이션 실행 후 동작, 컬럼 없어도 다른 기능 안 깨짐)
@@ -364,12 +496,14 @@ export async function deleteItem(id: string) {
 // ─────────────────────────────────────────────
 
 export async function fetchBoms() {
+  return withLocalFallback(async () => {
   const { data, error } = await supabase
     .from('boms')
     .select('*')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(convertBomFromDB);
+  }, () => store.getBoms());
 }
 
 // 목록 조회용 경량 fetch — product_image / pre_materials / color_boms 제외
@@ -387,12 +521,14 @@ const BOM_LIGHT_COLS = [
 ].join(',');
 
 export async function fetchBomsLight() {
+  return withLocalFallback(async () => {
   const { data, error } = await supabase
     .from('boms')
     .select(BOM_LIGHT_COLS)
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(convertBomFromDB);
+  }, () => store.getBoms());
 }
 
 export async function upsertBom(bom: any) {
@@ -428,7 +564,17 @@ export async function upsertBom(bom: any) {
     post_currency: bom.currency ?? 'CNY',
     pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
     post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny ?? bom.snapshotCnyKrw,
-    pnl_data: bom.pnl ? JSON.stringify(bom.pnl) : null,
+    pnl_data: (() => {
+      const base = bom.pnl && typeof bom.pnl === 'object' ? { ...bom.pnl } : {};
+      if (bom.packingItemId) {
+        (base as any).packingItemId = bom.packingItemId;
+        (base as any).packingItemStyleNo = bom.packingItemStyleNo || null;
+      } else {
+        delete (base as any).packingItemId;
+        delete (base as any).packingItemStyleNo;
+      }
+      return Object.keys(base).length ? JSON.stringify(base) : null;
+    })(),
     product_image: bom.productImage ?? null,
     // 간단 원가 BOM인 경우 memo에 JSON 저장
     memo: (() => {
@@ -459,6 +605,7 @@ export async function deleteBom(id: string) {
 // ─────────────────────────────────────────────
 
 export async function fetchSamples() {
+  return withLocalFallback(async () => {
   const { data, error } = await supabase
     .from('samples')
     .select('*')
@@ -498,6 +645,7 @@ export async function fetchSamples() {
     createdAt: row.created_at,
     memo: row.memo,
   }));
+  }, () => store.getSamples());
 }
 
 export async function upsertSample(sample: Record<string, any>) {
@@ -533,6 +681,7 @@ export async function deleteSample(id: string) {
 // ─────────────────────────────────────────────
 
 export async function fetchOrders() {
+  return withLocalFallback(async () => {
   const { data, error } = await supabase
     .from('production_orders')
     .select('*')
@@ -572,10 +721,17 @@ export async function fetchOrders() {
     defectNote: row.defect_note,
     receivedDate: row.received_date,
     negoHistory: row.nego_history ?? [],
+    projectNo: row.project_no,
+    workspace: row.workspace ?? 'OEM',
+    productionOrigin: row.production_origin,
+    brandBatchId: row.brand_batch_id,
+    shippedQty: row.shipped_qty ?? 0,
+    isEmployeePurchase: row.is_employee_purchase ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     memo: row.memo,
   }));
+  }, () => store.getOrders());
 }
 
 export async function upsertOrder(order: Record<string, any>) {
@@ -608,6 +764,17 @@ export async function upsertOrder(order: Record<string, any>) {
     nego_history: order.negoHistory ?? [],
     trade_statement_id: order.tradeStatementId || null,
     expense_id: order.expenseId || null,
+    project_no: order.projectNo,
+    workspace: order.workspace ?? 'OEM',
+    production_origin: order.productionOrigin,
+    brand_batch_id: order.brandBatchId,
+    shipped_qty: order.shippedQty ?? 0,
+    is_employee_purchase: order.isEmployeePurchase ?? false,
+    received_qty: order.receivedQty,
+    defect_qty: order.defectQty,
+    defect_note: order.defectNote,
+    received_date: order.receivedDate,
+    milestones: order.milestones,
     updated_at: order.updatedAt ?? new Date().toISOString(),
     created_at: order.createdAt ?? new Date().toISOString(),
   });
@@ -625,6 +792,7 @@ export async function deleteOrder(id: string) {
 // ─────────────────────────────────────────────
 
 export async function fetchMaterials() {
+  return withLocalFallback(async () => {
   const { data, error } = await supabase
     .from('materials')
     .select('*')
@@ -650,6 +818,7 @@ export async function fetchMaterials() {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
+  }, () => store.getMaterials());
 }
 
 export async function upsertMaterial(mat: Record<string, any>): Promise<void> {
@@ -700,6 +869,7 @@ export async function deleteMaterial(id: string) {
 // ─────────────────────────────────────────────
 
 export async function fetchPurchaseItems() {
+  return withLocalFallback(async () => {
   const { data, error } = await supabase
     .from('purchase_items')
     .select('*')
@@ -724,11 +894,14 @@ export async function fetchPurchaseItems() {
     statementNo: row.statement_no || undefined,
     memo: row.memo || '',
     createdAt: row.created_at || new Date().toISOString(),
+    projectNo: row.project_no || undefined,
+    styleNo: row.style_no || undefined,
   }));
+  }, () => store.getPurchaseItems());
 }
 
 export async function upsertPurchaseItem(item: Record<string, any>): Promise<void> {
-  const row = {
+  const row: Record<string, unknown> = {
     id: item.id,
     order_id: item.orderId || null,
     order_no: item.orderNo || null,
@@ -747,6 +920,38 @@ export async function upsertPurchaseItem(item: Record<string, any>): Promise<voi
     statement_no: item.statementNo || null,
     memo: item.memo || null,
   };
+  if (item.projectNo != null) row.project_no = item.projectNo;
+  // local 캐시 (프로젝트 손익 집계용)
+  try {
+    const key = 'ames_purchases';
+    const list: any[] = JSON.parse(localStorage.getItem(key) || '[]');
+    const local = {
+      id: item.id,
+      orderId: item.orderId || '',
+      orderNo: item.orderNo || '',
+      purchaseDate: item.purchaseDate || '',
+      itemName: item.itemName,
+      qty: item.qty || 0,
+      unit: item.unit || '',
+      unitPriceCny: item.unitPriceCny || 0,
+      currency: item.currency || 'CNY',
+      appliedRate: item.appliedRate || 191,
+      amountKrw: item.amountKrw || 0,
+      vendorId: item.vendorId,
+      vendorName: item.vendorName,
+      paymentMethod: item.paymentMethod || '기타',
+      purchaseStatus: item.purchaseStatus || '미발주',
+      statementNo: item.statementNo,
+      memo: item.memo,
+      createdAt: item.createdAt || new Date().toISOString(),
+      projectNo: item.projectNo,
+      styleNo: item.styleNo,
+    };
+    const idx = list.findIndex((p: any) => p.id === item.id);
+    if (idx >= 0) list[idx] = { ...list[idx], ...local };
+    else list.push(local);
+    localStorage.setItem(key, JSON.stringify(list));
+  } catch { /* ignore */ }
   const { error } = await supabase.from('purchase_items').upsert(row, { onConflict: 'id' });
   if (error) throw error;
 }

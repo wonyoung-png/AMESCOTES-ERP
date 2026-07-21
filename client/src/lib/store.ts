@@ -119,20 +119,26 @@ async function sbDelete(table: string, id: string): Promise<void> {
 
 export type Currency = 'KRW' | 'USD' | 'CNY';
 export type Season = '25FW' | '26SS' | '26FW' | '27SS';
-export type Category = '숄더백' | '토트백' | '크로스백' | '클러치' | '백팩' | '파우치' | '키링' | '지갑' | '기타';
+export type Category =
+  | '숄더백' | '토트백' | '크로스백' | '클러치' | '백팩'
+  | '파우치' | '키링' | '지갑'
+  | '스니커즈' | '힐' | '로퍼' | '부츠' | '샌들'
+  | '택배박스' | '내부박스' | '더스트백' | '쇼핑백' | '노루지' | '소모품' | '기타';
 export type BomCategory = '원자재' | '지퍼' | '장식' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
 export type BomSectionKey = '원자재' | '지퍼' | '장식' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
 export type MaterialCategory = '원자재' | '지퍼' | '장식' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
 export type VendorType = '바이어' | '자재거래처' | '공장' | '해외공장' | '물류업체' | '기타';
 export type BillingType = '월별합산' | '건별즉시';
 export type ItemStatus = 'TEMP' | 'ACTIVE' | 'INACTIVE';
-export type ErpCategory = 'HB' | 'ACC' | 'SHOES';
+export type ErpCategory = 'HB' | 'ACC' | 'SHOES' | 'PACK';
+/** LUMEN 패킹 사이즈 등급 (BAG: SS~XL / SHOES: S~L) */
+export type PackingSize = 'SS' | 'S' | 'M' | 'L' | 'XL';
 export type MaterialType = '완제품' | '원재료' | '부재료';
 export type SampleLocation = '내부개발실' | '중국공장';
 export type SampleRound = number;  // 1, 2, 3, 4, 5차... 제한 없음
 export type TradeStatementStatus = '미청구' | '청구완료' | '수금완료';
 export type TaxType = '과세' | '면세';
-export type OrderStatus = '발주생성' | '생산중' | '입고완료';
+export type OrderStatus = '발주생성' | '생산중' | '생산완료' | '입고완료';
 export type SampleStage = '1차' | '2차' | '3차' | '4차' | '최종승인' | '반려';
 export type SampleBillingStatus = '미청구' | '청구완료' | '수금완료';
 export type SettlementStatus = '정상' | '주의' | '위험' | '완납';
@@ -181,11 +187,12 @@ export interface Item {
   season: Season;
   category: Category;
   customCategory?: string;         // 세부 카테고리 직접입력 (기타 선택 시)
-  erpCategory?: ErpCategory;       // HB / SLG
+  erpCategory?: ErpCategory;       // HB / ACC / SHOES / PACK
   materialType?: MaterialType;     // 완제품 / 원재료 / 부재료 (항상 완제품으로 자동 설정)
   itemStatus?: ItemStatus;         // TEMP / ACTIVE / INACTIVE
   material: string;
   designer?: string;               // 담당 디자이너
+  packingSize?: PackingSize;       // LUMEN 패킹 등급 (SS/S/M/L/XL)
   boxSizeL?: number;
   boxSizeW?: number;
   boxSizeH?: number;
@@ -276,6 +283,8 @@ export interface Bom {
   logisticsCostKrw?: number;  // 물류비 (KRW, PCS 배분 후)
   packagingCostKrw?: number;  // 포장/검사비
   packingCostKrw?: number;    // 패킹재
+  packingItemId?: string;     // 품목마스터 PACK 연결 id
+  packingItemStyleNo?: string;
   productionMarginRate?: number; // 생산마진율 (기본 16%)
   snapshotCnyKrw: number;     // 적용 환율 (CNY→KRW)
   snapshotUsdKrw?: number;    // 적용 환율 (USD→KRW)
@@ -362,7 +371,7 @@ export interface ProductionOrder {
   postCostId?: string;
   logisticsCostId?: string;
   tradeStatementId?: string;      // 연결된 거래명세표 ID
-  expenseId?: string;             // 연결된 지출전표 ID
+  expenseId?: string;             // 연결된 지출결의(payable) ID — 구 지출전표 ID도 호환
   deliveryDate?: string;          // 바이어 납기일 (납품 목표일)
   // BOM 연동 발주 필드
   factoryUnitPriceCny?: number;   // 공장단가 (CNY) — BOM 임가공비에서 자동 설정
@@ -374,6 +383,13 @@ export interface ProductionOrder {
   defectQty?: number;             // 불량 수량
   defectNote?: string;            // 불량 비고
   receivedDate?: string;          // 입고일
+  // Phase 1 — project_no · 워크스페이스
+  projectNo?: string;
+  workspace?: 'OEM' | 'LUMEN' | 'AETALOOP';
+  productionOrigin?: 'domestic' | 'china';
+  brandBatchId?: string;
+  shippedQty?: number;
+  isEmployeePurchase?: boolean;
   // 리오더 네고 이력
   negoHistory?: {
     requestedPrice: number;   // 네고 요청단가
@@ -542,9 +558,12 @@ export interface PurchaseItem {
   vendorName?: string;
   paymentMethod: ExpenseType | '기타';
   purchaseStatus: '미구매' | '구매완료' | '발송완료';
+  /** 연결 지출결의(payable) id — 구 지출전표 id도 호환 */
   statementNo?: string;
   memo?: string;
   createdAt: string;
+  projectNo?: string;
+  styleNo?: string;
 }
 
 // ─── 거래처 마스터 ───
@@ -637,6 +656,8 @@ export interface TradeStatement {
   collectedDate?: string;
   memo?: string;
   createdAt: string;
+  projectNo?: string;
+  workspace?: 'OEM' | 'LUMEN' | 'AETALOOP';
 }
 
 // ─── 자재 발주 장바구니 ───
@@ -682,6 +703,8 @@ export interface Settlement {
   status: SettlementStatus;
   memo?: string;
   createdAt: string;
+  projectNo?: string;
+  workspace?: 'OEM' | 'LUMEN' | 'AETALOOP';
 }
 
 // ─── 지출 전표 ───
@@ -800,6 +823,7 @@ export function normalizeColors(colors: (ItemColor | string)[]): ItemColor[] {
 export const store = {
   // Materials
   getMaterials: () => getAll<Material>(KEYS.materials),
+  setMaterials: (v: Material[]) => setAll(KEYS.materials, v),
   getNextItemCode: (category: MaterialCategory): string => {
     const PREFIX: Record<string, string> = {
       '원자재': 'M', '지퍼': 'Z', '장식': 'H', '보강재': 'R',
@@ -1012,6 +1036,9 @@ export const store = {
     if (u.memo !== undefined) snakeU.memo = u.memo;
     if (u.vendorId !== undefined) snakeU.vendor_id = u.vendorId;
     if (u.buyerId !== undefined) snakeU.buyer_id = u.buyerId;
+    if (u.milestones !== undefined) snakeU.milestones = u.milestones;
+    if (u.receivedQty !== undefined) snakeU.received_qty = u.receivedQty;
+    if (u.projectNo !== undefined) snakeU.project_no = u.projectNo;
     if (Object.keys(snakeU).length > 0) sbUpdate('production_orders', id, snakeU);
   },
   deleteOrder: (id: string) => { setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).filter(x => x.id !== id)); sbDelete('production_orders', id); },
@@ -1028,10 +1055,15 @@ export const store = {
   /** 발주용 BOM 조회: 사후원가(postMaterials) 우선, 없으면 사전원가(lines) 반환 */
   getBomForOrder: (styleNo: string): { bom: Bom | null; type: 'post' | 'pre' | null } => {
     const boms = getAll<Bom>(KEYS.boms);
-    // 스타일번호로 매칭되는 최신 BOM (version 내림차순)
+    const items = getAll<Item>(KEYS.items);
+    const item = items.find(i => i.styleNo === styleNo);
+    // 스타일번호 또는 styleId로 매칭되는 최신 BOM (version 내림차순)
     const bomList = boms
-      .filter(b => b.styleNo === styleNo)
-      .sort((a, b) => b.version - a.version);
+      .filter(b =>
+        b.styleNo === styleNo
+        || (!!item && (b.styleId === item.id || b.styleId === item.styleNo || b.styleNo === item.styleNo))
+      )
+      .sort((a, b) => (b.version || 0) - (a.version || 0));
     if (bomList.length === 0) return { bom: null, type: null };
     // 사후원가 컬러 BOM 우선 (postColorBoms > postMaterials)
     const postColorBom = bomList.find(b => (b as any).postColorBoms && (b as any).postColorBoms.length > 0);
@@ -1052,7 +1084,7 @@ export const store = {
     try {
       const SURL = 'https://linzfvhgswrnoukssqyi.supabase.co/rest/v1';
       const SKEY = 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2';
-      const res = await fetch(`${SURL}/boms?style_no=eq.${styleNo}&select=*`, {
+      const res = await fetch(`${SURL}/boms?style_no=eq.${encodeURIComponent(styleNo)}&select=*`, {
         headers: { 'apikey': SKEY, 'Authorization': `Bearer ${SKEY}` }
       });
       if (!res.ok) return;
@@ -1060,10 +1092,30 @@ export const store = {
       if (!rows || rows.length === 0) return;
       const boms = getAll<any>(KEYS.boms);
       for (const row of rows) {
+        let pnl: any;
+        try {
+          if (row.pnl_data) {
+            pnl = typeof row.pnl_data === 'string' ? JSON.parse(row.pnl_data) : row.pnl_data;
+          }
+        } catch { /* ignore */ }
+        let isSimpleCost = false;
+        let simplePostCostKrw: number | undefined;
+        let simpleCostKrw: number | undefined;
+        try {
+          if (row.memo && typeof row.memo === 'string' && row.memo.includes('isSimple')) {
+            const m = JSON.parse(row.memo);
+            if (m?.isSimple) {
+              isSimpleCost = true;
+              simplePostCostKrw = m.postCost ?? undefined;
+              simpleCostKrw = m.preCost ?? undefined;
+            }
+          }
+        } catch { /* ignore */ }
         const idx = boms.findIndex((b: any) => b.id === row.id || b.styleNo === row.style_no);
         const converted = {
           ...(idx >= 0 ? boms[idx] : {}),
           id: row.id,
+          styleId: row.style_id ?? row.style_no,
           styleNo: row.style_no,
           styleName: row.style_name,
           postColorBoms: row.post_color_boms || [],
@@ -1075,10 +1127,19 @@ export const store = {
           exchangeRateCny: row.exchange_rate_cny || 191,
           preExchangeRateCny: row.pre_exchange_rate_cny || 191,
           postExchangeRateCny: row.post_exchange_rate_cny || row.exchange_rate_cny || 191,
+          exchangeRateUsd: row.exchange_rate_usd || 1380,
+          currency: row.currency || row.post_currency || 'CNY',
           customsRate: row.customs_rate || 0,
           productionMarginRate: row.production_margin_rate || 0.16,
+          logisticsCostKrw: row.logistics_cost_krw || 0,
+          packagingCostKrw: row.packaging_cost_krw || 0,
+          packingCostKrw: row.packing_cost_krw || 0,
           postProcessLines: row.post_process_lines || [],
           manufacturingCountry: row.manufacturing_country,
+          pnl,
+          isSimpleCost,
+          simplePostCostKrw,
+          simpleCostKrw,
           version: 1,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
@@ -1088,6 +1149,91 @@ export const store = {
       }
       setAll(KEYS.boms, boms);
     } catch(e) { console.warn('fetchAndCacheBom 오류:', e); }
+  },
+
+  /**
+   * BOM 공장단가(KRW/CNY) — BOM 화면과 동일 기준
+   * 우선순위: pnl.factoryUnitCostKrw → 간단원가 → 컬러별 사후원가(수량 가중) → postMaterials
+   */
+  resolveFactoryUnitFromBom: (bom: Bom | null | undefined, colorQtys?: ColorQty[]): {
+    factoryUnitPriceKrw: number;
+    factoryUnitPriceCny: number;
+    rate: number;
+  } => {
+    if (!bom) return { factoryUnitPriceKrw: 0, factoryUnitPriceCny: 0, rate: 191 };
+    const b = bom as any;
+    const postCur = b.currency || 'CNY';
+    const cnyKrw = b.postExchangeRateCny || b.exchangeRateCny || b.snapshotCnyKrw || 191;
+    const usdKrw = b.exchangeRateUsd || b.snapshotUsdKrw || 1380;
+    const rate = postCur === 'USD' ? usdKrw : postCur === 'KRW' ? 1 : cnyKrw;
+
+    const pnlKrw = Number(b.pnl?.factoryUnitCostKrw || 0);
+    if (pnlKrw > 0) {
+      return {
+        factoryUnitPriceKrw: Math.round(pnlKrw),
+        factoryUnitPriceCny: pnlKrw / (rate || 1),
+        rate,
+      };
+    }
+    if (b.isSimpleCost && Number(b.simplePostCostKrw) > 0) {
+      const v = Math.round(Number(b.simplePostCostKrw));
+      return { factoryUnitPriceKrw: v, factoryUnitPriceCny: v / (rate || 1), rate };
+    }
+
+    const calcKrwFromLines = (materials: any[], processingFee: number, postProc: any[]) => {
+      const lineAmt = (price: number, net: number, loss: number) =>
+        (price || 0) * (net || 0) * (1 + (loss || 0));
+      const factoryMat = (materials || []).reduce((s: number, l: any) => {
+        if (l.isHqProvided) return s;
+        const price = l.unitPriceCny ?? l.unitPrice ?? 0;
+        return s + lineAmt(price, l.netQty, l.lossRate);
+      }, 0);
+      const processing = processingFee || 0;
+      const postP = (postProc || []).reduce((s: number, l: any) =>
+        s + (l.netQty || 0) * (l.unitPrice ?? l.unitPriceCny ?? 0), 0);
+      return factoryMat * rate + processing * rate + postP * rate;
+    };
+
+    const postColors: any[] = Array.isArray(b.postColorBoms) ? b.postColorBoms : [];
+    if (colorQtys && colorQtys.length > 0 && postColors.length > 0) {
+      let weighted = 0;
+      let totalQty = 0;
+      for (const cq of colorQtys) {
+        if (!cq.qty || cq.qty <= 0) continue;
+        const key = (cq.color || '').trim().toUpperCase();
+        const match = postColors.find((cb: any) => (cb.color || '').trim().toUpperCase() === key)
+          || postColors.find((cb: any) => (cb.lines || []).some((l: any) => l.itemName || (l.unitPriceCny || 0) > 0));
+        if (!match) continue;
+        const krw = calcKrwFromLines(
+          match.lines || [],
+          match.processingFee ?? b.postProcessingFee ?? 0,
+          match.postProcessLines ?? b.postProcessLines ?? [],
+        );
+        weighted += krw * cq.qty;
+        totalQty += cq.qty;
+      }
+      if (totalQty > 0 && weighted > 0) {
+        const avg = Math.round(weighted / totalQty);
+        return { factoryUnitPriceKrw: avg, factoryUnitPriceCny: avg / (rate || 1), rate };
+      }
+    }
+
+    const postColorBom = postColors.find((cb: any) =>
+      (cb.lines || []).some((l: any) => l.itemName || (l.unitPriceCny || 0) > 0),
+    );
+    const materials = postColorBom ? (postColorBom.lines || []) : (b.postMaterials || []);
+    if (materials.length > 0) {
+      const krw = Math.round(calcKrwFromLines(
+        materials,
+        postColorBom ? (postColorBom.processingFee ?? 0) : (b.postProcessingFee || 0),
+        postColorBom ? (postColorBom.postProcessLines ?? []) : (b.postProcessLines || []),
+      ));
+      if (krw > 0) {
+        return { factoryUnitPriceKrw: krw, factoryUnitPriceCny: krw / (rate || 1), rate };
+      }
+    }
+
+    return { factoryUnitPriceKrw: 0, factoryUnitPriceCny: 0, rate };
   },
 
   /** 자재 소요량 계산: BOM 소요량 × 발주수량, 본사제공/미제공 분리
@@ -1224,19 +1370,22 @@ export const store = {
       }
     }
 
-    // 공장단가 = 공장구매자재비(per pcs, LOSS 포함) + 임가공비
-    // 공장구매 자재비 합산 (본사제공 제외, per pcs 기준)
-    const factoryMaterialCny = baseLines.reduce((s, l) => {
-      if (l.isHqProvided) return s;
-      const price = (l as any).unitPriceCny ?? (l as any).unitPrice ?? 0;
-      const perPcsQty = l.netQty * (1 + (l.lossRate ?? 0));
-      return s + price * perPcsQty;
-    }, 0);
-    // 후가공비 (per pcs)
-    const postProcessFee = (bom as any).postProcessLines
-      ? ((bom as any).postProcessLines as Array<{ netQty: number; unitPrice: number }>).reduce((s, l) => s + l.netQty * l.unitPrice, 0)
-      : 0;
-    const factoryUnitPriceCny = factoryMaterialCny + processingFee + postProcessFee;
+    // 공장단가 = BOM 화면과 동일 기준 (pnl / 컬러사후원가)
+    const resolved = store.resolveFactoryUnitFromBom(bom, colorQtys);
+    let factoryUnitPriceCny = resolved.factoryUnitPriceCny;
+    if (!(factoryUnitPriceCny > 0)) {
+      // fallback: 라인 합산 (본사제공 제외)
+      const factoryMaterialCny = baseLines.reduce((s, l) => {
+        if (l.isHqProvided) return s;
+        const price = (l as any).unitPriceCny ?? (l as any).unitPrice ?? 0;
+        const perPcsQty = l.netQty * (1 + (l.lossRate ?? 0));
+        return s + price * perPcsQty;
+      }, 0);
+      const postProcessFee = (bom as any).postProcessLines
+        ? ((bom as any).postProcessLines as Array<{ netQty: number; unitPrice: number }>).reduce((s, l) => s + l.netQty * l.unitPrice, 0)
+        : 0;
+      factoryUnitPriceCny = factoryMaterialCny + processingFee + postProcessFee;
+    }
 
     return {
       hqProvided,
@@ -1495,11 +1644,16 @@ export function getSettlementStatusByDays(days: number, outstanding: number): Se
 
 export function getBomForOrderFromList(
   boms: Bom[],
-  styleNo: string
+  styleNo: string,
+  styleId?: string
 ): { bom: Bom | null; type: 'post' | 'pre' | null } {
   const bomList = boms
-    .filter(b => b.styleNo === styleNo)
-    .sort((a, b) => b.version - a.version);
+    .filter(b =>
+      b.styleNo === styleNo
+      || (!!styleId && (b.styleId === styleId || b.styleId === styleNo))
+      || (!!styleNo && b.styleId === styleNo)
+    )
+    .sort((a, b) => (b.version || 0) - (a.version || 0));
   if (bomList.length === 0) return { bom: null, type: null };
   const postColorBom = bomList.find(b => (b as any).postColorBoms && (b as any).postColorBoms.length > 0);
   if (postColorBom) return { bom: postColorBom, type: 'post' };

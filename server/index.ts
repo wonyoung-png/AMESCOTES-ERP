@@ -4,9 +4,11 @@ dotenv.config({ override: true });
 
 import express from "express";
 import { createServer } from "http";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import yardageOcrRouter from "./yardage-ocr.js";
+import vendorOcrRouter from "./vendor-ocr.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,6 +52,8 @@ async function startServer() {
   // agent-routes보다 먼저 마운트해서 /api/yardage/ocr 를 우선 처리
   app.use(yardageOcrRouter);
   console.log("✓ Yardage OCR router mounted (/api/yardage/ocr)");
+  app.use(vendorOcrRouter);
+  console.log("✓ Vendor OCR router mounted (/api/vendor/ocr)");
 
   // AI 에이전트 API 라우터 (AI 에이전트 팀, SSE) — Supabase service key 없으면 스킵
   try {
@@ -61,21 +65,30 @@ async function startServer() {
     console.warn("  → AI 에이전트 팀 기능을 쓰려면 .env에 SUPABASE_SERVICE_ROLE_KEY 설정");
   }
 
-  // Serve static files from dist/public in production
-  const staticPath =
-    process.env.NODE_ENV === "production"
-      ? path.resolve(__dirname, "public")
-      : path.resolve(__dirname, "..", "dist", "public");
+  // Serve static files from dist/public
+  // dist/index.js 실행 시 __dirname === <project>/dist 이므로 항상 dist/public
+  const staticPath = path.resolve(__dirname, "public");
+  const indexHtml = path.join(staticPath, "index.html");
+  if (!fs.existsSync(indexHtml)) {
+    console.error(`✗ UI 빌드 없음: ${indexHtml}`);
+    console.error("  → npm run build 후 다시 시작하세요 (ERP_시작.bat)");
+  }
 
   app.use(express.static(staticPath));
 
   // Handle client-side routing - serve index.html for all routes
   // index.html은 캐시 금지 (새 빌드 즉시 반영 — 로그인 비번 변경 등)
   app.get("*", (_req, res) => {
+    if (!fs.existsSync(indexHtml)) {
+      res.status(503).type("text/plain").send(
+        "UI 빌드가 없습니다. npm run build 실행 후 서버를 다시 시작하세요.",
+      );
+      return;
+    }
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.set("Pragma", "no-cache");
     res.set("Expires", "0");
-    res.sendFile(path.join(staticPath, "index.html"));
+    res.sendFile(indexHtml);
   });
 
   const port = process.env.PORT || 4000;
