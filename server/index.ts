@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 dotenv.config({ override: true });
 
 import express from "express";
+import compression from "compression";
 import { createServer } from "http";
 import fs from "fs";
 import path from "path";
@@ -40,6 +41,7 @@ async function startServer() {
   }
 
   // JSON 파싱 미들웨어
+  app.use(compression());
   app.use(express.json({ limit: "10mb" }));
 
   // 요청 로깅 미들웨어
