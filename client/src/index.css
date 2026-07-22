@@ -191,3 +191,23 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
+
+/* ── 인쇄 공통 보정 ──
+   Radix Dialog는 transform + max-height/overflow 때문에
+   position:fixed 인쇄 영역이 갇혀 빈 페이지가 나온다.
+   인쇄 시 다이얼로그 래퍼를 평면화해서 본문 전체가 출력되게 한다. */
+@media print {
+  [role="dialog"],
+  #cost-sheet-modal-wrap,
+  #cost-sheet-print {
+    position: static !important;
+    transform: none !important;
+    max-height: none !important;
+    max-width: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+  #cost-sheet-modal-wrap { background: none !important; padding: 0 !important; display: block !important; }
+}

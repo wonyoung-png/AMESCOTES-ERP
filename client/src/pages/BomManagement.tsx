@@ -5172,7 +5172,12 @@ export default function BomManagement() {
             const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
             return (
               <div id="cost-sheet-modal-wrap" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <style>{`@media print { body > * { display: none !important; } #cost-sheet-print { display: block !important; } }`}</style>
+                <style>{`@media print {
+                  @page { size: A4; margin: 10mm; }
+                  body * { visibility: hidden; }
+                  #cost-sheet-print, #cost-sheet-print * { visibility: visible; }
+                  #cost-sheet-print { position: absolute; top: 0; left: 0; width: 100%; }
+                }`}</style>
                 <div id="cost-sheet-print" className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
                   {/* 헤더 */}
                   <div className="sticky top-0 z-10 bg-stone-800 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl print:hidden">

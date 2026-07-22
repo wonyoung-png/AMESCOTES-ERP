@@ -2661,7 +2661,8 @@ export default function ProductionOrders() {
                 @page { size: A4 landscape; margin: 8mm; }
                 body * { visibility: hidden; }
                 #work-order-print-area, #work-order-print-area * { visibility: visible; }
-                #work-order-print-area { position: fixed; top: 0; left: 0; width: 100%; }
+                /* fixed는 Dialog transform에 갇힘 → absolute (전역 index.css가 다이얼로그를 평면화) */
+                #work-order-print-area { position: absolute; top: 0; left: 0; width: 100%; }
                 .no-print { display: none !important; }
                 textarea { border: none !important; resize: none; background: transparent; }
                 input[type="text"], input[type="number"] { border: none !important; background: transparent; }
