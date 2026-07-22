@@ -5199,8 +5199,10 @@ export default function BomManagement() {
                             document.body.removeChild(a);
                             URL.revokeObjectURL(url);
                           } catch (e) {
-                            console.error('PDF 오류:', e);
-                            alert('PDF 생성 중 오류: ' + String(e));
+                            // 서버에 Chrome이 없는 환경(Railway 등) → 브라우저 인쇄로 대체.
+                            // 이 모달엔 이미 인쇄 CSS가 있어 원가계산서만 출력된다. 인쇄창에서 "PDF로 저장" 선택.
+                            console.warn('서버 PDF 실패 → 브라우저 인쇄로 대체:', e);
+                            window.print();
                           }
                         }}
                         className="px-4 py-1.5 bg-[#C9A96E] hover:bg-[#b8924f] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
