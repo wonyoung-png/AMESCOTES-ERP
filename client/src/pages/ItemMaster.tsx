@@ -1635,6 +1635,10 @@ export default function ItemMaster() {
 
   // 체크박스 다중 선택 관련
   const displayItems = showSelectedOnly ? filtered.filter(i => selectedIds.has(i.id)) : filtered;
+  // 렌더 상한 — 802행 × 20열을 한 번에 그리면 브라우저가 멈춘다. 필터가 바뀌면 다시 100부터.
+  const [renderLimit, setRenderLimit] = useState(100);
+  useEffect(() => { setRenderLimit(100); }, [search, filterSeason, filterCategory, filterErpCategory, filterBuyer, filterNoBom, filterStyleNo, filterName, showSelectedOnly]);
+  const visibleItems = displayItems.slice(0, renderLimit);
   const isAllSelected = filtered.length > 0 && filtered.every(item => selectedIds.has(item.id));
   const isIndeterminate = filtered.some(item => selectedIds.has(item.id)) && !isAllSelected;
 
@@ -2341,7 +2345,7 @@ export default function ItemMaster() {
               </tr>
             </thead>
             <tbody>
-              {displayItems.map(item => {
+              {visibleItems.map(item => {
                 const rd = rowDataMap.get(item.id) ?? { bom: null, delivery: 0, bomCost: 0, confirmedSalePrice: 0, actualMultiple: 0, marginRate: null, marginAmount: null, factoryUnitCostKrw: 0, logisticsKrw: 0, packagingKrw: 0, processingKrw: 0, processingBase: 0, processingCur: 'CNY', packingKrw: 0, prodMarginRate: 0, colorCosts: [] as ColorCostRow[], displayColors: [] as string[] };
                 const { bom: itemBom, delivery, bomCost, confirmedSalePrice, actualMultiple, marginRate, marginAmount, factoryUnitCostKrw, logisticsKrw, packagingKrw, processingKrw, processingCur, packingKrw, prodMarginRate, colorCosts, displayColors } = rd;
                 const costByColor = new Map(colorCosts.map(c => [c.color.trim().toUpperCase(), c]));
@@ -2721,6 +2725,15 @@ export default function ItemMaster() {
               )}
             </tbody>
           </table>
+          {displayItems.length > renderLimit && (
+            <div className="px-4 py-3 border-t border-stone-100 flex items-center justify-center gap-3">
+              <span className="text-xs text-stone-500">{renderLimit}/{displayItems.length}개 표시 중</span>
+              <button type="button" onClick={() => setRenderLimit(n => n + 200)}
+                className="text-sm px-3 py-1.5 rounded border border-stone-300 hover:bg-stone-50">더 보기</button>
+              <button type="button" onClick={() => setRenderLimit(displayItems.length)}
+                className="text-xs text-stone-500 hover:text-stone-800">전체 표시</button>
+            </div>
+          )}
         </div>
       </div>
       ) : (
