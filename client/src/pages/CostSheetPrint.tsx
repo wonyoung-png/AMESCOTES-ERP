@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { calcPostSummary } from '@/lib/costing';
 import { useSearch } from 'wouter';
 import { fetchBoms } from '@/lib/supabaseQueries';
 
@@ -83,85 +84,8 @@ interface ExtBom {
 }
 
 // ─── 헬퍼 함수 ──────────────────────────────────────────────────────────────
-const calcLineAmt = (price: number, net: number, loss: number) => price * net * (1 + loss);
+// 원가 계산식은 lib/costing.ts 정본을 사용한다 (예전엔 여기 복붙본이 있었음)
 const fmtKrw = (n: number) => '₩' + Math.round(n).toLocaleString('ko-KR');
-
-interface PostSummary {
-  factoryMaterialKrw: number;
-  hqMaterialKrw: number;
-  totalMaterialKrw: number;
-  processingKrw: number;
-  postProcessKrw: number;
-  customsRate: number;
-  customsKrw: number;
-  logisticsKrw: number;
-  packagingKrw: number;
-  packingKrw: number;
-  factoryUnitCostKrw: number;
-  totalCostKrw: number;
-  factoryMaterialCny: number;
-  hqMaterialCny: number;
-  totalMaterialCny: number;
-  processingCny: number;
-  postProcessCny: number;
-  factoryUnitCostCny: number;
-  totalCostCny: number;
-  rate: number;
-}
-
-function calcPostSummary(bom: ExtBom, settingsUsdKrw = 1380, postColorBom?: ExtColorBom): PostSummary {
-  const materials = postColorBom ? postColorBom.lines : (bom.postMaterials || []);
-  const postCur = bom.currency || 'CNY';
-  const cnyKrw = bom.exchangeRateCny || bom.snapshotCnyKrw || 191;
-  const usdKrw = bom.exchangeRateUsd || settingsUsdKrw;
-  const rate = postCur === 'USD' ? usdKrw : postCur === 'KRW' ? 1 : cnyKrw;
-
-  const factoryMaterialCny = materials.reduce((s, l) => {
-    if (l.isHqProvided) return s;
-    return s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate);
-  }, 0);
-  const hqMaterialCny = materials.reduce((s, l) => {
-    if (!l.isHqProvided) return s;
-    return s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate);
-  }, 0);
-  const totalMaterialCny = factoryMaterialCny + hqMaterialCny;
-  const processingCny = postColorBom ? (postColorBom.processingFee ?? 0) : (bom.postProcessingFee || 0);
-  const postProcLines = postColorBom ? (postColorBom.postProcessLines ?? []) : (bom.postProcessLines || []);
-  const postProcessCny = postProcLines.reduce((s, l) => s + l.netQty * l.unitPrice, 0);
-  const customsRate = bom.customsRate || 0;
-  const processingKrw = processingCny * rate;
-  const customsKrw = processingKrw * (customsRate / 100);
-  const logisticsKrw = bom.logisticsCostKrw || 0;
-  const packagingKrw = bom.packagingCostKrw || 0;
-  const packingKrw = bom.packingCostKrw || 0;
-  const factoryUnitCostKrw = factoryMaterialCny * rate + processingKrw + postProcessCny * rate;
-  const factoryUnitCostCny = factoryUnitCostKrw / (rate || 1);
-  const totalCostKrw = factoryUnitCostKrw + hqMaterialCny * rate + customsKrw + logisticsKrw + packagingKrw + packingKrw;
-  const totalCostCny = totalCostKrw / (rate || 1);
-
-  return {
-    factoryMaterialKrw: factoryMaterialCny * rate,
-    hqMaterialKrw: hqMaterialCny * rate,
-    totalMaterialKrw: totalMaterialCny * rate,
-    processingKrw,
-    postProcessKrw: postProcessCny * rate,
-    customsRate,
-    customsKrw,
-    logisticsKrw,
-    packagingKrw,
-    packingKrw,
-    factoryUnitCostKrw,
-    totalCostKrw,
-    factoryMaterialCny,
-    hqMaterialCny,
-    totalMaterialCny,
-    processingCny,
-    postProcessCny,
-    factoryUnitCostCny,
-    totalCostCny,
-    rate,
-  };
-}
 
 function calcPnl(totalCostKrw: number, pnl: BomPnlAssumptions) {
   const { discountRate, platformFeeRate, sgaRate, confirmedSalePrice } = pnl;

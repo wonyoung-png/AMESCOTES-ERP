@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useLocation, useSearch } from 'wouter';
+import { calcPostSummary } from '@/lib/costing';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type PackingSize, type ProductionOrder, type ColorQty } from '@/lib/store';
 import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, fetchBomsLight, updateItemCostData, saveConfirmedSalePrice, fetchMaterials } from '@/lib/supabaseQueries';
@@ -97,59 +98,46 @@ const emptyItem: Partial<Item> = {
   colors: [], memo: '',
 };
 
-// ─── 사후원가 계산 (BomManagement calcPostSummary 동일 로직) ───
-// productCost  = calcPostSummary.totalCostKrw (제품원가, 생산마진 제외)
-// totalCostKrw = productCost × (1 + productionMarginRate) (총원가액, 생산마진 포함)
-// factoryUnitCostKrw = 공장구매자재 + 임가공비 + 후가공비 (본사제공/관세/물류비 제외)
+// ─── 사후원가 계산 → lib/costing.ts 정본 위임 ───
+// 예전엔 여기에 calcPostSummary 복붙본이 있었고, 업체제공 자재를 공장단가에서
+// 빼지 않는 등 다른 사본들과 갈라져 있었다. 이제 계산식은 costing.ts에만 있다.
+// (반환 형태는 기존 호출부 호환을 위해 그대로 유지)
+type BomCostResult = {
+  productCost: number; totalCostKrw: number; factoryUnitCostKrw: number;
+  logisticsKrw: number; packagingKrw: number; processingKrw: number;
+  processingBase: number; processingCur: string; packingKrw: number; marginRate: number;
+};
+
 function calcBomCostsFromMaterials(
   bom: any,
   materials: any[],
   processingFee: number,
   postProcLines: any[],
-): { productCost: number; totalCostKrw: number; factoryUnitCostKrw: number; logisticsKrw: number; packagingKrw: number; processingKrw: number; processingBase: number; processingCur: string; packingKrw: number; marginRate: number } {
-  const calcLineAmt = (price: number, net: number, loss: number) => (price || 0) * (net || 0) * (1 + (loss || 0));
-  if (!materials.some((l: any) => l.itemName || l.unitPriceCny > 0)) {
-    return { productCost: 0, totalCostKrw: 0, factoryUnitCostKrw: 0, logisticsKrw: 0, packagingKrw: 0, processingKrw: 0, processingBase: 0, processingCur: bom.currency || 'CNY', packingKrw: 0, marginRate: 0 };
-  }
+): BomCostResult {
   const postCur = bom.currency || 'CNY';
-  const cnyKrw = bom.exchangeRateCny || bom.snapshotCnyKrw || 191;
-  const usdKrw = bom.exchangeRateUsd || 1380;
-  const rate = postCur === 'USD' ? usdKrw : postCur === 'KRW' ? 1 : cnyKrw;
-  const factoryMaterialCny = materials.reduce((s: number, l: any) =>
-    l.isHqProvided ? s : s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate), 0);
-  const hqMaterialCny = materials.reduce((s: number, l: any) =>
-    l.isHqProvided ? s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) : s, 0);
-  const processingCny = processingFee || 0;
-  const postProcessCny = (postProcLines || []).reduce((s: number, l: any) => s + (l.netQty || 0) * (l.unitPrice || 0), 0);
-  const processingKrw = processingCny * rate;
-  const customsKrw = processingKrw * ((bom.customsRate || 0) / 100);
-  const factoryUnitCostKrw = factoryMaterialCny * rate + processingKrw + postProcessCny * rate;
-  // PACK 키트: 라인 합산이 곧 원가. packingCostKrw/packagingCostKrw에 동일 금액을 또 넣으면 2배
-  const sn = String(bom.styleNo || '');
-  const isPackKit = !!(
-    bom.isPackBom
-    || bom.isSimpleCost
-    || bom.erpCategory === 'PACK'
-    || sn.startsWith('PACKAGE-')
-    || sn.startsWith('BOX-')
-  );
-  const addOnKrw = isPackKit
-    ? 0
-    : (bom.logisticsCostKrw || 0) + (bom.packagingCostKrw || 0) + (bom.packingCostKrw || 0);
-  const productCost = Math.round(
-    factoryUnitCostKrw + hqMaterialCny * rate + customsKrw + addOnKrw
-  );
-  const marginRate = bom.productionMarginRate ?? 0;
-  const totalCostKrw = marginRate > 0 ? Math.round(productCost * (1 + marginRate)) : productCost;
+  if (!materials.some((l: any) => l.itemName || l.unitPriceCny > 0)) {
+    return {
+      productCost: 0, totalCostKrw: 0, factoryUnitCostKrw: 0, logisticsKrw: 0,
+      packagingKrw: 0, processingKrw: 0, processingBase: 0, processingCur: postCur,
+      packingKrw: 0, marginRate: 0,
+    };
+  }
+  const ps = calcPostSummary(bom, store.getSettings().usdKrw || 1380, {
+    lines: materials,
+    processingFee,
+    postProcessLines: postProcLines,
+  });
   return {
-    productCost, totalCostKrw, factoryUnitCostKrw: Math.round(factoryUnitCostKrw),
+    productCost: Math.round(ps.productCostKrw),
+    totalCostKrw: Math.round(ps.finalCostKrw),
+    factoryUnitCostKrw: Math.round(ps.factoryUnitCostKrw),
     logisticsKrw: Math.round(bom.logisticsCostKrw || 0),
     packagingKrw: Math.round(bom.packagingCostKrw || 0),
-    processingKrw: Math.round(processingKrw),
-    processingBase: processingCny,
+    processingKrw: Math.round(ps.processingKrw),
+    processingBase: ps.processingCny,
     processingCur: postCur,
     packingKrw: Math.round(bom.packingCostKrw || 0),
-    marginRate,
+    marginRate: ps.marginRate,
   };
 }
 

@@ -3,54 +3,7 @@
 // localStorage + Supabase 동시 저장 (쓰기 시 둘 다, 읽기 시 localStorage 우선)
 
 import { supabase } from './supabase';
-
-// camelCase → snake_case 변환 헬퍼 (최상위 키만)
-function toSnakeCase(obj: Record<string, any>): Record<string, any> {
-  return Object.fromEntries(
-    Object.entries(obj).map(([k, v]) => [
-      k.replace(/[A-Z]/g, c => '_' + c.toLowerCase()),
-      v,
-    ])
-  );
-}
-
-// 테이블별 허용 컬럼 목록 (Supabase 스키마와 동기화)
-// ⚠️ 마이그레이션 후 컬럼이 추가되면 아래 목록에도 추가 필요
-// migration: supabase/MIGRATION_REQUIRED.md 참조
-const TABLE_COLUMNS: Record<string, string[]> = {
-  vendors: ['id', 'code', 'name', 'company_name', 'type', 'material_types', 'custom_type',
-            'contact_name', 'phone', 'email', 'memo', 'bank_info', 'created_at', 'updated_at'],
-  items: ['id', 'style_no', 'name', 'erp_category', 'sub_category', 'buyer_id', 'season',
-          'designer', 'material', 'delivery_price', 'margin_amount', 'margin_rate',
-          'last_order_date', 'memo', 'image_url',
-          'has_bom', 'base_cost_krw', 'colors',
-          'created_at', 'updated_at'],
-  samples: ['id', 'style_no', 'style_name', 'buyer_id', 'season', 'stage', 'assignee',
-            'sales_person', 'request_date', 'expected_date', 'approved_date', 'cost_krw',
-            'image_urls', 'material_requests', 'documents', 'memo', 'created_at', 'updated_at'],
-  boms: ['id', 'style_no', 'style_name', 'season', 'erp_category', 'designer', 'line_name',
-         'manufacturing_country', 'currency', 'exchange_rate_cny', 'exchange_rate_usd',
-         'pre_materials', 'pre_processing_fee', 'post_materials', 'post_processing_fee',
-         'delivery_price', 'logistics_cost_krw', 'production_margin_rate', 'memo',
-         'created_at', 'updated_at',
-         // 마이그레이션으로 추가된 컬럼 (실제 Supabase 테이블에 존재)
-         'color_boms', 'post_color_boms', 'pre_currency', 'post_currency',
-         'pre_exchange_rate_cny', 'post_exchange_rate_cny', 'customs_rate', 'post_process_lines'],
-  production_orders: ['id', 'style_no', 'style_name', 'buyer_id', 'vendor_id', 'quantity', 'unit_price',
-                      'currency', 'order_date', 'expected_date', 'status', 'memo',
-                      'order_no', 'vendor_name', 'factory_unit_price_krw', 'color_qtys',
-                      'delivery_date', 'style_id', 'revision',
-                      'created_at', 'updated_at'],
-  materials: ['id', 'name', 'spec', 'unit', 'unit_price', 'currency', 'vendor_id',
-              'category', 'stock_qty', 'memo', 'created_at', 'updated_at'],
-};
-
-// 테이블에서 허용된 컬럼만 필터링
-function filterForTable(table: string, row: Record<string, any>): Record<string, any> {
-  const allowed = TABLE_COLUMNS[table];
-  if (!allowed) return row; // 알 수 없는 테이블은 그대로 통과
-  return Object.fromEntries(Object.entries(row).filter(([k]) => allowed.includes(k)));
-}
+import { filterForTable, toSnakeCase } from './tableColumns';
 
 // 마이그레이션 전까지 Supabase에 없는 컬럼 목록 (PGRST204 에러 방지용 제외 컬럼)
 // migration_add_missing_columns.sql 실행 후 이 목록에서 제거하세요
@@ -63,57 +16,84 @@ const PENDING_MIGRATION_COLUMNS: Record<string, string[]> = {
                       'received_date', 'revision'],
 };
 
-// Supabase 저장 (실패해도 앱에 영향 없음)
-// PGRST204 (컬럼 없음) 에러 시 pending 컬럼 제외 후 재시도
+// ─────────────────────────────────────────────
+// Supabase 쓰기 실패 알림
+//
+// 호출부 21곳이 전부 fire-and-forget(await 없음)이라 throw하면
+// unhandled rejection만 남고 사용자는 여전히 모릅니다.
+// 그래서 throw 대신 화면에 띄웁니다 — 저장 실패를 성공으로 착각하는 게 최악입니다.
+// ─────────────────────────────────────────────
+type SbWriteFailure = { table: string; op: string; message: string };
+let onSbWriteFailure: ((f: SbWriteFailure) => void) | null = null;
+
+/** 앱 시작 시 1회 등록 (main/App에서 toast 연결) */
+export function setSbWriteFailureHandler(fn: (f: SbWriteFailure) => void): void {
+  onSbWriteFailure = fn;
+}
+
+function reportSbFailure(table: string, op: string, message: string): void {
+  console.error(`[store] ${table} ${op} 실패:`, message);
+  try {
+    onSbWriteFailure?.({ table, op, message });
+  } catch (e) {
+    console.error('[store] 실패 핸들러 오류:', e);
+  }
+}
+
 async function sbUpsert(table: string, data: Record<string, any>): Promise<void> {
   try {
     const row = filterForTable(table, toSnakeCase(data));
     const { error } = await supabase.from(table).upsert(row);
-    if (error) {
-      if (error.code === 'PGRST204' && PENDING_MIGRATION_COLUMNS[table]) {
-        // 마이그레이션 미실행 컬럼 제외 후 재시도
-        const pending = PENDING_MIGRATION_COLUMNS[table];
-        const fallbackRow = Object.fromEntries(Object.entries(row).filter(([k]) => !pending.includes(k)));
-        const { error: err2 } = await supabase.from(table).upsert(fallbackRow);
-        if (err2) console.warn(`[store] ${table} upsert 재시도 실패:`, err2.message);
-      } else {
-        console.warn(`[store] ${table} upsert 실패:`, error.message);
-      }
+    if (!error) return;
+    if (error.code === 'PGRST204' && PENDING_MIGRATION_COLUMNS[table]) {
+      // 마이그레이션 미실행 컬럼 제외 후 재시도
+      const pending = PENDING_MIGRATION_COLUMNS[table];
+      const fallbackRow = Object.fromEntries(Object.entries(row).filter(([k]) => !pending.includes(k)));
+      const { error: err2 } = await supabase.from(table).upsert(fallbackRow);
+      if (err2) reportSbFailure(table, 'upsert 재시도', err2.message);
+      else console.warn(`[store] ${table}: 마이그레이션 미실행 컬럼 제외하고 저장됨`);
+    } else {
+      reportSbFailure(table, 'upsert', error.message);
     }
   } catch (e) {
-    console.warn(`[store] ${table} upsert 오류:`, e);
+    reportSbFailure(table, 'upsert', String(e));
   }
 }
 
 async function sbUpdate(table: string, id: string, patch: Record<string, any>): Promise<void> {
   try {
     const row = filterForTable(table, toSnakeCase(patch));
-    if (Object.keys(row).length === 0) return; // 저장할 컬럼 없음
+    if (Object.keys(row).length === 0) {
+      // 넘어온 필드가 전부 화이트리스트 밖 — 조용히 버리면 안 된다
+      reportSbFailure(table, 'update', `저장 가능한 컬럼이 없습니다 (${Object.keys(toSnakeCase(patch)).join(', ')})`);
+      return;
+    }
     const { error } = await supabase.from(table).update(row).eq('id', id);
-    if (error) {
-      if (error.code === 'PGRST204' && PENDING_MIGRATION_COLUMNS[table]) {
-        // 마이그레이션 미실행 컬럼 제외 후 재시도
-        const pending = PENDING_MIGRATION_COLUMNS[table];
-        const fallbackRow = Object.fromEntries(Object.entries(row).filter(([k]) => !pending.includes(k)));
-        if (Object.keys(fallbackRow).length > 0) {
-          const { error: err2 } = await supabase.from(table).update(fallbackRow).eq('id', id);
-          if (err2) console.warn(`[store] ${table} update 재시도 실패:`, err2.message);
-        }
+    if (!error) return;
+    if (error.code === 'PGRST204' && PENDING_MIGRATION_COLUMNS[table]) {
+      const pending = PENDING_MIGRATION_COLUMNS[table];
+      const fallbackRow = Object.fromEntries(Object.entries(row).filter(([k]) => !pending.includes(k)));
+      if (Object.keys(fallbackRow).length > 0) {
+        const { error: err2 } = await supabase.from(table).update(fallbackRow).eq('id', id);
+        if (err2) reportSbFailure(table, 'update 재시도', err2.message);
+        else console.warn(`[store] ${table}: 마이그레이션 미실행 컬럼 제외하고 저장됨`);
       } else {
-        console.warn(`[store] ${table} update 실패:`, error.message);
+        reportSbFailure(table, 'update', '마이그레이션 미실행 컬럼만 남아 저장 불가');
       }
+    } else {
+      reportSbFailure(table, 'update', error.message);
     }
   } catch (e) {
-    console.warn(`[store] ${table} update 오류:`, e);
+    reportSbFailure(table, 'update', String(e));
   }
 }
 
 async function sbDelete(table: string, id: string): Promise<void> {
   try {
     const { error } = await supabase.from(table).delete().eq('id', id);
-    if (error) console.warn(`[store] ${table} delete 실패:`, error.message);
+    if (error) reportSbFailure(table, 'delete', error.message);
   } catch (e) {
-    console.warn(`[store] ${table} delete 오류:`, e);
+    reportSbFailure(table, 'delete', String(e));
   }
 }
 
@@ -1022,24 +1002,12 @@ export const store = {
     const a = getAll<ProductionOrder>(KEYS.orders);
     const i = a.findIndex(x => x.id === id);
     if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.orders, a); }
-    // Supabase에 snake_case로 명시적 변환 후 저장
-    const snakeU: Record<string, unknown> = {};
-    if (u.orderNo !== undefined) snakeU.order_no = u.orderNo;
-    if (u.vendorName !== undefined) snakeU.vendor_name = u.vendorName;
-    if (u.factoryUnitPriceKrw !== undefined) snakeU.factory_unit_price_krw = u.factoryUnitPriceKrw;
-    if (u.colorQtys !== undefined) snakeU.color_qtys = u.colorQtys;
-    if (u.deliveryDate !== undefined) snakeU.delivery_date = u.deliveryDate;
-    if (u.styleId !== undefined) snakeU.style_id = u.styleId;
-    if (u.styleName !== undefined) snakeU.style_name = u.styleName;
-    if (u.status !== undefined) snakeU.status = u.status;
-    if (u.qty !== undefined) snakeU.quantity = u.qty;
-    if (u.memo !== undefined) snakeU.memo = u.memo;
-    if (u.vendorId !== undefined) snakeU.vendor_id = u.vendorId;
-    if (u.buyerId !== undefined) snakeU.buyer_id = u.buyerId;
-    if (u.milestones !== undefined) snakeU.milestones = u.milestones;
-    if (u.receivedQty !== undefined) snakeU.received_qty = u.receivedQty;
-    if (u.projectNo !== undefined) snakeU.project_no = u.projectNo;
-    if (Object.keys(snakeU).length > 0) sbUpdate('production_orders', id, snakeU);
+    // camelCase → snake_case 자동 변환 후 화이트리스트(tableColumns.ts)로 거른다.
+    // 예전엔 필드를 하나씩 손으로 나열해서 defectQty/shippedQty/receivedDate/defectNote가
+    // 통째로 누락됐고, 입고·출고 기록이 Supabase에 저장되지 않았다.
+    const patch: Record<string, unknown> = { ...u };
+    if (u.qty !== undefined) { patch.quantity = u.qty; delete patch.qty; } // qty만 컬럼명이 다름
+    sbUpdate('production_orders', id, patch);
   },
   deleteOrder: (id: string) => { setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).filter(x => x.id !== id)); sbDelete('production_orders', id); },
   getNextRevision: (styleNo: string) => { const orders = getAll<ProductionOrder>(KEYS.orders).filter(o => o.styleNo === styleNo); return orders.length > 0 ? Math.max(...orders.map(o => o.revision)) + 1 : 1; },

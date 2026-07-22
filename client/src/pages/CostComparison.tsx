@@ -103,9 +103,9 @@ export default function CostComparison() {
       if (isSimple && (bom as any).simplePostCostKrw) {
         postCost = (bom as any).simplePostCostKrw;
       } else if (bom.postTotalCostKrw && bom.postTotalCostKrw > 0) {
-        // 생산마진 적용하여 종원가액 계산 (displayTotalCostKrw 기준)
-        const marginRate = (bom as any).productionMarginRate ?? 0;
-        postCost = Math.round(bom.postTotalCostKrw * (1 + marginRate));
+        // postTotalCostKrw는 저장 시점(BomManagement.tsx handleSave)에 이미
+        // 생산마진이 곱해진 값이다. 여기서 또 곱하면 마진이 이중 계상된다.
+        postCost = Math.round(bom.postTotalCostKrw);
       }
 
       // 차이

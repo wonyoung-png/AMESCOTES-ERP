@@ -9,6 +9,7 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useLocation, useSearch } from 'wouter';
+import { calcQty, calcLineAmt, ceil10, calcPostSummary, calcActualMultiple, type PostSummary } from '@/lib/costing';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   store, genId, normalizeColors,
@@ -168,8 +169,6 @@ const SECTION_SUB_PARTS: Record<string, string[]> = {
 // const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS']; // 미사용
 
 // ─── 계산 헬퍼 ──────────────────────────────────────────────────────────────
-const calcQty = (net: number, loss: number) => net * (1 + loss);
-const calcLineAmt = (price: number, net: number, loss: number) => price * calcQty(net, loss);
 const fmt = (n: number) => n.toLocaleString('ko-KR', { maximumFractionDigits: 3 });
 const fmtKrw = (n: number) => '₩' + Math.round(n).toLocaleString('ko-KR');
 
@@ -189,8 +188,9 @@ function resolvePackItemCostKrw(item: Item): number {
 // colorBom이 주어지면 해당 컬러 BOM 데이터 사용
 function calcSummary(bom: ExtBom, settingsUsdKrw?: number, colorBom?: ExtColorBom) {
   const preCur = bom.preCurrency || 'CNY';
-  const cnyKrw = bom.preExchangeRateCny ?? bom.snapshotCnyKrw ?? 191;
-  const usdKrw = bom.preExchangeRateUsd ?? settingsUsdKrw ?? 1380;
+  // `||` 사용 — 환율 입력칸을 비우면 0이 들어오는데 `??`는 0을 통과시켜 총원가가 ₩0이 된다
+  const cnyKrw = bom.preExchangeRateCny || bom.snapshotCnyKrw || 191;
+  const usdKrw = bom.preExchangeRateUsd || settingsUsdKrw || 1380;
   // 입력 통화에 따른 KRW 환산 비율
   const toKrw = preCur === 'KRW' ? 1 : preCur === 'USD' ? usdKrw : cnyKrw;
 
@@ -238,86 +238,7 @@ function calcSummary(bom: ExtBom, settingsUsdKrw?: number, colorBom?: ExtColorBo
   };
 }
 
-// 사후원가 요약 계산
-interface PostSummary {
-  factoryMaterialCny: number;   // 공장구매 자재 (본사제공 제외)
-  hqMaterialCny: number;        // 본사제공 자재
-  totalMaterialCny: number;     // 자재비 합계
-  processingCny: number;        // 임가공비
-  postProcessCny: number;       // 후가공비
-  factoryUnitCostCny: number;   // 공장단가 (공장구매자재 + 임가공비 + 후가공 + 관세)
-  totalCostCny: number;         // 제품원가 (공장단가 + 본사제공 + 물류비)
-  rate: number;                 // 적용 환율
-  factoryMaterialKrw: number;
-  hqMaterialKrw: number;
-  totalMaterialKrw: number;
-  processingKrw: number;
-  postProcessKrw: number;
-  customsRate: number;          // 관세율 (%)
-  customsKrw: number;           // 관세금액 (KRW)
-  logisticsKrw: number;         // 물류비 (KRW)
-  packagingKrw: number;         // 포장/검사비 (KRW)
-  packingKrw: number;           // 패킹재 (KRW)
-  factoryUnitCostKrw: number;
-  totalCostKrw: number;
-}
-
-function calcPostSummary(bom: ExtBom, settingsUsdKrw = 1380, postColorBom?: ExtColorBom): PostSummary {
-  const materials = postColorBom ? postColorBom.lines : (bom.postMaterials || []);
-  const postCur = bom.currency || 'CNY';
-  const cnyKrw = bom.exchangeRateCny || bom.snapshotCnyKrw || 191;
-  const usdKrw = bom.exchangeRateUsd || settingsUsdKrw;
-  const rate = postCur === 'USD' ? usdKrw : postCur === 'KRW' ? 1 : cnyKrw;
-
-  const factoryMaterialCny = materials.reduce((s, l) => {
-    if (l.isHqProvided) return s;
-    return s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate);
-  }, 0);
-  const hqMaterialCny = materials.reduce((s, l) => {
-    if (!l.isHqProvided) return s;
-    return s + calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate);
-  }, 0);
-  const totalMaterialCny = factoryMaterialCny + hqMaterialCny;
-  const processingCny = postColorBom ? (postColorBom.processingFee ?? 0) : (bom.postProcessingFee || 0);
-  const postProcLines = postColorBom ? (postColorBom.postProcessLines ?? []) : (bom.postProcessLines || []);
-  const postProcessCny2 = postProcLines.reduce((s, l) => s + l.netQty * l.unitPrice, 0);
-  // 관세 = 임가공비(KRW) × 관세율(%)
-  const customsRate = bom.customsRate || 0;
-  const processingKrw = processingCny * rate;
-  const customsKrw = processingKrw * (customsRate / 100);
-  const logisticsKrw = bom.logisticsCostKrw || 0;
-  const packagingKrw = bom.packagingCostKrw || 0;
-  const packingKrw = bom.packingCostKrw || 0;
-  // 공장단가 = 공장구매자재 + 임가공비 + 후가공비 (관세는 우리가 내는 것 - 제외)
-  const factoryUnitCostKrw = factoryMaterialCny * rate + processingKrw + postProcessCny2 * rate;
-  const factoryUnitCostCny = factoryUnitCostKrw / (rate || 1);
-  // 제품원가 = 공장단가 + 본사제공 + 관세 + 물류비 + 포장/검사비 + 패킹재
-  const totalCostKrw = factoryUnitCostKrw + hqMaterialCny * rate + customsKrw + logisticsKrw + packagingKrw + packingKrw;
-  const totalCostCny = totalCostKrw / (rate || 1);
-
-  return {
-    factoryMaterialCny,
-    hqMaterialCny,
-    totalMaterialCny,
-    processingCny,
-    postProcessCny: postProcessCny2,
-    factoryUnitCostCny,
-    totalCostCny,
-    rate,
-    factoryMaterialKrw: factoryMaterialCny * rate,
-    hqMaterialKrw: hqMaterialCny * rate,
-    totalMaterialKrw: totalMaterialCny * rate,
-    processingKrw,
-    postProcessKrw: postProcessCny2 * rate,
-    customsRate,
-    customsKrw,
-    logisticsKrw,
-    packagingKrw,
-    packingKrw,
-    factoryUnitCostKrw,
-    totalCostKrw,
-  };
-}
+// 사후원가 요약 계산 → lib/costing.ts 정본 사용 (예전엔 여기 복붙본이 있었음)
 
 function calcPnl(totalCostKrw: number, pnl: BomPnlAssumptions) {
   const { discountRate, platformFeeRate, sgaRate, confirmedSalePrice } = pnl;
@@ -330,7 +251,7 @@ function calcPnl(totalCostKrw: number, pnl: BomPnlAssumptions) {
   const afterSga = afterPlatform * (1 - sgaRate);
   const operatingProfit = afterSga - totalCostKrw;
   const operatingMargin = salePrice > 0 ? operatingProfit / salePrice : 0;
-  const actualMultiple = salePrice > 0 ? salePrice / totalCostKrw : 0;
+  const actualMultiple = calcActualMultiple(salePrice, totalCostKrw); // 원가 0일 때 Infinity 방지
   const costReductionNeeded = Math.max(0, totalCostKrw - salePrice / 3.5);
   return { price35, price40, price45, netSale, afterPlatform, afterSga, operatingProfit, operatingMargin, actualMultiple, costReductionNeeded, meets35x: actualMultiple >= 3.5 };
 }
@@ -519,7 +440,6 @@ interface QuoteRow {
 }
 
 // 10원 단위 올림
-const ceil10 = (n: number) => Math.ceil(n / 10) * 10;
 
 function buildQuoteRows(bom: ExtBom, tab: 'pre' | 'post' = 'pre', colorBom?: ExtColorBom): QuoteRow[] {
   // 환율 결정
@@ -2865,10 +2785,8 @@ export default function BomManagement() {
       (updated as any).isPackBom = true;
     } else if (activePostCB) {
       const ps = calcPostSummary(updated, store.getSettings().usdKrw || 1380, activePostCB);
-      // BomManagement finalCost와 동일: totalCostKrw + 생산관리비용(마진)
-      const marginRate = updated.productionMarginRate ?? 0;
-      const finalCost = marginRate > 0 ? ps.totalCostKrw * (1 + marginRate) : ps.totalCostKrw;
-      postCostKrw = Math.round(finalCost);
+      // 총원가액(생산마진 포함) — costing.ts가 계산한 값을 그대로 쓴다
+      postCostKrw = Math.round(ps.finalCostKrw);
       (updated as any).postSubtotalKrw = postCostKrw;
       (updated as any).postTotalCostKrw = postCostKrw;
       // factoryUnitCostKrw를 pnl에 저장 (품목마스터 공장단가 연동)
@@ -3335,10 +3253,10 @@ export default function BomManagement() {
     : undefined;
   // summary는 활성 컬러 BOM 기준 (없으면 lines 기준 fallback)
   const summary = editBom ? calcSummary(editBom, settings.usdKrw, activeColorBom) : null;
-  // 총원가액 = 원부자재합산 + 임가공비 + 물류비 + 포장검사비 + 패킹재 + 생산마진 (P&L 분석에도 동일 기준 적용)
-  const displayTotalCostKrw = summary
-    ? summary.totalMaterialKrw + summary.postProcessKrw + summary.processingKrw + summary.logisticsKrw + summary.packagingKrw + summary.packingKrw + summary.productionMarginKrw
-    : 0;
+  // 총원가액은 calcSummary가 계산한 값을 그대로 쓴다.
+  // 예전엔 여기서 다시 더했는데, 그 식은 업체제공 자재를 포함하고 관세를 빠뜨려서
+  // 같은 화면의 P&L ⑥ 매출원가(summary.totalCostKrw)와 값이 어긋났다.
+  const displayTotalCostKrw = summary ? summary.totalCostKrw : 0;
   const pnlResult = summary && editBom?.pnl ? calcPnl(displayTotalCostKrw, editBom.pnl) : null;
   const cnyKrw = editBom?.snapshotCnyKrw || settings.cnyKrw;
 
@@ -4107,7 +4025,7 @@ export default function BomManagement() {
                         <tr className="bg-stone-800 text-white">
                           <td className="px-4 py-3 font-bold">사</td>
                           <td className="px-4 py-3 font-bold text-base" colSpan={2}>총 원 가 액</td>
-                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums text-[#C9A96E]">{fmtKrw(summary.totalMaterialKrw + summary.postProcessKrw + summary.processingKrw + summary.logisticsKrw + summary.packagingKrw + summary.packingKrw + summary.productionMarginKrw)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums text-[#C9A96E]">{fmtKrw(summary.totalCostKrw)}</td>
                         </tr>
                         {(() => {
                           const linkedItem = items.find(i => i.id === editBom.styleId);

@@ -39,9 +39,23 @@ const LineSheet = lazy(() => import("./pages/LineSheet"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 import { ensureErpBootstrap } from "@/lib/ensureErpBootstrap";
+import { setSbWriteFailureHandler } from "@/lib/store";
 import { toast } from "sonner";
 
 /** Phase 1 제조 ERP 라우트 — 브랜드운영(/sales), AI(/agent)는 Phase 2 */
+
+// Supabase 저장 실패를 화면에 띄운다 (예전엔 console.warn으로 삼켜서
+// 저장이 안 됐는데도 성공 토스트가 뜨던 문제)
+const SB_TABLE_LABEL: Record<string, string> = {
+  vendors: '거래처', items: '품목', samples: '샘플', boms: 'BOM',
+  production_orders: '생산발주', materials: '자재',
+};
+setSbWriteFailureHandler(({ table, op, message }) => {
+  toast.error(`${SB_TABLE_LABEL[table] || table} 저장 실패 (${op})`, {
+    description: `${message}\n화면에 보이는 값이 서버에 저장되지 않았습니다.`,
+    duration: 10000,
+  });
+});
 
 function Router() {
   const [, forceUpdate] = useState(0);
