@@ -3,9 +3,10 @@ import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from 'rea
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useLocation, useSearch } from 'wouter';
 import { calcPostSummary } from '@/lib/costing';
+import { nextOrderNo, parseRevision } from '@/lib/orderNo';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type PackingSize, type ProductionOrder, type ColorQty } from '@/lib/store';
-import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, fetchBomsLight, updateItemCostData, saveConfirmedSalePrice, fetchMaterials } from '@/lib/supabaseQueries';
+import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, fetchBomsLight, updateItemCostData, saveConfirmedSalePrice, fetchMaterials, fetchOrders } from '@/lib/supabaseQueries';
 import { PackBomEditor } from '@/components/PackBomEditor';
 import {
   applyPackLinesToBom, createEmptyPackBom, linesFromPackBom, packLinesTotal, type PackBomLine,
@@ -97,6 +98,20 @@ const emptyItem: Partial<Item> = {
   material: '', deliveryPrice: 0,
   colors: [], memo: '',
 };
+
+/**
+ * 단가 조회용 BOM 라인 전체 목록.
+ * 소요량 계산이 아니라 "이 자재의 단가가 얼마였나"만 보므로 전 컬러를 훑어도 된다.
+ * (소요량은 반드시 컬러별로 계산해야 한다 — CLAUDE.md)
+ */
+function bomLinesForPricing(bom: any): Array<{ id?: string; itemName?: string; unitPriceCny?: number; unitPrice?: number }> {
+  return [
+    ...((bom?.postColorBoms || []).flatMap((cb: any) => cb.lines || [])),
+    ...(bom?.postMaterials || []),
+    ...((bom?.colorBoms || []).flatMap((cb: any) => cb.lines || [])),
+    ...(bom?.lines || []),
+  ];
+}
 
 // ─── 사후원가 계산 → lib/costing.ts 정본 위임 ───
 // 예전엔 여기에 calcPostSummary 복붙본이 있었고, 업체제공 자재를 공장단가에서
@@ -3832,13 +3847,17 @@ function MultiBulkOrderModal({
     setSubmitting(true);
     try {
       const createdOrders: ProductionOrder[] = [];
+      // 채번은 Supabase 발주 목록 기준 (localStorage의 store.getNextRevision을 쓰면
+      // 캐시가 빈 새 PC에서 이미 존재하는 발주번호와 충돌한다 — CLAUDE.md 레드라인)
+      const allOrders = await fetchOrders();
+      const issuedOrderNos = new Set<string>(); // 이번 일괄발주 안에서의 충돌도 방지
 
       for (const state of enabledStates) {
         const totalQty = state.colorQtys.reduce((sum, cq) => sum + cq.qty, 0);
         if (totalQty <= 0) continue;
 
-        const revision = store.getNextRevision(state.item.styleNo);
-        const orderNo = `${state.item.styleNo}-R${revision}`;
+        const orderNo = nextOrderNo(state.item.styleNo, allOrders as any[], issuedOrderNos);
+        const revision = parseRevision(orderNo);
         const colorQtysForOrder: ColorQty[] = state.colorQtys.filter(cq => cq.qty > 0).map(cq => ({ color: cq.color, qty: cq.qty }));
 
         await store.fetchAndCacheBom(state.item.styleNo);
@@ -3861,30 +3880,33 @@ function MultiBulkOrderModal({
           purchaseStatus: '미구매' as const,
         }));
 
-        // 본사제공 자재 장바구니 — 단가가 라인에 있을 수 있어 BOM lines에서 보완
+        // 본사제공 자재 장바구니
+        // calc.hqProvided[].reqQty는 store.calcMaterialRequirements가 이미
+        // 컬러별 수량을 반영해 계산한 "총 소요량"이다. 여기서 다시 계산하면 안 된다.
+        // (예전엔 postColorBoms를 전 컬러 flatMap해서 아무 컬러의 netQty/lossRate를
+        //  집어와 총수량에 곱했다 — 컬러별 소요량이 다르면 자재가 부족해진다.
+        //  CLAUDE.md가 금지한 패턴)
+        // addToMaterialCart가 netQty × (1+lossRate) × orderQty로 다시 곱하므로,
+        // reqQty를 그대로 재현하도록 netQty = reqQty/총수량, lossRate = 0으로 넘긴다.
         if (calc.hqProvided.length > 0 && bom) {
-          const allLines = [
-            ...((bom as any).postColorBoms || []).flatMap((cb: any) => cb.lines || []),
-            ...(bom.postMaterials || []),
-            ...((bom as any).colorBoms || []).flatMap((cb: any) => cb.lines || []),
-            ...(bom.lines || []),
-          ];
-          const cartMats = calc.hqProvided.map(h => {
-            const line = allLines.find((l: any) => l.id === h.bomLineId || l.itemName === h.itemName);
-            const lossRate = line?.lossRate ?? 0;
-            const netQty = line?.netQty ?? (totalQty > 0 ? h.reqQty / totalQty / (1 + lossRate) : 0);
-            return {
-              itemName: h.itemName,
-              spec: h.spec,
-              unit: h.unit,
-              netQty,
-              lossRate,
-              vendorName: h.vendorName,
-              isHqProvided: true as const,
-              imageUrl: h.imageUrl,
-              unitPriceCny: (line as any)?.unitPriceCny ?? (line as any)?.unitPrice,
-            };
-          });
+          const priceByLine = new Map<string, number>();
+          for (const l of bomLinesForPricing(bom)) {
+            const price = (l as any).unitPriceCny ?? (l as any).unitPrice;
+            if (price === undefined) continue;
+            if (l.id) priceByLine.set(`id:${l.id}`, price);
+            if (l.itemName) priceByLine.set(`name:${l.itemName}`, price);
+          }
+          const cartMats = calc.hqProvided.map(h => ({
+            itemName: h.itemName,
+            spec: h.spec,
+            unit: h.unit,
+            netQty: totalQty > 0 ? h.reqQty / totalQty : 0,
+            lossRate: 0, // reqQty에 로스가 이미 반영돼 있음 — 다시 곱하면 이중 적용
+            vendorName: h.vendorName,
+            isHqProvided: true as const,
+            imageUrl: h.imageUrl,
+            unitPriceCny: priceByLine.get(`id:${h.bomLineId}`) ?? priceByLine.get(`name:${h.itemName}`),
+          }));
           store.addToMaterialCart(state.item.styleNo, state.item.name, cartMats, totalQty);
         }
 

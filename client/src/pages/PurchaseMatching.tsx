@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useSearch } from 'wouter';
+import { confirmMaterialOrder } from '@/lib/confirmMaterialOrder';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchPurchaseItems, upsertPurchaseItem, deletePurchaseItem as deletePurchaseItemSB,
@@ -1218,55 +1219,32 @@ export default function PurchaseMatching() {
               <Button
                 className="h-8 text-xs bg-green-700 hover:bg-green-800 text-white"
                 onClick={async () => {
-                  const today = new Date().toISOString().split('T')[0];
-                  let savedCount = 0;
-                  // 중복 방지: Supabase에서 기존 항목 조회
-                  const existingItems = await fetchPurchaseItems();
-                  for (const item of cartItems) {
-                    const stockQty = item.stockQty ?? 0;
-                    const orderQty = Math.max(0, item.qty - stockQty);
-                    if (orderQty === 0) continue;
-                    const vendor = item.vendorName || '미지정';
-                    const unitPriceCny = item.unitPriceCny ?? 0;
-                    const amountKrw = Math.round(orderQty * unitPriceCny * settings.cnyKrw);
-                    // 발주별로 구매 이력 저장 (발주번호별로 분리)
-                    const orderNos = [...new Set(item.orders.map(o => o.styleNo))];
-                    for (const styleNo of orderNos) {
-                      const matchOrder = orders.find(o => o.styleNo === styleNo);
-                      const currentOrderNo = matchOrder?.orderNo || styleNo;
-                      // 중복 방지
-                      const existingKeys = new Set(
-                        existingItems
-                          .filter(p => p.orderNo === currentOrderNo)
-                          .map(p => p.itemName + '||' + p.unit)
-                      );
-                      const key = item.materialName + '||' + item.unit;
-                      if (existingKeys.has(key)) continue;
-                      await upsertPurchaseItem({
-                        id: genId(),
-                        orderId: matchOrder?.id || '',
-                        orderNo: currentOrderNo,
-                        purchaseDate: today,
-                        itemName: item.materialName,
-                        qty: orderQty,
-                        unit: item.unit,
-                        unitPriceCny: unitPriceCny,
-                        currency: 'CNY',
-                        appliedRate: settings.cnyKrw || 191,
-                        amountKrw: amountKrw,
-                        vendorName: vendor,
-                        paymentMethod: '기타',
-                        purchaseStatus: '미발주',
-                        createdAt: new Date().toISOString(),
+                  // 정본: lib/confirmMaterialOrder.ts
+                  // 예전엔 여기 사본에 1단계(Supabase materials 저장)와
+                  // invalidateQueries(['materials'])가 통째로 빠져 있어서,
+                  // 같은 버튼인데 생산발주 탭에서 누를 때와 결과가 달랐다.
+                  try {
+                    const r = await confirmMaterialOrder({
+                      cartItems,
+                      orders,
+                      vendors: allVendors,
+                      cnyKrw: settings.cnyKrw || 191,
+                    });
+                    queryClient.invalidateQueries({ queryKey: ['materials'] });
+                    queryClient.invalidateQueries({ queryKey: ['purchaseItems'] });
+                    refreshCart();
+                    refresh();
+                    if (r.skippedNoOrder.length > 0) {
+                      toast.warning(`발주번호를 찾지 못해 ${r.skippedNoOrder.length}종을 건너뛰었습니다`, {
+                        description: r.skippedNoOrder.join(', '),
                       });
-                      savedCount++;
                     }
+                    toast.success(`✅ 자재 ${r.materialCount}종 저장 · 자재구매 전표 ${r.purchaseCount}건 생성`);
+                    setVendorOrderModal(false);
+                  } catch (e: any) {
+                    console.error('발주 확정 오류:', e);
+                    toast.error(`발주 확정 실패: ${e?.message || '알 수 없는 오류'}`);
                   }
-                  store.clearMaterialCart();
-                  refreshCart();
-                  refresh();
-                  toast.success(`✅ ${savedCount}건이 자재구매 목록에 저장되었습니다`);
-                  setVendorOrderModal(false);
                 }}
               >
                 ✅ 발주 확정

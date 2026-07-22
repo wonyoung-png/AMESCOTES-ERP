@@ -4,6 +4,8 @@ import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems, fetchMaterials, upsertMaterial, fetchPurchaseItems, upsertPurchaseItem } from '@/lib/supabaseQueries';
 import { phase1 } from '@/lib/phase1';
+import { confirmMaterialOrder } from '@/lib/confirmMaterialOrder';
+import { nextOrderNo } from '@/lib/orderNo';
 import {
   store, genId, calcDDay, dDayLabel, dDayColor, formatNumber, formatKRW, normalizeColors,
   getBomForOrderFromList,
@@ -689,15 +691,7 @@ export default function ProductionOrders() {
     }
 
     // 신규 발주 시 실제 저장될 orderNo를 명시적으로 계산 (form.orderNo가 오래된 값일 수 있음)
-    const finalOrderNo = (() => {
-      const existingForStyle = (orders as any[]).filter(o => o.styleNo === form.styleNo);
-      const existingRevisions = existingForStyle.map((o: any) => {
-        const match = (o.orderNo || '').match(/-R(\d+)$/);
-        return match ? parseInt(match[1]) : 0;
-      });
-      const nextRevision = existingRevisions.length > 0 ? Math.max(...existingRevisions) + 1 : 1;
-      return `${form.styleNo}-R${nextRevision}`;
-    })();
+    const finalOrderNo = nextOrderNo(form.styleNo || '', orders as any[]);
 
     // 손익·전표 연결 키 = 발주번호. OEM은 project_no 미발급
     const order: ProductionOrder = {
@@ -3390,80 +3384,24 @@ export default function ProductionOrders() {
                 className="h-8 text-xs bg-green-700 hover:bg-green-800 text-white"
                 onClick={async () => {
                   try {
-                  const existingMaterials = await fetchMaterials();
-                  let savedCount = 0;
-                  const today = new Date().toISOString().split('T')[0];
-
-                  for (const item of cartItems) {
-                    const stockQty = item.stockQty ?? 0;
-                    const orderQty = Math.max(0, item.qty - stockQty);
-                    if (orderQty === 0) continue;
-                    const vendor = item.vendorName || '미지정';
-
-                    const existing = existingMaterials.find((m: any) =>
-                      m.name === item.materialName && m.unit === item.unit
-                    );
-                    await upsertMaterial({
-                      id: existing?.id || genId(),
-                      name: item.materialName,
-                      spec: item.spec || '',
-                      unit: item.unit,
-                      category: '원자재',
-                      orderStatus: '발주중',
-                      orderDate: today,
-                      orderQty: orderQty,
-                      orderVendorName: vendor,
-                      vendorId: allVendors.find((v: any) => v.name === vendor && v.type === '자재거래처')?.id,
-                      createdAt: (existing as any)?.createdAt || new Date().toISOString(),
+                    const r = await confirmMaterialOrder({
+                      cartItems,
+                      orders,
+                      vendors: allVendors,
+                      cnyKrw: store.getSettings().cnyKrw || 191,
+                      fallbackOrder: postOrderInfo?.order ?? null,
                     });
-                    savedCount++;
-                  }
-
-                  queryClient.invalidateQueries({ queryKey: ['materials'] });
-                  // PurchaseMatching 탭에도 저장 (자재 구매 이력) - Supabase 직접 저장, 중복 방지
-                  const settings = store.getSettings();
-                  // postOrderInfo.order.orderNo는 handleSave에서 finalOrderNo로 정확히 설정됨
-                  const currentOrderNo = postOrderInfo?.order?.orderNo || '';
-                  // Supabase에서 기존 항목 조회해 중복 방지
-                  const existingPurchases = await fetchPurchaseItems();
-                  const existingKeys = new Set(
-                    existingPurchases
-                      .filter(p => p.orderNo === currentOrderNo)
-                      .map(p => p.itemName + '||' + p.unit)
-                  );
-                  for (const item of cartItems) {
-                    const stockQty = item.stockQty ?? 0;
-                    const orderQty = Math.max(0, item.qty - stockQty);
-                    if (orderQty === 0) continue;
-                    // 이미 같은 발주번호+자재명으로 등록됐으면 스킵
-                    const key = item.materialName + '||' + item.unit;
-                    if (existingKeys.has(key)) continue;
-                    await upsertPurchaseItem({
-                      id: genId(),
-                      orderId: postOrderInfo?.order?.id || '',
-                      orderNo: currentOrderNo,
-                      projectNo: postOrderInfo?.order?.projectNo,
-                      styleNo: postOrderInfo?.order?.styleNo,
-                      purchaseDate: today,
-                      itemName: item.materialName,
-                      qty: orderQty,
-                      unit: item.unit,
-                      unitPriceCny: (item as any).unitPriceCny ?? 0,
-                      currency: 'CNY',
-                      appliedRate: settings.cnyKrw || 191,
-                      amountKrw: Math.round(((item as any).unitPriceCny ?? 0) * orderQty * (settings.cnyKrw || 191)),
-                      vendorName: item.vendorName || '미지정',
-                      paymentMethod: '기타',
-                      purchaseStatus: '미발주',
-                      createdAt: new Date().toISOString(),
-                    });
-                  }
-                  queryClient.invalidateQueries({ queryKey: ['purchaseItems'] });
-                  store.clearMaterialCart();  // 장바구니 비우기
-                  refreshCart();
-                  toast.success(`✅ ${savedCount}종 자재가 자재구매 탭에 저장되었습니다`);
-                  setVendorOrderModal(false);
-                  } catch(e: any) {
+                    queryClient.invalidateQueries({ queryKey: ['materials'] });
+                    queryClient.invalidateQueries({ queryKey: ['purchaseItems'] });
+                    refreshCart();
+                    if (r.skippedNoOrder.length > 0) {
+                      toast.warning(`발주번호를 찾지 못해 ${r.skippedNoOrder.length}종을 건너뛰었습니다`, {
+                        description: r.skippedNoOrder.join(', '),
+                      });
+                    }
+                    toast.success(`✅ 자재 ${r.materialCount}종 저장 · 자재구매 전표 ${r.purchaseCount}건 생성`);
+                    setVendorOrderModal(false);
+                  } catch (e: any) {
                     console.error('발주 확정 오류:', e);
                     toast.error(`발주 확정 실패: ${e?.message || '알 수 없는 오류'}`);
                   }
