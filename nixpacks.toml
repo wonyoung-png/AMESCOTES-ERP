@@ -8,7 +8,7 @@ PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["npm install --legacy-peer-deps --no-audit --no-fund"]
+cmds = ["PUPPETEER_SKIP_DOWNLOAD=true PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install --legacy-peer-deps --no-audit --no-fund"]
 
 [phases.build]
 cmds = ["npm run build"]
