@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAutoExchangeRate } from '@/hooks/useAutoExchangeRate';
 import { Toaster } from "@/components/ui/sonner";
@@ -12,31 +12,32 @@ import { isAuthenticated } from "@/lib/auth";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import ItemMaster from "./pages/ItemMaster";
-import BomManagement from "./pages/BomManagement";
-import SampleManagement from "./pages/SampleManagement";
-import ProductionOrders from "./pages/ProductionOrders";
-import PurchaseMatching from "./pages/PurchaseMatching";
-import VendorMaster from "./pages/VendorMaster";
-import TradeStatement from "./pages/TradeStatement";
-import SettlementManagement from "./pages/SettlementManagement";
-import ExpenseEntry from "./pages/ExpenseEntry";
-import DocumentOutput from "./pages/DocumentOutput";
-import ExchangeSettings from "./pages/ExchangeSettings";
-import MaterialMaster from "./pages/MaterialMaster";
-import CostComparison from "./pages/CostComparison";
-import CostSheetPrint from "./pages/CostSheetPrint";
-import ReceivingShipping from "./pages/ReceivingShipping";
-import PayablesManagement from "./pages/PayablesManagement";
-import BrandOrders from "./pages/BrandOrders";
-import ChinaWarehouse from "./pages/ChinaWarehouse";
-import ProjectPL from "./pages/ProjectPL";
-import DeadlineManagement from "./pages/DeadlineManagement";
-import OperationalCalendar from "./pages/OperationalCalendar";
-import OrgChartPage from "./pages/OrgChart";
-import WorkflowGuide from "./pages/WorkflowGuide";
-import LineSheet from "./pages/LineSheet";
-import NotFound from "./pages/NotFound";
+const ItemMaster = lazy(() => import("./pages/ItemMaster"));
+const BomManagement = lazy(() => import("./pages/BomManagement"));
+const SampleManagement = lazy(() => import("./pages/SampleManagement"));
+const ProductionOrders = lazy(() => import("./pages/ProductionOrders"));
+const PurchaseMatching = lazy(() => import("./pages/PurchaseMatching"));
+const VendorMaster = lazy(() => import("./pages/VendorMaster"));
+const TradeStatement = lazy(() => import("./pages/TradeStatement"));
+const SettlementManagement = lazy(() => import("./pages/SettlementManagement"));
+const ExpenseEntry = lazy(() => import("./pages/ExpenseEntry"));
+const DocumentOutput = lazy(() => import("./pages/DocumentOutput"));
+const ExchangeSettings = lazy(() => import("./pages/ExchangeSettings"));
+const MaterialMaster = lazy(() => import("./pages/MaterialMaster"));
+const CostComparison = lazy(() => import("./pages/CostComparison"));
+const CostSheetPrint = lazy(() => import("./pages/CostSheetPrint"));
+const ReceivingShipping = lazy(() => import("./pages/ReceivingShipping"));
+const PayablesManagement = lazy(() => import("./pages/PayablesManagement"));
+const BrandOrders = lazy(() => import("./pages/BrandOrders"));
+const ChinaWarehouse = lazy(() => import("./pages/ChinaWarehouse"));
+const ProjectPL = lazy(() => import("./pages/ProjectPL"));
+const DeadlineManagement = lazy(() => import("./pages/DeadlineManagement"));
+const OperationalCalendar = lazy(() => import("./pages/OperationalCalendar"));
+const OrgChartPage = lazy(() => import("./pages/OrgChart"));
+const WorkflowGuide = lazy(() => import("./pages/WorkflowGuide"));
+const LineSheet = lazy(() => import("./pages/LineSheet"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
 import { ensureErpBootstrap } from "@/lib/ensureErpBootstrap";
 import { toast } from "sonner";
 
@@ -132,7 +133,13 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-[#F5F4EF] text-stone-600 text-sm">
+              불러오는 중...
+            </div>
+          }>
+            <Router />
+          </Suspense>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
