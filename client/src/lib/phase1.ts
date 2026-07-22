@@ -337,7 +337,7 @@ function isLegacyAutoTask(t: { team: string; label: string }): boolean {
 }
 
 /** 직접 추가한 업무만 유지 (자동 템플릿 업무 제거). startDate는 호환용으로 유지 */
-export function buildCampaignProjectTasks(_startDate: string, existing?: CampaignTask[]): CampaignTask[] {
+function buildCampaignProjectTasks(_startDate: string, existing?: CampaignTask[]): CampaignTask[] {
   return (existing || [])
     .filter(t => t.label?.trim() && !isLegacyAutoTask(t))
     .map(t => normalizeTask(t));
@@ -376,7 +376,7 @@ function setAll<T>(key: string, data: T[]): void {
 }
 function uid() { return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`; }
 
-export function generateProjectNo(workspace: Workspace, vendorCode?: string): string {
+function generateProjectNo(workspace: Workspace, vendorCode?: string): string {
   const d = new Date();
   const yy = String(d.getFullYear()).slice(2);
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -473,7 +473,7 @@ export type BoardOrderInput = {
   factoryUnitPriceKrw?: number;
 };
 
-export function buildOrderReceiptSummary(orderId: string, orderQty: number) {
+function buildOrderReceiptSummary(orderId: string, orderQty: number) {
   const logs = getAll<ReceiptLog>(KEYS.receiptLogs).filter(r => r.orderId === orderId);
   const inbound = logs.filter(l => l.logType === 'inbound');
   const outbound = logs.filter(l => l.logType === 'outbound_oem' || l.logType === 'outbound_3pl');

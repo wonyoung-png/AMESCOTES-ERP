@@ -145,7 +145,7 @@ function normalizeColorBom(cb: any): any {
 }
 
 // ─── BOM DB 행 → 앱 구조 변환 ───
-export function convertBomFromDB(row: any) {
+function convertBomFromDB(row: any) {
   const preMats = row.pre_materials;
   const lines = Array.isArray(preMats) ? preMats.map(normalizeBomLine) : [];
 

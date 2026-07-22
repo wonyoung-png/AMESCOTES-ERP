@@ -1614,28 +1614,6 @@ export function dDayLabel(d: number): string {
   return `D-${d}`;
 }
 
-export function calcBomLineQty(line: BomLine): number {
-  return line.netQty * (1 + line.lossRate / 100);
-}
-
-export function calcBomLineAmount(line: BomLine): number {
-  return calcBomLineQty(line) * line.unitPriceCny;
-}
-
-export function calcOutstandingDays(dueDateStr: string): number {
-  const due = new Date(dueDateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  due.setHours(0, 0, 0, 0);
-  return Math.max(0, Math.ceil((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
-}
-
-export function getSettlementStatusByDays(days: number, outstanding: number): SettlementStatus {
-  if (outstanding === 0) return '완납';
-  if (days <= 30) return '정상';
-  if (days <= 60) return '주의';
-  return '위험';
-}
 
 // ─────────────────────────────────────────────
 // 외부 boms 배열을 받는 BOM 유틸 함수
@@ -1666,18 +1644,3 @@ export function getBomForOrderFromList(
   return { bom: bomList[0], type: 'pre' };
 }
 
-export function calcMaterialRequirementsFromList(
-  boms: Bom[],
-  styleNo: string,
-  qty: number,
-  colorQtys?: ColorQty[]
-): {
-  hqProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string; category?: string }>;
-  factoryProvided: Array<{ bomLineId: string; itemName: string; spec?: string; unit: string; reqQty: number; vendorName?: string; color?: string; imageUrl?: string; category?: string }>;
-  processingFee: number;
-  factoryUnitPriceCny: number;
-  bomType: 'post' | 'pre' | null;
-  manufacturingCountry?: string;
-} {
-  return store.calcMaterialRequirements(styleNo, qty, colorQtys);
-}
