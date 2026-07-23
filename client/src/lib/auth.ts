@@ -13,6 +13,7 @@
 // 버전: 2026-04-16-team (데모 계정 → 팀원 실계정 마이그레이션)
 
 import { store, genId, type AppUser, type UserRole } from './store';
+import { supabase } from './supabase';
 
 // 간단한 해시 (Phase 1 임시용 — Phase 2 에서 Supabase Auth로 교체)
 function simpleHash(str: string): string {
@@ -73,10 +74,30 @@ export function initDefaultUsers(): void {
   }
 }
 
-export function login(email: string, password: string): AppUser | null {
+export async function login(email: string, password: string): Promise<AppUser | null> {
   const users = store.getUsers();
+  const normEmail = email.toLowerCase();
+
+  // 1) Supabase Auth 우선 — RLS(DB 잠금) 전환 후에도 유효한 정식 세션 확보
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data.session) {
+      const user = users.find(u => u.email.toLowerCase() === normEmail && u.isActive);
+      if (user) { store.setCurrentUser(user); return user; }
+      // 로컬 레코드 없는 신규 직원 → 기본 '사원'으로 생성 (권한 상향은 대표가 조정)
+      const fresh: AppUser = {
+        id: genId(), email, name: email.split('@')[0], role: '사원',
+        passwordHash: '', isActive: true, createdAt: new Date().toISOString(),
+      };
+      store.addUser(fresh);
+      store.setCurrentUser(fresh);
+      return fresh;
+    }
+  } catch { /* 네트워크 오류 등 → 레거시 폴백 */ }
+
+  // 2) 레거시 폴백 — Auth 계정 미생성 과도기 동안만 유효 (RLS 켜면 DB 접근 불가)
   const hash = simpleHash(password);
-  const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.passwordHash === hash && u.isActive);
+  const user = users.find(u => u.email.toLowerCase() === normEmail && u.passwordHash === hash && u.isActive);
   if (!user) return null;
   store.setCurrentUser(user);
   return user;
@@ -84,6 +105,7 @@ export function login(email: string, password: string): AppUser | null {
 
 export function logout(): void {
   store.setCurrentUser(null);
+  supabase.auth.signOut().catch(() => { /* 세션 없으면 무시 */ });
 }
 
 export function getCurrentUser(): AppUser | null {

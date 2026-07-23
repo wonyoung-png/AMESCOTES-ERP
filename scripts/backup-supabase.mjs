@@ -12,7 +12,8 @@ for (const l of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n/))
   if (m) env[m[1].trim()] = m[2].trim();
 }
 const SB = env.VITE_SUPABASE_URL;
-const KEY = env.VITE_SUPABASE_ANON_KEY;
+// RLS 적용 후에는 anon 키로 못 읽음 → .env에 SUPABASE_SERVICE_ROLE_KEY 있으면 우선 사용
+const KEY = env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY;
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}` };
 
 const today = new Date().toISOString().slice(0, 10);

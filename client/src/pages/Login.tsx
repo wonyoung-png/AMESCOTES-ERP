@@ -26,7 +26,7 @@ export default function Login({ onLogin }: LoginProps) {
     e.preventDefault();
     if (!email || !password) { toast.error('이메일과 비밀번호를 입력해주세요'); return; }
     setLoading(true);
-    const user = login(email, password);
+    const user = await login(email, password);
     if (!user) {
       setLoading(false);
       toast.error('이메일 또는 비밀번호가 올바르지 않습니다');
