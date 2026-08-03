@@ -67,7 +67,7 @@
   --fill-secondary: rgba(120, 120, 128, 0.16);
   --fill-tertiary: rgba(118, 118, 128, 0.12);
   --fill-quaternary: rgba(116, 116, 128, 0.08);
-  --separator: rgba(60, 60, 67, 0.29);
+  --separator: rgba(60, 60, 67, 0.14);
   --separator-opaque: #c6c6c8;
 
   --system-blue: #007aff;
@@ -125,7 +125,7 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: rgba(118, 118, 128, 0.08);
   --sidebar-accent-foreground: rgba(0, 0, 0, 1);
-  --sidebar-border: rgba(60, 60, 67, 0.29);
+  --sidebar-border: rgba(60, 60, 67, 0.14);
   --sidebar-ring: #1c1c1e;
 }
 
@@ -138,7 +138,7 @@
   --fill-secondary: rgba(120, 120, 128, 0.32);
   --fill-tertiary: rgba(118, 118, 128, 0.24);
   --fill-quaternary: rgba(118, 118, 128, 0.18);
-  --separator: rgba(84, 84, 88, 0.6);
+  --separator: rgba(84, 84, 88, 0.38);
   --separator-opaque: #38383a;
 
   --system-blue: #0a84ff;
@@ -177,7 +177,7 @@
   --sidebar-primary-foreground: #1c1c1e;
   --sidebar-accent: rgba(118, 118, 128, 0.18);
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgba(84, 84, 88, 0.6);
+  --sidebar-border: rgba(84, 84, 88, 0.38);
   --sidebar-ring: #ffffff;
 }
 
@@ -188,6 +188,11 @@
   body {
     @apply bg-background text-foreground font-sans;
     -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
