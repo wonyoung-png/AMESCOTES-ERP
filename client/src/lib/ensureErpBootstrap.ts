@@ -29,6 +29,13 @@ export async function ensureErpBootstrap(): Promise<{ seeded: boolean; message: 
     localStorage.setItem(DEMO_SEED_FLAG, new Date().toISOString());
   }
 
+  // 운영 서버에서는 자동 시드(데모·패킹·RRP·컬러 보정) 전면 비활성.
+  // 접속하는 브라우저마다 운영 DB에 데모 행을 추가하는 부작용 방지.
+  // 개발 환경에서 필요하면 빌드 시 VITE_ENABLE_DEMO_SEED=true 로 활성화.
+  if (import.meta.env.VITE_ENABLE_DEMO_SEED !== 'true') {
+    return { seeded: false, message: '' };
+  }
+
   if (!hasData) {
     const result = await seedDemoIntegrationData();
     try {
