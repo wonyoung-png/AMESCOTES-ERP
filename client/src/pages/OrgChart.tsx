@@ -25,12 +25,12 @@ function UnitCard({ unit, depth }: { unit: OrgUnit; depth: number }) {
     <div className={`${depth > 0 ? 'ml-3 border-l border-border pl-3' : ''}`}>
       <div className="rounded-xl border border-border bg-card overflow-hidden mb-3">
         <div className={`px-3 py-2 border-b border-border flex items-center gap-2 ${
-          depth === 0 ? 'bg-sidebar text-white' :
+          depth === 0 ? 'bg-[var(--fill-tertiary)]' :
           depth === 1 ? 'bg-muted' : 'bg-muted/50'
         }`}>
-          <span className={`text-sm font-semibold ${depth === 0 ? 'text-white' : 'text-foreground'}`}>{unit.name}</span>
+          <span className="text-sm font-semibold text-foreground">{unit.name}</span>
           {head && !head.isVacant && (
-            <span className={`text-[11px] ${depth === 0 ? 'text-sidebar-primary' : 'text-muted-foreground'}`}>
+            <span className="text-[11px] text-muted-foreground">
               · {head.name} {head.title}
             </span>
           )}
@@ -59,7 +59,7 @@ function UnitCard({ unit, depth }: { unit: OrgUnit; depth: number }) {
                 {m.r3Roles && m.r3Roles.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">
                     {m.r3Roles.map(r => (
-                      <span key={r} className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--system-indigo)]/10 text-[var(--system-indigo)] border border-[var(--system-indigo)]/20">
+                      <span key={r} className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--fill-tertiary)] text-foreground border border-border">
                         R3·{R3_ROLE_LABEL[r]}
                       </span>
                     ))}
@@ -119,8 +119,8 @@ export default function OrgChartPage() {
 
       {/* R3 역할 매핑 */}
       <div className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className="px-4 py-3 border-b border-border bg-[var(--system-indigo)]/10 flex items-center gap-2">
-          <Users size={16} className="text-[var(--system-indigo)]" />
+        <div className="px-4 py-3 border-b border-border bg-[var(--fill-quaternary)] flex items-center gap-2">
+          <Users size={16} className="text-muted-foreground" />
           <span className="text-sm font-semibold text-foreground">R3 승인 담당 (임시)</span>
           <span className="text-xs text-muted-foreground">
             워크스페이스 {workspace} · 디자인팀장은 루멘/에탈루프 분기

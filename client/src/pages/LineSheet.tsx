@@ -438,7 +438,7 @@ export default function LineSheet() {
           </div>
 
           <div className="bg-card rounded-xl border border-border overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-border bg-sidebar text-white text-sm font-semibold">
+            <div className="px-4 py-2.5 border-b border-border bg-[#1c1c1e] text-white text-sm font-semibold">
               Line Sheet
             </div>
             <div className="overflow-auto max-h-[70vh]">

@@ -109,7 +109,7 @@ export default function SettlementManagement() {
     return buckets;
   }, [settlements]);
 
-  const AGING_COLORS = ['var(--system-green)', 'var(--system-yellow)', 'var(--system-orange)', 'var(--system-red)'];
+  const AGING_COLORS = ['var(--chart-4)', 'var(--chart-3)', 'var(--chart-2)', 'var(--system-red)'];
 
   // 경과일 계산 (만기일 기준, 음수면 경과)
   const calcElapsedDays = (dueDate: string) => {
@@ -218,7 +218,7 @@ export default function SettlementManagement() {
       )}
 
       {/* 미수금 총액 대시보드 */}
-      <div className="bg-sidebar rounded-xl p-5 flex items-center justify-between">
+      <div className="bg-[#1c1c1e] rounded-xl p-5 flex items-center justify-between">
         <div>
           <p className="text-white/60 text-xs mb-1">총 미수금</p>
           <p className="text-3xl font-bold text-white">{formatKRW(stats.totalReceivable)}</p>

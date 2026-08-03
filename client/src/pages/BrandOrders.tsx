@@ -25,8 +25,8 @@ const PIPELINE = ['발주', '진행중', '생산완료', '한국/중국입고', 
 
 const STATUS_CLASS: Record<OrderDisplayStatus, string> = {
   결제완료: 'bg-[var(--fill-quaternary)] text-[var(--system-green)] border-border',
-  지출결의: 'bg-[var(--fill-quaternary)] text-[var(--system-indigo)] border-border',
-  입고완료: 'bg-[var(--fill-quaternary)] text-[var(--system-teal)] border-border',
+  지출결의: 'bg-[var(--fill-tertiary)] text-foreground border-border',
+  입고완료: 'bg-[var(--fill-quaternary)] text-[var(--system-green)] border-border',
   부분입고: 'bg-[var(--fill-quaternary)] text-[var(--system-orange)] border-border',
   선입고: 'bg-[var(--fill-quaternary)] text-[var(--system-orange)] border-border',
   생산완료: 'bg-[var(--fill-quaternary)] text-primary border-border',
@@ -551,11 +551,11 @@ export default function BrandOrders() {
                   </div>
 
                   {detail.status === 'in_approval' && stepAssignee && (
-                    <p className="text-xs text-[var(--system-indigo)] bg-[var(--fill-quaternary)] border border-border rounded-md px-3 py-2">
+                    <p className="text-xs text-foreground bg-[var(--fill-quaternary)] border border-border rounded-md px-3 py-2">
                       현재 단계 담당(조직도): <b>{stepAssignee.name}</b> {stepAssignee.title}
-                      <span className="text-[var(--system-indigo)] ml-1">· {R3_ROLE_LABEL[R3_STEP_ROLE[detail.approvalStep]]}</span>
+                      <span className="text-muted-foreground ml-1">· {R3_ROLE_LABEL[R3_STEP_ROLE[detail.approvalStep]]}</span>
                       {detail.approvalStep === 2 && (
-                        <span className="block mt-1 text-[var(--system-indigo)]">생산납기(예상입고일)는 이 단계에서 입력 · 조직도에서 담당 변경 가능</span>
+                        <span className="block mt-1 text-muted-foreground">생산납기(예상입고일)는 이 단계에서 입력 · 조직도에서 담당 변경 가능</span>
                       )}
                     </p>
                   )}

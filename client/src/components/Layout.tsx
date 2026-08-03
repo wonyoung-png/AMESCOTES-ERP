@@ -137,7 +137,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
       <aside
         className={`
-          flex flex-col bg-sidebar text-white shrink-0 transition-all duration-200
+          flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border shrink-0 transition-all duration-200
           md:relative md:translate-x-0
           fixed inset-y-0 left-0 z-40
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -145,20 +145,20 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           ${collapsed ? 'w-16' : 'w-[240px]'}
         `}
       >
-        <div className={`flex items-center gap-3 px-4 py-5 border-b border-white/8 ${collapsed ? 'justify-center px-2' : ''}`}>
+        <div className={`flex items-center gap-3 px-4 py-5 border-b border-sidebar-border ${collapsed ? 'justify-center px-2' : ''}`}>
           <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
-            <span className="text-white font-bold text-xs leading-none">AT</span>
+            <span className="text-sidebar-primary-foreground font-bold text-xs leading-none">AT</span>
           </div>
           {!collapsed && (
             <div className="overflow-hidden flex-1">
-              <h1 className="text-sm font-bold text-white tracking-wide leading-tight">ATLM ERP</h1>
-              <p className="text-[11px] text-white/35 tracking-wider leading-tight">제조 · Phase 1</p>
+              <h1 className="text-sm font-bold text-foreground tracking-wide leading-tight">ATLM ERP</h1>
+              <p className="text-[11px] text-muted-foreground tracking-wider leading-tight">제조 · Phase 1</p>
             </div>
           )}
           {!collapsed && (
             <button
               onClick={() => setSidebarOpen(false)}
-              className="md:hidden text-white/40 hover:text-white/70 p-1"
+              className="md:hidden text-muted-foreground hover:text-foreground p-1"
             >
               <X size={16} />
             </button>
@@ -167,8 +167,8 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
         {/* 워크스페이스 — Phase 1: OEM만 활성 */}
         {!collapsed && (
-          <div className="px-3 py-3 border-b border-white/8">
-            <div className="flex gap-1 bg-white/5 rounded-lg p-1">
+          <div className="px-3 py-3 border-b border-sidebar-border">
+            <div className="flex gap-1 bg-[var(--fill-tertiary)] rounded-lg p-1">
               {(['OEM', 'LUMEN', 'AETALOOP'] as WorkspaceId[]).map((ws) => {
                 const active = workspace === ws;
                 return (
@@ -178,7 +178,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     onClick={() => setWorkspace(ws)}
                     className={`
                       flex-1 text-[11px] font-semibold py-1.5 rounded-md transition-all
-                      ${active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-white/50 hover:text-white/80 hover:bg-white/5'}
+                      ${active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'}
                     `}
                   >
                     {ws}
@@ -186,7 +186,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                 );
               })}
             </div>
-            <p className="text-[11px] text-white/25 mt-1.5 px-1">
+            <p className="text-[11px] text-muted-foreground mt-1.5 px-1">
               {workspace === 'OEM' ? 'OEM + 브랜드 생산 공유' : `${workspace} 브랜드 발주`}
             </p>
           </div>
@@ -200,12 +200,12 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             <div key={gi} className="mb-1">
               {group.label && !collapsed && (
                 <div className="px-3 pt-4 pb-1.5">
-                  <span className="text-[11px] font-semibold text-white/25 uppercase tracking-[0.15em]">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.15em]">
                     {group.label}
                   </span>
                 </div>
               )}
-              {group.label && collapsed && <div className="my-2 mx-2 h-px bg-white/10" />}
+              {group.label && collapsed && <div className="my-2 mx-2 h-px bg-border" />}
               {group.items.map((item) => {
                 if (item.lumenOnly && workspace !== 'LUMEN') return null;
                 const active = isActive(item.path);
@@ -218,7 +218,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                       flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 mb-0.5
                       ${active
                         ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium border border-sidebar-primary/20'
-                        : 'text-white/55 hover:text-white/90 hover:bg-white/8'
+                        : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'
                       }
                       ${collapsed ? 'justify-center px-2' : ''}
                     `}
@@ -247,23 +247,23 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           })}
         </nav>
 
-        <div className="px-2 py-3 border-t border-white/8 space-y-1">
+        <div className="px-2 py-3 border-t border-sidebar-border space-y-1">
           {!collapsed && currentUser && (
-            <div className="px-3 py-2 text-xs text-white/40 truncate">
-              <span className="text-white/70 font-medium">{currentUser.name}</span>
+            <div className="px-3 py-2 text-xs text-muted-foreground truncate">
+              <span className="text-foreground font-medium">{currentUser.name}</span>
               <span className="ml-1.5">· {currentUser.role}</span>
             </div>
           )}
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-white/35 hover:text-[var(--system-red)] hover:bg-white/8 transition-colors text-xs ${collapsed ? 'justify-center' : ''}`}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-muted-foreground hover:text-[var(--system-red)] hover:bg-[var(--fill-quaternary)] transition-colors text-xs ${collapsed ? 'justify-center' : ''}`}
           >
             <LogOut size={14} />
             {!collapsed && <span>로그아웃</span>}
           </button>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className={`w-full hidden md:flex items-center gap-2 px-3 py-2 rounded-lg text-white/35 hover:text-white/70 hover:bg-white/8 transition-colors text-xs ${collapsed ? 'justify-center' : ''}`}
+            className={`w-full hidden md:flex items-center gap-2 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)] transition-colors text-xs ${collapsed ? 'justify-center' : ''}`}
           >
             {collapsed ? <ChevronRight size={14} /> : <><ChevronLeft size={14} /><span>접기</span></>}
           </button>

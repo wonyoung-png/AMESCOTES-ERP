@@ -60,10 +60,10 @@ const CATEGORY_CODE_MAP: Partial<Record<Category, string>> = {
 };
 
 const ERP_CAT_COLOR: Record<ErpCategory, string> = {
-  'HB':   'bg-blue-50 text-blue-700 border-blue-200',
-  'ACC':  'bg-purple-50 text-purple-700 border-purple-200',
-  'SHOES':'bg-green-50 text-[var(--system-green)] border-green-200',
-  'PACK':'bg-amber-50 text-amber-700 border-amber-200',
+  'HB':   'bg-[var(--fill-tertiary)] text-foreground border-border',
+  'ACC':  'bg-[var(--fill-tertiary)] text-foreground border-border',
+  'SHOES':'bg-[var(--fill-tertiary)] text-foreground border-border',
+  'PACK':'bg-[var(--fill-tertiary)] text-foreground border-border',
 };
 
 function generateStyleNo(
@@ -1998,10 +1998,10 @@ export default function ItemMaster() {
       {/* 품목 수 통계 — 클릭 시 카테고리 필터 (바이어 지정 시 해당 바이어만 집계) */}
       <div className="grid grid-cols-5 gap-3">
         {([
-          { key: 'HB', label: 'HB (핸드백)', count: tabCounts.HB, active: 'bg-blue-100 border-blue-400 ring-2 ring-blue-300', idle: 'bg-blue-50 border-blue-200 hover:border-blue-400', num: 'text-blue-700', sub: 'text-blue-600' },
-          { key: 'ACC', label: 'ACC (소품)', count: tabCounts.ACC, active: 'bg-purple-100 border-purple-400 ring-2 ring-purple-300', idle: 'bg-purple-50 border-purple-200 hover:border-purple-400', num: 'text-purple-700', sub: 'text-purple-600' },
-          { key: 'SHOES', label: 'SHOES (슈즈)', count: tabCounts.SHOES, active: 'bg-green-100 border-green-400 ring-2 ring-green-300', idle: 'bg-green-50 border-green-200 hover:border-green-400', num: 'text-[var(--system-green)]', sub: 'text-[var(--system-green)]' },
-          { key: 'PACK' as const, label: 'PACK (패키지)', count: tabCounts.PACK, active: 'bg-amber-100 border-amber-400 ring-2 ring-amber-300', idle: 'bg-amber-50 border-amber-200 hover:border-amber-400', num: 'text-amber-700', sub: 'text-amber-600' },
+          { key: 'HB', label: 'HB (핸드백)', count: tabCounts.HB, active: 'bg-[var(--fill-tertiary)] border-border ring-2 ring-primary/30', idle: 'bg-card border-border hover:border-border', num: 'text-foreground', sub: 'text-muted-foreground' },
+          { key: 'ACC', label: 'ACC (소품)', count: tabCounts.ACC, active: 'bg-[var(--fill-tertiary)] border-border ring-2 ring-primary/30', idle: 'bg-card border-border hover:border-border', num: 'text-foreground', sub: 'text-muted-foreground' },
+          { key: 'SHOES', label: 'SHOES (슈즈)', count: tabCounts.SHOES, active: 'bg-[var(--fill-tertiary)] border-border ring-2 ring-primary/30', idle: 'bg-card border-border hover:border-border', num: 'text-foreground', sub: 'text-muted-foreground' },
+          { key: 'PACK' as const, label: 'PACK (패키지)', count: tabCounts.PACK, active: 'bg-[var(--fill-tertiary)] border-border ring-2 ring-primary/30', idle: 'bg-card border-border hover:border-border', num: 'text-foreground', sub: 'text-muted-foreground' },
           { key: '전체', label: '전체', count: tabCounts.전체, active: 'bg-[var(--fill-tertiary)] border-border ring-2 ring-primary/30', idle: 'bg-card border-border hover:border-border', num: 'text-foreground', sub: 'text-muted-foreground' },
         ] as const).map(tab => {
           const selected = filterErpCategory === tab.key;
@@ -2418,7 +2418,7 @@ export default function ItemMaster() {
                     showCol('buyer') && (
                       <td key="buyer" className="px-4 py-3">
                         {item.buyerId ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fill-tertiary)] text-foreground border border-border whitespace-nowrap">
                             {vendorMap.get(item.buyerId)?.code || vendorMap.get(item.buyerId)?.name || '-'}
                           </span>
                         ) : <span className="text-muted-foreground text-xs">-</span>}
@@ -2514,7 +2514,7 @@ export default function ItemMaster() {
                           <div className="flex flex-col gap-0.5 items-end">
                             {visibleColorRows.map(row => (
                               <div key={row.name} className="h-6 px-1 inline-flex items-center">
-                                <span className="text-blue-700 leading-none">
+                                <span className="text-foreground leading-none">
                                   {row.factoryUnitCostKrw > 0 ? formatKRW(row.factoryUnitCostKrw) : '—'}
                                 </span>
                               </div>
@@ -2524,7 +2524,7 @@ export default function ItemMaster() {
                             )}
                           </div>
                         ) : factoryUnitCostKrw > 0 ? (
-                          <span className="text-blue-700">{formatKRW(factoryUnitCostKrw)}</span>
+                          <span className="text-foreground">{formatKRW(factoryUnitCostKrw)}</span>
                         ) : (
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
@@ -2965,10 +2965,10 @@ export default function ItemMaster() {
                   <tr className="bg-[var(--fill-quaternary)] border-b border-border">
                     <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">시즌</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-muted-foreground">전체</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-600">HB</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-purple-600">ACC</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-[var(--system-green)]">SHOES</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-600">BOM완료</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-medium text-muted-foreground">HB</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-medium text-muted-foreground">ACC</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-medium text-muted-foreground">SHOES</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-medium text-muted-foreground">BOM완료</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-[var(--system-red)]">BOM미작성</th>
                   </tr>
                 </thead>
@@ -2977,10 +2977,10 @@ export default function ItemMaster() {
                     <tr key={row.season} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
                       <td className="px-4 py-2.5 font-semibold text-foreground">{row.season}</td>
                       <td className="px-3 py-2.5 text-center font-bold text-foreground">{row.total}</td>
-                      <td className="px-3 py-2.5 text-center text-blue-700">{row.hb}</td>
-                      <td className="px-3 py-2.5 text-center text-purple-700">{row.acc}</td>
-                      <td className="px-3 py-2.5 text-center text-[var(--system-green)]">{row.shoes}</td>
-                      <td className="px-3 py-2.5 text-center text-blue-600">{row.hasBom}</td>
+                      <td className="px-3 py-2.5 text-center text-foreground">{row.hb}</td>
+                      <td className="px-3 py-2.5 text-center text-foreground">{row.acc}</td>
+                      <td className="px-3 py-2.5 text-center text-foreground">{row.shoes}</td>
+                      <td className="px-3 py-2.5 text-center text-[var(--system-green)]">{row.hasBom}</td>
                       <td className="px-3 py-2.5 text-center">
                         {row.noBom > 0 ? (
                           <span className="inline-flex items-center gap-1 text-[var(--system-red)] font-medium">
@@ -3607,7 +3607,7 @@ export default function ItemMaster() {
                     : 'BOM 없음 (자동 생성)';
                   const statusEl = (() => {
                     if (bi.status === 'pending') return <span className="text-muted-foreground">대기중</span>;
-                    if (bi.status === 'ready') return <span className="text-blue-600 font-medium">✓ {bi.parsedData!.materials.length}개 자재 · 환율 {bi.parsedData!.exchangeRateCny}</span>;
+                    if (bi.status === 'ready') return <span className="text-foreground font-medium">✓ {bi.parsedData!.materials.length}개 자재 · 환율 {bi.parsedData!.exchangeRateCny}</span>;
                     if (bi.status === 'saving') return <span className="text-[var(--system-orange)] animate-pulse">저장중…</span>;
                     if (bi.status === 'done') return <span className="text-[var(--system-green)] font-medium">적용 완료</span>;
                     if (bi.status === 'error') return <span className="text-[var(--system-red)]">{bi.errorMsg}</span>;
@@ -4262,7 +4262,7 @@ function BulkOrderItemRow({
                     <button
                       type="button"
                       onClick={() => onRemoveColor(cq.color)}
-                      className="text-muted-foreground hover:text-red-400 transition-colors"
+                      className="text-muted-foreground hover:text-[var(--system-red)] transition-colors"
                     >
                       <X size={12} />
                     </button>

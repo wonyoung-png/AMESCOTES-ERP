@@ -17,14 +17,14 @@ const MATERIAL_CATEGORIES: MaterialCategory[] = ['원자재', '지퍼', '장식'
 const UNITS = ['SF', 'YD', 'M', 'EA', 'L', '콘', 'KG', 'SET', '장', '개', 'PC', 'CM'];
 
 const CATEGORY_COLOR: Record<MaterialCategory, string> = {
-  '원자재': 'bg-amber-50 text-amber-700 border-amber-200',
-  '지퍼': 'bg-blue-50 text-blue-700 border-blue-200',
-  '장식': 'bg-purple-50 text-purple-700 border-purple-200',
-  '보강재': 'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
-  '봉사·접착제': 'bg-green-50 text-green-700 border-green-200',
-  '포장재': 'bg-orange-50 text-orange-700 border-orange-200',
-  '철형': 'bg-slate-50 text-slate-700 border-slate-200',
-  '후가공': 'bg-rose-50 text-rose-700 border-rose-200',
+  '원자재': 'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '지퍼': 'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '장식': 'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '보강재': 'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '봉사·접착제': 'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '포장재': 'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '철형': 'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '후가공': 'bg-[var(--fill-tertiary)] text-foreground border-border',
 };
 
 const emptyForm: Partial<Material> = {

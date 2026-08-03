@@ -192,7 +192,7 @@ export default function ChinaWarehouse() {
                 <td className="px-4 py-3 font-mono text-xs text-primary">{b.styleNo}</td>
                 <td className="px-4 py-3">{b.styleName}</td>
                 <td className="px-4 py-3"><Badge variant="outline" className="text-[11px]">{b.color}</Badge></td>
-                <td className="px-4 py-3 text-right text-[var(--system-teal)]">{formatNumber(b.inboundQty)}</td>
+                <td className="px-4 py-3 text-right text-foreground">{formatNumber(b.inboundQty)}</td>
                 <td className="px-4 py-3 text-right text-muted-foreground">{formatNumber(b.outboundQty)}</td>
                 <td className={`px-4 py-3 text-right font-bold ${b.onHand < 0 ? 'text-[var(--system-red)]' : ''}`}>
                   {formatNumber(b.onHand)}
@@ -219,8 +219,8 @@ export default function ChinaWarehouse() {
             <div key={m.id} className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-sm">
               <div className="min-w-0">
                 <span className={`text-[11px] px-1.5 py-0.5 rounded border border-border bg-[var(--fill-quaternary)] mr-2 ${
-                  m.moveType === 'inbound' ? 'text-[var(--system-teal)]' :
-                  m.moveType === 'outbound' ? 'text-[var(--system-orange)]' :
+                  m.moveType === 'inbound' ? 'text-foreground' :
+                  m.moveType === 'outbound' ? 'text-foreground' :
                   'text-muted-foreground'
                 }`}>{MOVE_LABEL[m.moveType]}</span>
                 <span className="font-mono text-xs text-primary">{m.styleNo}</span>
@@ -230,7 +230,7 @@ export default function ChinaWarehouse() {
                 {m.memo && <span className="ml-2 text-xs text-muted-foreground">{m.memo}</span>}
               </div>
               <div className="text-right shrink-0">
-                <span className={`font-semibold ${m.moveType === 'outbound' ? 'text-[var(--system-orange)]' : m.moveType === 'adjust' && m.qty < 0 ? 'text-[var(--system-red)]' : 'text-[var(--system-teal)]'}`}>
+                <span className={`font-semibold ${m.moveType === 'outbound' ? 'text-foreground' : m.moveType === 'adjust' && m.qty < 0 ? 'text-[var(--system-red)]' : 'text-foreground'}`}>
                   {m.moveType === 'outbound' ? '−' : m.moveType === 'adjust' && m.qty > 0 ? '+' : m.qty < 0 ? '' : '+'}
                   {formatNumber(Math.abs(m.qty))}
                 </span>

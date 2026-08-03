@@ -25,7 +25,7 @@ const TYPE_ICON: Record<ExpenseType, React.ReactNode> = {
 
 const TYPE_COLOR: Record<ExpenseType, string> = {
   '법인카드': 'bg-primary/10 text-primary border-primary/20',
-  '계좌이체': 'bg-[var(--fill-quaternary)] text-[var(--system-green)] border-border',
+  '계좌이체': 'bg-[var(--fill-tertiary)] text-foreground border-border',
   '현금': 'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
 };
 
@@ -401,7 +401,7 @@ function printExpenseTradeStatement(expense: Expense) {
         <table>
           <tr><td>공급가액</td><td style="text-align:right">${supplyAmount.toLocaleString()}원</td></tr>
           <tr><td>세액(10%)</td><td style="text-align:right">${taxAmount.toLocaleString()}원</td></tr>
-          <tr style="font-weight:bold;background:#fef3c7"><td>합계</td><td style="text-align:right">${total.toLocaleString()}원</td></tr>
+          <tr style="font-weight:bold;background:#f5f5f5"><td>합계</td><td style="text-align:right">${total.toLocaleString()}원</td></tr>
         </table>
       </div>
       <script>window.onload = function() { window.print(); };</script>

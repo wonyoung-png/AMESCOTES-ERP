@@ -22,10 +22,10 @@ interface FlowNode {
 
 const TONE: Record<NonNullable<FlowNode['tone']>, string> = {
   master: 'border-border bg-card hover:border-muted-foreground hover:bg-muted',
-  produce: 'border-[var(--system-orange)]/30 bg-[var(--system-orange)]/5 hover:border-[var(--system-orange)] hover:bg-[var(--system-orange)]/10',
+  produce: 'border-border bg-[var(--fill-quaternary)] hover:border-muted-foreground hover:bg-muted',
   buy: 'border-primary/30 bg-primary/5 hover:border-primary hover:bg-primary/10',
-  settle: 'border-[var(--system-green)]/30 bg-[var(--system-green)]/5 hover:border-[var(--system-green)] hover:bg-[var(--system-green)]/10',
-  brand: 'border-[var(--system-indigo)]/30 bg-[var(--system-indigo)]/5 hover:border-[var(--system-indigo)] hover:bg-[var(--system-indigo)]/10',
+  settle: 'border-border bg-[var(--fill-quaternary)] hover:border-muted-foreground hover:bg-muted',
+  brand: 'border-border bg-[var(--fill-quaternary)] hover:border-muted-foreground hover:bg-muted',
   external: 'border-dashed border-border bg-muted text-muted-foreground hover:border-muted-foreground',
 };
 
@@ -223,10 +223,10 @@ export default function WorkflowGuide() {
       {/* 범례 */}
       <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-muted-foreground" />마스터</span>
-        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-[var(--system-orange)]" />생산</span>
+        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-[var(--chart-2)]" />생산</span>
         <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-primary" />구매</span>
-        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-[var(--system-green)]" />정산</span>
-        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-[var(--system-indigo)]" />브랜드</span>
+        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-[var(--chart-3)]" />정산</span>
+        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-[var(--chart-4)]" />브랜드</span>
       </div>
 
       {flow === 'oem' ? (

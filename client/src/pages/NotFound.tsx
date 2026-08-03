@@ -15,7 +15,7 @@ export default function NotFound() {
       <Card className="w-full max-w-lg mx-4 border border-border bg-card">
         <CardContent className="pt-8 pb-8 text-center">
           <div className="flex justify-center mb-6">
-            <AlertCircle className="h-16 w-16 text-[var(--system-red)]" />
+            <AlertCircle className="h-16 w-16 text-muted-foreground" />
           </div>
 
           <h1 className="text-4xl font-bold text-foreground mb-2">404</h1>

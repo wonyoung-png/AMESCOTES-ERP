@@ -99,7 +99,7 @@
   --card-foreground: var(--label-primary);
   --popover: #ffffff;
   --popover-foreground: var(--label-primary);
-  --primary: var(--system-blue);
+  --primary: #1c1c1e; /* 모노톤 액센트 — 블랙 */
   --primary-foreground: #ffffff;
   --secondary: var(--fill-secondary);
   --secondary-foreground: var(--label-primary);
@@ -111,20 +111,22 @@
   --destructive-foreground: #ffffff;
   --border: var(--separator);
   --input: var(--separator);
-  --ring: var(--system-blue);
-  --chart-1: var(--system-blue);
-  --chart-2: var(--system-teal);
-  --chart-3: var(--system-green);
-  --chart-4: var(--system-orange);
-  --chart-5: var(--system-indigo);
-  --sidebar: #1c1c1e;
-  --sidebar-foreground: rgba(235, 235, 245, 0.6);
-  --sidebar-primary: #0a84ff;
+  --ring: #1c1c1e;
+  /* 차트 — 그레이스케일 (모노톤 원칙) */
+  --chart-1: #1c1c1e;
+  --chart-2: #6e6e73;
+  --chart-3: #aeaeb2;
+  --chart-4: #d1d1d6;
+  --chart-5: #8e8e93;
+  /* 사이드바 — 라이트 (clobe.ai 레퍼런스) */
+  --sidebar: #ffffff;
+  --sidebar-foreground: rgba(60, 60, 67, 0.7);
+  --sidebar-primary: #1c1c1e;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #2c2c2e;
-  --sidebar-accent-foreground: rgba(255, 255, 255, 1);
-  --sidebar-border: rgba(84, 84, 88, 0.6);
-  --sidebar-ring: #0a84ff;
+  --sidebar-accent: rgba(118, 118, 128, 0.08);
+  --sidebar-accent-foreground: rgba(0, 0, 0, 1);
+  --sidebar-border: rgba(60, 60, 67, 0.29);
+  --sidebar-ring: #1c1c1e;
 }
 
 .dark {
@@ -161,6 +163,22 @@
   --accent-foreground: var(--label-primary);
   --border: var(--separator);
   --input: var(--separator);
+  --primary: #ffffff;
+  --primary-foreground: #1c1c1e;
+  --ring: #ffffff;
+  --chart-1: #ffffff;
+  --chart-2: #aeaeb2;
+  --chart-3: #6e6e73;
+  --chart-4: #48484a;
+  --chart-5: #8e8e93;
+  --sidebar: #1c1c1e;
+  --sidebar-foreground: rgba(235, 235, 245, 0.6);
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #1c1c1e;
+  --sidebar-accent: rgba(118, 118, 128, 0.18);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(84, 84, 88, 0.6);
+  --sidebar-ring: #ffffff;
 }
 
 @layer base {

@@ -29,7 +29,7 @@ const STATUS_LABEL: Record<CampaignStatus, string> = {
 const STATUS_STYLE: Record<CampaignStatus, string> = {
   draft: 'border-dashed opacity-50 bg-muted',
   onboarded: 'bg-primary/10 border-primary/20',
-  active: 'bg-[var(--fill-quaternary)] border-[var(--system-green)] font-medium',
+  active: 'bg-[var(--fill-tertiary)] border-foreground font-medium',
   closed: 'bg-muted opacity-50',
 };
 

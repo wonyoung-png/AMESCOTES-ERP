@@ -529,7 +529,7 @@ export default function CostComparison() {
                         {row.isSimple ? (
                           <Badge className="text-[11px] py-0 h-4 bg-primary/10 text-primary border-transparent">간단</Badge>
                         ) : row.hasDetailedBom ? (
-                          <Badge className="text-[11px] py-0 h-4 bg-[var(--system-green)]/10 text-[var(--system-green)] border-transparent">상세</Badge>
+                          <Badge className="text-[11px] py-0 h-4 bg-[var(--fill-tertiary)] text-foreground border-transparent">상세</Badge>
                         ) : (
                           <Badge className="text-[11px] py-0 h-4 bg-[var(--fill-quaternary)] text-muted-foreground border-transparent">-</Badge>
                         )}

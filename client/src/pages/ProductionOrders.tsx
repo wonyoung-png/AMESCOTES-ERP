@@ -29,7 +29,7 @@ const ORDER_STATUSES: OrderStatus[] = ['발주생성', '생산중', '생산완�
 
 const STATUS_COLOR: Record<OrderStatus, string> = {
   '발주생성': 'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
-  '생산중': 'bg-[var(--system-orange)]/10 text-[var(--system-orange)] border-transparent',
+  '생산중': 'bg-[var(--fill-tertiary)] text-foreground border-transparent',
   '생산완료': 'bg-primary/10 text-primary border-transparent',
   '입고완료': 'bg-[var(--system-green)]/10 text-[var(--system-green)] border-transparent',
 };

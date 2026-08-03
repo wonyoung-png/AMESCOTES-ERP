@@ -31,7 +31,7 @@ const PURCHASE_STATUSES = ['미발주', '발주완료', '입고완료', '발송�
 const STATUS_COLOR: Record<string, string> = {
   '미발주': 'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
   '발주완료': 'bg-primary/10 text-primary border-transparent',
-  '입고완료': 'bg-[var(--system-orange)]/10 text-[var(--system-orange)] border-transparent',
+  '입고완료': 'bg-[var(--system-green)]/10 text-[var(--system-green)] border-transparent',
   '발송완료': 'bg-[var(--system-green)]/10 text-[var(--system-green)] border-transparent',
 };
 

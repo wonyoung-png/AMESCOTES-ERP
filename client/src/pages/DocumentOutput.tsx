@@ -39,7 +39,7 @@ export default function DocumentOutput() {
     // Build print content
     let content = '';
     const header = `
-      <div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #C9A96E;padding-bottom:16px;">
+      <div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1C1C1E;padding-bottom:16px;">
         <h1 style="font-size:20px;color:#1C1C1E;margin:0;">ATLM — Atelier de LUMEN</h1>
         <p style="font-size:12px;color:#6B6B6B;margin:4px 0 0;">(주)아메스코테스</p>
       </div>
@@ -54,7 +54,7 @@ export default function DocumentOutput() {
           <tr><td><b>공장:</b> ${order.vendorName}</td><td><b>발주일:</b> ${order.createdAt?.split('T')[0] || ''}</td></tr>
         </table>
         <table style="width:100%;border-collapse:collapse;font-size:11px;">
-          <thead><tr style="background:#f5f4ef;">
+          <thead><tr style="background:#f5f5f5;">
             <th style="border:1px solid #ddd;padding:6px;">구분</th>
             <th style="border:1px solid #ddd;padding:6px;">품목명</th>
             <th style="border:1px solid #ddd;padding:6px;">규격</th>
@@ -81,7 +81,7 @@ export default function DocumentOutput() {
       content = `${header}
         <h2 style="font-size:16px;margin-bottom:16px;">견적서 (Quotation)</h2>
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
-          <thead><tr style="background:#f5f4ef;">
+          <thead><tr style="background:#f5f5f5;">
             <th style="border:1px solid #ddd;padding:8px;">Style No.</th>
             <th style="border:1px solid #ddd;padding:8px;">Product Name</th>
             <th style="border:1px solid #ddd;padding:8px;">Material</th>

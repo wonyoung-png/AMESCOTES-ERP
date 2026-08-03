@@ -22,11 +22,11 @@ const COUNTRIES = ['한국', '중국', '이탈리아', '프랑스', '일본', '�
 const BILLING_TYPES: BillingType[] = ['월별합산', '건별즉시'];
 
 const TYPE_COLOR: Record<VendorType, string> = {
-  '바이어':    'bg-purple-50 text-purple-700 border-purple-200',
-  '자재거래처': 'bg-green-50 text-green-700 border-green-200',
-  '공장':      'bg-blue-50 text-blue-700 border-blue-200',
-  '해외공장':  'bg-sky-50 text-sky-700 border-sky-200',
-  '물류업체':  'bg-orange-50 text-orange-700 border-orange-200',
+  '바이어':    'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '자재거래처': 'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '공장':      'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '해외공장':  'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '물류업체':  'bg-[var(--fill-tertiary)] text-foreground border-border',
   '기타':      'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
 };
 
@@ -770,7 +770,7 @@ export default function VendorMaster() {
                 <td className="px-4 py-3">
                   <div className="flex flex-col gap-1">
                     {v.vendorCode && (
-                      <span className="inline-block px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700 text-xs font-mono font-bold w-fit">
+                      <span className="inline-block px-2 py-0.5 rounded bg-[var(--fill-tertiary)] border border-border text-foreground text-xs font-mono font-bold w-fit">
                         {v.vendorCode}
                       </span>
                     )}
@@ -792,7 +792,7 @@ export default function VendorMaster() {
                   {v.type === '자재거래처' && (v.materialTypes || []).length > 0 ? (
                     <div className="flex flex-wrap gap-1">
                       {(v.materialTypes || []).map(mt => (
-                        <span key={mt} className="text-xs px-1.5 py-0.5 rounded bg-green-50 border border-green-200 text-green-700">
+                        <span key={mt} className="text-xs px-1.5 py-0.5 rounded bg-[var(--fill-tertiary)] border border-border text-foreground">
                           {mt === '기타' && v.customMaterialType ? `기타 (${v.customMaterialType})` : mt}
                         </span>
                       ))}
@@ -824,7 +824,7 @@ export default function VendorMaster() {
                 {(filterType === '공장' || filterType === '해외공장' || filtered.some(vv => vv.type === '공장' || vv.type === '해외공장')) && (
                   <td className="px-4 py-3 text-muted-foreground text-xs">
                     {(v.type === '공장' || v.type === '해외공장') && v.bankInfo?.swiftCode ? (
-                      <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded text-xs border border-sky-200">
+                      <span className="font-mono text-foreground bg-[var(--fill-tertiary)] px-2 py-0.5 rounded text-xs border border-border">
                         {v.bankInfo.swiftCode}
                       </span>
                     ) : <span className="text-muted-foreground">—</span>}

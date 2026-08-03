@@ -290,7 +290,7 @@ export default function TradeStatement() {
           table { width: 100%; border-collapse: collapse; margin-top: 16px; }
           th, td { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
           th { background: #f5f5f5; text-align: center; }
-          .total-row { background: #fef3c7; font-weight: bold; }
+          .total-row { background: #f5f5f5; font-weight: bold; }
           .footer { margin-top: 16px; text-align: right; font-size: 11px; color: #666; }
           @media print { body { margin: 0; } }
         </style>

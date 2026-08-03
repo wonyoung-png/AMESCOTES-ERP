@@ -49,18 +49,18 @@ const LOCATIONS: SampleLocation[] = ['내부개발실', '중국공장'];
 // SampleRound는 이제 number (제한 없음)
 
 const STAGE_COLOR: Record<SampleStage, string> = {
-  '1차':    'bg-blue-50 text-blue-700 border-blue-200',
-  '2차':    'bg-indigo-50 text-indigo-700 border-indigo-200',
-  '3차':    'bg-purple-50 text-purple-700 border-purple-200',
-  '4차':    'bg-amber-50 text-amber-700 border-amber-200',
-  '최종승인': 'bg-green-50 text-green-700 border-green-200',
-  '반려':   'bg-red-50 text-red-600 border-red-200',
+  '1차':    'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '2차':    'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '3차':    'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '4차':    'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '최종승인': 'bg-[var(--fill-tertiary)] text-[var(--system-green)] border-border',
+  '반려':   'bg-[var(--fill-tertiary)] text-[var(--system-red)] border-border',
 };
 
 const BILLING_COLOR: Record<SampleBillingStatus, string> = {
   '미청구':   'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
-  '청구완료': 'bg-amber-50 text-amber-700 border-amber-200',
-  '수금완료': 'bg-green-50 text-green-700 border-green-200',
+  '청구완료': 'bg-[var(--fill-tertiary)] text-[var(--system-orange)] border-border',
+  '수금완료': 'bg-[var(--fill-tertiary)] text-[var(--system-green)] border-border',
 };
 
 // TEMP 품목 자동생성 헬퍼
@@ -729,7 +729,7 @@ export default function SampleManagement() {
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 md:gap-3">
         {[
           { label: '전체',    value: stats.total,            color: 'text-foreground' },
-          { label: '진행중',  value: stats.inProgress,       color: 'text-blue-700' },
+          { label: '진행중',  value: stats.inProgress,       color: 'text-foreground' },
           { label: '최종승인', value: stats.approved,         color: 'text-[var(--system-green)]' },
           { label: '미청구',  value: stats.unclaimed,        color: 'text-[var(--system-orange)]' },
         ].map(s => (
@@ -763,7 +763,7 @@ export default function SampleManagement() {
                 <p className="text-xs text-muted-foreground">접수</p>
               </div>
               <div>
-                <p className="font-bold text-blue-700">{thisMonthInProgress}건</p>
+                <p className="font-bold text-foreground">{thisMonthInProgress}건</p>
                 <p className="text-xs text-muted-foreground">진행중</p>
               </div>
               <div>
@@ -830,7 +830,7 @@ export default function SampleManagement() {
           {(statFilterSalesPerson !== 'all' || statFilterAssignee !== 'all' || statFilterBuyer !== 'all' || statFilterSeason !== 'all') && (
             <button
               onClick={() => { setStatFilterSalesPerson('all'); setStatFilterAssignee('all'); setStatFilterBuyer('all'); setStatFilterSeason('all'); }}
-              className="text-xs text-muted-foreground hover:text-[var(--system-red)] px-2 py-1 rounded border border-border hover:border-red-300"
+              className="text-xs text-muted-foreground hover:text-[var(--system-red)] px-2 py-1 rounded border border-border hover:border-[var(--system-red)]"
             >
               필터 초기화
             </button>
@@ -891,7 +891,7 @@ export default function SampleManagement() {
           >
             {opt.label}
             {opt.value === '진행중' && (
-              <span className="ml-1 text-[11px] text-blue-600 font-bold">
+              <span className="ml-1 text-[11px] text-foreground font-bold">
                 {samples.filter(s => ['1차','2차','3차','4차'].includes(s.stage)).length}
               </span>
             )}
@@ -1028,7 +1028,7 @@ export default function SampleManagement() {
                   </td>
                   <td className="px-4 py-3">
                     {s.buyerId ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fill-tertiary)] text-foreground border border-border">
                         {vendors.find(v => v.id === s.buyerId)?.name || '-'}
                       </span>
                     ) : <span className="text-muted-foreground text-xs">-</span>}
@@ -1041,7 +1041,7 @@ export default function SampleManagement() {
                   <td className="px-4 py-3">
                     {s.location && <p className="text-xs text-muted-foreground">{s.location}</p>}
                     {s.round && (
-                      <p className="text-xs text-blue-600 font-medium">
+                      <p className="text-xs text-foreground font-medium">
                         {s.round}차{s.roundName ? ` (${s.roundName})` : ''}
                       </p>
                     )}
@@ -1191,7 +1191,7 @@ export default function SampleManagement() {
                   </div>
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     {s.buyerId && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--fill-tertiary)] text-foreground border border-border">
                         {vendors.find(v => v.id === s.buyerId)?.name || '-'}
                       </span>
                     )}
@@ -1663,7 +1663,7 @@ export default function SampleManagement() {
                         <DocIcon fileType={doc.fileType} />
                         <button
                           type="button"
-                          className="flex-1 text-xs text-foreground text-left hover:text-blue-600 truncate"
+                          className="flex-1 text-xs text-foreground text-left hover:underline truncate"
                           onClick={() => openFile(doc.url, doc.fileType, doc.name)}
                           title={doc.fileType === 'excel' ? '클릭하면 다운로드' : '클릭하면 새 탭에서 열림'}
                         >
@@ -1802,7 +1802,7 @@ export default function SampleManagement() {
                     <div className="space-y-2">
                       {(detailSample.revisionHistory || []).map((r, i) => (
                         <div key={i} className="flex gap-3 text-sm p-2 bg-[var(--fill-quaternary)] rounded-lg border border-border">
-                          <span className="text-xs font-bold text-blue-600 shrink-0 mt-0.5">{r.round}차</span>
+                          <span className="text-xs font-bold text-foreground shrink-0 mt-0.5">{r.round}차</span>
                           <div className="flex-1">
                             <p className="text-foreground">{r.note}</p>
                             <p className="text-[11px] text-muted-foreground mt-0.5">{r.date}</p>

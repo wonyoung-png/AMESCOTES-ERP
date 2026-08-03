@@ -19,16 +19,16 @@ import { Badge } from '@/components/ui/badge';
 
 // 문서 아이콘
 function DocIconSmall({ fileType }: { fileType: string }) {
-  if (fileType === 'pdf') return <File className="w-4 h-4 text-[var(--system-red)]" />;
-  if (fileType === 'excel') return <FileSpreadsheet className="w-4 h-4 text-[var(--system-green)]" />;
+  if (fileType === 'pdf') return <File className="w-4 h-4 text-muted-foreground" />;
+  if (fileType === 'excel') return <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />;
   return <Camera className="w-4 h-4 text-muted-foreground" />;
 }
 
 const STAGE_COLOR: Record<string, string> = {
   '1차':    'bg-primary/10 text-primary border-primary/20',
   '2차':    'bg-primary/10 text-primary border-primary/20',
-  '3차':    'bg-[var(--system-indigo)]/10 text-[var(--system-indigo)] border-[var(--system-indigo)]/20',
-  '4차':    'bg-[var(--system-indigo)]/10 text-[var(--system-indigo)] border-[var(--system-indigo)]/20',
+  '3차':    'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '4차':    'bg-[var(--fill-tertiary)] text-foreground border-border',
   '최종승인': 'bg-[var(--system-green)]/10 text-[var(--system-green)] border-[var(--system-green)]/20',
   '반려':   'bg-[var(--system-red)]/10 text-[var(--system-red)] border-[var(--system-red)]/20',
 };
@@ -81,9 +81,9 @@ export default function Dashboard() {
       })
       .filter(o => o.dday !== null);
 
-    const critical = all.filter(o => o.dday! <= 1);   // 🔴 D-1 이하
-    const warning  = all.filter(o => o.dday! > 1 && o.dday! <= 7);  // 🟡 D-7
-    const normal   = all.filter(o => o.dday! > 7 && o.dday! <= 30); // 🟢 정상 (D-30)
+    const critical = all.filter(o => o.dday! <= 1);   // D-1 이하
+    const warning  = all.filter(o => o.dday! > 1 && o.dday! <= 7);  // D-7
+    const normal   = all.filter(o => o.dday! > 7 && o.dday! <= 30); // 정상 (D-30)
     return { critical, warning, normal, all: all.sort((a, b) => (a.dday ?? 999) - (b.dday ?? 999)) };
   }, [orders]);
 
@@ -125,11 +125,11 @@ export default function Dashboard() {
   // 오더 파이프라인
   const pipeline = useMemo(() => {
     const stages = [
-      { label: '샘플 진행', count: samples.filter(s => s.stage !== '최종승인' && s.stage !== '반려').length, color: 'bg-primary' },
-      { label: '발주 생성', count: orders.filter(o => o.status === '발주생성').length, color: 'bg-muted-foreground' },
-      { label: '생산 중',   count: orders.filter(o => o.status === '생산중').length,   color: 'bg-[var(--system-orange)]' },
-      { label: '선적/통관', count: orders.filter(o => ['선적중','통관중'].includes(o.status)).length, color: 'bg-[var(--system-indigo)]' },
-      { label: '입고 완료', count: orders.filter(o => o.status === '입고완료').length,  color: 'bg-[var(--system-green)]' },
+      { label: '샘플 진행', count: samples.filter(s => s.stage !== '최종승인' && s.stage !== '반려').length, color: 'bg-[var(--chart-1)]' },
+      { label: '발주 생성', count: orders.filter(o => o.status === '발주생성').length, color: 'bg-[var(--chart-2)]' },
+      { label: '생산 중',   count: orders.filter(o => o.status === '생산중').length,   color: 'bg-[var(--chart-3)]' },
+      { label: '선적/통관', count: orders.filter(o => ['선적중','통관중'].includes(o.status)).length, color: 'bg-[var(--chart-4)]' },
+      { label: '입고 완료', count: orders.filter(o => o.status === '입고완료').length,  color: 'bg-[var(--chart-5)]' },
     ];
     return stages;
   }, [orders, samples]);
@@ -174,8 +174,8 @@ export default function Dashboard() {
           sub={`최종승인 ${samples.filter(s => s.stage === '최종승인').length}건`}
         />
         <KpiCard
-          icon={<TrendingUp className="w-5 h-5 text-[var(--system-green)]" />}
-          bg="bg-[var(--system-green)]/10"
+          icon={<TrendingUp className="w-5 h-5 text-foreground" />}
+          bg="bg-[var(--fill-quaternary)]"
           label="이달 청구"
           value={formatKRW(monthBilledAmount)}
           sub={`거래명세 ${monthBilledCount}건`}
@@ -188,22 +188,22 @@ export default function Dashboard() {
           sub={`납기임박 D-7 ${deadlineRisk.warning.length + deadlineRisk.critical.length}건`}
         />
         <KpiCard
-          icon={<Truck className="w-5 h-5 text-[var(--system-indigo)]" />}
-          bg="bg-[var(--system-indigo)]/10"
+          icon={<Truck className="w-5 h-5 text-foreground" />}
+          bg="bg-[var(--fill-quaternary)]"
           label="이달 청구"
           value={formatKRW(monthBilledAmount)}
           sub={`${store.getTradeStatements().filter(ts => ts.issueDate.startsWith(thisMonth)).length}건`}
         />
         <KpiCard
           icon={<AlertTriangle className="w-5 h-5 text-[var(--system-red)]" />}
-          bg="bg-[var(--system-red)]/10"
+          bg="bg-[var(--fill-quaternary)]"
           label="미수금"
           value={formatKRW(totalOutstanding)}
           sub={overdueSettlements.length > 0 ? <span className="text-[var(--system-red)]">연체 {overdueSettlements.length}건</span> : '연체 없음'}
         />
         <KpiCard
           icon={<Clock className="w-5 h-5 text-[var(--system-orange)]" />}
-          bg="bg-[var(--system-orange)]/10"
+          bg="bg-[var(--fill-quaternary)]"
           label="납기 위험"
           value={`${deadlineRisk.critical.length + deadlineRisk.warning.length}건`}
           sub={deadlineRisk.critical.length > 0
@@ -213,7 +213,7 @@ export default function Dashboard() {
         />
         <KpiCard
           icon={<FileText className="w-5 h-5 text-muted-foreground" />}
-          bg="bg-muted"
+          bg="bg-[var(--fill-quaternary)]"
           label="미청구"
           value={`${unclaimedStatements.length}건`}
           sub={formatKRW(unclaimedAmount)}
@@ -256,9 +256,9 @@ export default function Dashboard() {
               <p className="text-xs text-muted-foreground py-6 text-center">납기 위험 발주가 없습니다</p>
             ) : deadlineRisk.all.slice(0, 8).map(o => (
               <div key={o.id} className={`flex items-center justify-between py-2 px-3 rounded-lg border ${
-                o.dday! <= 1 ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20' :
-                o.dday! <= 7 ? 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20' :
-                'bg-muted border-border'
+                o.dday! <= 1 ? 'bg-[var(--fill-quaternary)] border-[var(--system-red)]/30' :
+                o.dday! <= 7 ? 'bg-[var(--fill-quaternary)] border-[var(--system-orange)]/30' :
+                'bg-[var(--fill-quaternary)] border-border'
               }`}>
                 <div>
                   <p className="text-sm font-medium text-foreground">{o.orderNo}</p>
@@ -281,7 +281,7 @@ export default function Dashboard() {
           <div className="bg-card rounded-xl border border-border p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <ShoppingCart className="w-3.5 h-3.5 text-[var(--system-orange)]" />자재 입고 대기
+                <ShoppingCart className="w-3.5 h-3.5 text-muted-foreground" />자재 입고 대기
               </h3>
               <Link href="/purchase" className="text-xs text-primary hover:underline flex items-center gap-1">
                 전체 <ArrowRight className="w-3 h-3" />
@@ -296,7 +296,7 @@ export default function Dashboard() {
                     <p className="text-xs font-medium text-foreground">{h.itemName}</p>
                     <p className="text-[11px] text-muted-foreground">{h.orderNo}</p>
                   </div>
-                  <span className="text-xs font-medium text-[var(--system-orange)]">{formatNumber(h.requiredQty)} {h.unit}</span>
+                  <span className="text-xs font-medium text-foreground">{formatNumber(h.requiredQty)} {h.unit}</span>
                 </div>
               ))}
             </div>
@@ -364,7 +364,7 @@ export default function Dashboard() {
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`} />
                 <Tooltip formatter={(v: number) => formatKRW(v)} />
-                <Bar dataKey="total" name="청구" fill="var(--primary)" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="total" name="청구" fill="var(--chart-1)" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

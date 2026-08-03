@@ -1081,20 +1081,20 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                   const rowBg = marginRow
                     ? 'bg-primary/5'
                     : vendorRow
-                    ? 'bg-[var(--system-teal)]/10'
+                    ? 'bg-[var(--fill-tertiary)]'
                     : '';
                   return (
                     <tr key={row.id} className={`border-b border-border ${rowBg}`}>
                       <td className="px-2 py-1.5 text-center text-muted-foreground">{idx + 1}</td>
                       <td className="px-1 py-1 min-w-[7rem]">
-                        <Input value={row.category} onChange={e => updateRow(row.id, 'category', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-[var(--system-teal)] font-medium' : ''} ${marginRow ? 'text-primary font-semibold' : ''}`} />
+                        <Input value={row.category} onChange={e => updateRow(row.id, 'category', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-muted-foreground font-medium' : ''} ${marginRow ? 'text-primary font-semibold' : ''}`} />
                       </td>
-                      <td className="px-1 py-1"><Input value={row.itemName} onChange={e => updateRow(row.id, 'itemName', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-[var(--system-teal)]' : ''} ${marginRow ? 'text-primary' : ''}`} /></td>
-                      <td className="px-1 py-1"><Input type="number" value={parseFloat(row.qty.toFixed(2))} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${vendorRow ? 'text-[var(--system-teal)] font-semibold' : ''}`} /></td>
+                      <td className="px-1 py-1"><Input value={row.itemName} onChange={e => updateRow(row.id, 'itemName', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-muted-foreground' : ''} ${marginRow ? 'text-primary' : ''}`} /></td>
+                      <td className="px-1 py-1"><Input type="number" value={parseFloat(row.qty.toFixed(2))} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${vendorRow ? 'text-muted-foreground font-semibold' : ''}`} /></td>
                       <td className="px-1 py-1">
                         <div className="text-right">
                           {vendorRow ? (
-                            <span className="text-xs text-[var(--system-teal)] px-1">—</span>
+                            <span className="text-xs text-muted-foreground px-1">—</span>
                           ) : (
                             <Input
                               type="text"
@@ -1107,7 +1107,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                       </td>
                       <td className="px-1 py-1">
                         {vendorRow ? (
-                          <span className="text-xs text-[var(--system-teal)] px-1 block text-right">—</span>
+                          <span className="text-xs text-muted-foreground px-1 block text-right">—</span>
                         ) : (
                           <Input
                             type="text"
@@ -1119,7 +1119,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                       </td>
                       <td className={`px-2 py-1.5 text-right ${marginRow ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>{vendorRow ? '—' : fmtKrw(row.taxAmt)}</td>
                       <td className={`px-2 py-1.5 text-right font-medium ${marginRow ? 'text-primary' : ''}`}>{vendorRow ? '—' : fmtKrw(ceil10(row.supplyAmt + row.taxAmt))}</td>
-                      <td className="px-1 py-1">{marginRow ? null : vendorRow ? <span className="text-xs text-[var(--system-teal)] font-medium px-1">업체제공</span> : <Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" placeholder="비고" />}</td>
+                      <td className="px-1 py-1">{marginRow ? null : vendorRow ? <span className="text-xs text-muted-foreground font-medium px-1">업체제공</span> : <Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" placeholder="비고" />}</td>
                       <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(r => r.id !== row.id))} className="text-muted-foreground hover:text-[var(--system-red)]"><X className="w-3 h-3" /></button></td>
                     </tr>
                   );
@@ -1363,7 +1363,7 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
             title="기본 정보 미입력 — 거래처 마스터에서 추가 정보 입력 필요"
             className="text-[var(--system-red)] hover:text-[var(--system-red)] shrink-0"
           >
-            <span className="text-sm">❗</span>
+            <span className="text-sm font-bold">!</span>
           </button>
         )}
       </div>
@@ -1515,7 +1515,7 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
               <button
                 onClick={() => setCalcType('YD')}
                 className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-                  calcType === 'YD' ? 'bg-sky-600 text-white' : 'bg-[var(--fill-tertiary)] text-muted-foreground hover:bg-[var(--fill-secondary)]'
+                  calcType === 'YD' ? 'bg-primary text-primary-foreground' : 'bg-[var(--fill-tertiary)] text-muted-foreground hover:bg-[var(--fill-secondary)]'
                 }`}
               >원단 (YD)</button>
             </div>
@@ -1539,7 +1539,7 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="font-semibold whitespace-nowrap">원단폭(cm)</span>
                 <input type="number" value={width} onChange={e => setWidth(parseFloat(e.target.value) || 150)}
-                  className="w-20 border border-border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-sky-400" />
+                  className="w-20 border border-border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring" />
               </label>
             )}
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -1664,7 +1664,7 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
   const supplyLabel = !isHqProvided && !isVendorProvided
     ? { text: '공장', cls: 'text-muted-foreground' }
     : isVendorProvided && !isHqProvided
-    ? { text: '업체', cls: 'text-[var(--system-teal)]' }
+    ? { text: '업체', cls: 'text-muted-foreground' }
     : { text: '본사', cls: 'text-primary font-semibold' };
 
   const handleMaterialSelect = (m: Material) => {
@@ -1866,8 +1866,8 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
               <span className="text-xs text-primary font-medium">본사</span>
             </label>
             <label className="flex items-center gap-1 cursor-pointer" title="업체제공">
-              <input type="checkbox" checked={isVendorProvided} onChange={e => handleVendorChange(e.target.checked)} className="w-4 h-4 accent-[var(--system-teal)]" />
-              <span className="text-xs text-[var(--system-teal)] font-medium">업체</span>
+              <input type="checkbox" checked={isVendorProvided} onChange={e => handleVendorChange(e.target.checked)} className="w-4 h-4 accent-primary" />
+              <span className="text-xs text-muted-foreground font-medium">업체</span>
             </label>
           </div>
         </div>
@@ -1914,7 +1914,7 @@ function PostCostSummary({
   const marginAmt = deliveryPrice > 0 ? deliveryPrice - ps.totalCostKrw : 0;
   const marginPct = deliveryPrice > 0 ? (marginAmt / deliveryPrice) * 100 : 0;
   const marginClass = marginPct < 15 ? 'text-[var(--system-red)]' : marginPct < 20 ? 'text-[var(--system-orange)]' : marginPct <= 30 ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]';
-  const marginBgClass = marginPct < 15 ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20' : marginPct < 30 ? 'bg-[var(--system-yellow)]/10 border-[var(--system-yellow)]/30' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20';
+  const marginBgClass = marginPct < 15 ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20' : marginPct < 30 ? 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20';
   const marginLabel = marginPct < 15 ? '위험' : marginPct < 30 ? '주의' : '양호';
 
   const fmtCny = (n: number) => `${currSymbol}${n.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}`;
@@ -3652,7 +3652,7 @@ export default function BomManagement() {
                   size="sm"
                   variant="outline"
                   onClick={copyAllPostToPre}
-                  className="border-[var(--system-indigo)]/30 text-[var(--system-indigo)] hover:bg-[var(--system-indigo)]/10 gap-1.5 mt-2"
+                  className="border-border text-foreground hover:bg-[var(--fill-tertiary)] gap-1.5 mt-2"
                 >
                   사후원가 전체 불러오기 → (컬러 {(editBom.postColorBoms || []).length}개)
                 </Button>
@@ -3787,7 +3787,7 @@ export default function BomManagement() {
                         variant="outline"
                         size="sm"
                         onClick={copyAllPostToPre}
-                        className="h-7 gap-1 text-xs border-[var(--system-indigo)]/30 text-[var(--system-indigo)] hover:bg-[var(--system-indigo)]/10"
+                        className="h-7 gap-1 text-xs border-border text-foreground hover:bg-[var(--fill-tertiary)]"
                       >
                         <Copy className="w-3 h-3" /> 사후원가 전체 불러오기 →
                       </Button>
@@ -4112,13 +4112,13 @@ export default function BomManagement() {
                         </div>
                       )}
                       {vendorLines.length > 0 && (
-                        <div className="bg-card rounded-xl border border-[var(--system-teal)]/30 overflow-hidden">
-                          <div className="px-5 py-3 border-b border-[var(--system-teal)]/20 bg-[var(--system-teal)]/10">
-                            <h4 className="font-semibold text-sm text-[var(--system-teal)]">업체제공 자재 목록</h4>
+                        <div className="bg-card rounded-xl border border-border overflow-hidden">
+                          <div className="px-5 py-3 border-b border-border bg-[var(--fill-tertiary)]">
+                            <h4 className="font-semibold text-sm text-muted-foreground">업체제공 자재 목록</h4>
                           </div>
                           <table className="w-full text-xs">
                             <thead>
-                              <tr className="bg-[var(--system-teal)]/10 text-[13px] font-semibold text-muted-foreground">
+                              <tr className="bg-[var(--fill-tertiary)] text-[13px] font-semibold text-muted-foreground">
                                 <th className="px-3 py-2 text-left">부위</th>
                                 <th className="px-3 py-2 text-left">자재명</th>
                                 <th className="px-3 py-2 text-left">규격</th>
@@ -4236,7 +4236,7 @@ export default function BomManagement() {
 
           {/* 사후원가 - 컬러 탭 없는 경우 안내 */}
           {mainTab === 'post' && !activePostColorBom && (editBom.postColorBoms || []).length === 0 && (
-            <div className="bg-[var(--fill-quaternary)] border border-dashed border-blue-300 rounded-xl p-10 text-center">
+            <div className="bg-[var(--fill-quaternary)] border border-dashed border-border rounded-xl p-10 text-center">
               <Factory className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-foreground text-sm font-semibold mb-1">사후원가 컬러 탭이 없습니다</p>
               <p className="text-muted-foreground text-xs mb-4">공장 원가표를 관리하려면 컬러를 추가하세요.</p>
@@ -4248,7 +4248,7 @@ export default function BomManagement() {
                   size="sm"
                   variant="outline"
                   onClick={copyAllPreToPost}
-                  className="border-[var(--system-indigo)]/30 text-[var(--system-indigo)] hover:bg-[var(--system-indigo)]/10 gap-1.5 mt-2"
+                  className="border-border text-foreground hover:bg-[var(--fill-tertiary)] gap-1.5 mt-2"
                 >
                   <Copy className="w-4 h-4" /> ← 사전원가 전체 불러오기 (컬러 {(editBom.colorBoms || []).length}개)
                 </Button>
@@ -4387,7 +4387,7 @@ export default function BomManagement() {
                           variant="outline"
                           size="sm"
                           onClick={copyAllPreToPost}
-                          className="h-7 gap-1 text-xs border-[var(--system-indigo)]/30 text-[var(--system-indigo)] hover:bg-[var(--system-indigo)]/10"
+                          className="h-7 gap-1 text-xs border-border text-foreground hover:bg-[var(--fill-tertiary)]"
                         >
                           <Copy className="w-3 h-3" /> ← 사전원가 전체 불러오기
                         </Button>
@@ -4975,7 +4975,7 @@ export default function BomManagement() {
                     <button
                       onClick={() => setYardageTab('fabric')}
                       className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-                        yardageTab === 'fabric' ? 'bg-sky-600 text-white' : 'bg-[var(--fill-tertiary)] text-muted-foreground hover:bg-[var(--fill-secondary)]'
+                        yardageTab === 'fabric' ? 'bg-primary text-primary-foreground' : 'bg-[var(--fill-tertiary)] text-muted-foreground hover:bg-[var(--fill-secondary)]'
                       }`}
                     >원단 (YD)</button>
                   </div>
@@ -5063,14 +5063,14 @@ export default function BomManagement() {
                 {/* 원단 탭 */}
                 {yardageTab === 'fabric' && (
                   <div className="bg-card rounded-xl border border-border overflow-hidden">
-                    <div className="flex items-center gap-4 px-4 py-2.5 bg-sky-50 border-b border-border flex-wrap">
+                    <div className="flex items-center gap-4 px-4 py-2.5 bg-[var(--fill-quaternary)] border-b border-border flex-wrap">
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">원단 폭 (cm)</span>
                         <input
                           type="number"
                           value={fabricWidth}
                           onChange={e => setFabricWidth(parseFloat(e.target.value) || 150)}
-                          className="w-24 border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-sky-400"
+                          className="w-24 border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-ring"
                         />
                       </div>
                       <div className="flex items-center gap-2">
@@ -5079,14 +5079,14 @@ export default function BomManagement() {
                           type="number"
                           value={fabricLossRate}
                           onChange={e => setFabricLossRate(parseFloat(e.target.value) || 0)}
-                          className="w-20 border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-sky-400"
+                          className="w-20 border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-ring"
                           min={0} max={100}
                         />
                       </div>
                       <span className="text-xs text-muted-foreground">최종 = Net × (1 + 로스율/100)</span>
                     </div>
                     <table className="w-full">
-                      <thead className="bg-sky-50/60 border-b border-border">
+                      <thead className="bg-[var(--fill-quaternary)] border-b border-border">
                         <tr>
                           <th className={thCls} style={{width:'36%'}}>부위</th>
                           <th className={thCls} style={{width:'18%'}}>가로 CM</th>
@@ -5110,15 +5110,15 @@ export default function BomManagement() {
                       </tbody>
                     </table>
                     <div className="p-3 flex items-center justify-between">
-                      <button onClick={addFabricRow} className="text-xs text-sky-600 hover:text-sky-800 font-semibold">+ 행 추가</button>
+                      <button onClick={addFabricRow} className="text-xs text-primary hover:text-primary/80 font-semibold">+ 행 추가</button>
                       <div className="flex items-center gap-6">
                         <div className="text-right">
                           <span className="text-xs text-muted-foreground mr-2">Net</span>
-                          <span className="text-base font-bold text-sky-600">{netYD.toFixed(3)} YD</span>
+                          <span className="text-base font-bold text-foreground">{netYD.toFixed(3)} YD</span>
                         </div>
                         <div className="text-right">
                           <span className="text-xs text-muted-foreground mr-2">최종 (+{fabricLossRate}%)</span>
-                          <span className="text-lg font-bold text-sky-700">{finalYD.toFixed(3)} YD</span>
+                          <span className="text-lg font-bold text-foreground">{finalYD.toFixed(3)} YD</span>
                         </div>
                       </div>
                     </div>

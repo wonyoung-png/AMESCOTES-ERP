@@ -83,7 +83,7 @@ export default function DeadlineManagement() {
         (o.milestones || []).forEach(m => {
           if (m.plannedDate === dateStr || m.actualDate === dateStr) {
             const dd = calcDDay(m.plannedDate!);
-            const color = dd < 0 ? 'bg-[var(--system-red)]' : dd <= 3 ? 'bg-[var(--system-orange)]' : dd <= 7 ? 'bg-[var(--system-yellow)]' : 'bg-[var(--system-green)]';
+            const color = dd < 0 ? 'bg-[var(--system-red)]' : dd <= 3 ? 'bg-[var(--system-orange)]' : dd <= 7 ? 'bg-[var(--system-orange)]' : 'bg-[var(--system-green)]';
             events.push({ orderNo: o.orderNo, milestone: MILESTONE_LABELS[m.stage] || m.stage, color });
           }
         });
