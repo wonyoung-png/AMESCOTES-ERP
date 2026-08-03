@@ -22,20 +22,20 @@ function UnitCard({ unit, depth }: { unit: OrgUnit; depth: number }) {
   const head = unit.headMemberId ? getMember(unit.headMemberId) : null;
 
   return (
-    <div className={`${depth > 0 ? 'ml-3 border-l border-stone-200 pl-3' : ''}`}>
-      <div className="rounded-xl border border-stone-200 bg-white overflow-hidden mb-3">
-        <div className={`px-3 py-2 border-b flex items-center gap-2 ${
-          depth === 0 ? 'bg-stone-800 text-white' :
-          depth === 1 ? 'bg-stone-100' : 'bg-stone-50'
+    <div className={`${depth > 0 ? 'ml-3 border-l border-border pl-3' : ''}`}>
+      <div className="rounded-xl border border-border bg-card overflow-hidden mb-3">
+        <div className={`px-3 py-2 border-b border-border flex items-center gap-2 ${
+          depth === 0 ? 'bg-sidebar text-white' :
+          depth === 1 ? 'bg-muted' : 'bg-muted/50'
         }`}>
-          <span className={`text-sm font-semibold ${depth === 0 ? 'text-white' : 'text-stone-800'}`}>{unit.name}</span>
+          <span className={`text-sm font-semibold ${depth === 0 ? 'text-white' : 'text-foreground'}`}>{unit.name}</span>
           {head && !head.isVacant && (
-            <span className={`text-[11px] ${depth === 0 ? 'text-amber-200' : 'text-stone-500'}`}>
+            <span className={`text-[11px] ${depth === 0 ? 'text-sidebar-primary' : 'text-muted-foreground'}`}>
               · {head.name} {head.title}
             </span>
           )}
           {head?.isVacant && (
-            <Badge variant="outline" className="text-[10px] border-red-300 text-red-600 bg-red-50">공석</Badge>
+            <Badge variant="outline" className="text-[11px] border-[var(--system-red)]/30 text-[var(--system-red)] bg-[var(--system-red)]/10">공석</Badge>
           )}
         </div>
         {(members.length > 0 || concurrent.length > 0) && (
@@ -44,22 +44,22 @@ function UnitCard({ unit, depth }: { unit: OrgUnit; depth: number }) {
               <div
                 key={m.id}
                 className={`rounded-lg border px-2.5 py-2 ${
-                  m.isVacant ? 'border-dashed border-stone-300 bg-stone-50 text-stone-400' : 'border-stone-200 bg-white'
+                  m.isVacant ? 'border-dashed border-border bg-muted text-muted-foreground' : 'border-border bg-card'
                 }`}
               >
-                <p className="text-sm font-medium text-stone-800">{m.name}</p>
-                <p className="text-[11px] text-stone-500">{m.title}</p>
+                <p className="text-sm font-medium text-foreground">{m.name}</p>
+                <p className="text-[11px] text-muted-foreground">{m.title}</p>
                 {m.brands && (
                   <div className="flex gap-1 mt-1">
                     {m.brands.map(b => (
-                      <span key={b} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">{b}</span>
+                      <span key={b} className="text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">{b}</span>
                     ))}
                   </div>
                 )}
                 {m.r3Roles && m.r3Roles.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">
                     {m.r3Roles.map(r => (
-                      <span key={r} className="text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">
+                      <span key={r} className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--system-indigo)]/10 text-[var(--system-indigo)] border border-[var(--system-indigo)]/20">
                         R3·{R3_ROLE_LABEL[r]}
                       </span>
                     ))}
@@ -68,9 +68,9 @@ function UnitCard({ unit, depth }: { unit: OrgUnit; depth: number }) {
               </div>
             ))}
             {concurrent.map(m => (
-              <div key={m.id} className="rounded-lg border border-dashed border-stone-300 px-2.5 py-2 bg-stone-50/80">
-                <p className="text-sm font-medium text-stone-600">{m.name}</p>
-                <p className="text-[11px] text-stone-400">{m.title}</p>
+              <div key={m.id} className="rounded-lg border border-dashed border-border px-2.5 py-2 bg-muted/80">
+                <p className="text-sm font-medium text-muted-foreground">{m.name}</p>
+                <p className="text-[11px] text-muted-foreground">{m.title}</p>
               </div>
             ))}
           </div>
@@ -95,11 +95,11 @@ export default function OrgChartPage() {
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
-            <Network size={22} className="text-amber-700" />
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Network size={22} className="text-primary" />
             조직도
           </h1>
-          <p className="text-sm text-stone-500 mt-0.5">
+          <p className="text-sm text-muted-foreground mt-0.5">
             AMESCOTES 임시 조직도 · R3 승인 담당 매핑 (추후 로그인/권한과 연동)
           </p>
         </div>
@@ -118,18 +118,18 @@ export default function OrgChartPage() {
       </div>
 
       {/* R3 역할 매핑 */}
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
-        <div className="px-4 py-3 border-b bg-violet-50 flex items-center gap-2">
-          <Users size={16} className="text-violet-700" />
-          <span className="text-sm font-semibold text-violet-900">R3 승인 담당 (임시)</span>
-          <span className="text-xs text-violet-600">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="px-4 py-3 border-b border-border bg-[var(--system-indigo)]/10 flex items-center gap-2">
+          <Users size={16} className="text-[var(--system-indigo)]" />
+          <span className="text-sm font-semibold text-foreground">R3 승인 담당 (임시)</span>
+          <span className="text-xs text-muted-foreground">
             워크스페이스 {workspace} · 디자인팀장은 루멘/에탈루프 분기
           </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-xs text-stone-500 bg-stone-50 border-b">
+              <tr className="text-xs text-muted-foreground bg-muted border-b border-border">
                 <th className="text-left px-4 py-2">R3 역할</th>
                 <th className="text-left px-4 py-2">승인 단계</th>
                 <th className="text-left px-4 py-2">현재 담당</th>
@@ -140,21 +140,21 @@ export default function OrgChartPage() {
               {roleBoard.map(row => {
                 const steps = R3_STEPS.filter(s => R3_STEP_ROLE[s.step] === row.role);
                 return (
-                  <tr key={row.role} className="border-t border-stone-100">
+                  <tr key={row.role} className="border-t border-border">
                     <td className="px-4 py-3">
-                      <span className="font-semibold text-stone-800">{row.label}</span>
-                      <span className="ml-2 text-[10px] font-mono text-stone-400">{row.role}</span>
+                      <span className="font-semibold text-foreground">{row.label}</span>
+                      <span className="ml-2 text-[11px] font-mono text-muted-foreground">{row.role}</span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-stone-600">
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
                       {steps.map(s => `${s.step}.${s.label}`).join(' · ')}
                     </td>
                     <td className="px-4 py-3">
                       {row.member ? (
-                        <span className="text-sm font-medium text-violet-800">
-                          {row.member.name} <span className="text-xs text-stone-500 font-normal">{row.member.title}</span>
+                        <span className="text-sm font-medium text-foreground">
+                          {row.member.name} <span className="text-xs text-muted-foreground font-normal">{row.member.title}</span>
                         </span>
                       ) : (
-                        <span className="text-xs text-red-500">미지정</span>
+                        <span className="text-xs text-[var(--system-red)]">미지정</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -182,7 +182,7 @@ export default function OrgChartPage() {
 
       {/* 조직 트리 */}
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">AMESCOTES, INC. 조직</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">AMESCOTES, INC. 조직</p>
         {roots.map(u => <UnitCard key={u.id} unit={u} depth={0} />)}
       </div>
     </div>

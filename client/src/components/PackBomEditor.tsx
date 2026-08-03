@@ -94,7 +94,7 @@ function MaterialNameField({
   return (
     <div ref={wrapRef} className="relative">
       <div className="relative">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-stone-400 pointer-events-none" />
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
         <Input
           value={draft}
           onChange={e => {
@@ -122,20 +122,20 @@ function MaterialNameField({
             }
           }}
           placeholder="자재명 입력 · 찾기"
-          className={`h-7 text-xs pl-7 ${linked ? 'border-stone-200' : 'border-amber-400'}`}
+          className={`h-7 text-xs pl-7 ${linked ? 'border-border' : 'border-[var(--system-orange)]'}`}
         />
       </div>
       {open && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-0.5 rounded-md border border-stone-200 bg-white shadow-lg overflow-hidden min-w-[260px]">
-          <div className="p-1.5 border-b border-stone-100 bg-stone-50">
+        <div className="absolute z-50 left-0 right-0 top-full mt-0.5 rounded-md border border-border bg-card shadow-lg overflow-hidden min-w-[260px]">
+          <div className="p-1.5 border-b border-border bg-[var(--fill-quaternary)]">
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-stone-400" />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
               <input
                 ref={findRef}
                 value={findQ}
                 onChange={e => setFindQ(e.target.value)}
                 placeholder="자재 찾기 (이름·품번)"
-                className="w-full h-7 pl-7 pr-2 text-xs rounded border border-stone-200 bg-white outline-none focus:border-amber-400"
+                className="w-full h-7 pl-7 pr-2 text-xs rounded border border-border bg-card outline-none focus:border-primary"
                 onKeyDown={e => {
                   if (e.key === 'Enter' && suggestions[0]) {
                     e.preventDefault();
@@ -150,12 +150,12 @@ function MaterialNameField({
           </div>
           <div className="max-h-52 overflow-y-auto">
             {suggestions.length === 0 ? (
-              <div className="px-3 py-3 text-[11px] text-stone-400">검색 결과 없음 — 자재명을 직접 입력하세요</div>
+              <div className="px-3 py-3 text-[11px] text-muted-foreground">검색 결과 없음 — 자재명을 직접 입력하세요</div>
             ) : suggestions.map(m => (
               <button
                 key={m.id}
                 type="button"
-                className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-amber-50 flex items-center justify-between gap-2"
+                className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-[var(--fill-quaternary)] flex items-center justify-between gap-2"
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => {
                   onPickMaterial(m);
@@ -164,10 +164,10 @@ function MaterialNameField({
                   setFindQ('');
                 }}
               >
-                <span className="font-medium text-stone-800 truncate">
+                <span className="font-medium text-foreground truncate">
                   {displayMaterialName(m.name, m.itemCode)}
                 </span>
-                <span className="text-[10px] text-stone-400 tabular-nums shrink-0">
+                <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
                   {formatKRW(m.unitPriceKrw ?? m.unitPriceCny ?? 0)}
                 </span>
               </button>
@@ -249,21 +249,21 @@ export function PackBomEditor({ lines, materials, onChange, compact }: PackBomEd
   const total = packLinesTotal(lines);
 
   return (
-    <div className={`space-y-3 ${compact ? '' : 'rounded-xl border border-amber-200 bg-amber-50/40 p-4'}`}>
+    <div className={`space-y-3 ${compact ? '' : 'rounded-xl border border-border bg-card p-4'}`}>
       {!compact && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground">
           <span>
             <b>패키지 구성</b> — 자재명 입력/찾기 · 단가는 자재마스터 전용 · 수량×단가 = 전체원가
           </span>
-          <span className="text-[10px] text-amber-700/80">
+          <span className="text-[11px] text-muted-foreground">
             연결 {linkedCount}/{lines.length}
           </span>
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-border bg-card">
         <table className="w-full text-xs">
-          <thead className="bg-stone-50 text-stone-500">
+          <thead className="text-[13px] font-semibold text-muted-foreground border-b border-border">
             <tr>
               <th className="text-left px-3 py-2 w-28">품번</th>
               <th className="text-left px-3 py-2 min-w-[220px]">자재명</th>
@@ -275,10 +275,10 @@ export function PackBomEditor({ lines, materials, onChange, compact }: PackBomEd
               <th className="w-10" />
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {lines.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-stone-400">
+                <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
                   「행 추가」 후 자재명을 입력·선택하세요
                 </td>
               </tr>
@@ -286,8 +286,8 @@ export function PackBomEditor({ lines, materials, onChange, compact }: PackBomEd
               const linked = !!line.materialId && materials.some(m => m.id === line.materialId);
               const rowMaterials = materialPool(materials, line.materialId || undefined);
               return (
-                <tr key={`pack-row-${idx}`} className="border-t border-stone-100">
-                  <td className="px-3 py-2 font-mono text-[10px] text-stone-500">
+                <tr key={`pack-row-${idx}`} className="hover:bg-[var(--fill-quaternary)]">
+                  <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
                     {line.itemCode || '—'}
                   </td>
                   <td className="px-2 py-1.5">
@@ -300,7 +300,7 @@ export function PackBomEditor({ lines, materials, onChange, compact }: PackBomEd
                       onTypeName={name => typeLineName(idx, name)}
                     />
                   </td>
-                  <td className="px-3 py-2 text-stone-500">{line.spec || '—'}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{line.spec || '—'}</td>
                   <td className="px-2 py-2 text-center">{line.unit}</td>
                   <td className="px-2 py-2">
                     <Input
@@ -314,10 +314,10 @@ export function PackBomEditor({ lines, materials, onChange, compact }: PackBomEd
                   </td>
                   <td className="px-2 py-2">
                     <div
-                      className="h-7 flex items-center justify-end gap-1 px-2 rounded bg-stone-100 text-stone-600 font-mono tabular-nums select-none cursor-not-allowed"
+                      className="h-7 flex items-center justify-end gap-1 px-2 rounded bg-[var(--fill-tertiary)] text-muted-foreground font-mono tabular-nums select-none cursor-not-allowed"
                       title="단가는 자재마스터에서만 수정할 수 있습니다"
                     >
-                      <Lock className="w-3 h-3 text-stone-400 shrink-0" />
+                      <Lock className="w-3 h-3 text-muted-foreground shrink-0" />
                       {formatKRW(line.unitPriceKrw || 0)}
                     </div>
                   </td>
@@ -325,7 +325,7 @@ export function PackBomEditor({ lines, materials, onChange, compact }: PackBomEd
                     {formatKRW(packLineTotal(line))}
                   </td>
                   <td className="px-1 py-2 text-center">
-                    <button type="button" onClick={() => removeLine(idx)} className="text-stone-400 hover:text-red-500">
+                    <button type="button" onClick={() => removeLine(idx)} className="text-muted-foreground hover:text-[var(--system-red)]">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </td>
@@ -334,10 +334,10 @@ export function PackBomEditor({ lines, materials, onChange, compact }: PackBomEd
             })}
           </tbody>
           {lines.length > 0 && (
-            <tfoot className="bg-amber-50 border-t border-amber-100">
+            <tfoot className="bg-[var(--fill-quaternary)] border-t border-border">
               <tr>
-                <td colSpan={6} className="px-3 py-2.5 text-right font-semibold text-amber-900">전체원가</td>
-                <td className="px-3 py-2.5 text-right font-bold text-amber-800 font-mono tabular-nums">
+                <td colSpan={6} className="px-3 py-2.5 text-right font-semibold text-foreground">전체원가</td>
+                <td className="px-3 py-2.5 text-right font-bold text-primary font-mono tabular-nums">
                   {formatKRW(total)}
                 </td>
                 <td />

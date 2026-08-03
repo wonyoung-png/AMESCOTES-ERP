@@ -21,20 +21,20 @@ interface FlowNode {
 }
 
 const TONE: Record<NonNullable<FlowNode['tone']>, string> = {
-  master: 'border-stone-300 bg-white hover:border-stone-500 hover:bg-stone-50',
-  produce: 'border-amber-300 bg-amber-50/80 hover:border-amber-500 hover:bg-amber-50',
-  buy: 'border-sky-300 bg-sky-50/80 hover:border-sky-500 hover:bg-sky-50',
-  settle: 'border-emerald-300 bg-emerald-50/80 hover:border-emerald-500 hover:bg-emerald-50',
-  brand: 'border-violet-300 bg-violet-50/80 hover:border-violet-500 hover:bg-violet-50',
-  external: 'border-dashed border-stone-300 bg-stone-50 text-stone-500 hover:border-stone-400',
+  master: 'border-border bg-card hover:border-muted-foreground hover:bg-muted',
+  produce: 'border-[var(--system-orange)]/30 bg-[var(--system-orange)]/5 hover:border-[var(--system-orange)] hover:bg-[var(--system-orange)]/10',
+  buy: 'border-primary/30 bg-primary/5 hover:border-primary hover:bg-primary/10',
+  settle: 'border-[var(--system-green)]/30 bg-[var(--system-green)]/5 hover:border-[var(--system-green)] hover:bg-[var(--system-green)]/10',
+  brand: 'border-[var(--system-indigo)]/30 bg-[var(--system-indigo)]/5 hover:border-[var(--system-indigo)] hover:bg-[var(--system-indigo)]/10',
+  external: 'border-dashed border-border bg-muted text-muted-foreground hover:border-muted-foreground',
 };
 
 function ArrowDown({ label }: { label?: string }) {
   return (
-    <div className="flex flex-col items-center py-1 text-stone-400">
-      <div className="w-px h-3 bg-stone-300" />
-      {label && <span className="text-[10px] my-0.5 px-1.5 text-stone-500">{label}</span>}
-      <svg width="12" height="8" viewBox="0 0 12 8" className="text-stone-400">
+    <div className="flex flex-col items-center py-1 text-muted-foreground">
+      <div className="w-px h-3 bg-border" />
+      {label && <span className="text-[11px] my-0.5 px-1.5 text-muted-foreground">{label}</span>}
+      <svg width="12" height="8" viewBox="0 0 12 8" className="text-muted-foreground">
         <path d="M6 8L0 0h12L6 8z" fill="currentColor" />
       </svg>
     </div>
@@ -43,7 +43,7 @@ function ArrowDown({ label }: { label?: string }) {
 
 function ArrowRight() {
   return (
-    <div className="hidden sm:flex items-center px-1 text-stone-300">
+    <div className="hidden sm:flex items-center px-1 text-muted-foreground">
       <svg width="20" height="12" viewBox="0 0 20 12">
         <path d="M0 5h14M14 5l-4-4M14 5l-4 4" stroke="currentColor" strokeWidth="1.5" fill="none" />
       </svg>
@@ -65,19 +65,19 @@ function FlowCard({
       type="button"
       disabled={external && !node.path}
       onClick={() => node.path && onGo(node.path, node.label)}
-      className={`group relative w-full sm:w-auto min-w-[140px] max-w-[200px] text-left rounded-xl border-2 px-3 py-2.5 transition shadow-sm
+      className={`group relative w-full sm:w-auto min-w-[140px] max-w-[200px] text-left rounded-xl border px-3 py-2.5 transition
         ${TONE[tone]}
         ${external && !node.path ? 'cursor-default opacity-80' : 'cursor-pointer'}
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40`}
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40`}
     >
       <div className="flex items-start gap-2">
-        {node.icon && <span className="mt-0.5 text-stone-600 shrink-0">{node.icon}</span>}
+        {node.icon && <span className="mt-0.5 text-muted-foreground shrink-0">{node.icon}</span>}
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-stone-800 leading-tight">{node.label}</p>
-          {node.sub && <p className="text-[11px] text-stone-500 mt-0.5 leading-snug">{node.sub}</p>}
+          <p className="text-sm font-semibold text-foreground leading-tight">{node.label}</p>
+          {node.sub && <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{node.sub}</p>}
         </div>
         {node.path && (
-          <ExternalLink size={12} className="text-stone-300 group-hover:text-amber-600 shrink-0 mt-0.5" />
+          <ExternalLink size={12} className="text-muted-foreground group-hover:text-primary shrink-0 mt-0.5" />
         )}
       </div>
     </button>
@@ -96,20 +96,20 @@ function BranchSplit({
   return (
     <div className="w-full max-w-xl mx-auto">
       <div className="flex justify-center">
-        <div className="w-px h-3 bg-stone-300" />
+        <div className="w-px h-3 bg-border" />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border border-stone-200 rounded-2xl p-3 bg-stone-50/50">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border border-border rounded-2xl p-3 bg-muted/50">
         <div className="flex flex-col items-center gap-1">
-          <Badge variant="outline" className="text-[10px] mb-1">본사 사입</Badge>
+          <Badge variant="outline" className="text-[11px] mb-1">본사 사입</Badge>
           <FlowCard node={left} onGo={onGo} />
         </div>
         <div className="flex flex-col items-center gap-1">
-          <Badge variant="outline" className="text-[10px] mb-1">공장 완사입</Badge>
+          <Badge variant="outline" className="text-[11px] mb-1">공장 완사입</Badge>
           <FlowCard node={right} onGo={onGo} />
         </div>
       </div>
       <div className="flex justify-center">
-        <div className="w-px h-3 bg-stone-300" />
+        <div className="w-px h-3 bg-border" />
       </div>
     </div>
   );
@@ -186,19 +186,19 @@ export default function WorkflowGuide() {
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
-            <GitBranch size={22} className="text-amber-700" />
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <GitBranch size={22} className="text-primary" />
             워크플로우
           </h1>
-          <p className="text-sm text-stone-500 mt-1">
-            박스를 누르면 해당 메뉴로 이동합니다 · 현재 워크스페이스: <span className="font-medium text-stone-700">{workspace}</span>
+          <p className="text-sm text-muted-foreground mt-1">
+            박스를 누르면 해당 메뉴로 이동합니다 · 현재 워크스페이스: <span className="font-medium text-foreground">{workspace}</span>
           </p>
         </div>
-        <div className="flex rounded-lg border border-stone-200 overflow-hidden">
+        <div className="flex rounded-lg border border-border overflow-hidden">
           <Button
             size="sm"
             variant={flow === 'oem' ? 'default' : 'ghost'}
-            className={`rounded-none ${flow === 'oem' ? 'bg-stone-800' : ''}`}
+            className="rounded-none"
             onClick={() => setFlow('oem')}
           >
             OEM 생산
@@ -206,7 +206,7 @@ export default function WorkflowGuide() {
           <Button
             size="sm"
             variant={flow === 'brand' ? 'default' : 'ghost'}
-            className={`rounded-none ${flow === 'brand' ? 'bg-stone-800' : ''}`}
+            className="rounded-none"
             onClick={() => setFlow('brand')}
           >
             브랜드 (LUMEN/AE)
@@ -215,23 +215,23 @@ export default function WorkflowGuide() {
       </div>
 
       {hint && (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5">
+        <p className="text-xs text-primary bg-primary/10 border border-primary/20 rounded-lg px-3 py-1.5">
           {hint}
         </p>
       )}
 
       {/* 범례 */}
-      <div className="flex flex-wrap gap-2 text-[11px] text-stone-500">
-        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-stone-400" />마스터</span>
-        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-amber-400" />생산</span>
-        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-sky-400" />구매</span>
-        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-emerald-400" />정산</span>
-        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-violet-400" />브랜드</span>
+      <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-muted-foreground" />마스터</span>
+        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-[var(--system-orange)]" />생산</span>
+        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-primary" />구매</span>
+        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-[var(--system-green)]" />정산</span>
+        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-full bg-[var(--system-indigo)]" />브랜드</span>
       </div>
 
       {flow === 'oem' ? (
-        <section className="rounded-2xl border border-stone-200 bg-gradient-to-b from-stone-50 to-white p-4 sm:p-6">
-          <h2 className="text-sm font-semibold text-stone-700 mb-4">OEM 생산 파이프라인</h2>
+        <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
+          <h2 className="text-sm font-semibold text-foreground mb-4">OEM 생산 파이프라인</h2>
 
           {/* 사전 가로 스크롤 */}
           <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-1 mb-2 justify-center">
@@ -262,7 +262,7 @@ export default function WorkflowGuide() {
           <BranchSplit left={OEM_BUY} right={OEM_FACTORY_ONLY} onGo={go} />
 
           <div className="flex flex-col items-center">
-            <p className="text-[11px] text-stone-400 mb-1">공장 생산</p>
+            <p className="text-[11px] text-muted-foreground mb-1">공장 생산</p>
             <ArrowDown />
             {OEM_AFTER.map((n, i) => (
               <div key={n.id} className="flex flex-col items-center">
@@ -273,9 +273,9 @@ export default function WorkflowGuide() {
           </div>
         </section>
       ) : (
-        <section className="rounded-2xl border border-violet-200/60 bg-gradient-to-b from-violet-50/40 to-white p-4 sm:p-6">
-          <h2 className="text-sm font-semibold text-stone-700 mb-1">브랜드 MD → 생산팀</h2>
-          <p className="text-xs text-stone-500 mb-4">승인 후 생산발주 · 작업지시서/공장발주서 → 사입·완사입 (OEM과 동일)</p>
+        <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
+          <h2 className="text-sm font-semibold text-foreground mb-1">브랜드 MD → 생산팀</h2>
+          <p className="text-xs text-muted-foreground mb-4">승인 후 생산발주 · 작업지시서/공장발주서 → 사입·완사입 (OEM과 동일)</p>
 
           <div className="flex flex-col items-center">
             {BRAND_PRE.map((n, i) => (
@@ -292,7 +292,7 @@ export default function WorkflowGuide() {
           <BranchSplit left={OEM_BUY} right={OEM_FACTORY_ONLY} onGo={go} />
 
           <div className="flex flex-col items-center">
-            <p className="text-[11px] text-stone-400 mb-1">공장 생산</p>
+            <p className="text-[11px] text-muted-foreground mb-1">공장 생산</p>
             <ArrowDown />
             {BRAND_AFTER.map((n, i) => (
               <div key={n.id} className="flex flex-col items-center">
@@ -306,14 +306,14 @@ export default function WorkflowGuide() {
 
       {/* 바로가기 */}
       <div>
-        <h3 className="text-xs font-semibold text-stone-500 mb-2 uppercase tracking-wide">관련 메뉴</h3>
+        <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">관련 메뉴</h3>
         <div className="flex flex-wrap gap-2">
           {QUICK_LINKS.map(n => (
             <button
               key={n.id}
               type="button"
               onClick={() => go(n.path, n.label)}
-              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-stone-200 bg-white hover:border-amber-400 hover:bg-amber-50 text-stone-700 transition"
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border bg-card hover:border-primary hover:bg-primary/10 text-foreground transition"
             >
               {n.icon}
               {n.label}

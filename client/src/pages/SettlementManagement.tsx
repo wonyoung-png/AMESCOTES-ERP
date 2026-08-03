@@ -18,10 +18,10 @@ const CHANNELS: SettlementChannel[] = ['W Concept', '29CM', '자사몰', '해외
 const STATUSES: SettlementStatus[] = ['정상', '주의', '위험', '완납'];
 
 const STATUS_COLOR: Record<SettlementStatus, string> = {
-  '정상': 'bg-blue-50 text-blue-700 border-blue-200',
-  '주의': 'bg-amber-50 text-amber-700 border-amber-200',
-  '위험': 'bg-red-50 text-red-600 border-red-200',
-  '완납': 'bg-green-50 text-green-700 border-green-200',
+  '정상': 'bg-[var(--fill-quaternary)] text-primary border-border',
+  '주의': 'bg-[var(--fill-quaternary)] text-[var(--system-orange)] border-border',
+  '위험': 'bg-[var(--fill-quaternary)] text-[var(--system-red)] border-border',
+  '완납': 'bg-[var(--fill-quaternary)] text-[var(--system-green)] border-border',
 };
 
 function calcStatus(dueDate: string, collected: number, billed: number): SettlementStatus {
@@ -109,7 +109,7 @@ export default function SettlementManagement() {
     return buckets;
   }, [settlements]);
 
-  const AGING_COLORS = ['#22c55e', '#f59e0b', '#f97316', '#ef4444'];
+  const AGING_COLORS = ['var(--system-green)', 'var(--system-yellow)', 'var(--system-orange)', 'var(--system-red)'];
 
   // 경과일 계산 (만기일 기준, 음수면 경과)
   const calcElapsedDays = (dueDate: string) => {
@@ -194,23 +194,23 @@ export default function SettlementManagement() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-stone-800">정산 / 미수금</h1>
-          <p className="text-xs md:text-sm text-stone-500 mt-0.5 hidden sm:block">명세표 발행 후 입금 현황 관리 · 기한 초과 자동 알림</p>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">정산 / 미수금</h1>
+          <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">명세표 발행 후 입금 현황 관리 · 기한 초과 자동 알림</p>
         </div>
-        <Button onClick={openNew} className="bg-amber-700 hover:bg-amber-800 text-white gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
+        <Button onClick={openNew} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
           <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />정산 등록
         </Button>
       </div>
 
       {/* 연체 알림 배너 */}
       {overdueList.length > 0 && (
-        <div className="bg-red-50 border border-red-300 rounded-xl p-4 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-red-700">
+            <p className="text-sm font-semibold text-destructive">
               만기 경과 미수금 {overdueList.length}건 있습니다
             </p>
-            <p className="text-xs text-red-600 mt-0.5">
+            <p className="text-xs text-destructive mt-0.5">
               {overdueList.map(s => `${s.buyerName} (D+${calcElapsedDays(s.dueDate)}일)`).join(' · ')}
             </p>
           </div>
@@ -218,37 +218,37 @@ export default function SettlementManagement() {
       )}
 
       {/* 미수금 총액 대시보드 */}
-      <div className="bg-stone-800 rounded-xl p-5 flex items-center justify-between">
+      <div className="bg-sidebar rounded-xl p-5 flex items-center justify-between">
         <div>
-          <p className="text-stone-400 text-xs mb-1">총 미수금</p>
+          <p className="text-white/60 text-xs mb-1">총 미수금</p>
           <p className="text-3xl font-bold text-white">{formatKRW(stats.totalReceivable)}</p>
-          <p className="text-stone-400 text-xs mt-1">미납 합계 (완납 제외)</p>
+          <p className="text-white/60 text-xs mt-1">미납 합계 (완납 제외)</p>
         </div>
         {stats.overdueCount > 0 && (
           <div className="text-right">
-            <p className="text-red-400 text-sm font-semibold">⚠ 연체 {stats.overdueCount}건</p>
-            <p className="text-red-300 text-xl font-bold">{formatKRW(stats.overdueAmount)}</p>
+            <p className="text-[var(--system-red)] text-sm font-semibold flex items-center justify-end gap-1"><AlertTriangle className="w-4 h-4" />연체 {stats.overdueCount}건</p>
+            <p className="text-[var(--system-red)] text-xl font-bold">{formatKRW(stats.overdueAmount)}</p>
           </div>
         )}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
         {[
-          { label: '연체 건수', value: `${stats.overdueCount}건`, sub: '기한 초과', color: 'text-red-600' },
-          { label: '연체 금액', value: formatKRW(stats.overdueAmount), sub: '기한 초과 미수금', color: 'text-red-600' },
-          { label: '90일 초과', value: formatKRW(stats.over90Amount), sub: '장기 미수금', color: 'text-red-700' },
+          { label: '연체 건수', value: `${stats.overdueCount}건`, sub: '기한 초과', color: 'text-[var(--system-red)]' },
+          { label: '연체 금액', value: formatKRW(stats.overdueAmount), sub: '기한 초과 미수금', color: 'text-[var(--system-red)]' },
+          { label: '90일 초과', value: formatKRW(stats.over90Amount), sub: '장기 미수금', color: 'text-[var(--system-red)]' },
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-stone-200 p-4">
+          <div key={s.label} className="bg-card rounded-xl border border-border p-4">
             <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-stone-500 mt-0.5">{s.label}</p>
-            <p className="text-[10px] text-stone-400">{s.sub}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
+            <p className="text-[11px] text-muted-foreground">{s.sub}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-stone-200 p-4">
+      <div className="bg-card rounded-xl border border-border p-4">
         <div className="flex items-center gap-2 mb-3">
-          <AlertTriangle className="w-4 h-4 text-amber-600" />
-          <p className="text-sm font-semibold text-stone-700">미수금 에이징 분석</p>
+          <AlertTriangle className="w-4 h-4 text-[var(--system-orange)]" />
+          <p className="text-sm font-semibold text-foreground">미수금 에이징 분석</p>
         </div>
         <div className="h-[180px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -265,39 +265,39 @@ export default function SettlementManagement() {
       </div>
 
       {/* 바이어별 누적 거래금액 */}
-      <div className="bg-white rounded-xl border border-stone-200 p-4">
+      <div className="bg-card rounded-xl border border-border p-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-semibold text-stone-700">바이어별 누적 거래금액</p>
+          <p className="text-sm font-semibold text-foreground">바이어별 누적 거래금액</p>
           <button
             onClick={() => setShowBuyerStats(v => !v)}
-            className="text-xs text-stone-500 hover:text-stone-700 px-2 py-1 rounded border border-stone-200 hover:bg-stone-50 transition-colors"
+            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded border border-border hover:bg-[var(--fill-quaternary)] transition-colors"
           >
             {showBuyerStats ? '접기' : '펼치기'}
           </button>
         </div>
         {showBuyerStats && (
           buyerStats.length === 0 ? (
-            <p className="text-xs text-stone-400 text-center py-3">등록된 정산 내역이 없습니다</p>
+            <p className="text-xs text-muted-foreground text-center py-3">등록된 정산 내역이 없습니다</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-stone-100">
-                  <th className="text-left py-2 text-xs text-stone-500">바이어</th>
-                  <th className="text-center py-2 text-xs text-stone-500">거래건수</th>
-                  <th className="text-right py-2 text-xs text-stone-500">총 청구금액</th>
-                  <th className="text-right py-2 text-xs text-stone-500">수금금액</th>
-                  <th className="text-right py-2 text-xs text-stone-500">미수금</th>
+                <tr className="border-b border-border">
+                  <th className="text-left py-2 text-[13px] font-semibold text-muted-foreground">바이어</th>
+                  <th className="text-center py-2 text-[13px] font-semibold text-muted-foreground">거래건수</th>
+                  <th className="text-right py-2 text-[13px] font-semibold text-muted-foreground">총 청구금액</th>
+                  <th className="text-right py-2 text-[13px] font-semibold text-muted-foreground">수금금액</th>
+                  <th className="text-right py-2 text-[13px] font-semibold text-muted-foreground">미수금</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border">
                 {buyerStats.map(b => (
-                  <tr key={b.name} className="border-b border-stone-50">
-                    <td className="py-2 font-medium text-stone-700">{b.name}</td>
-                    <td className="py-2 text-center text-stone-500">{b.count}건</td>
-                    <td className="py-2 text-right font-mono text-stone-700">{formatKRW(b.total)}</td>
-                    <td className="py-2 text-right font-mono text-green-700">{formatKRW(b.collected)}</td>
-                    <td className="py-2 text-right font-mono font-semibold text-red-600">
-                      {b.total - b.collected > 0 ? formatKRW(b.total - b.collected) : <span className="text-stone-300">-</span>}
+                  <tr key={b.name} className="hover:bg-[var(--fill-quaternary)]">
+                    <td className="py-2 font-medium text-foreground">{b.name}</td>
+                    <td className="py-2 text-center text-muted-foreground">{b.count}건</td>
+                    <td className="py-2 text-right font-mono text-foreground">{formatKRW(b.total)}</td>
+                    <td className="py-2 text-right font-mono text-[var(--system-green)]">{formatKRW(b.collected)}</td>
+                    <td className="py-2 text-right font-mono font-semibold text-[var(--system-red)]">
+                      {b.total - b.collected > 0 ? formatKRW(b.total - b.collected) : <span className="text-muted-foreground">-</span>}
                     </td>
                   </tr>
                 ))}
@@ -306,13 +306,13 @@ export default function SettlementManagement() {
           )
         )}
         {!showBuyerStats && buyerStats.length > 0 && (
-          <p className="text-xs text-stone-400">{buyerStats.length}개 바이어 · 총 청구 {formatKRW(buyerStats.reduce((s, b) => s + b.total, 0))}</p>
+          <p className="text-xs text-muted-foreground">{buyerStats.length}개 바이어 · 총 청구 {formatKRW(buyerStats.reduce((s, b) => s + b.total, 0))}</p>
         )}
       </div>
 
       <div className="flex gap-3">
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="바이어명 / 명세서번호 검색" className="pl-9 h-9" />
         </div>
         <Select value={filterChannel} onValueChange={setFilterChannel}>
@@ -331,26 +331,26 @@ export default function SettlementManagement() {
         </Select>
       </div>
 
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         <table className="hidden md:table w-full text-sm">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50">
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">바이어</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">채널</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">명세서번호</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">발행일</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">만기일</th>
-              <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">경과일</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">청구금액</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">수금금액</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">미수금</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">상태</th>
-              <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
+            <tr className="border-b border-border">
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">바이어</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">채널</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">명세서번호</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">발행일</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">만기일</th>
+              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">경과일</th>
+              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">청구금액</th>
+              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">수금금액</th>
+              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">미수금</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">상태</th>
+              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {filtered.length === 0 ? (
-              <tr><td colSpan={11} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={11} className="text-center py-12 text-muted-foreground">
                 <Wallet className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 정산 내역이 없습니다</p>
               </td></tr>
@@ -359,26 +359,26 @@ export default function SettlementManagement() {
               const elapsed = s.status !== '완납' ? calcElapsedDays(s.dueDate) : -999;
               const isOver7 = elapsed >= 7;
               return (
-                <tr key={s.id} className={`border-b hover:bg-stone-50/50 ${isOver7 ? 'bg-red-50/60' : 'border-stone-50'}`}>
-                  <td className="px-4 py-3 font-medium text-stone-800">{s.buyerName}</td>
-                  <td className="px-4 py-3 text-stone-600">{s.channel}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-stone-500">{s.invoiceNo || '-'}</td>
-                  <td className="px-4 py-3 text-stone-600">{s.invoiceDate}</td>
-                  <td className="px-4 py-3 text-stone-600">{s.dueDate}</td>
+                <tr key={s.id} className={`hover:bg-[var(--fill-quaternary)] ${isOver7 ? 'bg-destructive/5' : ''}`}>
+                  <td className="px-4 py-3 font-medium text-foreground">{s.buyerName}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{s.channel}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{s.invoiceNo || '-'}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{s.invoiceDate}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{s.dueDate}</td>
                   <td className="px-4 py-3 text-center">
                     {s.status !== '완납' && elapsed > 0 ? (
-                      <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${isOver7 ? 'bg-red-100 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
+                      <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${isOver7 ? 'bg-destructive/10 text-destructive' : 'bg-[var(--fill-quaternary)] text-[var(--system-orange)]'}`}>
                         D+{elapsed}일
                       </span>
                     ) : s.status === '완납' ? (
-                      <span className="text-xs text-stone-400">-</span>
+                      <span className="text-xs text-muted-foreground">-</span>
                     ) : (
-                      <span className="text-xs text-blue-600 font-mono">{Math.abs(elapsed)}일 남음</span>
+                      <span className="text-xs text-primary font-mono">{Math.abs(elapsed)}일 남음</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono text-stone-700">{formatNumber(s.billedAmountKrw)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-green-700">{formatNumber(s.collectedAmountKrw)}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-red-600">{receivable > 0 ? formatNumber(receivable) : '-'}</td>
+                  <td className="px-4 py-3 text-right font-mono text-foreground">{formatNumber(s.billedAmountKrw)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-[var(--system-green)]">{formatNumber(s.collectedAmountKrw)}</td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold text-[var(--system-red)]">{receivable > 0 ? formatNumber(receivable) : '-'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${STATUS_COLOR[s.status]}`}>
                       {s.status === '완납' ? <CheckCircle className="w-3 h-3" /> : s.status === '위험' ? <AlertTriangle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
@@ -388,12 +388,12 @@ export default function SettlementManagement() {
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
                       {s.status !== '완납' && (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-green-700 hover:bg-green-50 px-2" onClick={() => handleCollect(s)}>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-[var(--system-green)] px-2" onClick={() => handleCollect(s)}>
                           수금완료
                         </Button>
                       )}
                       <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(s)}>수정</Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(s.id)}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -405,9 +405,9 @@ export default function SettlementManagement() {
         </table>
 
         {/* 카드 리스트 (모바일) */}
-        <div className="md:hidden divide-y divide-stone-100">
+        <div className="md:hidden divide-y divide-border">
           {filtered.length === 0 ? (
-            <div className="text-center py-12 text-stone-400">
+            <div className="text-center py-12 text-muted-foreground">
               <Wallet className="w-10 h-10 mx-auto mb-2 opacity-30" />
               <p className="text-sm">등록된 정산 내역이 없습니다</p>
             </div>
@@ -416,32 +416,32 @@ export default function SettlementManagement() {
             const elapsed = s.status !== '완납' ? calcElapsedDays(s.dueDate) : -999;
             const isOver7 = elapsed >= 7;
             return (
-              <div key={s.id} className={`p-4 ${isOver7 ? 'bg-red-50/60' : ''}`}>
+              <div key={s.id} className={`p-4 ${isOver7 ? 'bg-destructive/5' : ''}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-semibold text-stone-800">{s.buyerName}</p>
-                    <p className="text-xs text-stone-500 mt-0.5">{s.channel} · {s.invoiceNo || '-'}</p>
+                    <p className="font-semibold text-foreground">{s.buyerName}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{s.channel} · {s.invoiceNo || '-'}</p>
                   </div>
                   <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLOR[s.status]}`}>
                     {s.status === '완납' ? <CheckCircle className="w-3 h-3" /> : s.status === '위험' ? <AlertTriangle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                     {s.status}
                   </span>
                 </div>
-                <div className="mt-2 flex items-center gap-4 text-xs text-stone-500">
-                  <span>청구: <span className="font-mono font-medium text-stone-700">{formatNumber(s.billedAmountKrw)}</span></span>
-                  <span>미수: <span className={`font-mono font-semibold ${receivable > 0 ? 'text-red-600' : 'text-stone-400'}`}>{receivable > 0 ? formatNumber(receivable) : '-'}</span></span>
+                <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+                  <span>청구: <span className="font-mono font-medium text-foreground">{formatNumber(s.billedAmountKrw)}</span></span>
+                  <span>미수: <span className={`font-mono font-semibold ${receivable > 0 ? 'text-[var(--system-red)]' : 'text-muted-foreground'}`}>{receivable > 0 ? formatNumber(receivable) : '-'}</span></span>
                   {s.status !== '완납' && elapsed > 0 && (
-                    <span className={`font-mono font-bold px-1.5 py-0.5 rounded ${isOver7 ? 'bg-red-100 text-red-700' : 'bg-amber-50 text-amber-700'}`}>D+{elapsed}일</span>
+                    <span className={`font-mono font-bold px-1.5 py-0.5 rounded ${isOver7 ? 'bg-destructive/10 text-destructive' : 'bg-[var(--fill-quaternary)] text-[var(--system-orange)]'}`}>D+{elapsed}일</span>
                   )}
                 </div>
                 <div className="flex items-center justify-end gap-1 mt-2">
                   {s.status !== '완납' && (
-                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-green-700 hover:bg-green-50" onClick={() => handleCollect(s)}>
+                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-[var(--system-green)]" onClick={() => handleCollect(s)}>
                       수금완료
                     </Button>
                   )}
                   <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openEdit(s)}>수정</Button>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(s.id)}>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -520,7 +520,7 @@ export default function SettlementManagement() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
-            <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">{editId ? '수정' : '등록'}</Button>
+            <Button onClick={handleSave}>{editId ? '수정' : '등록'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

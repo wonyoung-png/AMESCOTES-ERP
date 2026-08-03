@@ -242,11 +242,11 @@ export default function AgentPanel() {
     <div className="flex flex-col h-full max-h-[calc(100vh-4rem)] bg-background">
       {/* 헤더 */}
       <div className="flex items-center gap-3 px-6 py-4 border-b">
-        <div className="flex items-center justify-center w-9 h-9 rounded-full" style={{ backgroundColor: '#C9A96E' }}>
-          <Bot className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-center w-9 h-9 rounded-full bg-primary">
+          <Bot className="w-5 h-5 text-primary-foreground" />
         </div>
         <div>
-          <h1 className="text-lg font-semibold" style={{ color: '#1C1C1E' }}>AI 어시스턴트</h1>
+          <h1 className="text-lg font-semibold text-foreground">AI 어시스턴트</h1>
           <p className="text-xs text-muted-foreground">AI 어시스턴트 · claude-haiku-4-5</p>
         </div>
       </div>
@@ -258,8 +258,7 @@ export default function AgentPanel() {
             key={label}
             onClick={() => sendMessage(prompt, [])}
             disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition-colors disabled:opacity-50 hover:bg-accent"
-            style={{ borderColor: '#C9A96E', color: '#C9A96E' }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border border-primary/30 text-primary transition-colors disabled:opacity-50 hover:bg-primary/10"
           >
             <Zap className="w-3 h-3" />
             {label}
@@ -273,12 +272,11 @@ export default function AgentPanel() {
           {messages.map(message => (
             <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
               <div
-                className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full"
-                style={message.role === 'agent' ? { backgroundColor: '#C9A96E' } : { backgroundColor: '#e5e7eb' }}
+                className={`flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full ${message.role === 'agent' ? 'bg-primary' : 'bg-muted'}`}
               >
                 {message.role === 'user'
                   ? <User className="w-4 h-4 text-muted-foreground" />
-                  : <Bot className="w-4 h-4 text-white" />
+                  : <Bot className="w-4 h-4 text-primary-foreground" />
                 }
               </div>
               <div className={`max-w-[75%] space-y-2 ${message.role === 'user' ? 'items-end' : 'items-start'} flex flex-col`}>
@@ -336,7 +334,7 @@ export default function AgentPanel() {
                 <img src={img.preview} alt="첨부" className="w-16 h-16 rounded-lg object-cover border" />
                 <button
                   onClick={() => setPendingImages(prev => prev.filter((_, idx) => idx !== i))}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--system-red)] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -359,7 +357,6 @@ export default function AgentPanel() {
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
             className="h-11 px-3 flex-shrink-0"
-            style={{ color: '#C9A96E', borderColor: '#C9A96E55' }}
             title="이미지 또는 Excel/CSV 파일 첨부"
           >
             <Paperclip className="w-4 h-4" />
@@ -373,15 +370,14 @@ export default function AgentPanel() {
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={pendingImages.length > 0 ? '이미지에 대해 질문하거나 Enter로 바로 분석...' : '질문을 입력하거나 이미지를 붙여넣기(Ctrl+V)...'}
-              className="w-full min-h-[44px] max-h-32 resize-none rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-1"
-              style={{ '--tw-ring-color': '#C9A96E' } as React.CSSProperties}
+              className="w-full min-h-[44px] max-h-32 resize-none rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
               disabled={isLoading}
               rows={1}
             />
             {pendingImages.length > 0 && (
               <div className="absolute right-2 top-2 flex items-center gap-1 text-xs text-muted-foreground">
-                <Image className="w-3 h-3" style={{ color: '#C9A96E' }} />
-                <span style={{ color: '#C9A96E' }}>{pendingImages.length}</span>
+                <Image className="w-3 h-3 text-primary" />
+                <span className="text-primary">{pendingImages.length}</span>
               </div>
             )}
           </div>
@@ -390,8 +386,7 @@ export default function AgentPanel() {
             type="button"
             onClick={() => sendMessage(inputText)}
             disabled={isLoading || (!inputText.trim() && pendingImages.length === 0)}
-            className="h-11 px-4 text-white flex-shrink-0"
-            style={{ backgroundColor: '#C9A96E' }}
+            className="h-11 px-4 flex-shrink-0"
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </Button>

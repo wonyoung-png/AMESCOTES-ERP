@@ -100,22 +100,22 @@ export default function ReceivingShipping() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-stone-800">입고 · 출고</h1>
-        <p className="text-sm text-stone-500">부분입고 · OEM 직출고 · 3PL 입고 (receipt_logs)</p>
+        <h1 className="text-2xl font-bold text-foreground">입고 · 출고</h1>
+        <p className="text-sm text-muted-foreground">부분입고 · OEM 직출고 · 3PL 입고 (receipt_logs)</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {(['all', 'pending', 'partial', 'done'] as const).map(f => (
-          <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'}
+          <Button key={f} size="sm" variant={filter === f ? 'secondary' : 'outline'}
             onClick={() => setFilter(f)}>
             {f === 'all' ? '전체' : f === 'pending' ? '미입고' : f === 'partial' ? '부분입고' : '완료'}
           </Button>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-stone-50 text-xs text-stone-500">
+          <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
               <th className="text-left px-4 py-2">발주번호</th>
               <th className="text-right px-4 py-2">발주</th>
@@ -125,13 +125,13 @@ export default function ReceivingShipping() {
               <th className="px-4 py-2">처리</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {filtered.map(o => (
-              <tr key={o.id} className="border-t border-stone-100 hover:bg-stone-50">
+              <tr key={o.id} className="hover:bg-[var(--fill-quaternary)]">
                 <td className="px-4 py-3 font-mono text-xs">{o.orderNo}</td>
                 <td className="px-4 py-3 text-right">{formatNumber(o.qty)}</td>
-                <td className="px-4 py-3 text-right text-green-700">{formatNumber(o.receivedQty)}</td>
-                <td className="px-4 py-3 text-right text-blue-700">{formatNumber(o.shippedQty)}</td>
+                <td className="px-4 py-3 text-right text-[var(--system-green)]">{formatNumber(o.receivedQty)}</td>
+                <td className="px-4 py-3 text-right text-primary">{formatNumber(o.shippedQty)}</td>
                 <td className="px-4 py-3 text-right font-semibold">{formatNumber(o.remaining)}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1 flex-wrap">
@@ -154,7 +154,7 @@ export default function ReceivingShipping() {
 
       <div>
         <div className="flex items-center gap-3 mb-3">
-          <h2 className="font-semibold text-stone-700">입출고 이력</h2>
+          <h2 className="font-semibold text-foreground">입출고 이력</h2>
           <Select value={logFilter} onValueChange={v => setLogFilter(v as ReceiptLogType | 'all')}>
             <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -165,24 +165,24 @@ export default function ReceivingShipping() {
             </SelectContent>
           </Select>
         </div>
-        <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100">
+        <div className="bg-card rounded-xl border border-border divide-y divide-border">
           {allLogs.length === 0 ? (
-            <p className="p-6 text-sm text-stone-400 text-center">이력 없음</p>
+            <p className="p-6 text-sm text-muted-foreground text-center">이력 없음</p>
           ) : allLogs.slice(0, 30).map(l => (
             <div key={l.id} className="px-4 py-3 flex justify-between text-sm">
               <div>
                 <span className="font-mono text-xs">{l.orderNo}</span>
-                <span className="mx-2 text-stone-300">·</span>
-                <span className="text-stone-600">{LOG_LABELS[l.logType]}</span>
-                {l.destination === 'korea' && <span className="ml-1 text-[10px] text-amber-700">한국</span>}
-                {l.destination === 'china' && <span className="ml-1 text-[10px] text-blue-700">중국{l.color ? `·${l.color}` : ''}</span>}
-                {l.isAdvance && <span className="ml-1 text-[10px] text-orange-600">선입</span>}
-                {l.orderNo && <span className="ml-2 text-xs text-stone-400">{l.orderNo}</span>}
+                <span className="mx-2 text-muted-foreground">·</span>
+                <span className="text-muted-foreground">{LOG_LABELS[l.logType]}</span>
+                {l.destination === 'korea' && <span className="ml-1 text-[11px] text-muted-foreground">한국</span>}
+                {l.destination === 'china' && <span className="ml-1 text-[11px] text-primary">중국{l.color ? `·${l.color}` : ''}</span>}
+                {l.isAdvance && <span className="ml-1 text-[11px] text-[var(--system-orange)]">선입</span>}
+                {l.orderNo && <span className="ml-2 text-xs text-muted-foreground">{l.orderNo}</span>}
               </div>
               <div className="text-right">
                 <span className="font-semibold">{formatNumber(l.qty)}</span>
-                {l.defectQty > 0 && <span className="text-red-500 text-xs ml-2">불량 {l.defectQty}</span>}
-                <span className="text-stone-400 text-xs ml-2">{l.receivedDate}</span>
+                {l.defectQty > 0 && <span className="text-[var(--system-red)] text-xs ml-2">불량 {l.defectQty}</span>}
+                <span className="text-muted-foreground text-xs ml-2">{l.receivedDate}</span>
               </div>
             </div>
           ))}

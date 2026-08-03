@@ -24,14 +24,14 @@ import { getAssigneeForStep, R3_ROLE_LABEL, R3_STEP_ROLE } from '@/lib/orgChart'
 const PIPELINE = ['발주', '진행중', '생산완료', '한국/중국입고', '지출결의', '공장결제'] as const;
 
 const STATUS_CLASS: Record<OrderDisplayStatus, string> = {
-  결제완료: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  지출결의: 'bg-violet-100 text-violet-800 border-violet-200',
-  입고완료: 'bg-sky-100 text-sky-800 border-sky-200',
-  부분입고: 'bg-amber-100 text-amber-800 border-amber-200',
-  선입고: 'bg-orange-100 text-orange-800 border-orange-200',
-  생산완료: 'bg-blue-100 text-blue-800 border-blue-200',
-  진행중: 'bg-stone-100 text-stone-700 border-stone-200',
-  발주: 'bg-white text-stone-600 border-stone-200',
+  결제완료: 'bg-[var(--fill-quaternary)] text-[var(--system-green)] border-border',
+  지출결의: 'bg-[var(--fill-quaternary)] text-[var(--system-indigo)] border-border',
+  입고완료: 'bg-[var(--fill-quaternary)] text-[var(--system-teal)] border-border',
+  부분입고: 'bg-[var(--fill-quaternary)] text-[var(--system-orange)] border-border',
+  선입고: 'bg-[var(--fill-quaternary)] text-[var(--system-orange)] border-border',
+  생산완료: 'bg-[var(--fill-quaternary)] text-primary border-border',
+  진행중: 'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
+  발주: 'bg-card text-muted-foreground border-border',
 };
 
 function ensureChinaCorpVendor(): { id: string; name: string } {
@@ -365,13 +365,13 @@ export default function BrandOrders() {
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">리오더 · 오더관리</h1>
-          <p className="text-sm text-stone-500">{ws} — 차수별 잔량·선입고 · 한국/중국 입고 · 지출결의</p>
+          <h1 className="text-2xl font-bold text-foreground">리오더 · 오더관리</h1>
+          <p className="text-sm text-muted-foreground">{ws} — 차수별 잔량·선입고 · 한국/중국 입고 · 지출결의</p>
         </div>
         <Button
           size="sm"
           variant="outline"
-          className="border-amber-300 text-amber-900 hover:bg-amber-50 gap-1.5"
+          className="gap-1.5"
           onClick={applyColorsForTest}
         >
           <Palette size={14} />
@@ -393,7 +393,7 @@ export default function BrandOrders() {
               ['done', '완료'],
               ['all', '전체'],
             ] as const).map(([k, label]) => (
-              <Button key={k} size="sm" variant={progressFilter === k ? 'default' : 'outline'}
+              <Button key={k} size="sm" variant={progressFilter === k ? 'secondary' : 'outline'}
                 onClick={() => setProgressFilter(k)}>{label}</Button>
             ))}
             <select
@@ -410,25 +410,25 @@ export default function BrandOrders() {
               value={styleSearch}
               onChange={e => setStyleSearch(e.target.value)}
             />
-            <span className="text-[10px] text-stone-400 ml-auto hidden sm:inline">
+            <span className="text-[11px] text-muted-foreground ml-auto hidden sm:inline">
               기본·미지정 컬러가 보이면 「컬러 데이터 재적용」
             </span>
           </div>
 
           {board.length === 0 ? (
-            <div className="bg-white rounded-xl border p-10 text-center text-sm text-stone-400">
+            <div className="bg-card rounded-xl border p-10 text-center text-sm text-muted-foreground">
               표시할 오더가 없습니다. 승인 탭에서 묶음 발주 → 생산발주 분할 후, 또는 리오더 생산발주를 등록하세요.
             </div>
           ) : board.map(group => (
-            <div key={group.styleNo} className="bg-white rounded-xl border overflow-hidden">
-              <div className="px-4 py-3 border-b bg-stone-50 flex items-center gap-2">
+            <div key={group.styleNo} className="bg-card rounded-xl border overflow-hidden">
+              <div className="px-4 py-3 border-b bg-muted flex items-center gap-2">
                 <span className="font-semibold text-sm">{group.styleName}</span>
-                <span className="font-mono text-xs text-amber-700">{group.styleNo}</span>
-                {group.erpCategory && <Badge variant="outline" className="text-[10px]">{group.erpCategory}</Badge>}
-                <span className="text-[10px] text-stone-400 ml-auto">{group.rows.length}차</span>
+                <span className="font-mono text-xs text-primary">{group.styleNo}</span>
+                {group.erpCategory && <Badge variant="outline" className="text-[11px]">{group.erpCategory}</Badge>}
+                <span className="text-[11px] text-muted-foreground ml-auto">{group.rows.length}차</span>
               </div>
               <table className="w-full text-sm">
-                <thead className="text-xs text-stone-500 bg-white">
+                <thead className="text-[13px] font-semibold text-muted-foreground">
                   <tr>
                     <th className="text-left px-3 py-2">차수</th>
                     <th className="text-left px-3 py-2">컬러</th>
@@ -445,42 +445,42 @@ export default function BrandOrders() {
                   {group.rows.flatMap(row => {
                     const lines = (row.colorLines?.length ? row.colorLines : [{ color: '(미지정)', qty: row.qty, advanceQty: row.advanceQty, receivedQty: row.receivedQty, remaining: row.remaining }]);
                     return lines.map((cl, idx) => (
-                      <tr key={`${row.orderId}-${cl.color}`} className="border-t border-stone-100 hover:bg-amber-50/40">
+                      <tr key={`${row.orderId}-${cl.color}`} className="border-t border-border hover:bg-[var(--fill-quaternary)]">
                         <td className="px-3 py-2 font-medium text-xs">
                           {idx === 0 ? `${row.revision}차` : ''}
                           {idx === 0 && lines.length > 1 && (
-                            <span className="block text-[10px] text-stone-400 font-normal">합 {formatNumber(row.qty)}</span>
+                            <span className="block text-[11px] text-muted-foreground font-normal">합 {formatNumber(row.qty)}</span>
                           )}
                         </td>
                         <td className="px-3 py-2">
-                          <Badge variant="outline" className="text-[10px] font-mono">{cl.color}</Badge>
+                          <Badge variant="outline" className="text-[11px] font-mono">{cl.color}</Badge>
                         </td>
                         <td className="px-3 py-2 text-xs">{idx === 0 ? (row.orderDate || '—') : ''}</td>
                         <td className="px-3 py-2 text-right">{formatNumber(cl.qty)}</td>
-                        <td className="px-3 py-2 text-right text-orange-700">{formatNumber(cl.advanceQty)}</td>
+                        <td className="px-3 py-2 text-right text-[var(--system-orange)]">{formatNumber(cl.advanceQty)}</td>
                         <td className="px-3 py-2 text-right">{formatNumber(cl.receivedQty)}</td>
                         <td className="px-3 py-2 text-right font-semibold">{formatNumber(cl.remaining)}</td>
                         <td className="px-3 py-2">
                           {idx === 0 ? (
-                            <span className={`text-[10px] px-2 py-0.5 rounded border ${STATUS_CLASS[row.displayStatus]}`}>
+                            <span className={`text-[11px] px-2 py-0.5 rounded border ${STATUS_CLASS[row.displayStatus]}`}>
                               {row.displayStatus}
                             </span>
                           ) : (
-                            <span className="text-[10px] text-stone-400">{cl.remaining <= 0 ? '입고완료' : cl.receivedQty > 0 ? '부분' : '대기'}</span>
+                            <span className="text-[11px] text-muted-foreground">{cl.remaining <= 0 ? '입고완료' : cl.receivedQty > 0 ? '부분' : '대기'}</span>
                           )}
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap gap-1 justify-end">
                             {idx === 0 && (
-                              <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setDetailRow(row)}>상세</Button>
+                              <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => setDetailRow(row)}>상세</Button>
                             )}
                             {cl.remaining > 0 && (
-                              <Button size="sm" className="h-7 text-[10px]" onClick={() => openRecv(row, cl.color)}>
+                              <Button size="sm" variant="secondary" className="h-7 text-[11px]" onClick={() => openRecv(row, cl.color)}>
                                 <Package className="w-3 h-3 mr-0.5" />입고
                               </Button>
                             )}
                             {idx === 0 && row.productionStatus !== 'produced' && row.orderStatus !== '입고완료' && (
-                              <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => markProduced(row)}>
+                              <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => markProduced(row)}>
                                 <Factory className="w-3 h-3 mr-0.5" />생산완료
                               </Button>
                             )}
@@ -499,35 +499,35 @@ export default function BrandOrders() {
         <TabsContent value="approval" className="mt-4 space-y-4">
           <div className="flex gap-2">
             <Input placeholder="발주 제목 (예: 6월 2주차 리오더)" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="max-w-sm" />
-            <Button onClick={createBatch}>+ 묶음 발주</Button>
+            <Button variant="secondary" onClick={createBatch}>+ 묶음 발주</Button>
           </div>
 
           <div className="grid grid-cols-5 gap-4">
-            <div className="col-span-2 bg-white rounded-xl border divide-y max-h-[70vh] overflow-y-auto">
+            <div className="col-span-2 bg-card rounded-xl border divide-y divide-border max-h-[70vh] overflow-y-auto">
               {batches.length === 0 ? (
-                <p className="p-6 text-sm text-stone-400 text-center">발주 없음</p>
+                <p className="p-6 text-sm text-muted-foreground text-center">발주 없음</p>
               ) : batches.map(b => (
                 <button key={b.id} type="button"
-                  className={`w-full text-left px-4 py-3 hover:bg-stone-50 ${selected?.id === b.id ? 'bg-amber-50' : ''}`}
+                  className={`w-full text-left px-4 py-3 hover:bg-[var(--fill-quaternary)] ${selected?.id === b.id ? 'bg-primary/5' : ''}`}
                   onClick={() => setSelected(b)}>
-                  <p className="font-mono text-xs text-amber-700">{b.projectNo}</p>
+                  <p className="font-mono text-xs text-primary">{b.projectNo}</p>
                   <p className="font-medium text-sm">{b.title}</p>
-                  <p className="text-xs text-stone-500 mt-1">{stepLabel(b)} · {b.lines.length} SKU</p>
+                  <p className="text-xs text-muted-foreground mt-1">{stepLabel(b)} · {b.lines.length} SKU</p>
                 </button>
               ))}
             </div>
 
-            <div className="col-span-3 bg-white rounded-xl border p-5 space-y-4">
+            <div className="col-span-3 bg-card rounded-xl border p-5 space-y-4">
               {!detail ? (
-                <p className="text-stone-400 text-sm">왼쪽에서 발주 선택</p>
+                <p className="text-muted-foreground text-sm">왼쪽에서 발주 선택</p>
               ) : (
                 <>
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-mono text-sm text-amber-700">{detail.projectNo}</p>
+                      <p className="font-mono text-sm text-primary">{detail.projectNo}</p>
                       <h2 className="text-lg font-bold">{detail.title}</h2>
                     </div>
-                    <span className="text-xs bg-stone-100 px-2 py-1 rounded">{stepLabel(detail)}</span>
+                    <span className="text-xs bg-muted px-2 py-1 rounded">{stepLabel(detail)}</span>
                   </div>
 
                   <div className="flex flex-wrap gap-1">
@@ -537,10 +537,10 @@ export default function BrandOrders() {
                         <span
                           key={s.step}
                           title={asg ? `담당: ${asg.name} (${R3_ROLE_LABEL[R3_STEP_ROLE[s.step]]})` : undefined}
-                          className={`text-[10px] px-2 py-1 rounded border ${
-                            detail.approvalStep > s.step ? 'bg-green-50 border-green-200 text-green-700' :
-                            detail.approvalStep === s.step && detail.status === 'in_approval' ? 'bg-amber-50 border-amber-300 font-bold' :
-                            'bg-stone-50 border-stone-200 text-stone-400'
+                          className={`text-[11px] px-2 py-1 rounded border ${
+                            detail.approvalStep > s.step ? 'bg-[var(--fill-quaternary)] border-border text-[var(--system-green)]' :
+                            detail.approvalStep === s.step && detail.status === 'in_approval' ? 'bg-primary/10 border-primary/30 font-bold' :
+                            'bg-[var(--fill-quaternary)] border-border text-muted-foreground'
                           }`}
                         >
                           {s.step}.{s.label}
@@ -551,19 +551,19 @@ export default function BrandOrders() {
                   </div>
 
                   {detail.status === 'in_approval' && stepAssignee && (
-                    <p className="text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded-md px-3 py-2">
+                    <p className="text-xs text-[var(--system-indigo)] bg-[var(--fill-quaternary)] border border-border rounded-md px-3 py-2">
                       현재 단계 담당(조직도): <b>{stepAssignee.name}</b> {stepAssignee.title}
-                      <span className="text-violet-500 ml-1">· {R3_ROLE_LABEL[R3_STEP_ROLE[detail.approvalStep]]}</span>
+                      <span className="text-[var(--system-indigo)] ml-1">· {R3_ROLE_LABEL[R3_STEP_ROLE[detail.approvalStep]]}</span>
                       {detail.approvalStep === 2 && (
-                        <span className="block mt-1 text-violet-600">생산납기(예상입고일)는 이 단계에서 입력 · 조직도에서 담당 변경 가능</span>
+                        <span className="block mt-1 text-[var(--system-indigo)]">생산납기(예상입고일)는 이 단계에서 입력 · 조직도에서 담당 변경 가능</span>
                       )}
                     </p>
                   )}
 
                   {detail.status === 'in_approval' && detail.approvalStep === 2 && (
-                    <div className="flex flex-wrap items-end gap-2 border rounded-lg p-3 bg-amber-50/50">
+                    <div className="flex flex-wrap items-end gap-2 border rounded-lg p-3 bg-muted">
                       <div className="space-y-1">
-                        <label className="text-[10px] text-stone-500">생산납기 · 예상입고일</label>
+                        <label className="text-[11px] text-muted-foreground">생산납기 · 예상입고일</label>
                         <Input
                           type="date"
                           className="h-8 text-sm"
@@ -575,13 +575,13 @@ export default function BrandOrders() {
                           }}
                         />
                       </div>
-                      <p className="text-[10px] text-stone-500 pb-1">저장되면 MD 화면에 참고 표시됩니다</p>
+                      <p className="text-[11px] text-muted-foreground pb-1">저장되면 MD 화면에 참고 표시됩니다</p>
                     </div>
                   )}
 
                   {detail.expectedDely && (
-                    <p className="text-xs text-stone-600">
-                      등록된 생산납기: <b className="font-mono text-amber-800">{detail.expectedDely}</b>
+                    <p className="text-xs text-muted-foreground">
+                      등록된 생산납기: <b className="font-mono text-primary">{detail.expectedDely}</b>
                     </p>
                   )}
 
@@ -612,7 +612,7 @@ export default function BrandOrders() {
                   )}
 
                   <table className="w-full text-sm border rounded-lg overflow-hidden">
-                    <thead className="bg-stone-50 text-xs">
+                    <thead className="text-[13px] font-semibold text-muted-foreground">
                       <tr>
                         <th className="text-left px-3 py-2">SKU</th>
                         <th className="text-left px-3 py-2">컬러</th>
@@ -621,11 +621,11 @@ export default function BrandOrders() {
                         <th className="text-left px-3 py-2">생산지</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-border">
                       {detail.lines.flatMap(l => {
                         const cqs = l.colorQtys?.length ? l.colorQtys : [{ color: '(미지정)', qty: l.qty }];
                         return cqs.map((cq, i) => (
-                          <tr key={`${l.id}-${cq.color}-${i}`} className="border-t">
+                          <tr key={`${l.id}-${cq.color}-${i}`} className="hover:bg-[var(--fill-quaternary)]">
                             <td className="px-3 py-2 font-mono text-xs">{i === 0 ? l.styleNo : ''}</td>
                             <td className="px-3 py-2 text-xs">{cq.color}</td>
                             <td className="px-3 py-2 text-right">{cq.qty}</td>
@@ -639,7 +639,7 @@ export default function BrandOrders() {
 
                   {detail.status === 'draft' && (
                     <div className="border-t pt-4 space-y-2">
-                      <p className="text-xs font-semibold text-stone-500">SKU 추가 (컬러별 수량)</p>
+                      <p className="text-xs font-semibold text-muted-foreground">SKU 추가 (컬러별 수량)</p>
                       <div className="grid grid-cols-2 gap-2">
                         <select className="border rounded h-9 px-2 text-sm" value={lineForm.styleNo}
                           onChange={e => pickStyleForLine(e.target.value)}>
@@ -653,7 +653,7 @@ export default function BrandOrders() {
                         </select>
                       </div>
                       {lineForm.styleNo && (
-                        <div className="space-y-1.5 border rounded-md p-2 bg-stone-50">
+                        <div className="space-y-1.5 border rounded-md p-2 bg-muted">
                           {lineColorQtys.map((cq, idx) => (
                             <div key={idx} className="grid grid-cols-5 gap-1.5 items-center">
                               <Input
@@ -674,14 +674,14 @@ export default function BrandOrders() {
                             </div>
                           ))}
                           <div className="flex justify-between items-center pt-1">
-                            <Button type="button" size="sm" variant="outline" className="h-7 text-[10px]"
+                            <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]"
                               onClick={() => setLineColorQtys(prev => [...prev, { color: '', qty: 0 }])}>+ 컬러</Button>
-                            <span className="text-[10px] text-stone-500">
+                            <span className="text-[11px] text-muted-foreground">
                               합계 {lineColorQtys.reduce((s, c) => s + (c.qty || 0), 0).toLocaleString()} PCS
                             </span>
                           </div>
                           {!normalizeColors(items.find(i => i.styleNo === lineForm.styleNo)?.colors || []).length && (
-                            <p className="text-[10px] text-amber-700">품목마스터에 컬러가 없습니다. 직접 입력하세요.</p>
+                            <p className="text-[11px] text-[var(--system-orange)]">품목마스터에 컬러가 없습니다. 직접 입력하세요.</p>
                           )}
                         </div>
                       )}
@@ -691,9 +691,9 @@ export default function BrandOrders() {
 
                   {phase1.getApprovalLogs(detail.id).length > 0 && (
                     <div className="border-t pt-3">
-                      <p className="text-xs font-semibold text-stone-500 mb-2">승인 이력</p>
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">승인 이력</p>
                       {phase1.getApprovalLogs(detail.id).map(l => (
-                        <p key={l.id} className="text-xs text-stone-600 py-0.5">
+                        <p key={l.id} className="text-xs text-muted-foreground py-0.5">
                           {l.createdAt.slice(0, 10)} · {l.step}단계 {l.action} · {l.actorName}
                           {l.comment && ` — ${l.comment}`}
                         </p>
@@ -716,7 +716,7 @@ export default function BrandOrders() {
                 <DialogTitle className="text-base">
                   {detailRow.styleName} · {detailRow.revision}차
                 </DialogTitle>
-                <p className="text-xs text-stone-500 font-mono">{detailRow.orderNo} · {detailRow.orderDate}</p>
+                <p className="text-xs text-muted-foreground font-mono">{detailRow.orderNo} · {detailRow.orderDate}</p>
               </DialogHeader>
 
               <div className="flex flex-wrap gap-1">
@@ -729,24 +729,24 @@ export default function BrandOrders() {
                     (i === 4 && ['지출결의', '결제완료'].includes(detailRow.displayStatus)) ||
                     (i === 5 && detailRow.displayStatus === '결제완료');
                   return (
-                    <span key={label} className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                      stepOn ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-stone-50 border-stone-200 text-stone-400'
+                    <span key={label} className={`text-[11px] px-1.5 py-0.5 rounded border ${
+                      stepOn ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-[var(--fill-quaternary)] border-border text-muted-foreground'
                     }`}>{label}</span>
                   );
                 })}
               </div>
 
               <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                <div className="rounded border p-2"><p className="text-stone-400">발주</p><p className="font-bold">{formatNumber(detailRow.qty)}</p></div>
-                <div className="rounded border p-2"><p className="text-stone-400">선입</p><p className="font-bold text-orange-700">{formatNumber(detailRow.advanceQty)}</p></div>
-                <div className="rounded border p-2"><p className="text-stone-400">입고</p><p className="font-bold">{formatNumber(detailRow.receivedQty)}</p></div>
-                <div className="rounded border p-2"><p className="text-stone-400">잔량</p><p className="font-bold">{formatNumber(detailRow.remaining)}</p></div>
+                <div className="rounded border p-2"><p className="text-muted-foreground">발주</p><p className="font-bold">{formatNumber(detailRow.qty)}</p></div>
+                <div className="rounded border p-2"><p className="text-muted-foreground">선입</p><p className="font-bold text-[var(--system-orange)]">{formatNumber(detailRow.advanceQty)}</p></div>
+                <div className="rounded border p-2"><p className="text-muted-foreground">입고</p><p className="font-bold">{formatNumber(detailRow.receivedQty)}</p></div>
+                <div className="rounded border p-2"><p className="text-muted-foreground">잔량</p><p className="font-bold">{formatNumber(detailRow.remaining)}</p></div>
               </div>
 
               <div>
-                <p className="text-xs font-semibold text-stone-500 mb-1">컬러별</p>
+                <p className="text-xs font-semibold text-muted-foreground mb-1">컬러별</p>
                 <table className="w-full text-xs border rounded overflow-hidden">
-                  <thead className="bg-stone-50 text-stone-500">
+                  <thead className="text-muted-foreground font-semibold">
                     <tr>
                       <th className="text-left px-2 py-1">컬러</th>
                       <th className="text-right px-2 py-1">발주</th>
@@ -756,17 +756,17 @@ export default function BrandOrders() {
                       <th className="px-2 py-1"></th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border">
                     {(detailRow.colorLines || []).map(cl => (
-                      <tr key={cl.color} className="border-t">
+                      <tr key={cl.color}>
                         <td className="px-2 py-1 font-mono">{cl.color}</td>
                         <td className="px-2 py-1 text-right">{formatNumber(cl.qty)}</td>
-                        <td className="px-2 py-1 text-right text-orange-700">{formatNumber(cl.advanceQty)}</td>
+                        <td className="px-2 py-1 text-right text-[var(--system-orange)]">{formatNumber(cl.advanceQty)}</td>
                         <td className="px-2 py-1 text-right">{formatNumber(cl.receivedQty)}</td>
                         <td className="px-2 py-1 text-right font-semibold">{formatNumber(cl.remaining)}</td>
                         <td className="px-2 py-1 text-right">
                           {cl.remaining > 0 && (
-                            <Button size="sm" className="h-6 text-[10px]" onClick={() => openRecv(detailRow, cl.color)}>입고</Button>
+                            <Button size="sm" variant="secondary" className="h-6 text-[11px]" onClick={() => openRecv(detailRow, cl.color)}>입고</Button>
                           )}
                         </td>
                       </tr>
@@ -776,9 +776,9 @@ export default function BrandOrders() {
               </div>
 
               <div>
-                <p className="text-xs font-semibold text-stone-500 mb-1">입고 이력</p>
+                <p className="text-xs font-semibold text-muted-foreground mb-1">입고 이력</p>
                 {detailLogs.length === 0 ? (
-                  <p className="text-xs text-stone-400">입고 기록 없음</p>
+                  <p className="text-xs text-muted-foreground">입고 기록 없음</p>
                 ) : detailLogs.map(l => (
                   <div key={l.id} className="text-xs border rounded px-2 py-1.5 mb-1 flex justify-between gap-2">
                     <span>
@@ -818,19 +818,19 @@ export default function BrandOrders() {
           <DialogHeader>
             <DialogTitle>입고 등록</DialogTitle>
             {detailRow && (
-              <p className="text-xs text-stone-500">{detailRow.styleName} · {detailRow.revision}차 · 잔량 {detailRow.remaining}</p>
+              <p className="text-xs text-muted-foreground">{detailRow.styleName} · {detailRow.revision}차 · 잔량 {detailRow.remaining}</p>
             )}
           </DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>목적지</Label>
               <div className="flex gap-2 mt-1">
-                <Button type="button" size="sm" variant={recvForm.destination === 'korea' ? 'default' : 'outline'}
+                <Button type="button" size="sm" variant={recvForm.destination === 'korea' ? 'secondary' : 'outline'}
                   onClick={() => setRecvForm(f => ({ ...f, destination: 'korea' }))}>한국입고</Button>
-                <Button type="button" size="sm" variant={recvForm.destination === 'china' ? 'default' : 'outline'}
+                <Button type="button" size="sm" variant={recvForm.destination === 'china' ? 'secondary' : 'outline'}
                   onClick={() => setRecvForm(f => ({ ...f, destination: 'china' }))}>중국입고</Button>
               </div>
-              <p className="text-[10px] text-stone-400 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 {recvForm.destination === 'korea'
                   ? '지출결의 → 공장 다이렉트'
                   : '지출결의 → 아메스코테스 중국법인'}
@@ -841,7 +841,7 @@ export default function BrandOrders() {
               <Input type="number" value={recvForm.qty || ''} onChange={e => setRecvForm(f => ({ ...f, qty: +e.target.value }))} />
             </div>
             <div>
-              <Label>컬러 <span className="text-red-500">*</span></Label>
+              <Label>컬러 <span className="text-destructive">*</span></Label>
               {detailRow?.colorLines?.length || detailRow?.colorQtys?.length ? (
                 <select
                   className="w-full border rounded-md h-9 px-2 text-sm"
@@ -868,12 +868,12 @@ export default function BrandOrders() {
               <Label>입고일</Label>
               <Input type="date" value={recvForm.date} onChange={e => setRecvForm(f => ({ ...f, date: e.target.value }))} />
             </div>
-            <label className="flex items-center gap-2 text-xs text-stone-600">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input type="checkbox" checked={recvForm.isAdvance}
                 onChange={e => setRecvForm(f => ({ ...f, isAdvance: e.target.checked }))} />
               생산완료 전 선입고
             </label>
-            <label className="flex items-center gap-2 text-xs text-stone-600">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input type="checkbox" checked={recvForm.createPayable}
                 onChange={e => setRecvForm(f => ({ ...f, createPayable: e.target.checked }))} />
               입고와 함께 지출결의 초안 생성

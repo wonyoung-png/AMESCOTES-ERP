@@ -121,11 +121,11 @@ export default function ChinaWarehouse() {
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
-            <Warehouse className="w-6 h-6 text-amber-700" />
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Warehouse className="w-6 h-6 text-primary" />
             중국창고
           </h1>
-          <p className="text-sm text-stone-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {ws} — 품목·컬러 장부 (한국 3PL/이지어드민과 별도)
           </p>
         </div>
@@ -143,17 +143,17 @@ export default function ChinaWarehouse() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <div className="bg-white rounded-xl border p-4">
-          <p className="text-xs text-stone-500">현재고 합계</p>
-          <p className="text-2xl font-bold text-stone-800">{formatNumber(totalOnHand)}</p>
+        <div className="bg-card rounded-xl border p-4">
+          <p className="text-xs text-muted-foreground">현재고 합계</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(totalOnHand)}</p>
         </div>
-        <div className="bg-white rounded-xl border p-4">
-          <p className="text-xs text-stone-500">SKU·컬러 (재고 보유)</p>
-          <p className="text-2xl font-bold text-stone-800">{skuCount}</p>
+        <div className="bg-card rounded-xl border p-4">
+          <p className="text-xs text-muted-foreground">SKU·컬러 (재고 보유)</p>
+          <p className="text-2xl font-bold text-foreground">{skuCount}</p>
         </div>
-        <div className="bg-white rounded-xl border p-4 col-span-2 md:col-span-1">
-          <p className="text-xs text-stone-500">입고 경로</p>
-          <p className="text-sm text-stone-700 mt-1">오더관리 → <strong>중국입고</strong> 시 자동 반영</p>
+        <div className="bg-card rounded-xl border p-4 col-span-2 md:col-span-1">
+          <p className="text-xs text-muted-foreground">입고 경로</p>
+          <p className="text-sm text-foreground mt-1">오더관리 → <strong>중국입고</strong> 시 자동 반영</p>
         </div>
       </div>
 
@@ -166,10 +166,10 @@ export default function ChinaWarehouse() {
         />
       </div>
 
-      <div className="bg-white rounded-xl border overflow-hidden">
+      <div className="bg-card rounded-xl border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">현재고 (품목 · 컬러)</div>
         <table className="w-full text-sm">
-          <thead className="bg-stone-50 text-xs text-stone-500">
+          <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
               <th className="text-left px-4 py-2">스타일</th>
               <th className="text-left px-4 py-2">품명</th>
@@ -180,25 +180,25 @@ export default function ChinaWarehouse() {
               <th className="px-4 py-2">액션</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {filteredBalances.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-stone-400 text-sm">
+                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground text-sm">
                   중국창고 재고가 없습니다. 리오더 · 오더관리에서 중국입고를 등록하세요.
                 </td>
               </tr>
             ) : filteredBalances.map(b => (
-              <tr key={`${b.styleNo}-${b.color}`} className="border-t border-stone-100">
-                <td className="px-4 py-3 font-mono text-xs text-amber-700">{b.styleNo}</td>
+              <tr key={`${b.styleNo}-${b.color}`} className="hover:bg-[var(--fill-quaternary)]">
+                <td className="px-4 py-3 font-mono text-xs text-primary">{b.styleNo}</td>
                 <td className="px-4 py-3">{b.styleName}</td>
-                <td className="px-4 py-3"><Badge variant="outline" className="text-[10px]">{b.color}</Badge></td>
-                <td className="px-4 py-3 text-right text-sky-700">{formatNumber(b.inboundQty)}</td>
-                <td className="px-4 py-3 text-right text-stone-500">{formatNumber(b.outboundQty)}</td>
-                <td className={`px-4 py-3 text-right font-bold ${b.onHand < 0 ? 'text-red-600' : ''}`}>
+                <td className="px-4 py-3"><Badge variant="outline" className="text-[11px]">{b.color}</Badge></td>
+                <td className="px-4 py-3 text-right text-[var(--system-teal)]">{formatNumber(b.inboundQty)}</td>
+                <td className="px-4 py-3 text-right text-muted-foreground">{formatNumber(b.outboundQty)}</td>
+                <td className={`px-4 py-3 text-right font-bold ${b.onHand < 0 ? 'text-[var(--system-red)]' : ''}`}>
                   {formatNumber(b.onHand)}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Button size="sm" variant="outline" className="h-7 text-[10px]"
+                  <Button size="sm" variant="outline" className="h-7 text-[11px]"
                     disabled={b.onHand <= 0}
                     onClick={() => openOutbound(b.styleNo, b.color, b.styleName)}>
                     출고
@@ -210,31 +210,31 @@ export default function ChinaWarehouse() {
         </table>
       </div>
 
-      <div className="bg-white rounded-xl border overflow-hidden">
+      <div className="bg-card rounded-xl border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">입출고 이력</div>
-        <div className="divide-y max-h-[420px] overflow-y-auto">
+        <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
           {moves.length === 0 ? (
-            <p className="p-6 text-sm text-stone-400 text-center">이력 없음</p>
+            <p className="p-6 text-sm text-muted-foreground text-center">이력 없음</p>
           ) : moves.map(m => (
             <div key={m.id} className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-sm">
               <div className="min-w-0">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded border mr-2 ${
-                  m.moveType === 'inbound' ? 'bg-sky-50 border-sky-200 text-sky-800' :
-                  m.moveType === 'outbound' ? 'bg-amber-50 border-amber-200 text-amber-800' :
-                  'bg-stone-50 border-stone-200 text-stone-600'
+                <span className={`text-[11px] px-1.5 py-0.5 rounded border border-border bg-[var(--fill-quaternary)] mr-2 ${
+                  m.moveType === 'inbound' ? 'text-[var(--system-teal)]' :
+                  m.moveType === 'outbound' ? 'text-[var(--system-orange)]' :
+                  'text-muted-foreground'
                 }`}>{MOVE_LABEL[m.moveType]}</span>
-                <span className="font-mono text-xs text-amber-700">{m.styleNo}</span>
-                <span className="mx-1.5 text-stone-300">·</span>
+                <span className="font-mono text-xs text-primary">{m.styleNo}</span>
+                <span className="mx-1.5 text-muted-foreground">·</span>
                 <span>{m.color}</span>
-                {m.orderNo && <span className="ml-2 text-xs text-stone-400">{m.orderNo}</span>}
-                {m.memo && <span className="ml-2 text-xs text-stone-500">{m.memo}</span>}
+                {m.orderNo && <span className="ml-2 text-xs text-muted-foreground">{m.orderNo}</span>}
+                {m.memo && <span className="ml-2 text-xs text-muted-foreground">{m.memo}</span>}
               </div>
               <div className="text-right shrink-0">
-                <span className={`font-semibold ${m.moveType === 'outbound' ? 'text-amber-800' : m.moveType === 'adjust' && m.qty < 0 ? 'text-red-600' : 'text-sky-800'}`}>
+                <span className={`font-semibold ${m.moveType === 'outbound' ? 'text-[var(--system-orange)]' : m.moveType === 'adjust' && m.qty < 0 ? 'text-[var(--system-red)]' : 'text-[var(--system-teal)]'}`}>
                   {m.moveType === 'outbound' ? '−' : m.moveType === 'adjust' && m.qty > 0 ? '+' : m.qty < 0 ? '' : '+'}
                   {formatNumber(Math.abs(m.qty))}
                 </span>
-                <span className="text-xs text-stone-400 ml-2">{m.moveDate}</span>
+                <span className="text-xs text-muted-foreground ml-2">{m.moveDate}</span>
               </div>
             </div>
           ))}
@@ -293,7 +293,7 @@ export default function ChinaWarehouse() {
       <Dialog open={adjOpen} onOpenChange={setAdjOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>수기 재고 조정</DialogTitle></DialogHeader>
-          <p className="text-xs text-stone-500 -mt-2">증가는 +, 감소는 − 수량으로 입력</p>
+          <p className="text-xs text-muted-foreground -mt-2">증가는 +, 감소는 − 수량으로 입력</p>
           <div className="space-y-3">
             <div>
               <Label>스타일번호</Label>

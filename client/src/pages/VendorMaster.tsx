@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Pencil, Trash2, Building2, Clock, Loader2, Paperclip, Upload, Sparkles, Factory, ShoppingBag, Users } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, Clock, Loader2, Paperclip, Upload, Sparkles, Factory, ShoppingBag, Users, AlertCircle } from 'lucide-react';
 
 const VENDOR_TYPES: VendorType[] = ['바이어', '자재거래처', '공장', '해외공장', '물류업체', '기타'];
 const CURRENCIES: Currency[] = ['KRW', 'USD', 'CNY'];
@@ -27,7 +27,7 @@ const TYPE_COLOR: Record<VendorType, string> = {
   '공장':      'bg-blue-50 text-blue-700 border-blue-200',
   '해외공장':  'bg-sky-50 text-sky-700 border-sky-200',
   '물류업체':  'bg-orange-50 text-orange-700 border-orange-200',
-  '기타':      'bg-stone-50 text-stone-600 border-stone-200',
+  '기타':      'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
 };
 
 // 자재 유형 옵션
@@ -393,7 +393,7 @@ export default function VendorMaster() {
       setIsOcrLoading(true);
       try {
         await parseVendorExcel(file);
-        toast.success('엑셀 거래처 정보가 자동 입력되었습니다 ✅');
+        toast.success('엑셀 거래처 정보가 자동 입력되었습니다');
       } catch (err) {
         const msg = err instanceof Error ? err.message : '알 수 없는 오류';
         toast.error(`엑셀 파싱 실패: ${msg}`);
@@ -415,7 +415,7 @@ export default function VendorMaster() {
         address: info.address || v.address,
       }));
       setIsDirty(true);
-      toast.success('사업자등록증 정보가 자동 입력되었습니다 ✅');
+      toast.success('사업자등록증 정보가 자동 입력되었습니다');
     } catch (err) {
       const msg = err instanceof Error ? err.message : '알 수 없는 오류';
       toast.error(`OCR 실패: ${msg}`);
@@ -500,7 +500,7 @@ export default function VendorMaster() {
       setIsBankFileLoading(true);
       try {
         await parseBankInfoExcel(file);
-        toast.success('엑셀 계좌정보가 자동 입력되었습니다 ✅');
+        toast.success('엑셀 계좌정보가 자동 입력되었습니다');
       } catch (err) {
         const msg = err instanceof Error ? err.message : '알 수 없는 오류';
         toast.error(`엑셀 파싱 실패: ${msg}`);
@@ -586,7 +586,7 @@ export default function VendorMaster() {
           ...v,
           bankInfo: { ...(v.bankInfo || {}), ...parsed },
         }));
-        toast.success(`계좌정보 ${filledCount}개 필드가 자동 입력되었습니다 ✅`);
+        toast.success(`계좌정보 ${filledCount}개 필드가 자동 입력되었습니다`);
       } else {
         toast.warning('자동 파싱에 실패했습니다. 직접 입력해주세요.');
       }
@@ -617,18 +617,18 @@ export default function VendorMaster() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">거래처 마스터</h1>
-          <p className="text-sm text-stone-500 mt-0.5">바이어 · 자재거래처 · 공장 · 물류업체</p>
+          <h1 className="text-2xl font-bold text-foreground">거래처 마스터</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">바이어 · 자재거래처 · 공장 · 물류업체</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             onClick={openAiRegister}
-            className="border-violet-300 text-violet-700 hover:bg-violet-50 gap-2"
+            className="gap-2"
           >
             <Sparkles className="w-4 h-4" />AI 자동등록
           </Button>
-          <Button onClick={openAdd} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">
+          <Button onClick={openAdd} className="gap-2">
             <Plus className="w-4 h-4" />거래처 등록
           </Button>
         </div>
@@ -637,27 +637,27 @@ export default function VendorMaster() {
       {/* 유형별 통계 */}
       <div className="grid grid-cols-6 gap-3">
         {VENDOR_TYPES.map(t => (
-          <div key={t} className="bg-white rounded-xl border border-stone-200 p-3 text-center">
-            <p className="text-xl font-bold text-stone-800">{typeCounts[t] || 0}</p>
-            <p className="text-xs text-stone-500 mt-0.5">{t}</p>
+          <div key={t} className="bg-card rounded-xl border border-border p-3">
+            <p className="text-xl font-bold text-foreground">{typeCounts[t] || 0}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{t}</p>
           </div>
         ))}
       </div>
 
       {/* 유형 탭 필터 */}
-      <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl w-fit">
+      <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-xl w-fit">
         {(['all', ...VENDOR_TYPES] as const).map(t => (
           <button
             key={t}
             onClick={() => { setFilterType(t); setFilterMaterialType('all'); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
               filterType === t
-                ? 'bg-white text-stone-800 shadow-sm'
-                : 'text-stone-500 hover:text-stone-700'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {t === 'all' ? '전체' : t}
-            <span className="ml-1.5 text-[10px] opacity-60">
+            <span className="ml-1.5 text-[11px] opacity-60">
               {t === 'all' ? vendors.length : (typeCounts[t] || 0)}
             </span>
           </button>
@@ -667,16 +667,16 @@ export default function VendorMaster() {
       {/* 자재유형 필터 (자재거래처 탭 선택 시 표시) */}
       {filterType === '자재거래처' && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-stone-500">자재 유형:</span>
-          <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl w-fit">
+          <span className="text-xs text-muted-foreground">자재 유형:</span>
+          <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-xl w-fit">
             {(['all', ...MATERIAL_TYPE_OPTIONS] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setFilterMaterialType(t)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                   filterMaterialType === t
-                    ? 'bg-white text-stone-800 shadow-sm'
-                    : 'text-stone-500 hover:text-stone-700'
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {t === 'all' ? '전체' : t}
@@ -688,84 +688,84 @@ export default function VendorMaster() {
 
       {/* 검색 */}
       <div className="relative max-w-xs">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="거래처명 / 코드 검색" className="pl-9 h-9" />
       </div>
 
       {/* 다중 선택 액션 바 */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-stone-800 text-white rounded-xl">
-          <span className="text-sm font-medium">{selectedIds.size}개 선택됨</span>
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-xl">
+          <span className="text-sm font-medium text-foreground">{selectedIds.size}개 선택됨</span>
           <button
             onClick={handleBulkDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-lg text-xs font-medium transition-colors"
           >
-            🗑️ 선택 삭제
+            <Trash2 className="w-4 h-4" />선택 삭제
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
-            className="flex items-center gap-1 px-3 py-1.5 bg-stone-600 hover:bg-stone-500 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-lg text-xs font-medium transition-colors"
           >
-            ✕ 선택 해제
+            선택 해제
           </button>
         </div>
       )}
 
       {/* 테이블 */}
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50">
+            <tr className="border-b border-border bg-[var(--fill-quaternary)]">
               <th className="px-4 py-3 w-10">
                 <input
                   type="checkbox"
                   checked={isAllSelected}
                   ref={el => { if (el) el.indeterminate = isIndeterminate; }}
                   onChange={toggleSelectAll}
-                  className="w-4 h-4 rounded border-stone-300 accent-amber-700 cursor-pointer"
+                  className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                 />
               </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">거래처명</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">코드</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">유형</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">자재유형</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">담당자</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">연락처</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">결제조건</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">거래처명</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">코드</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">유형</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">자재유형</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">담당자</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">연락처</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">결제조건</th>
               {/* 공장 유형 필터 시 SWIFT CODE 컬럼 표시 */}
               {(filterType === '공장' || filterType === '해외공장' || filtered.some(v => v.type === '공장' || v.type === '해외공장')) && (
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">SWIFT CODE</th>
+                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">SWIFT CODE</th>
               )}
-              <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
+              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={10} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={10} className="text-center py-12 text-muted-foreground">
                 <Building2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 거래처가 없습니다</p>
               </td></tr>
 ) : filtered.map(v => {
   const isChecked = selectedIds.has(v.id);
   return (
-              <tr key={v.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${isChecked ? 'bg-amber-50/60' : ''}`}>
+              <tr key={v.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${isChecked ? 'bg-primary/5' : ''}`}>
                 <td className="px-4 py-3">
                   <input
                     type="checkbox"
                     checked={isChecked}
                     onChange={() => toggleSelect(v.id)}
-                    className="w-4 h-4 rounded border-stone-300 accent-amber-700 cursor-pointer"
+                    className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                   />
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5">
-                    <p className="font-medium text-stone-800">{v.name}</p>
+                    <p className="font-medium text-foreground">{v.name}</p>
                     {v.type === '자재거래처' && !v.contactName && !v.contactEmail && !v.contactPhone && (
-                      <span title="기본 정보 미입력 — 거래처 마스터에서 연락처 정보 입력 필요" className="text-red-500 text-sm leading-none cursor-help">🔴</span>
+                      <AlertCircle className="w-4 h-4 text-[var(--system-red)] cursor-help shrink-0" aria-label="기본 정보 미입력 — 거래처 마스터에서 연락처 정보 입력 필요" />
                     )}
                   </div>
-                  {v.nameEn && <p className="text-xs text-stone-400">{v.nameEn}</p>}
-                  {v.nameCn && <p className="text-xs text-stone-400">{v.nameCn}</p>}
+                  {v.nameEn && <p className="text-xs text-muted-foreground">{v.nameEn}</p>}
+                  {v.nameCn && <p className="text-xs text-muted-foreground">{v.nameCn}</p>}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-col gap-1">
@@ -775,15 +775,15 @@ export default function VendorMaster() {
                       </span>
                     )}
                     {v.code && (
-                      <span className="inline-block px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 text-xs font-mono font-bold w-fit">
+                      <span className="inline-block px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary text-xs font-mono font-bold w-fit">
                         {v.code}
                       </span>
                     )}
-                    {!v.vendorCode && !v.code && <span className="text-stone-300 text-xs">—</span>}
+                    {!v.vendorCode && !v.code && <span className="text-muted-foreground text-xs">—</span>}
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${TYPE_COLOR[v.type] || 'bg-stone-50 text-stone-600 border-stone-200'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${TYPE_COLOR[v.type] || 'bg-[var(--fill-quaternary)] text-muted-foreground border-border'}`}>
                     {v.type === '기타' && v.customType ? `기타 (${v.customType})` : v.type}
                   </span>
                 </td>
@@ -798,36 +798,36 @@ export default function VendorMaster() {
                       ))}
                     </div>
                   ) : (
-                    <span className="text-stone-300 text-xs">—</span>
+                    <span className="text-muted-foreground text-xs">—</span>
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <p className="text-stone-700">{v.contactName || '-'}</p>
+                  <p className="text-foreground">{v.contactName || '-'}</p>
                 </td>
-                <td className="px-4 py-3 text-stone-500 text-xs">
+                <td className="px-4 py-3 text-muted-foreground text-xs">
                   {v.contactEmail && <p>{v.contactEmail}</p>}
                   {v.contactPhone && <p>{v.contactPhone}</p>}
                   {!v.contactEmail && !v.contactPhone && (
                     <span className="flex items-center gap-1">
                       {v.type === '자재거래처' && !v.contactName && (
-                        <span title="기본 정보 미입력 — 전화번호, 이메일, 연락처 없음" className="text-red-500 text-sm cursor-help">🔴</span>
+                        <AlertCircle className="w-4 h-4 text-[var(--system-red)] cursor-help shrink-0" aria-label="기본 정보 미입력 — 전화번호, 이메일, 연락처 없음" />
                       )}
                       <span>-</span>
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-stone-500 text-xs">
-                  {v.billingType ? <p className="text-xs">{v.billingType}</p> : <span className="text-stone-300 text-xs">—</span>}
+                <td className="px-4 py-3 text-muted-foreground text-xs">
+                  {v.billingType ? <p className="text-xs">{v.billingType}</p> : <span className="text-muted-foreground text-xs">—</span>}
                   {v.settlementCycle && <p>{v.settlementCycle}</p>}
                 </td>
                 {/* SWIFT CODE 컬럼 (공장 유형이 목록에 있을 때만 표시) */}
                 {(filterType === '공장' || filterType === '해외공장' || filtered.some(vv => vv.type === '공장' || vv.type === '해외공장')) && (
-                  <td className="px-4 py-3 text-stone-500 text-xs">
+                  <td className="px-4 py-3 text-muted-foreground text-xs">
                     {(v.type === '공장' || v.type === '해외공장') && v.bankInfo?.swiftCode ? (
                       <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded text-xs border border-sky-200">
                         {v.bankInfo.swiftCode}
                       </span>
-                    ) : <span className="text-stone-300">—</span>}
+                    ) : <span className="text-muted-foreground">—</span>}
                   </td>
                 )}
                 <td className="px-4 py-3 text-center">
@@ -835,7 +835,7 @@ export default function VendorMaster() {
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(v)}>
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(v.id)}>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(v.id)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
@@ -862,7 +862,7 @@ export default function VendorMaster() {
           <div className="space-y-5 py-2">
 
             {/* 사업자등록증 / 거래처정보 업로드 */}
-            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -877,7 +877,7 @@ export default function VendorMaster() {
                 size="sm"
                 disabled={isOcrLoading}
                 onClick={() => fileInputRef.current?.click()}
-                className="gap-2 border-amber-400 text-amber-800 hover:bg-amber-100 whitespace-nowrap"
+                className="gap-2 whitespace-nowrap"
               >
                 {isOcrLoading ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />인식 중...</>
@@ -885,15 +885,15 @@ export default function VendorMaster() {
                   <><Paperclip className="w-4 h-4" />사업자등록증 / 거래처정보 업로드</>
                 )}
               </Button>
-              <p className="text-xs text-amber-700">이미지·PDF → 사업자등록증 OCR | 엑셀(.xlsx/.xls) → 거래처 정보 자동 매핑</p>
+              <p className="text-xs text-muted-foreground">이미지·PDF → 사업자등록증 OCR | 엑셀(.xlsx/.xls) → 거래처 정보 자동 매핑</p>
             </div>
 
             {/* 코드 + 회사명 섹션 */}
-            <div className="p-3 bg-stone-50 border border-stone-200 rounded-lg">
-              <p className="text-xs font-medium text-stone-600 mb-3">식별 정보</p>
+            <div className="p-3 bg-[var(--fill-quaternary)] border border-border rounded-lg">
+              <p className="text-xs font-medium text-muted-foreground mb-3">식별 정보</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">코드 <span className="text-stone-400 font-normal">(2자리, 중복불가)</span></Label>
+                  <Label className="text-xs">코드 <span className="text-muted-foreground font-normal">(2자리, 중복불가)</span></Label>
                   <Input
                     value={editVendor.code || ''}
                     onChange={e => updateCode('code', e.target.value, 2)}
@@ -901,17 +901,17 @@ export default function VendorMaster() {
                     maxLength={2}
                     className="w-28 font-mono uppercase text-center font-bold tracking-widest"
                   />
-                  <p className="text-[11px] text-stone-400">예: 202603-LLL-001 / AT2603HB01</p>
+                  <p className="text-[11px] text-muted-foreground">예: 202603-LLL-001 / AT2603HB01</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">사업자 회사명 <span className="text-stone-400 font-normal">(계산서 발급용)</span></Label>
+                  <Label className="text-xs">사업자 회사명 <span className="text-muted-foreground font-normal">(계산서 발급용)</span></Label>
                   <Input
                     value={editVendor.companyName || ''}
                     onChange={e => update('companyName', e.target.value)}
                     placeholder="(주)아뜰리에드루멘"
                     className="text-sm"
                   />
-                  <p className="text-[11px] text-stone-400">세금계산서에 표기되는 공식 회사명</p>
+                  <p className="text-[11px] text-muted-foreground">세금계산서에 표기되는 공식 회사명</p>
                 </div>
                 <div className="space-y-1.5 col-span-2">
                   <Label className="text-xs">사업자등록번호</Label>
@@ -923,7 +923,7 @@ export default function VendorMaster() {
                   />
                 </div>
                 <div className="space-y-1.5 col-span-2">
-                  <Label className="text-xs">사업장 주소 <span className="text-stone-400 font-normal">(퀵/택배 발송용)</span></Label>
+                  <Label className="text-xs">사업장 주소 <span className="text-muted-foreground font-normal">(퀵/택배 발송용)</span></Label>
                   <Input
                     value={editVendor.address || ''}
                     onChange={e => update('address', e.target.value)}
@@ -936,7 +936,7 @@ export default function VendorMaster() {
 
             {/* 거래처 유형 */}
             <div className="space-y-1.5">
-              <Label>거래처 유형 <span className="text-red-500">*</span></Label>
+              <Label>거래처 유형 <span className="text-[var(--system-red)]">*</span></Label>
               <Select value={editVendor.type || '바이어'} onValueChange={v => update('type', v as VendorType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -962,7 +962,7 @@ export default function VendorMaster() {
             {/* 자재 유형 (자재거래처만 표시) */}
             {editVendor.type === '자재거래처' && (
               <div className="space-y-1.5">
-                <Label>자재 유형 <span className="text-stone-400 text-xs font-normal">(복수 선택 가능)</span></Label>
+                <Label>자재 유형 <span className="text-muted-foreground text-xs font-normal">(복수 선택 가능)</span></Label>
                 <div className="flex items-center gap-2 flex-wrap">
                   {MATERIAL_TYPE_OPTIONS.map(mt => {
                     const isSelected = (editVendor.materialTypes || []).includes(mt);
@@ -979,8 +979,8 @@ export default function VendorMaster() {
                         }}
                         className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                           isSelected
-                            ? 'bg-green-600 text-white border-green-600'
-                            : 'bg-white text-stone-600 border-stone-300 hover:border-green-400'
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card text-muted-foreground border-border hover:border-primary/40'
                         }`}
                       >
                         {mt}
@@ -997,27 +997,27 @@ export default function VendorMaster() {
                     className="mt-1.5 text-sm"
                   />
                 )}
-                <p className="text-[11px] text-stone-400">장식, 원단, 가죽, 기타 중 해당 유형을 모두 선택해주세요</p>
+                <p className="text-[11px] text-muted-foreground">장식, 원단, 가죽, 기타 중 해당 유형을 모두 선택해주세요</p>
               </div>
             )}
 
             {/* 거래처명 */}
             <div className="space-y-1.5">
-              <Label>거래처명 <span className="text-red-500">*</span></Label>
+              <Label>거래처명 <span className="text-[var(--system-red)]">*</span></Label>
               <Input value={editVendor.name || ''} onChange={e => update('name', e.target.value)} placeholder="아뜰리에 드 루멘" />
             </div>
 
             {/* 브랜딩 (바이어만 표시) */}
             {editVendor.type === '바이어' && (
               <div className="space-y-1.5">
-                <Label>브랜드명 <span className="text-stone-400 text-xs font-normal">(브랜딩 표기용, 바이어 전용)</span></Label>
+                <Label>브랜드명 <span className="text-muted-foreground text-xs font-normal">(브랜딩 표기용, 바이어 전용)</span></Label>
                 <Input value={editVendor.nameEn || ''} onChange={e => update('nameEn', e.target.value)} placeholder="Atelier de LUMEN" />
               </div>
             )}
 
             {/* 담당자 정보 */}
             <div className="space-y-3">
-              <p className="text-xs font-medium text-stone-600">담당자 정보</p>
+              <p className="text-xs font-medium text-muted-foreground">담당자 정보</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>담당자명</Label>
@@ -1034,7 +1034,7 @@ export default function VendorMaster() {
                 {/* 공장일 때 리드타임 표시 */}
                 {(editVendor.type === '공장' || editVendor.type === '해외공장') && (
                   <div className="space-y-1.5 col-span-2">
-                    <Label>리드타임 (일) <span className="text-stone-400 text-xs">(발주→납품 소요일)</span></Label>
+                    <Label>리드타임 (일) <span className="text-muted-foreground text-xs">(발주→납품 소요일)</span></Label>
                     <Input type="number" value={editVendor.leadTimeDays ?? ''} onChange={e => update('leadTimeDays', e.target.value ? Number(e.target.value) : undefined)} placeholder="예: 45" />
                   </div>
                 )}
@@ -1042,17 +1042,17 @@ export default function VendorMaster() {
             </div>
 
             {/* 계산서 발행 이메일 */}
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-              <p className="text-xs font-medium text-blue-700">계산서 / 세금계산서 발행 정보</p>
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
+              <p className="text-xs font-medium text-primary">계산서 / 세금계산서 발행 정보</p>
               <div className="space-y-1.5">
-                <Label className="text-xs">세금계산서 수신 이메일 <span className="text-stone-400 font-normal">(담당자 이메일과 다를 경우 별도 입력)</span></Label>
+                <Label className="text-xs">세금계산서 수신 이메일 <span className="text-muted-foreground font-normal">(담당자 이메일과 다를 경우 별도 입력)</span></Label>
                 <Input
                   value={editVendor.billingEmail || ''}
                   onChange={e => update('billingEmail', e.target.value)}
                   placeholder="billing@example.com (비우면 담당자 이메일 사용)"
-                  className="bg-white text-sm"
+                  className="bg-card text-sm"
                 />
-                <p className="text-[11px] text-blue-600">비워두면 담당자 이메일로 발송됩니다.</p>
+                <p className="text-[11px] text-muted-foreground">비워두면 담당자 이메일로 발송됩니다.</p>
               </div>
             </div>
 
@@ -1060,9 +1060,9 @@ export default function VendorMaster() {
 
             {/* 해외공장 계좌정보 섹션 (해외공장 유형일 때만 표시) */}
             {editVendor.type === '해외공장' && (
-              <div className="p-4 bg-sky-50 border border-sky-200 rounded-lg space-y-3">
+              <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-sky-700">🏦 해외 송금 계좌정보 (해외공장 전용)</p>
+                  <p className="text-xs font-medium text-primary">해외 송금 계좌정보 (해외공장 전용)</p>
                   {/* 파일 업로드 버튼 */}
                   <div>
                     <input
@@ -1079,7 +1079,7 @@ export default function VendorMaster() {
                       size="sm"
                       disabled={isBankFileLoading}
                       onClick={() => bankFileInputRef.current?.click()}
-                      className="gap-2 border-sky-400 text-sky-700 hover:bg-sky-100 text-xs"
+                      className="gap-2 text-xs"
                     >
                       {isBankFileLoading ? (
                         <><Loader2 className="w-3.5 h-3.5 animate-spin" />파싱 중...</>
@@ -1089,7 +1089,7 @@ export default function VendorMaster() {
                     </Button>
                   </div>
                 </div>
-                <p className="text-[11px] text-sky-600">엑셀(.xlsx/.xls) 또는 PDF/이미지 업로드 시 BENEFICIARY, BANK NAME, SWIFT CODE 등 자동 추출을 시도합니다.</p>
+                <p className="text-[11px] text-muted-foreground">엑셀(.xlsx/.xls) 또는 PDF/이미지 업로드 시 BENEFICIARY, BANK NAME, SWIFT CODE 등 자동 추출을 시도합니다.</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5 col-span-2">
                     <Label className="text-xs">수취인 (BENEFICIARY)</Label>
@@ -1097,7 +1097,7 @@ export default function VendorMaster() {
                       value={editVendor.bankInfo?.beneficiary || ''}
                       onChange={e => update('bankInfo', { ...(editVendor.bankInfo || {}), beneficiary: e.target.value })}
                       placeholder="HONGKONG GIOCH TRADING LIMITED"
-                      className="bg-white text-sm"
+                      className="bg-card text-sm"
                     />
                   </div>
                   <div className="space-y-1.5 col-span-2">
@@ -1106,7 +1106,7 @@ export default function VendorMaster() {
                       value={editVendor.bankInfo?.address || ''}
                       onChange={e => update('bankInfo', { ...(editVendor.bankInfo || {}), address: e.target.value })}
                       placeholder="161 Queen's Road Central, HK"
-                      className="bg-white text-sm"
+                      className="bg-card text-sm"
                     />
                   </div>
                   <div className="space-y-1.5 col-span-2">
@@ -1115,7 +1115,7 @@ export default function VendorMaster() {
                       value={editVendor.bankInfo?.bankName || ''}
                       onChange={e => update('bankInfo', { ...(editVendor.bankInfo || {}), bankName: e.target.value })}
                       placeholder="OCBC Wing Hang Bank Limited"
-                      className="bg-white text-sm"
+                      className="bg-card text-sm"
                     />
                   </div>
                   <div className="space-y-1.5 col-span-2">
@@ -1124,7 +1124,7 @@ export default function VendorMaster() {
                       value={editVendor.bankInfo?.bankAccount || ''}
                       onChange={e => update('bankInfo', { ...(editVendor.bankInfo || {}), bankAccount: e.target.value })}
                       placeholder="035-802-796132-831"
-                      className="bg-white text-sm font-mono"
+                      className="bg-card text-sm font-mono"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1133,7 +1133,7 @@ export default function VendorMaster() {
                       value={editVendor.bankInfo?.bankCode || ''}
                       onChange={e => update('bankInfo', { ...(editVendor.bankInfo || {}), bankCode: e.target.value })}
                       placeholder="035"
-                      className="bg-white text-sm font-mono"
+                      className="bg-card text-sm font-mono"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1142,7 +1142,7 @@ export default function VendorMaster() {
                       value={editVendor.bankInfo?.branchCode || ''}
                       onChange={e => update('bankInfo', { ...(editVendor.bankInfo || {}), branchCode: e.target.value })}
                       placeholder="802"
-                      className="bg-white text-sm font-mono"
+                      className="bg-card text-sm font-mono"
                     />
                   </div>
                   <div className="space-y-1.5 col-span-2">
@@ -1151,16 +1151,16 @@ export default function VendorMaster() {
                       value={editVendor.bankInfo?.bankAddress || ''}
                       onChange={e => update('bankInfo', { ...(editVendor.bankInfo || {}), bankAddress: e.target.value })}
                       placeholder="161 Queen's Road Central, HK"
-                      className="bg-white text-sm"
+                      className="bg-card text-sm"
                     />
                   </div>
                   <div className="space-y-1.5 col-span-2">
-                    <Label className="text-xs font-semibold text-sky-800">SWIFT CODE</Label>
+                    <Label className="text-xs font-semibold text-primary">SWIFT CODE</Label>
                     <Input
                       value={editVendor.bankInfo?.swiftCode || ''}
                       onChange={e => update('bankInfo', { ...(editVendor.bankInfo || {}), swiftCode: e.target.value.toUpperCase() })}
                       placeholder="WIHBHKHHXXX"
-                      className="bg-white text-sm font-mono uppercase font-bold tracking-widest"
+                      className="bg-card text-sm font-mono uppercase font-bold tracking-widest"
                     />
                   </div>
                 </div>
@@ -1192,7 +1192,7 @@ export default function VendorMaster() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => handleModalClose(true)}>취소</Button>
-            <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">저장</Button>
+            <Button onClick={handleSave}>저장</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1202,14 +1202,14 @@ export default function VendorMaster() {
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-violet-600" />
+              <Sparkles className="w-5 h-5 text-primary" />
               AI 거래처 자동등록
             </DialogTitle>
           </DialogHeader>
 
           {aiStep === 'upload' && (
             <div className="space-y-4 py-2">
-                <p className="text-sm text-stone-600">
+                <p className="text-sm text-muted-foreground">
                 사업자등록증 · 통장사본 · 명함 사진/PDF와 계산서용 이메일·연락처 텍스트를 넣으면 AI가 채웁니다.
               </p>
               <div>
@@ -1228,21 +1228,21 @@ export default function VendorMaster() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-24 border-dashed border-2 border-violet-200 text-violet-700 hover:bg-violet-50 flex flex-col gap-1"
+                  className="w-full h-24 border border-dashed border-border flex flex-col gap-1"
                   onClick={() => aiFileRef.current?.click()}
                 >
                   <Upload className="w-6 h-6" />
                   <span className="text-sm font-medium">서류 추가 (최대 8개)</span>
-                  <span className="text-[10px] text-stone-400">jpg / png / webp / pdf</span>
+                  <span className="text-[11px] text-muted-foreground">jpg / png / webp / pdf</span>
                 </Button>
                 {aiFiles.length > 0 && (
                   <ul className="mt-2 space-y-1">
                     {aiFiles.map((f, i) => (
-                      <li key={`${f.name}-${i}`} className="flex items-center justify-between text-xs bg-stone-50 rounded px-2 py-1.5">
-                        <span className="truncate text-stone-700">{f.name}</span>
+                      <li key={`${f.name}-${i}`} className="flex items-center justify-between text-xs bg-[var(--fill-quaternary)] rounded px-2 py-1.5">
+                        <span className="truncate text-foreground">{f.name}</span>
                         <button
                           type="button"
-                          className="text-red-500 shrink-0 ml-2"
+                          className="text-[var(--system-red)] shrink-0 ml-2"
                           onClick={() => setAiFiles(prev => prev.filter((_, j) => j !== i))}
                         >
                           삭제
@@ -1257,7 +1257,7 @@ export default function VendorMaster() {
                 <textarea
                   value={aiNotes}
                   onChange={e => setAiNotes(e.target.value)}
-                  className="w-full min-h-[100px] text-sm border border-stone-200 rounded-lg p-3 resize-y"
+                  className="w-full min-h-[100px] text-sm border border-border rounded-lg p-3 resize-y"
                   placeholder={"예)\n계산서 이메일: tax@example.com\n담당자: 김○○ / 010-1234-5678\n위챗: wechat_id"}
                 />
               </div>
@@ -1266,7 +1266,7 @@ export default function VendorMaster() {
                 <Button
                   onClick={runAiVendorOcr}
                   disabled={aiLoading}
-                  className="bg-violet-600 hover:bg-violet-700 text-white gap-2"
+                  className="gap-2"
                 >
                   {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                   {aiLoading ? '분석 중…' : 'AI 분석'}
@@ -1277,13 +1277,13 @@ export default function VendorMaster() {
 
           {aiStep === 'type' && (
             <div className="space-y-4 py-2">
-              <div className="bg-violet-50 border border-violet-100 rounded-lg p-3 text-sm">
-                <p className="font-medium text-violet-900">이 거래처는 무엇인가요?</p>
+              <div className="bg-primary/5 border border-primary/10 rounded-lg p-3 text-sm">
+                <p className="font-medium text-foreground">이 거래처는 무엇인가요?</p>
                 {aiDraft.typeHint && (
-                  <p className="text-xs text-violet-700 mt-1">AI 힌트: {aiDraft.typeHint}</p>
+                  <p className="text-xs text-primary mt-1">AI 힌트: {aiDraft.typeHint}</p>
                 )}
                 {aiDraft.name || aiDraft.companyName ? (
-                  <p className="text-xs text-stone-600 mt-1">추출명: {aiDraft.name || aiDraft.companyName}</p>
+                  <p className="text-xs text-muted-foreground mt-1">추출명: {aiDraft.name || aiDraft.companyName}</p>
                 ) : null}
               </div>
               <div className="grid grid-cols-1 gap-2">
@@ -1297,14 +1297,14 @@ export default function VendorMaster() {
                       onClick={() => setAiType(c.type)}
                       className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-colors ${
                         selected
-                          ? 'border-violet-500 bg-violet-50 ring-1 ring-violet-300'
-                          : 'border-stone-200 hover:border-violet-200 hover:bg-stone-50'
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                          : 'border-border hover:border-primary/30 hover:bg-[var(--fill-quaternary)]'
                       }`}
                     >
-                      <Icon className={`w-5 h-5 mt-0.5 shrink-0 ${selected ? 'text-violet-600' : 'text-stone-400'}`} />
+                      <Icon className={`w-5 h-5 mt-0.5 shrink-0 ${selected ? 'text-primary' : 'text-muted-foreground'}`} />
                       <div>
-                        <p className="text-sm font-semibold text-stone-800">{c.label}</p>
-                        <p className="text-xs text-stone-500">{c.desc}</p>
+                        <p className="text-sm font-semibold text-foreground">{c.label}</p>
+                        <p className="text-xs text-muted-foreground">{c.desc}</p>
                       </div>
                     </button>
                   );
@@ -1312,15 +1312,15 @@ export default function VendorMaster() {
               </div>
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button variant="outline" onClick={() => setAiStep('upload')}>← 서류 다시</Button>
-                <Button onClick={confirmAiType} className="bg-violet-600 hover:bg-violet-700 text-white">다음 · 내용 확인</Button>
+                <Button onClick={confirmAiType}>다음 · 내용 확인</Button>
               </DialogFooter>
             </div>
           )}
 
           {aiStep === 'review' && (
             <div className="space-y-3 py-2">
-              <p className="text-sm text-stone-600">
-                유형: <span className="font-semibold text-violet-700">{aiType}</span> — 틀린 값은 수정 후 등록하세요.
+              <p className="text-sm text-muted-foreground">
+                유형: <span className="font-semibold text-primary">{aiType}</span> — 틀린 값은 수정 후 등록하세요.
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {([
@@ -1344,8 +1344,8 @@ export default function VendorMaster() {
                   </div>
                 ))}
               </div>
-              <div className="border-t border-stone-100 pt-3 space-y-2">
-                <p className="text-xs font-medium text-stone-600">계좌 정보</p>
+              <div className="border-t border-border pt-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">계좌 정보</p>
                 <div className="grid grid-cols-2 gap-2">
                   {([
                     ['bankName', '은행명'],
@@ -1369,7 +1369,7 @@ export default function VendorMaster() {
               </div>
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button variant="outline" onClick={() => setAiStep('type')}>← 유형 다시</Button>
-                <Button onClick={saveAiVendor} className="bg-amber-700 hover:bg-amber-800 text-white">거래처 등록</Button>
+                <Button onClick={saveAiVendor}>거래처 등록</Button>
               </DialogFooter>
             </div>
           )}

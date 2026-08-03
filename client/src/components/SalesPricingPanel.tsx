@@ -24,20 +24,20 @@ export function SalesPricingPanel({ costKrw, pnl, onPatch }: Props) {
   const discountPct = Math.round((pnl.wholesaleDiscountRate ?? sp.wholesaleDiscountRate) * 1000) / 10;
 
   return (
-    <div className="bg-stone-50 rounded-lg p-4 border border-stone-200 space-y-4">
+    <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border space-y-4">
       <div>
-        <h3 className="text-xs font-semibold text-stone-600">세일즈 가격 확정</h3>
-        <p className="text-[10px] text-stone-400 mt-0.5">
+        <h3 className="text-xs font-semibold text-muted-foreground">세일즈 가격 확정</h3>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
           Markup = 배수 · 원가 기준 {costKrw > 0 ? fmtKrw(costKrw) : '—'}
         </p>
       </div>
 
       {/* KMSRP */}
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-stone-700 block">
+        <label className="text-xs font-semibold text-foreground block">
           {SALES_PRICE_LABELS.kmsrpFull}
         </label>
-        <p className="text-[10px] text-stone-400">{SALES_PRICE_LABELS.kmsrpHint}</p>
+        <p className="text-[11px] text-muted-foreground">{SALES_PRICE_LABELS.kmsrpHint}</p>
         <div className="flex items-center gap-3 flex-wrap">
           <Input
             type="number"
@@ -51,13 +51,13 @@ export function SalesPricingPanel({ costKrw, pnl, onPatch }: Props) {
               }
               onPatch(patch);
             }}
-            className="h-8 text-sm border-stone-300 text-right w-40 font-semibold"
+            className="h-8 text-sm border-border text-right w-40 font-semibold"
             placeholder="KMSRP"
           />
           {sp.markup1 > 0 && (
-            <span className="text-xs text-stone-500">
+            <span className="text-xs text-muted-foreground">
               {SALES_PRICE_LABELS.markup1}:{' '}
-              <span className={`font-bold ${sp.markup1 >= 3.5 ? 'text-green-600' : 'text-red-500'}`}>
+              <span className={`font-bold ${sp.markup1 >= 3.5 ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]'}`}>
                 {sp.markup1.toFixed(2)}배
               </span>
             </span>
@@ -66,16 +66,16 @@ export function SalesPricingPanel({ costKrw, pnl, onPatch }: Props) {
       </div>
 
       {/* Global MSRP */}
-      <div className="space-y-1.5 border-t border-stone-200 pt-3">
+      <div className="space-y-1.5 border-t border-border pt-3">
         <div className="flex items-end justify-between gap-2 flex-wrap">
           <div>
-            <label className="text-xs font-semibold text-stone-700 block">
+            <label className="text-xs font-semibold text-foreground block">
               {SALES_PRICE_LABELS.globalMsrpFull}
             </label>
-            <p className="text-[10px] text-stone-400">{SALES_PRICE_LABELS.markup2Hint}</p>
+            <p className="text-[11px] text-muted-foreground">{SALES_PRICE_LABELS.markup2Hint}</p>
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-[10px] text-stone-500">{SALES_PRICE_LABELS.markup2}</span>
+            <span className="text-[11px] text-muted-foreground">{SALES_PRICE_LABELS.markup2}</span>
             <Input
               type="number"
               step="0.01"
@@ -92,9 +92,9 @@ export function SalesPricingPanel({ costKrw, pnl, onPatch }: Props) {
                 }
                 onPatch(patch);
               }}
-              className="h-7 text-xs border-stone-200 text-right w-16"
+              className="h-7 text-xs border-border text-right w-16"
             />
-            <span className="text-[10px] text-stone-400">배</span>
+            <span className="text-[11px] text-muted-foreground">배</span>
           </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -109,27 +109,27 @@ export function SalesPricingPanel({ costKrw, pnl, onPatch }: Props) {
               }
               onPatch(patch);
             }}
-            className="h-8 text-sm border-stone-300 text-right w-40 font-semibold"
+            className="h-8 text-sm border-border text-right w-40 font-semibold"
             placeholder="Global MSRP"
           />
           {sp.markup2 > 0 && (
-            <span className="text-xs text-stone-500">
+            <span className="text-xs text-muted-foreground">
               실현 {SALES_PRICE_LABELS.markup2}:{' '}
-              <span className="font-bold text-stone-800">{sp.markup2.toFixed(2)}배</span>
+              <span className="font-bold text-foreground">{sp.markup2.toFixed(2)}배</span>
             </span>
           )}
         </div>
       </div>
 
       {/* Wholesale = Global × (1 − 할인율) */}
-      <div className="space-y-1.5 border-t border-stone-200 pt-3">
-        <label className="text-xs font-semibold text-stone-700 block">
+      <div className="space-y-1.5 border-t border-border pt-3">
+        <label className="text-xs font-semibold text-foreground block">
           {SALES_PRICE_LABELS.wholesaleFull}
         </label>
-        <p className="text-[10px] text-stone-400">{SALES_PRICE_LABELS.wholesaleDiscountHint}</p>
+        <p className="text-[11px] text-muted-foreground">{SALES_PRICE_LABELS.wholesaleDiscountHint}</p>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-1">
-            <span className="text-[10px] text-stone-500">{SALES_PRICE_LABELS.wholesaleDiscount}</span>
+            <span className="text-[11px] text-muted-foreground">{SALES_PRICE_LABELS.wholesaleDiscount}</span>
             <Input
               type="number"
               step="0.1"
@@ -149,12 +149,12 @@ export function SalesPricingPanel({ costKrw, pnl, onPatch }: Props) {
                   wholesalePrice: g > 0 ? wholesaleFromGlobal(g, rate) : undefined,
                 });
               }}
-              className="h-8 text-sm border-stone-300 text-right w-20 font-semibold"
+              className="h-8 text-sm border-border text-right w-20 font-semibold"
               placeholder="40"
             />
-            <span className="text-xs text-stone-500">%</span>
+            <span className="text-xs text-muted-foreground">%</span>
           </div>
-          <span className="text-stone-300">→</span>
+          <span className="text-muted-foreground">→</span>
           <Input
             type="number"
             value={sp.wholesalePrice || ''}
@@ -172,11 +172,11 @@ export function SalesPricingPanel({ costKrw, pnl, onPatch }: Props) {
                 wholesaleDiscountRate: g > 0 ? discountFromWholesale(g, w) : undefined,
               });
             }}
-            className="h-8 text-sm border-stone-300 text-right w-40 font-semibold"
+            className="h-8 text-sm border-border text-right w-40 font-semibold"
             placeholder="홀세일가"
           />
           {sp.wholesaleDiscountRate > 0 && sp.globalSalePrice > 0 && (
-            <span className="text-xs text-stone-500">
+            <span className="text-xs text-muted-foreground">
               {fmtKrw(sp.globalSalePrice)} × (1 − {(sp.wholesaleDiscountRate * 100).toFixed(0)}%)
             </span>
           )}
@@ -185,22 +185,22 @@ export function SalesPricingPanel({ costKrw, pnl, onPatch }: Props) {
 
       {/* Summary strip */}
       {kmsrp > 0 && (
-        <div className="grid grid-cols-3 gap-2 border-t border-stone-200 pt-3 text-center">
-          <div className="rounded bg-white border border-stone-200 px-2 py-2">
-            <div className="text-[10px] text-stone-400">{SALES_PRICE_LABELS.kmsrp}</div>
-            <div className="text-xs font-bold text-stone-800 tabular-nums">{fmtKrw(kmsrp)}</div>
-            {sp.markup1 > 0 && <div className="text-[10px] text-stone-500">{sp.markup1.toFixed(2)}배</div>}
+        <div className="grid grid-cols-3 gap-2 border-t border-border pt-3">
+          <div className="rounded bg-card border border-border px-2 py-2">
+            <div className="text-[11px] text-muted-foreground">{SALES_PRICE_LABELS.kmsrp}</div>
+            <div className="text-xs font-bold text-foreground tabular-nums">{fmtKrw(kmsrp)}</div>
+            {sp.markup1 > 0 && <div className="text-[11px] text-muted-foreground">{sp.markup1.toFixed(2)}배</div>}
           </div>
-          <div className="rounded bg-white border border-stone-200 px-2 py-2">
-            <div className="text-[10px] text-stone-400">{SALES_PRICE_LABELS.globalMsrp}</div>
-            <div className="text-xs font-bold text-stone-800 tabular-nums">{fmtKrw(sp.globalSalePrice)}</div>
-            {sp.markup2 > 0 && <div className="text-[10px] text-stone-500">{sp.markup2.toFixed(2)}배</div>}
+          <div className="rounded bg-card border border-border px-2 py-2">
+            <div className="text-[11px] text-muted-foreground">{SALES_PRICE_LABELS.globalMsrp}</div>
+            <div className="text-xs font-bold text-foreground tabular-nums">{fmtKrw(sp.globalSalePrice)}</div>
+            {sp.markup2 > 0 && <div className="text-[11px] text-muted-foreground">{sp.markup2.toFixed(2)}배</div>}
           </div>
-          <div className="rounded bg-white border border-stone-200 px-2 py-2">
-            <div className="text-[10px] text-stone-400">{SALES_PRICE_LABELS.wholesale}</div>
-            <div className="text-xs font-bold text-stone-800 tabular-nums">{fmtKrw(sp.wholesalePrice)}</div>
+          <div className="rounded bg-card border border-border px-2 py-2">
+            <div className="text-[11px] text-muted-foreground">{SALES_PRICE_LABELS.wholesale}</div>
+            <div className="text-xs font-bold text-foreground tabular-nums">{fmtKrw(sp.wholesalePrice)}</div>
             {sp.wholesaleDiscountRate > 0 && (
-              <div className="text-[10px] text-stone-500">
+              <div className="text-[11px] text-muted-foreground">
                 −{(sp.wholesaleDiscountRate * 100).toFixed(0)}%
               </div>
             )}

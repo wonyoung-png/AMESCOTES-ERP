@@ -35,7 +35,7 @@ import { toast } from 'sonner';
 import {
   Plus, Trash2, Upload, FileText, Download, ChevronDown, ChevronRight,
   Calculator, TrendingUp, AlertTriangle, CheckCircle, Save, X, Copy, Search,
-  Factory, DollarSign,
+  Factory, DollarSign, Camera, Package, Ruler, Printer,
 } from 'lucide-react';
 
 // ─── 타입 정의 ───────────────────────────────────────────────────────────────
@@ -767,17 +767,17 @@ function SimpleCostModal({
       <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-amber-600" />
+            <DollarSign className="w-4 h-4 text-primary" />
             간단 원가 입력
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2.5 text-xs text-primary">
             자재 세부 내역 없이 사전원가(코스트)를 직접 입력합니다.
             사후원가는 선택사항입니다.
           </div>
           <div>
-            <label className="text-xs text-stone-500 mb-1 block font-medium">스타일 검색</label>
+            <label className="text-xs text-muted-foreground mb-1 block font-medium">스타일 검색</label>
             <Input
               value={itemSearch}
               onChange={e => setItemSearch(e.target.value)}
@@ -794,7 +794,7 @@ function SimpleCostModal({
                     <span className="flex items-center gap-2">
                       {item.styleNo} — {item.name}
                       {item.hasBom && (
-                        <span className="text-[10px] text-amber-600">(BOM있음)</span>
+                        <span className="text-[11px] text-primary">(BOM있음)</span>
                       )}
                     </span>
                   </SelectItem>
@@ -802,14 +802,14 @@ function SimpleCostModal({
               </SelectContent>
             </Select>
             {selectedItem && (
-              <div className="mt-1 text-[10px] text-stone-500">
+              <div className="mt-1 text-[11px] text-muted-foreground">
                 {selectedItem.season} | {selectedItem.erpCategory || '카테고리 없음'}
               </div>
             )}
           </div>
           <div>
-            <label className="text-xs text-stone-500 mb-1 block font-medium">
-              사전원가 (KRW) <span className="text-red-500">*</span>
+            <label className="text-xs text-muted-foreground mb-1 block font-medium">
+              사전원가 (KRW) <span className="text-[var(--system-red)]">*</span>
             </label>
             <Input
               value={preCost}
@@ -819,14 +819,14 @@ function SimpleCostModal({
               type="number"
             />
             {preCost && Number(preCost) > 0 && (
-              <div className="text-xs text-amber-700 mt-1">
+              <div className="text-xs text-primary mt-1">
                 ₩{Number(preCost).toLocaleString('ko-KR')}
               </div>
             )}
           </div>
           <div>
-            <label className="text-xs text-stone-500 mb-1 block font-medium">
-              사후원가 (KRW) <span className="text-stone-400">선택</span>
+            <label className="text-xs text-muted-foreground mb-1 block font-medium">
+              사후원가 (KRW) <span className="text-muted-foreground">선택</span>
             </label>
             <Input
               value={postCost}
@@ -836,7 +836,7 @@ function SimpleCostModal({
               type="number"
             />
             {postCost && Number(postCost) > 0 && (
-              <div className="text-xs text-blue-700 mt-1">
+              <div className="text-xs text-primary mt-1">
                 ₩{Number(postCost).toLocaleString('ko-KR')}
               </div>
             )}
@@ -845,7 +845,7 @@ function SimpleCostModal({
             const pre = Number(preCost);
             const post = Number(postCost);
             const diff = ((post - pre) / pre) * 100;
-            const cls = diff > 0 ? 'text-red-600 bg-red-50 border-red-200' : diff < 0 ? 'text-green-700 bg-green-50 border-green-200' : 'text-stone-500 bg-stone-50 border-stone-200';
+            const cls = diff > 0 ? 'text-[var(--system-red)] bg-[var(--system-red)]/10 border-[var(--system-red)]/20' : diff < 0 ? 'text-[var(--system-green)] bg-[var(--system-green)]/10 border-[var(--system-green)]/20' : 'text-muted-foreground bg-[var(--fill-quaternary)] border-border';
             return (
               <div className={`rounded-lg border px-3 py-2 text-xs font-semibold ${cls}`}>
                 사후원가 차이: {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
@@ -859,7 +859,7 @@ function SimpleCostModal({
               size="sm"
               onClick={handleSave}
               disabled={saving || !selectedItemId || !preCost}
-              className="bg-amber-700 hover:bg-amber-800 text-white gap-1.5"
+              className="gap-1.5"
             >
               <Save className="w-3.5 h-3.5" />
               {saving ? '저장 중...' : '저장'}
@@ -954,114 +954,114 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
-        <div className="sticky top-0 z-10 bg-white border-b border-stone-200 px-6 py-3 flex items-center justify-between">
+        <div className="sticky top-0 z-10 bg-card border-b border-border px-6 py-3 flex items-center justify-between">
           <DialogHeader>
-            <DialogTitle className="text-stone-800 font-semibold text-sm">업체용 견적서 — {bom.styleNo} {bom.styleName}</DialogTitle>
+            <DialogTitle className="text-foreground font-semibold text-sm">업체용 견적서 — {bom.styleNo} {bom.styleName}</DialogTitle>
           </DialogHeader>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setRows(p => [...p, { id: genId(), category: '', itemName: '', qty: 1, unitPrice: 0, supplyAmt: 0, taxAmt: 0 }])} className="text-xs gap-1">
               <Plus className="w-3 h-3" /> 행 추가
             </Button>
-            <Button size="sm" onClick={handlePrint} className="text-xs gap-1 bg-[#C9A96E] hover:bg-[#b8944f] text-white">
+            <Button size="sm" onClick={handlePrint} className="text-xs gap-1">
               <Download className="w-3 h-3" /> PDF 출력
             </Button>
           </div>
         </div>
         <div className="px-6 py-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="text-xs text-stone-500 mb-1 block">수신</label><Input value={recipient} onChange={e => setRecipient(e.target.value)} placeholder="수신처 입력" className="text-sm h-8" /></div>
-            <div><label className="text-xs text-stone-500 mb-1 block">날짜</label><Input type="date" value={dateStr} onChange={e => setDateStr(e.target.value)} className="text-sm h-8" /></div>
+            <div><label className="text-xs text-muted-foreground mb-1 block">수신</label><Input value={recipient} onChange={e => setRecipient(e.target.value)} placeholder="수신처 입력" className="text-sm h-8" /></div>
+            <div><label className="text-xs text-muted-foreground mb-1 block">날짜</label><Input type="date" value={dateStr} onChange={e => setDateStr(e.target.value)} className="text-sm h-8" /></div>
           </div>
 
           {/* ── 마진율 조정 패널 ── */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 space-y-3">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 space-y-3">
             <div className="flex items-center gap-4 flex-wrap">
-              <span className="text-xs font-semibold text-amber-800">마진율 설정</span>
+              <span className="text-xs font-semibold text-primary">마진율 설정</span>
               <div className="flex items-center gap-1.5">
-                <label className="text-xs text-stone-500 whitespace-nowrap">내부 마진율</label>
+                <label className="text-xs text-muted-foreground whitespace-nowrap">내부 마진율</label>
                 <Input
                   type="number" min={20} max={50} value={internalMargin}
                   onChange={e => { setInternalMargin(Number(e.target.value)); setMarginApplied(false); }}
-                  className="h-7 text-xs w-20 text-right border-amber-300"
+                  className="h-7 text-xs w-20 text-right border-primary/30"
                 />
-                <span className="text-xs text-stone-500">%</span>
+                <span className="text-xs text-muted-foreground">%</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <label className="text-xs text-stone-500 whitespace-nowrap">견적 마진율</label>
+                <label className="text-xs text-muted-foreground whitespace-nowrap">견적 마진율</label>
                 <Input
                   type="number" min={15} max={20} value={quoteMargin}
                   onChange={e => { setQuoteMargin(Number(e.target.value)); setMarginApplied(false); }}
-                  className="h-7 text-xs w-20 text-right border-amber-300"
+                  className="h-7 text-xs w-20 text-right border-primary/30"
                 />
-                <span className="text-xs text-stone-500">%</span>
+                <span className="text-xs text-muted-foreground">%</span>
               </div>
-              <Button size="sm" onClick={handleApplyMargin} className="text-xs h-7 gap-1 bg-amber-600 hover:bg-amber-700 text-white">
+              <Button size="sm" variant="secondary" onClick={handleApplyMargin} className="text-xs h-7 gap-1">
                 <Calculator className="w-3 h-3" /> 마진 자동 조정
               </Button>
               {marginApplied && (
-                <Button size="sm" variant="outline" onClick={handleResetMargin} className="text-xs h-7 gap-1 border-stone-300 text-stone-500">
+                <Button size="sm" variant="outline" onClick={handleResetMargin} className="text-xs h-7 gap-1">
                   <X className="w-3 h-3" /> 초기화
                 </Button>
               )}
             </div>
 
             {marginInfo && (
-              <div className="grid grid-cols-2 gap-3 pt-1 border-t border-amber-200">
+              <div className="grid grid-cols-2 gap-3 pt-1 border-t border-primary/20">
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs">
-                    <span className="text-stone-500">제품원가 소계</span>
+                    <span className="text-muted-foreground">제품원가 소계</span>
                     <span className="font-medium">{fmtKrw(marginInfo.factoryCost)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-stone-500">내부 납품가 <span className="text-stone-400">({internalMargin}%)</span></span>
-                    <span className="font-semibold text-blue-700">{fmtKrw(marginInfo.internalPrice)}</span>
+                    <span className="text-muted-foreground">내부 납품가 <span className="text-muted-foreground">({internalMargin}%)</span></span>
+                    <span className="font-semibold text-primary">{fmtKrw(marginInfo.internalPrice)}</span>
                   </div>
                 </div>
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs">
-                    <span className="text-stone-500">견적 생산관리비용 <span className="text-stone-400">({quoteMargin}%)</span></span>
-                    <span className="font-semibold text-amber-700">{fmtKrw(marginInfo.marginAmt)}</span>
+                    <span className="text-muted-foreground">견적 생산관리비용 <span className="text-muted-foreground">({quoteMargin}%)</span></span>
+                    <span className="font-semibold text-primary">{fmtKrw(marginInfo.marginAmt)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-stone-500">차액 (부자재 분산)</span>
-                    <span className={`font-semibold ${marginInfo.gap > 0 ? 'text-green-700' : 'text-stone-500'}`}>
+                    <span className="text-muted-foreground">차액 (부자재 분산)</span>
+                    <span className={`font-semibold ${marginInfo.gap > 0 ? 'text-[var(--system-green)]' : 'text-muted-foreground'}`}>
                       {marginInfo.gap > 0 ? `+${fmtKrw(marginInfo.gap)}` : fmtKrw(marginInfo.gap)}
                     </span>
                   </div>
                 </div>
-                <div className="col-span-2 text-[10px] text-stone-400">
+                <div className="col-span-2 text-[11px] text-muted-foreground">
                   ※ 내부납품가 = 소계×(1+{internalMargin}%). 차액은 원자재 제외 항목에 금액 비례 분산됩니다.
                 </div>
               </div>
             )}
           </div>
 
-          <div className="bg-stone-50 border border-stone-200 rounded-lg px-4 py-3 space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-stone-500">
+          <div className="bg-[var(--fill-quaternary)] border border-border rounded-lg px-4 py-3 space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>소계 (업체제공·마진 제외)</span>
               <span className="tabular-nums">{fmtKrw(baseSupply)}</span>
             </div>
-            <div className="flex items-center justify-between text-xs text-amber-700">
+            <div className="flex items-center justify-between text-xs text-primary">
               <span>생산관리비용 {marginRowAmt > 0 ? `(견적마진 ${quoteMargin}% 적용)` : `(견적마진 ${quoteMargin}% 참고)`}</span>
               <span className="tabular-nums font-medium">+ {fmtKrw(marginAmt)}</span>
             </div>
-            <div className="border-t border-stone-200 pt-1.5 flex items-center justify-between">
-              <span className="text-sm font-semibold text-stone-700">견적 공급가</span>
-              <span className="text-base font-bold text-stone-800 tabular-nums">{fmtKrw(totalSupply)}</span>
+            <div className="border-t border-border pt-1.5 flex items-center justify-between">
+              <span className="text-sm font-semibold text-foreground">견적 공급가</span>
+              <span className="text-base font-bold text-foreground tabular-nums">{fmtKrw(totalSupply)}</span>
             </div>
-            <div className="flex items-center justify-between text-xs text-stone-500">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>세액 (10%)</span>
               <span className="tabular-nums">{fmtKrw(totalTax)}</span>
             </div>
-            <div className="flex items-center justify-between border-t border-stone-300 pt-1.5">
-              <span className="text-sm font-bold text-stone-800">합계금액 (공급가+세액)</span>
+            <div className="flex items-center justify-between border-t border-border pt-1.5">
+              <span className="text-sm font-bold text-foreground">합계금액 (공급가+세액)</span>
               <span className="text-xl font-bold text-[#C9A96E] tabular-nums">{fmtKrw(grandTotal)}</span>
             </div>
           </div>
-          <div className="overflow-x-auto rounded-lg border border-stone-200">
+          <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-stone-800 text-white">
+                <tr className="border-b border-border text-[13px] font-semibold text-muted-foreground">
                   <th className="px-2 py-2 text-center w-8">No</th>
                   <th className="px-2 py-2 text-left w-28">구분</th>
                   <th className="px-2 py-2 text-left">품목</th>
@@ -1079,52 +1079,52 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                   const vendorRow = row.isVendorProvided;
                   const marginRow = row.isMarginRow;
                   const rowBg = marginRow
-                    ? 'bg-amber-50'
+                    ? 'bg-primary/5'
                     : vendorRow
-                    ? 'bg-blue-50'
-                    : idx % 2 === 0 ? 'bg-white' : 'bg-stone-50';
+                    ? 'bg-[var(--system-teal)]/10'
+                    : '';
                   return (
-                    <tr key={row.id} className={rowBg}>
-                      <td className="px-2 py-1.5 text-center text-stone-400">{idx + 1}</td>
+                    <tr key={row.id} className={`border-b border-border ${rowBg}`}>
+                      <td className="px-2 py-1.5 text-center text-muted-foreground">{idx + 1}</td>
                       <td className="px-1 py-1 min-w-[7rem]">
-                        <Input value={row.category} onChange={e => updateRow(row.id, 'category', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-blue-700 font-medium' : ''} ${marginRow ? 'text-amber-700 font-semibold' : ''}`} />
+                        <Input value={row.category} onChange={e => updateRow(row.id, 'category', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-[var(--system-teal)] font-medium' : ''} ${marginRow ? 'text-primary font-semibold' : ''}`} />
                       </td>
-                      <td className="px-1 py-1"><Input value={row.itemName} onChange={e => updateRow(row.id, 'itemName', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-blue-700' : ''} ${marginRow ? 'text-amber-700' : ''}`} /></td>
-                      <td className="px-1 py-1"><Input type="number" value={parseFloat(row.qty.toFixed(2))} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${vendorRow ? 'text-blue-700 font-semibold' : ''}`} /></td>
+                      <td className="px-1 py-1"><Input value={row.itemName} onChange={e => updateRow(row.id, 'itemName', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-[var(--system-teal)]' : ''} ${marginRow ? 'text-primary' : ''}`} /></td>
+                      <td className="px-1 py-1"><Input type="number" value={parseFloat(row.qty.toFixed(2))} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${vendorRow ? 'text-[var(--system-teal)] font-semibold' : ''}`} /></td>
                       <td className="px-1 py-1">
                         <div className="text-right">
                           {vendorRow ? (
-                            <span className="text-xs text-blue-400 px-1">—</span>
+                            <span className="text-xs text-[var(--system-teal)] px-1">—</span>
                           ) : (
                             <Input
                               type="text"
                               value={row.unitPrice.toLocaleString()}
                               onChange={e => updateRow(row.id, 'unitPrice', Number(e.target.value.replace(/,/g, '')))}
-                              className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${marginRow ? 'text-amber-700 font-semibold' : ''}`}
+                              className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${marginRow ? 'text-primary font-semibold' : ''}`}
                             />
                           )}
                         </div>
                       </td>
                       <td className="px-1 py-1">
                         {vendorRow ? (
-                          <span className="text-xs text-blue-400 px-1 block text-right">—</span>
+                          <span className="text-xs text-[var(--system-teal)] px-1 block text-right">—</span>
                         ) : (
                           <Input
                             type="text"
                             value={row.supplyAmt.toLocaleString('ko-KR')}
                             onChange={e => updateRow(row.id, 'supplyAmt', Number(e.target.value.replace(/,/g, '')))}
-                            className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${marginRow ? 'text-amber-700 font-semibold' : ''}`}
+                            className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${marginRow ? 'text-primary font-semibold' : ''}`}
                           />
                         )}
                       </td>
-                      <td className={`px-2 py-1.5 text-right ${marginRow ? 'text-amber-700 font-semibold' : 'text-stone-600'}`}>{vendorRow ? '—' : fmtKrw(row.taxAmt)}</td>
-                      <td className={`px-2 py-1.5 text-right font-medium ${marginRow ? 'text-amber-700' : ''}`}>{vendorRow ? '—' : fmtKrw(ceil10(row.supplyAmt + row.taxAmt))}</td>
-                      <td className="px-1 py-1">{marginRow ? null : vendorRow ? <span className="text-xs text-blue-600 font-medium px-1">업체제공</span> : <Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" placeholder="비고" />}</td>
-                      <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(r => r.id !== row.id))} className="text-stone-300 hover:text-red-400"><X className="w-3 h-3" /></button></td>
+                      <td className={`px-2 py-1.5 text-right ${marginRow ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>{vendorRow ? '—' : fmtKrw(row.taxAmt)}</td>
+                      <td className={`px-2 py-1.5 text-right font-medium ${marginRow ? 'text-primary' : ''}`}>{vendorRow ? '—' : fmtKrw(ceil10(row.supplyAmt + row.taxAmt))}</td>
+                      <td className="px-1 py-1">{marginRow ? null : vendorRow ? <span className="text-xs text-[var(--system-teal)] font-medium px-1">업체제공</span> : <Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" placeholder="비고" />}</td>
+                      <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(r => r.id !== row.id))} className="text-muted-foreground hover:text-[var(--system-red)]"><X className="w-3 h-3" /></button></td>
                     </tr>
                   );
                 })}
-                <tr className="bg-[#f0ede4] font-semibold border-t-2 border-stone-300">
+                <tr className="bg-[var(--fill-quaternary)] font-semibold border-t border-border">
                   <td colSpan={5} className="px-2 py-2 text-right text-sm">TOTAL</td>
                   <td className="px-2 py-2 text-right text-sm">{fmtKrw(totalSupply)}</td>
                   <td className="px-2 py-2 text-right text-sm">{fmtKrw(totalTax)}</td>
@@ -1205,31 +1205,31 @@ function MaterialSearchPopover({ onSelect }: { onSelect: (m: Material) => void }
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors">
+        <button className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border border-primary/30 text-primary bg-primary/5 hover:bg-primary/15 transition-colors">
           <Search className="w-3 h-3" />자재
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-2" align="start">
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-stone-700">자재 마스터 검색</p>
+          <p className="text-xs font-semibold text-foreground">자재 마스터 검색</p>
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="자재명 검색..." className="h-7 text-xs" />
-          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="w-full h-7 text-xs border border-stone-200 rounded px-2">
+          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="w-full h-7 text-xs border border-border rounded px-2">
             <option value="all">전체 카테고리</option>
             {BOM_SECTIONS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <div className="max-h-48 overflow-y-auto space-y-0.5">
             {filtered.length === 0 ? (
-              <p className="text-xs text-stone-400 text-center py-3">자재 없음</p>
+              <p className="text-xs text-muted-foreground text-center py-3">자재 없음</p>
             ) : filtered.map(m => (
               <button
                 key={m.id}
-                className="w-full text-left px-2 py-1.5 rounded hover:bg-amber-50 text-xs"
+                className="w-full text-left px-2 py-1.5 rounded hover:bg-primary/10 text-xs"
                 onClick={() => { onSelect(m); setOpen(false); setSearch(''); }}
               >
-                <span className="font-medium text-stone-800">{m.name}</span>
-                {m.spec && <span className="text-stone-400 ml-1">({m.spec})</span>}
-                <span className="ml-1 text-amber-600">{m.unit}</span>
-                {m.unitPriceCny != null && <span className="ml-1 text-stone-500">¥{m.unitPriceCny}</span>}
+                <span className="font-medium text-foreground">{m.name}</span>
+                {m.spec && <span className="text-muted-foreground ml-1">({m.spec})</span>}
+                <span className="ml-1 text-primary">{m.unit}</span>
+                {m.unitPriceCny != null && <span className="ml-1 text-muted-foreground">¥{m.unitPriceCny}</span>}
               </button>
             ))}
           </div>
@@ -1352,7 +1352,7 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
             );
             setOpen(true);
           }}
-          className="h-7 text-xs border-stone-200 bg-amber-50/60 w-full"
+          className="h-7 text-xs border-border bg-primary/5 w-full"
           placeholder="업체명 검색/입력"
           title="새 업체면 이름 입력 후 Enter 또는 신규 등록"
         />
@@ -1361,19 +1361,19 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
             type="button"
             onClick={goToVendorMaster}
             title="기본 정보 미입력 — 거래처 마스터에서 추가 정보 입력 필요"
-            className="text-red-500 hover:text-red-700 shrink-0"
+            className="text-[var(--system-red)] hover:text-[var(--system-red)] shrink-0"
           >
             <span className="text-sm">❗</span>
           </button>
         )}
       </div>
       {open && (
-        <div className="absolute z-50 top-full left-0 mt-0.5 bg-white border border-stone-200 rounded shadow-lg w-52 max-h-56 overflow-auto">
+        <div className="absolute z-50 top-full left-0 mt-0.5 bg-card border border-border rounded shadow-lg w-52 max-h-56 overflow-auto">
           {suggestions.map(v => (
             <button
               key={v.id}
               type="button"
-              className="w-full text-left px-3 py-1.5 text-xs hover:bg-amber-50 text-stone-800"
+              className="w-full text-left px-3 py-1.5 text-xs hover:bg-primary/10 text-foreground"
               onMouseDown={e => { e.preventDefault(); selectVendor(v); }}
             >
               {v.name}
@@ -1382,14 +1382,14 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
           {canRegisterNew ? (
             <button
               type="button"
-              className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 text-green-700 border-t border-stone-100 flex items-center gap-1 font-medium sticky bottom-0 bg-white"
+              className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--system-green)]/10 text-[var(--system-green)] border-t border-border flex items-center gap-1 font-medium sticky bottom-0 bg-card"
               onMouseDown={e => { e.preventDefault(); registerNew(); }}
             >
               <Plus className="w-3.5 h-3.5 shrink-0" />
               <span>"{inputVal.trim()}" 신규 등록</span>
             </button>
           ) : (
-            <div className="px-3 py-2 text-[10px] text-stone-400 border-t border-stone-100 sticky bottom-0 bg-stone-50">
+            <div className="px-3 py-2 text-[11px] text-muted-foreground border-t border-border sticky bottom-0 bg-[var(--fill-quaternary)]">
               새 업체면 이름 입력 후 Enter
             </div>
           )}
@@ -1416,7 +1416,7 @@ function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void 
             <a
               href={src}
               download="material-image.jpg"
-              className="bg-white/80 hover:bg-white text-stone-800 text-xs px-3 py-1.5 rounded-lg border border-stone-200 flex items-center gap-1 shadow-sm"
+              className="bg-card/80 hover:bg-card text-foreground text-xs px-3 py-1.5 rounded-lg border border-border flex items-center gap-1 shadow-sm"
             >
               <Download className="w-3.5 h-3.5" /> 다운로드
             </a>
@@ -1491,16 +1491,16 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
     return () => document.removeEventListener('paste', handlePaste);
   }, [calcType]);
 
-  const inputCls = 'w-full border border-stone-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400';
-  const inputRO = 'w-full border border-stone-100 rounded px-1.5 py-1 text-xs text-center bg-stone-50 text-stone-500';
+  const inputCls = 'w-full border border-border rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring';
+  const inputRO = 'w-full border border-border rounded px-1.5 py-1 text-xs text-center bg-[var(--fill-quaternary)] text-muted-foreground';
   const accent = calcType === 'SF' ? 'amber' : 'sky';
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-[640px] max-w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className={`px-4 py-3 border-b border-stone-200 flex items-center justify-between bg-${accent}-50`}>
-          <h3 className="text-sm font-bold text-stone-700">📐 소요량 계산 — {itemName || '자재'}</h3>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-600 text-xl leading-none">×</button>
+      <div className="bg-card rounded-xl shadow-2xl w-[640px] max-w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className={`px-4 py-3 border-b border-border flex items-center justify-between bg-${accent}-50`}>
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5"><Ruler className="w-4 h-4" />소요량 계산 — {itemName || '자재'}</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
         </div>
         <div className="p-4 space-y-3">
           {/* 가죽/원단 탭 + OCR 버튼 */}
@@ -1509,18 +1509,18 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
               <button
                 onClick={() => setCalcType('SF')}
                 className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-                  calcType === 'SF' ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                  calcType === 'SF' ? 'bg-primary text-primary-foreground' : 'bg-[var(--fill-tertiary)] text-muted-foreground hover:bg-[var(--fill-secondary)]'
                 }`}
               >가죽 (SF)</button>
               <button
                 onClick={() => setCalcType('YD')}
                 className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-                  calcType === 'YD' ? 'bg-sky-600 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                  calcType === 'YD' ? 'bg-sky-600 text-white' : 'bg-[var(--fill-tertiary)] text-muted-foreground hover:bg-[var(--fill-secondary)]'
                 }`}
               >원단 (YD)</button>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-stone-400">Ctrl+V로 이미지 붙여넣기</span>
+              <span className="text-[11px] text-muted-foreground">Ctrl+V로 이미지 붙여넣기</span>
               <input ref={ocrFileRef} type="file" accept="image/*" className="hidden" onChange={async e => {
                 const file = e.target.files?.[0];
                 if (file) await runOcr(file);
@@ -1529,46 +1529,46 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
               <button
                 onClick={() => ocrFileRef.current?.click()}
                 disabled={ocrLoading}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs border border-stone-200 text-stone-600 hover:bg-stone-50 disabled:opacity-50"
-              >{ocrLoading ? '처리중...' : '📷 이미지로 입력'}</button>
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs border border-border text-muted-foreground hover:bg-[var(--fill-quaternary)] disabled:opacity-50"
+              >{ocrLoading ? '처리중...' : <><Camera className="w-3.5 h-3.5" />이미지로 입력</>}</button>
             </div>
           </div>
           {/* 로스율 + (원단: 폭) */}
           <div className="flex items-center gap-4">
             {calcType === 'YD' && (
-              <label className="flex items-center gap-2 text-xs text-stone-600">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="font-semibold whitespace-nowrap">원단폭(cm)</span>
                 <input type="number" value={width} onChange={e => setWidth(parseFloat(e.target.value) || 150)}
-                  className="w-20 border border-stone-200 rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-sky-400" />
+                  className="w-20 border border-border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-sky-400" />
               </label>
             )}
-            <label className="flex items-center gap-2 text-xs text-stone-600">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="font-semibold whitespace-nowrap">로스율(%)</span>
               <input type="number" value={lossRate} onChange={e => setLossRate(parseFloat(e.target.value) || 0)}
-                className="w-20 border border-stone-200 rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-amber-400" min={0} max={100} />
+                className="w-20 border border-border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring" min={0} max={100} />
             </label>
           </div>
           {/* 행 테이블 */}
-          <div className="overflow-hidden rounded-lg border border-stone-200">
+          <div className="overflow-hidden rounded-lg border border-border">
             <table className="w-full">
-              <thead className={`bg-${accent}-50 border-b border-stone-200`}>
+              <thead className={`bg-${accent}-50 border-b border-border`}>
                 <tr>
-                  <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">부위</th>
+                  <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">부위</th>
                   {calcType === 'SF' ? (
                     <>
-                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">가로 CM</th>
-                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">세로 CM</th>
-                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">가로(+0.5)</th>
-                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">세로(+0.5)</th>
+                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">가로 CM</th>
+                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">세로 CM</th>
+                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">가로(+0.5)</th>
+                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">세로(+0.5)</th>
                     </>
                   ) : (
                     <>
-                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">가로 CM</th>
-                      <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">세로 CM</th>
+                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">가로 CM</th>
+                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">세로 CM</th>
                     </>
                   )}
-                  <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">수량</th>
-                  <th className="text-[11px] text-stone-500 py-1.5 px-2 text-center">{calcType === 'SF' ? 'NET(S/F)' : 'NET(YD)'}</th>
+                  <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">수량</th>
+                  <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">{calcType === 'SF' ? 'NET(S/F)' : 'NET(YD)'}</th>
                   <th className="w-6"></th>
                 </tr>
               </thead>
@@ -1578,7 +1578,7 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
                     ? (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764
                     : (width > 0 ? r.가로 * r.세로 * r.수량 / width / 91.44 : 0);
                   return (
-                    <tr key={r.id} className="border-b border-stone-100 hover:bg-stone-50">
+                    <tr key={r.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
                       <td className="px-1 py-1"><input className={inputCls} value={r.부위} onChange={e => update(r.id, '부위', e.target.value)} placeholder="바디" /></td>
                       <td className="px-1 py-1"><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => update(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
                       <td className="px-1 py-1"><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => update(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
@@ -1590,7 +1590,7 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
                       )}
                       <td className="px-1 py-1"><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => update(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
                       <td className="px-1 py-1"><input className={inputRO + ` font-semibold text-${accent}-700`} value={rowNet.toFixed(3)} readOnly /></td>
-                      <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(x => x.id !== r.id))} className="text-stone-300 hover:text-red-400">×</button></td>
+                      <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(x => x.id !== r.id))} className="text-muted-foreground hover:text-[var(--system-red)]">×</button></td>
                     </tr>
                   );
                 })}
@@ -1599,14 +1599,14 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
           </div>
           <button onClick={addRow} className={`text-xs text-${accent}-600 hover:text-${accent}-800 font-semibold`}>+ 행 추가</button>
           {/* 결과 */}
-          <div className="flex items-center justify-between pt-2 border-t border-stone-100">
+          <div className="flex items-center justify-between pt-2 border-t border-border">
             <div className="text-sm">
-              <span className="text-stone-400 mr-2">Net</span><span className="font-bold text-stone-700">{net.toFixed(3)} {calcType}</span>
-              <span className="text-stone-300 mx-2">→</span>
-              <span className="text-stone-400 mr-2">최종(+{lossRate}%)</span><span className={`font-bold text-${accent}-700 text-base`}>{final.toFixed(3)} {calcType}</span>
+              <span className="text-muted-foreground mr-2">Net</span><span className="font-bold text-foreground">{net.toFixed(3)} {calcType}</span>
+              <span className="text-muted-foreground mx-2">→</span>
+              <span className="text-muted-foreground mr-2">최종(+{lossRate}%)</span><span className={`font-bold text-${accent}-700 text-base`}>{final.toFixed(3)} {calcType}</span>
             </div>
             <div className="flex gap-2">
-              <button onClick={onClose} className="px-3 py-1.5 rounded text-xs border border-stone-200 text-stone-500 hover:bg-stone-50">취소</button>
+              <button onClick={onClose} className="px-3 py-1.5 rounded text-xs border border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]">취소</button>
               <button
                 onClick={() => { onApply(Math.ceil(final * 1000) / 1000); onClose(); }}
                 className={`px-4 py-1.5 rounded text-xs bg-${accent}-600 text-white hover:bg-${accent}-700 font-semibold`}
@@ -1662,10 +1662,10 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
   const isVendorProvided = !!(line.isVendorProvided);
   // 본사/업체 동시 체크 불가: 본사제공 우선
   const supplyLabel = !isHqProvided && !isVendorProvided
-    ? { text: '공장', cls: 'text-stone-400' }
+    ? { text: '공장', cls: 'text-muted-foreground' }
     : isVendorProvided && !isHqProvided
-    ? { text: '업체', cls: 'text-blue-500' }
-    : { text: '본사', cls: 'text-amber-600 font-semibold' };
+    ? { text: '업체', cls: 'text-[var(--system-teal)]' }
+    : { text: '본사', cls: 'text-primary font-semibold' };
 
   const handleMaterialSelect = (m: Material) => {
     onChange(line.id, 'itemName', m.name);
@@ -1718,8 +1718,8 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
   };
 
   const ringCls = accentColor === 'blue'
-    ? 'hover:bg-blue-50/30'
-    : 'hover:bg-amber-50/30';
+    ? 'hover:bg-primary/5/30'
+    : 'hover:bg-[var(--fill-quaternary)]';
 
   return (
     <>
@@ -1734,21 +1734,21 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
           onClose={() => setShowCalcModal(false)}
         />
       )}
-    <tr className={`group transition-colors border-b border-stone-100 ${ringCls}`}>
+    <tr className={`group transition-colors border-b border-border ${ringCls}`}>
       {/* 자재명 (부위 Select가 inline으로 포함됨) */}
       <td className="px-1 py-1">
         <div className="flex items-center gap-1">
           <Select value={line.subPart || ''} onValueChange={v => onChange(line.id, 'subPart', v as BomSubPart)}>
-            <SelectTrigger className="h-7 text-xs border-stone-200 w-20 shrink-0">
+            <SelectTrigger className="h-7 text-xs border-border w-20 shrink-0">
               <SelectValue placeholder="-" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none" className="text-xs text-stone-400">-</SelectItem>
+              <SelectItem value="none" className="text-xs text-muted-foreground">-</SelectItem>
               {subPartOptions.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
             </SelectContent>
           </Select>
           <MaterialSearchPopover onSelect={handleMaterialSelect} />
-          <Input value={line.itemName} onChange={e => onChange(line.id, 'itemName', e.target.value)} className="h-7 text-xs border-stone-200 bg-white min-w-[80px]" placeholder="자재명" />
+          <Input value={line.itemName} onChange={e => onChange(line.id, 'itemName', e.target.value)} className="h-7 text-xs border-border bg-card min-w-[80px]" placeholder="자재명" />
           {/* 이미지 기능 (원자재/장식 섹션에만) */}
           {showImageFeature && (
             <>
@@ -1763,14 +1763,14 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
                 <HoverZoomImage
                   src={line.imageUrl}
                   alt="자재 이미지"
-                  className="w-6 h-6 rounded border border-stone-200 overflow-hidden cursor-zoom-in shrink-0"
+                  className="w-6 h-6 rounded border border-border overflow-hidden cursor-zoom-in shrink-0"
                   imgClassName="w-6 h-6 object-cover"
                   previewSize={280}
                 >
                   <img
                     src={line.imageUrl}
                     alt="자재 이미지"
-                    className="w-6 h-6 object-cover rounded cursor-pointer border border-stone-200 shrink-0"
+                    className="w-6 h-6 object-cover rounded cursor-pointer border border-border shrink-0"
                     onClick={() => setShowImagePreview(true)}
                     title="클릭하여 확대 · 호버 미리보기"
                   />
@@ -1778,10 +1778,10 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
               ) : (
                 <button
                   onClick={() => imageInputRef.current?.click()}
-                  className="w-6 h-6 rounded border border-stone-200 text-stone-300 hover:text-stone-500 hover:border-stone-400 flex items-center justify-center shrink-0 transition-colors"
+                  className="w-6 h-6 rounded border border-border text-muted-foreground hover:text-muted-foreground hover:border-[var(--separator-opaque,#C6C6C8)] flex items-center justify-center shrink-0 transition-colors"
                   title="이미지 추가"
                 >
-                  📷
+                  <Camera className="w-3.5 h-3.5" />
                 </button>
               )}
             </>
@@ -1789,21 +1789,21 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
         </div>
       </td>
       {/* 규격 */}
-      <td className="px-1 py-1"><Input value={line.spec || ''} onChange={e => onChange(line.id, 'spec', e.target.value)} className="h-7 text-xs border-stone-200 bg-white min-w-[60px]" placeholder="규격" /></td>
+      <td className="px-1 py-1"><Input value={line.spec || ''} onChange={e => onChange(line.id, 'spec', e.target.value)} className="h-7 text-xs border-border bg-card min-w-[60px]" placeholder="규격" /></td>
       {/* 단위 */}
       <td className="px-1 py-1">
         <div className="flex flex-col gap-0.5">
           <Select value={line.unit} onValueChange={v => { onChange(line.id, 'unit', v); if (v !== '직접입력') onChange(line.id, 'customUnit', ''); }}>
-            <SelectTrigger className="h-7 text-xs border-stone-200 w-20"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-7 text-xs border-border w-20"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {UNITS.map(u => <SelectItem key={u} value={u} className={`text-xs ${u === '직접입력' ? 'border-t border-stone-200 text-stone-500 italic' : ''}`}>{u}</SelectItem>)}
+              {UNITS.map(u => <SelectItem key={u} value={u} className={`text-xs ${u === '직접입력' ? 'border-t border-border text-muted-foreground italic' : ''}`}>{u}</SelectItem>)}
             </SelectContent>
           </Select>
           {isCustomUnit && (
             <Input
               value={line.customUnit || ''}
               onChange={e => onChange(line.id, 'customUnit', e.target.value)}
-              className="h-6 text-xs border-stone-300 bg-amber-50 w-20"
+              className="h-6 text-xs border-border bg-primary/5 w-20"
               placeholder="단위 입력"
             />
           )}
@@ -1815,15 +1815,15 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
           type="number"
           value={line.unitPriceCny || ''}
           onChange={e => onChange(line.id, 'unitPriceCny', Number(e.target.value))}
-          className="h-7 text-xs border-stone-200 bg-white text-right w-20"
+          className="h-7 text-xs border-border bg-card text-right w-20"
           placeholder="단가"
         />
         <div style={{fontSize:'10px', color:'#9CA3AF', textAlign:'right'}}>₩{Math.round(line.unitPriceCny * cnyKrw).toLocaleString()}</div>
       </td>
       {/* NET 소요량 */}
-      <td className="px-1 py-1"><Input type="number" step="any" value={netQtyStr} onChange={e => { setNetQtyStr(e.target.value); const n = parseFloat(e.target.value); if (!isNaN(n)) onChange(line.id, 'netQty', n); else onChange(line.id, 'netQty', 0); }} onBlur={e => { const n = parseFloat(e.target.value); const v = isNaN(n) ? 0 : n; onChange(line.id, 'netQty', v); setNetQtyStr(v !== 0 ? String(v) : ''); }} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="0" /></td>
+      <td className="px-1 py-1"><Input type="number" step="any" value={netQtyStr} onChange={e => { setNetQtyStr(e.target.value); const n = parseFloat(e.target.value); if (!isNaN(n)) onChange(line.id, 'netQty', n); else onChange(line.id, 'netQty', 0); }} onBlur={e => { const n = parseFloat(e.target.value); const v = isNaN(n) ? 0 : n; onChange(line.id, 'netQty', v); setNetQtyStr(v !== 0 ? String(v) : ''); }} className="h-7 text-xs border-border bg-card text-right w-20" placeholder="0" /></td>
       {/* LOSS */}
-      <td className="px-1 py-1"><Input type="number" step="any" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className="h-7 text-xs border-stone-200 bg-white text-right w-14" placeholder="5" /></td>
+      <td className="px-1 py-1"><Input type="number" step="any" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className="h-7 text-xs border-border bg-card text-right w-14" placeholder="5" /></td>
       {/* 소요량 */}
       <td className="px-1 py-1">
         <div className="flex items-center gap-1">
@@ -1834,17 +1834,17 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
               const raw = e.target.value;
               onChange(line.id, 'manualQty', raw === '' ? undefined : parseFloat(raw) || 0);
             }}
-            className="h-7 text-xs border-stone-300 bg-amber-50 text-right w-20"
+            className="h-7 text-xs border-border bg-primary/5 text-right w-20"
             placeholder={fmt(computedQty)}
             title="소요량 직접 입력 (비우면 자동계산: NET × (1+LOSS))"
           />
           {showCalcBtn && (
             <button
               onClick={() => setShowCalcModal(true)}
-              className="h-7 w-7 shrink-0 flex items-center justify-center rounded border border-stone-200 bg-white hover:bg-amber-50 hover:border-amber-300 text-sm transition-colors"
+              className="h-7 w-7 shrink-0 flex items-center justify-center rounded border border-border bg-card hover:bg-primary/10 hover:border-primary/30 text-sm transition-colors"
               title={`소요량 계산기 (${effectiveUnit})`}
             >
-              📐
+              <Ruler className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
@@ -1862,12 +1862,12 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
           {/* 체크박스 2개 */}
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-1 cursor-pointer" title="본사제공">
-              <input type="checkbox" checked={isHqProvided} onChange={e => handleHqChange(e.target.checked)} className="w-4 h-4 accent-amber-600" />
-              <span className="text-xs text-amber-600 font-medium">본사</span>
+              <input type="checkbox" checked={isHqProvided} onChange={e => handleHqChange(e.target.checked)} className="w-4 h-4 accent-primary" />
+              <span className="text-xs text-primary font-medium">본사</span>
             </label>
             <label className="flex items-center gap-1 cursor-pointer" title="업체제공">
-              <input type="checkbox" checked={isVendorProvided} onChange={e => handleVendorChange(e.target.checked)} className="w-4 h-4 accent-blue-500" />
-              <span className="text-xs text-blue-500 font-medium">업체</span>
+              <input type="checkbox" checked={isVendorProvided} onChange={e => handleVendorChange(e.target.checked)} className="w-4 h-4 accent-[var(--system-teal)]" />
+              <span className="text-xs text-[var(--system-teal)] font-medium">업체</span>
             </label>
           </div>
         </div>
@@ -1882,11 +1882,11 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
             onChange={handleVendorAutoComplete}
           />
         ) : (
-          <span className="text-[10px] text-stone-300 px-2">—</span>
+          <span className="text-[11px] text-muted-foreground px-2">—</span>
         )}
       </td>
       {/* 삭제 */}
-      <td className="px-1 py-1"><button onClick={() => onDelete(line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-stone-300 hover:text-red-400 p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
+      <td className="px-1 py-1"><button onClick={() => onDelete(line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-[var(--system-red)] p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
     </tr>
     </>
   );
@@ -1913,115 +1913,115 @@ function PostCostSummary({
   const deliveryPrice = bom.postDeliveryPrice || linkedItem?.deliveryPrice || linkedItem?.targetSalePrice || 0;
   const marginAmt = deliveryPrice > 0 ? deliveryPrice - ps.totalCostKrw : 0;
   const marginPct = deliveryPrice > 0 ? (marginAmt / deliveryPrice) * 100 : 0;
-  const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 20 ? 'text-amber-600' : marginPct <= 30 ? 'text-green-600' : 'text-orange-600';
-  const marginBgClass = marginPct < 15 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200';
-  const marginLabel = marginPct < 15 ? '🔴 위험' : marginPct < 30 ? '🟡 주의' : '✅ 양호';
+  const marginClass = marginPct < 15 ? 'text-[var(--system-red)]' : marginPct < 20 ? 'text-[var(--system-orange)]' : marginPct <= 30 ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]';
+  const marginBgClass = marginPct < 15 ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20' : marginPct < 30 ? 'bg-[var(--system-yellow)]/10 border-[var(--system-yellow)]/30' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20';
+  const marginLabel = marginPct < 15 ? '위험' : marginPct < 30 ? '주의' : '양호';
 
   const fmtCny = (n: number) => `${currSymbol}${n.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}`;
 
   return (
-    <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-      <div className="px-5 py-3 border-b border-stone-100 bg-stone-800 text-white flex items-center justify-between">
-        <h2 className="text-sm font-semibold">사후 원가 요약 <span className="text-stone-400 text-xs font-normal ml-2">— 공장 실제 원가 기준</span></h2>
+    <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground flex items-center justify-between">
+        <h2 className="text-sm font-semibold">사후 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— 공장 실제 원가 기준</span></h2>
         {ps.totalMaterialCny > 0 && (
-          <span className="text-xs text-stone-400">적용 환율: {currency === 'CNY' ? `CNY ${ps.rate}` : currency === 'USD' ? `USD ${bom.exchangeRateUsd || 1380}` : 'KRW 직접'}</span>
+          <span className="text-xs text-muted-foreground">적용 환율: {currency === 'CNY' ? `CNY ${ps.rate}` : currency === 'USD' ? `USD ${bom.exchangeRateUsd || 1380}` : 'KRW 직접'}</span>
         )}
       </div>
       <div className="p-5 space-y-3">
         {/* 자재비 상세 */}
-        <div className="bg-stone-50 rounded-lg border border-stone-200 overflow-hidden">
-          <div className="px-4 py-2 bg-stone-100 border-b border-stone-200">
-            <span className="text-xs font-semibold text-stone-600">자재비 합계</span>
-            <span className="float-right text-xs font-bold text-stone-800">
-              {fmtCny(ps.totalMaterialCny)} {showKrw && <span className="text-stone-500">→ {fmtKrw(ps.totalMaterialKrw)}</span>}
+        <div className="bg-[var(--fill-quaternary)] rounded-lg border border-border overflow-hidden">
+          <div className="px-4 py-2 bg-[var(--fill-tertiary)] border-b border-border">
+            <span className="text-xs font-semibold text-muted-foreground">자재비 합계</span>
+            <span className="float-right text-xs font-bold text-foreground">
+              {fmtCny(ps.totalMaterialCny)} {showKrw && <span className="text-muted-foreground">→ {fmtKrw(ps.totalMaterialKrw)}</span>}
             </span>
           </div>
           <div className="px-4 py-2 space-y-1.5">
             <div className="flex justify-between text-xs">
-              <span className="text-stone-500 pl-3">- 공장구매 자재 <span className="text-[10px] text-stone-400">(본사제공 제외)</span></span>
-              <span className="text-stone-700 font-medium">
-                {fmtCny(ps.factoryMaterialCny)} {showKrw && <span className="text-stone-500">→ {fmtKrw(ps.factoryMaterialKrw)}</span>}
+              <span className="text-muted-foreground pl-3">- 공장구매 자재 <span className="text-[11px] text-muted-foreground">(본사제공 제외)</span></span>
+              <span className="text-foreground font-medium">
+                {fmtCny(ps.factoryMaterialCny)} {showKrw && <span className="text-muted-foreground">→ {fmtKrw(ps.factoryMaterialKrw)}</span>}
               </span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="text-stone-500 pl-3">- 본사제공 자재</span>
-              <span className="text-stone-700 font-medium">
-                {fmtCny(ps.hqMaterialCny)} {showKrw && <span className="text-stone-500">→ {fmtKrw(ps.hqMaterialKrw)}</span>}
+              <span className="text-muted-foreground pl-3">- 본사제공 자재</span>
+              <span className="text-foreground font-medium">
+                {fmtCny(ps.hqMaterialCny)} {showKrw && <span className="text-muted-foreground">→ {fmtKrw(ps.hqMaterialKrw)}</span>}
               </span>
             </div>
           </div>
         </div>
 
         {/* 임가공비 */}
-        <div className="flex justify-between items-center px-4 py-2 bg-stone-50 rounded-lg border border-stone-200 text-xs">
-          <span className="text-stone-600 font-medium">임가공비</span>
-          <span className="text-stone-800 font-medium">
-            {fmtCny(ps.processingCny)} {showKrw && <span className="text-stone-500">→ {fmtKrw(ps.processingKrw)}</span>}
+        <div className="flex justify-between items-center px-4 py-2 bg-[var(--fill-quaternary)] rounded-lg border border-border text-xs">
+          <span className="text-muted-foreground font-medium">임가공비</span>
+          <span className="text-foreground font-medium">
+            {fmtCny(ps.processingCny)} {showKrw && <span className="text-muted-foreground">→ {fmtKrw(ps.processingKrw)}</span>}
           </span>
         </div>
 
         {/* 관세 */}
         {ps.customsRate > 0 && (
-          <div className="flex justify-between items-center px-4 py-2 bg-stone-50 rounded-lg border border-stone-200 text-xs">
-            <span className="text-stone-600 font-medium">관세 ({ps.customsRate}%)</span>
-            <span className="text-stone-800 font-medium">{fmtKrw(ps.customsKrw)}</span>
+          <div className="flex justify-between items-center px-4 py-2 bg-[var(--fill-quaternary)] rounded-lg border border-border text-xs">
+            <span className="text-muted-foreground font-medium">관세 ({ps.customsRate}%)</span>
+            <span className="text-foreground font-medium">{fmtKrw(ps.customsKrw)}</span>
           </div>
         )}
 
         {/* 구분선 */}
-        <div className="border-t border-stone-200 my-1" />
+        <div className="border-t border-border my-1" />
 
         {/* 공장단가 (강조) */}
-        <div className="bg-amber-50 rounded-xl border-2 border-amber-300 px-4 py-3">
+        <div className="bg-primary/5 rounded-xl border border-primary/30 px-4 py-3">
           <div className="flex justify-between items-center">
             <div>
-              <span className="text-sm font-bold text-stone-800">🏭 공장단가</span>
-              <div className="text-[10px] text-stone-500 mt-0.5">공장구매자재 + 임가공 + 관세 (본사제공 제외)</div>
+              <span className="text-sm font-bold text-foreground flex items-center gap-1.5"><Factory className="w-4 h-4 text-primary" />공장단가</span>
+              <div className="text-[11px] text-muted-foreground mt-0.5">공장구매자재 + 임가공 + 관세 (본사제공 제외)</div>
             </div>
             <div className="text-right">
-              <div className="text-base font-bold text-amber-700">{fmtCny(ps.factoryUnitCostCny)}</div>
-              {showKrw && <div className="text-sm font-semibold text-stone-600">{fmtKrw(ps.factoryUnitCostKrw)}</div>}
+              <div className="text-base font-bold text-primary">{fmtCny(ps.factoryUnitCostCny)}</div>
+              {showKrw && <div className="text-sm font-semibold text-muted-foreground">{fmtKrw(ps.factoryUnitCostKrw)}</div>}
             </div>
           </div>
         </div>
 
         {/* 물류비 */}
         {ps.logisticsKrw > 0 && (
-          <div className="flex justify-between items-center px-4 py-2 bg-stone-50 rounded-lg border border-stone-200 text-xs">
-            <span className="text-stone-600 font-medium">물류비</span>
-            <span className="text-stone-800 font-medium">{fmtKrw(ps.logisticsKrw)}</span>
+          <div className="flex justify-between items-center px-4 py-2 bg-[var(--fill-quaternary)] rounded-lg border border-border text-xs">
+            <span className="text-muted-foreground font-medium">물류비</span>
+            <span className="text-foreground font-medium">{fmtKrw(ps.logisticsKrw)}</span>
           </div>
         )}
 
         {/* 제품원가 */}
-        <div className="bg-stone-800 rounded-xl px-4 py-3">
+        <div className="bg-primary rounded-xl px-4 py-3">
           <div className="flex justify-between items-center">
             <div>
-              <span className="text-sm font-bold text-white">📦 제품원가</span>
-              <div className="text-[10px] text-stone-400 mt-0.5">공장단가 + 본사제공 + 물류비</div>
+              <span className="text-sm font-bold text-primary-foreground flex items-center gap-1.5"><Package className="w-4 h-4" />제품원가</span>
+              <div className="text-[11px] text-primary-foreground/70 mt-0.5">공장단가 + 본사제공 + 물류비</div>
             </div>
             <div className="text-right">
-              <div className="text-base font-bold text-[#C9A96E]">{fmtCny(ps.totalCostCny)}</div>
-              {showKrw && <div className="text-sm font-semibold text-stone-300">{fmtKrw(ps.totalCostKrw)}</div>}
+              <div className="text-base font-bold text-primary-foreground">{fmtCny(ps.totalCostCny)}</div>
+              {showKrw && <div className="text-sm font-semibold text-primary-foreground/80">{fmtKrw(ps.totalCostKrw)}</div>}
             </div>
           </div>
         </div>
 
         {/* 구분선 */}
-        <div className="border-t border-stone-200 my-1" />
+        <div className="border-t border-border my-1" />
 
         {/* 납품가 */}
         <div className="flex items-center gap-3 px-1">
-          <label className="text-xs font-semibold text-stone-700 whitespace-nowrap">납품가 (KRW)</label>
+          <label className="text-xs font-semibold text-foreground whitespace-nowrap">납품가 (KRW)</label>
           <Input
             type="number"
             value={deliveryPrice || ''}
             onChange={e => onDeliveryPriceChange(Number(e.target.value))}
-            className="h-8 text-sm border-stone-300 text-right w-36 font-semibold"
+            className="h-8 text-sm border-border text-right w-36 font-semibold"
             placeholder="납품가 입력"
           />
           {linkedItem?.deliveryPrice && linkedItem.deliveryPrice !== bom.postDeliveryPrice && (
-            <span className="text-[10px] text-stone-400">품목마스터: {fmtKrw(linkedItem.deliveryPrice)}</span>
+            <span className="text-[11px] text-muted-foreground">품목마스터: {fmtKrw(linkedItem.deliveryPrice)}</span>
           )}
         </div>
 
@@ -2030,12 +2030,12 @@ function PostCostSummary({
           <div className={`rounded-xl border px-4 py-3 ${marginBgClass}`}>
             <div className="flex justify-between items-center">
               <div>
-                <div className="text-xs text-stone-600">마진율</div>
+                <div className="text-xs text-muted-foreground">마진율</div>
                 <div className={`text-2xl font-bold ${marginClass}`}>{marginPct.toFixed(1)}%</div>
-                <div className="text-[10px] text-stone-500 mt-0.5">{marginLabel}</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">{marginLabel}</div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-stone-600">마진금액</div>
+                <div className="text-xs text-muted-foreground">마진금액</div>
                 <div className={`text-lg font-bold ${marginClass}`}>{fmtKrw(marginAmt)}</div>
               </div>
             </div>
@@ -3265,26 +3265,26 @@ export default function BomManagement() {
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800 tracking-tight">BOM / 원가 관리</h1>
-          <p className="text-sm text-stone-500 mt-0.5">사전원가(BOM) 및 사후원가(공장 실적) 통합 관리</p>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">BOM / 원가 관리</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">사전원가(BOM) 및 사후원가(공장 실적) 통합 관리</p>
         </div>
         <div className="flex gap-2">
           <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handleExcelUpload} className="hidden" />
           <input ref={preFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePreExcelUpload} className="hidden" />
           <input ref={postFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePostExcelUpload} className="hidden" />
-          <Button variant="outline" size="sm" onClick={() => setShowSimpleCostModal(true)} className="gap-1.5 text-xs border-amber-400 text-amber-700 hover:bg-amber-50">
+          <Button variant="outline" size="sm" onClick={() => setShowSimpleCostModal(true)} className="gap-1.5 text-xs">
             <DollarSign className="w-3.5 h-3.5" /> 간단 원가 입력
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowCopyModal(true)} className="gap-1.5 text-xs border-stone-300">
+          <Button variant="outline" size="sm" onClick={() => setShowCopyModal(true)} className="gap-1.5 text-xs border-border">
             <Copy className="w-3.5 h-3.5" /> 유사 스타일 복사
           </Button>
           {editBom && (activeColorBom || activePostColorBom) && (
-            <Button variant="outline" size="sm" onClick={() => setShowQuote(true)} className="gap-1.5 text-xs border-[#C9A96E] text-[#C9A96E] hover:bg-amber-50">
+            <Button variant="outline" size="sm" onClick={() => setShowQuote(true)} className="gap-1.5 text-xs text-primary">
               <FileText className="w-3.5 h-3.5" /> 업체용 견적서
             </Button>
           )}
           {editBom && (
-            <Button size="sm" onClick={handleSave} className={`gap-1.5 text-xs text-white ${isDirty ? 'bg-stone-800 hover:bg-stone-700' : 'bg-stone-400 hover:bg-stone-500'}`}>
+            <Button size="sm" onClick={handleSave} className={`gap-1.5 text-xs ${isDirty ? '' : 'opacity-50'}`}>
               <Save className="w-3.5 h-3.5" /> 저장{isDirty ? '' : ' (변경없음)'}
             </Button>
           )}
@@ -3292,12 +3292,12 @@ export default function BomManagement() {
       </div>
 
       {/* 스타일 선택 */}
-      <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-sm">
+      <div className="bg-card rounded-xl border border-border p-5">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <div className="col-span-1">
-            <label className="text-xs text-stone-500 mb-1 block font-medium">바이어 필터</label>
+            <label className="text-xs text-muted-foreground mb-1 block font-medium">바이어 필터</label>
             <Select value={filterBuyerBom} onValueChange={setFilterBuyerBom}>
-              <SelectTrigger className="h-8 text-xs border-stone-200"><SelectValue placeholder="전체 바이어" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs border-border"><SelectValue placeholder="전체 바이어" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all" className="text-xs">전체 바이어</SelectItem>
                 {buyers.map(b => <SelectItem key={b.id} value={b.id} className="text-xs">{b.name}</SelectItem>)}
@@ -3305,13 +3305,13 @@ export default function BomManagement() {
             </Select>
           </div>
           <div className="col-span-1">
-            <label className="text-xs text-stone-500 mb-1 block font-medium">스타일 검색</label>
-            <Input value={styleSearch} onChange={e => setStyleSearch(e.target.value)} className="h-8 text-xs border-stone-200" placeholder="스타일번호 / 품명" />
+            <label className="text-xs text-muted-foreground mb-1 block font-medium">스타일 검색</label>
+            <Input value={styleSearch} onChange={e => setStyleSearch(e.target.value)} className="h-8 text-xs border-border" placeholder="스타일번호 / 품명" />
           </div>
           <div className="col-span-2">
-            <label className="text-xs text-stone-500 mb-1 block font-medium">스타일 선택</label>
+            <label className="text-xs text-muted-foreground mb-1 block font-medium">스타일 선택</label>
             <Select value={selectedStyleId.replace('_reload', '')} onValueChange={setSelectedStyleId}>
-              <SelectTrigger className="h-8 text-xs border-stone-200"><SelectValue placeholder="스타일 선택..." /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs border-border"><SelectValue placeholder="스타일 선택..." /></SelectTrigger>
               <SelectContent>
                 {items
                   .filter(item => filterBuyerBom === 'all' || item.buyerId === filterBuyerBom)
@@ -3322,8 +3322,8 @@ export default function BomManagement() {
                       <SelectItem key={item.id} value={item.id} className="text-xs">
                         <span className="flex items-center gap-1.5">
                           {item.styleNo} — {item.name}
-                          {item.hasBom && <Badge variant="outline" className="text-[10px] py-0 h-4 border-green-300 text-green-600">BOM</Badge>}
-                          {item.hasBom && bomCost > 0 && <span className="text-[10px] text-amber-600 font-medium">{fmtKrw(bomCost)}</span>}
+                          {item.hasBom && <Badge variant="outline" className="text-[11px] py-0 h-4 border-[var(--system-green)]/30 text-[var(--system-green)]">BOM</Badge>}
+                          {item.hasBom && bomCost > 0 && <span className="text-[11px] text-primary font-medium">{fmtKrw(bomCost)}</span>}
                         </span>
                       </SelectItem>
                     );
@@ -3334,29 +3334,29 @@ export default function BomManagement() {
           {editBom && (
             <>
               <div>
-                <label className="text-xs text-stone-500 mb-1 block font-medium">스타일번호 <span className="text-[10px] text-amber-600 font-normal">자동</span></label>
-                <Input value={editBom.styleNo} disabled className="h-8 text-xs border-stone-200 bg-stone-50 text-stone-500 cursor-not-allowed" />
+                <label className="text-xs text-muted-foreground mb-1 block font-medium">스타일번호 <span className="text-[11px] text-primary font-normal">자동</span></label>
+                <Input value={editBom.styleNo} disabled className="h-8 text-xs border-border bg-[var(--fill-quaternary)] text-muted-foreground cursor-not-allowed" />
               </div>
               <div>
-                <label className="text-xs text-stone-500 mb-1 block font-medium">품명 <span className="text-[10px] text-amber-600 font-normal">자동</span></label>
-                <Input value={editBom.styleName} disabled className="h-8 text-xs border-stone-200 bg-stone-50 text-stone-500 cursor-not-allowed" />
+                <label className="text-xs text-muted-foreground mb-1 block font-medium">품명 <span className="text-[11px] text-primary font-normal">자동</span></label>
+                <Input value={editBom.styleName} disabled className="h-8 text-xs border-border bg-[var(--fill-quaternary)] text-muted-foreground cursor-not-allowed" />
               </div>
               <div>
-                <label className="text-xs text-stone-500 mb-1 block font-medium">시즌 <span className="text-[10px] text-amber-600 font-normal">자동</span></label>
-                <Input value={editBom.season} disabled className="h-8 text-xs border-stone-200 bg-stone-50 text-stone-500 cursor-not-allowed" />
+                <label className="text-xs text-muted-foreground mb-1 block font-medium">시즌 <span className="text-[11px] text-primary font-normal">자동</span></label>
+                <Input value={editBom.season} disabled className="h-8 text-xs border-border bg-[var(--fill-quaternary)] text-muted-foreground cursor-not-allowed" />
               </div>
               <div>
-                <label className="text-xs text-stone-500 mb-1 block font-medium">카테고리 <span className="text-[10px] text-amber-600 font-normal">자동</span></label>
-                <Input value={editBom.erpCategory || ''} disabled className="h-8 text-xs border-stone-200 bg-stone-50 text-stone-500 cursor-not-allowed" />
+                <label className="text-xs text-muted-foreground mb-1 block font-medium">카테고리 <span className="text-[11px] text-primary font-normal">자동</span></label>
+                <Input value={editBom.erpCategory || ''} disabled className="h-8 text-xs border-border bg-[var(--fill-quaternary)] text-muted-foreground cursor-not-allowed" />
               </div>
               <div>
-                <label className="text-xs text-stone-500 mb-1 block font-medium">담당 디자이너 <span className="text-[10px] text-amber-600 font-normal">자동</span></label>
-                <Input value={editBom.designer || ''} disabled className="h-8 text-xs border-stone-200 bg-stone-50 text-stone-500 cursor-not-allowed" />
+                <label className="text-xs text-muted-foreground mb-1 block font-medium">담당 디자이너 <span className="text-[11px] text-primary font-normal">자동</span></label>
+                <Input value={editBom.designer || ''} disabled className="h-8 text-xs border-border bg-[var(--fill-quaternary)] text-muted-foreground cursor-not-allowed" />
               </div>
-              <div><label className="text-xs text-stone-500 mb-1 block font-medium">라인명</label><Input value={editBom.lineName || ''} onChange={e => updateField('lineName', e.target.value)} className="h-8 text-xs border-stone-200" placeholder="라인명" /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block font-medium">라인명</label><Input value={editBom.lineName || ''} onChange={e => updateField('lineName', e.target.value)} className="h-8 text-xs border-border" placeholder="라인명" /></div>
               {/* 제품이미지 업로드 (품목 imageUrl 폴백) */}
               <div className="col-span-2">
-                <label className="text-xs text-stone-500 mb-1 block font-medium">포토 구성 (제품사진 - 클릭 또는 Ctrl+V)</label>
+                <label className="text-xs text-muted-foreground mb-1 block font-medium">포토 구성 (제품사진 - 클릭 또는 Ctrl+V)</label>
                 <div className="flex items-center gap-3">
                   {(() => {
                     const linkedItemImg = items.find(i => i.id === editBom.styleId)?.imageUrl;
@@ -3364,7 +3364,7 @@ export default function BomManagement() {
                     return (
                   <>
                   <div
-                    className="w-20 h-20 border-2 border-dashed border-stone-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-amber-400 hover:bg-amber-50 transition-colors overflow-hidden flex-shrink-0"
+                    className="w-20 h-20 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/10 transition-colors overflow-hidden flex-shrink-0"
                     onClick={() => document.getElementById('bom-product-img-input')?.click()}
                     onPaste={e => { const pasteItems = Array.from(e.clipboardData?.items || []); const img = pasteItems.find(i => i.type.startsWith('image/')); if (img) { const blob = img.getAsFile(); if (blob) { const reader = new FileReader(); reader.onload = ev => updateField('productImage', ev.target?.result as string); reader.readAsDataURL(blob); } } }}
                     tabIndex={0}
@@ -3378,23 +3378,23 @@ export default function BomManagement() {
                         previewSize={360}
                       />
                     ) : (
-                      <><span className="text-lg">📷</span><span className="text-[9px] text-stone-400 text-center">제품사진</span></>
+                      <><Camera className="w-5 h-5 text-muted-foreground" /><span className="text-[11px] text-muted-foreground text-center">제품사진</span></>
                     )}
                   </div>
                   <input id="bom-product-img-input" type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = ev => updateField('productImage', ev.target?.result as string); reader.readAsDataURL(file); e.target.value = ''; }} />
                   {editBom.productImage && (
-                    <button onClick={() => updateField('productImage', undefined)} className="text-[10px] text-red-400 hover:text-red-600">× 삭제</button>
+                    <button onClick={() => updateField('productImage', undefined)} className="text-[11px] text-[var(--system-red)] hover:text-[var(--system-red)]">× 삭제</button>
                   )}
                   {!editBom.productImage && linkedItemImg && (
-                    <span className="text-[10px] text-stone-400">품목 마스터 사진</span>
+                    <span className="text-[11px] text-muted-foreground">품목 마스터 사진</span>
                   )}
                   </>
                     );
                   })()}
                 </div>
               </div>
-              <div><label className="text-xs text-stone-500 mb-1 block font-medium">환율 (CNY→KRW)</label><Input type="number" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 text-xs border-stone-200 text-right" /></div>
-              <div><label className="text-xs text-stone-500 mb-1 block font-medium">생산마진율 (%)</label><Input type="number" value={Math.round((editBom.productionMarginRate ?? 0.16) * 100)} onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)} className="h-8 text-xs border-stone-200 text-right" /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block font-medium">환율 (CNY→KRW)</label><Input type="number" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 text-xs border-border text-right" /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block font-medium">생산마진율 (%)</label><Input type="number" value={Math.round((editBom.productionMarginRate ?? 0.16) * 100)} onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)} className="h-8 text-xs border-border text-right" /></div>
             </>
           )}
         </div>
@@ -3403,10 +3403,10 @@ export default function BomManagement() {
 
 
       {!editBom && (
-        <div className="bg-stone-50 border border-dashed border-stone-300 rounded-xl p-12 text-center">
-          <Calculator className="w-10 h-10 text-stone-300 mx-auto mb-3" />
-          <p className="text-stone-500 text-sm font-medium">스타일을 선택하거나 엑셀을 업로드하세요</p>
-          <p className="text-stone-400 text-xs mt-1">중국원가표(.xlsm) 업로드 시 자동으로 BOM이 생성됩니다</p>
+        <div className="bg-[var(--fill-quaternary)] border border-dashed border-border rounded-xl p-12 text-center">
+          <Calculator className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm font-medium">스타일을 선택하거나 엑셀을 업로드하세요</p>
+          <p className="text-muted-foreground text-xs mt-1">중국원가표(.xlsm) 업로드 시 자동으로 BOM이 생성됩니다</p>
         </div>
       )}
 
@@ -3415,62 +3415,62 @@ export default function BomManagement() {
         <>
           {/* ── 최상위 탭 ── */}
           {isPackMode ? (
-            <div className="flex items-center border-b-2 border-amber-300">
-              <div className="flex flex-col items-start px-6 py-2.5 border-b-2 -mb-[2px] border-amber-500 text-amber-800">
+            <div className="flex items-center border-b-2 border-primary/30">
+              <div className="flex flex-col items-start px-6 py-2.5 border-b-2 -mb-[2px] border-primary text-primary">
                 <div className="flex items-center gap-2 text-sm font-bold">
                   패키지 구성
                   {packLines.length > 0 && (
-                    <Badge className="text-[10px] py-0 h-4 bg-amber-100 text-amber-800 border-amber-300">{packLines.length}자재</Badge>
+                    <Badge className="text-[11px] py-0 h-4 bg-primary/10 text-primary border-primary/30">{packLines.length}자재</Badge>
                   )}
                 </div>
-                <span className="text-[9px] font-mono opacity-50 leading-tight">자재마스터 · 포장재 합산</span>
+                <span className="text-[11px] font-mono opacity-50 leading-tight">자재마스터 · 포장재 합산</span>
               </div>
             </div>
           ) : (
-          <div className="flex items-center border-b-2 border-stone-200">
+          <div className="flex items-center border-b-2 border-border">
             <button
               onClick={() => setMainTab('pre')}
               className={`flex flex-col items-start px-6 py-2.5 border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
                 mainTab === 'pre'
-                  ? 'border-emerald-500 text-emerald-700'
-                  : 'border-transparent text-stone-400 hover:text-stone-600'
+                  ? 'border-[var(--system-green)] text-[var(--system-green)]'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               <div className="flex items-center gap-2 text-sm font-bold">
                 사전원가
                 {(editBom.colorBoms || []).length > 0 && (
-                  <Badge className="text-[10px] py-0 h-4 bg-emerald-100 text-emerald-700 border-emerald-300">{(editBom.colorBoms || []).length}컬러</Badge>
+                  <Badge className="text-[11px] py-0 h-4 bg-[var(--system-green)]/10 text-[var(--system-green)] border-[var(--system-green)]/30">{(editBom.colorBoms || []).length}컬러</Badge>
                 )}
               </div>
-              <span className="text-[9px] font-mono opacity-40 leading-tight">boms · pre_materials · color_boms</span>
+              <span className="text-[11px] font-mono opacity-40 leading-tight">boms · pre_materials · color_boms</span>
             </button>
             <button
               onClick={() => setMainTab('post')}
               className={`flex flex-col items-start px-6 py-2.5 border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
                 mainTab === 'post'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-stone-400 hover:text-stone-600'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               <div className="flex items-center gap-2 text-sm font-bold">
                 <Factory className="w-4 h-4" />
                 사후원가
                 {(editBom.postColorBoms || []).length > 0 && (
-                  <Badge className="text-[10px] py-0 h-4 bg-blue-100 text-blue-700 border-blue-300">{(editBom.postColorBoms || []).length}컬러</Badge>
+                  <Badge className="text-[11px] py-0 h-4 bg-primary/10 text-primary border-primary/20">{(editBom.postColorBoms || []).length}컬러</Badge>
                 )}
               </div>
-              <span className="text-[9px] font-mono opacity-40 leading-tight">boms · post_materials · post_color_boms</span>
+              <span className="text-[11px] font-mono opacity-40 leading-tight">boms · post_materials · post_color_boms</span>
             </button>
             <button
               onClick={() => setMainTab('yardage')}
               className={`flex flex-col items-start px-6 py-2.5 border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
                 mainTab === 'yardage'
-                  ? 'border-amber-500 text-amber-700'
-                  : 'border-transparent text-stone-400 hover:text-stone-600'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               <span className="text-sm font-bold">소요량 계산</span>
-              <span className="text-[9px] font-mono opacity-40 leading-tight">boms (계산 전용)</span>
+              <span className="text-[11px] font-mono opacity-40 leading-tight">boms (계산 전용)</span>
             </button>
           </div>
           )}
@@ -3488,54 +3488,54 @@ export default function BomManagement() {
           {!isPackMode && (
           <>
           {mainTab === 'pre' && (
-            <div className="flex items-center border-b border-stone-200 overflow-x-auto bg-emerald-50/40">
+            <div className="flex items-center border-b border-border overflow-x-auto bg-[var(--system-green)]/5">
               {(editBom.colorBoms || []).map(cb => (
                 <button
                   key={cb.color}
                   onClick={() => setActivePreColor(cb.color)}
                   className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                     activePreColor === cb.color
-                      ? 'border-emerald-500 text-emerald-700 bg-white'
-                      : 'border-transparent text-stone-400 hover:text-stone-600'
+                      ? 'border-[var(--system-green)] text-[var(--system-green)] bg-card'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {cb.color}
                   <span
                     onClick={e => { e.stopPropagation(); removeColorBom(cb.color, 'pre'); }}
-                    className="w-4 h-4 rounded-full bg-stone-200 hover:bg-red-200 text-stone-500 hover:text-red-600 flex items-center justify-center text-[10px] cursor-pointer"
+                    className="w-4 h-4 rounded-full bg-[var(--fill-tertiary)] hover:bg-[var(--system-red)]/20 text-muted-foreground hover:text-[var(--system-red)] flex items-center justify-center text-[11px] cursor-pointer"
                   >×</span>
                 </button>
               ))}
               <button
                 onClick={() => { setAddColorForTab('pre'); setShowAddColorModal(true); }}
-                className="px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-stone-400 hover:text-emerald-600 transition-colors whitespace-nowrap"
+                className="px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-muted-foreground hover:text-[var(--system-green)] transition-colors whitespace-nowrap"
               >+ 컬러 추가</button>
             </div>
           )}
 
           {/* ── 사후원가 컬러 서브탭 ── */}
           {mainTab === 'post' && (
-            <div className="flex items-center border-b border-stone-200 overflow-x-auto bg-blue-50/40">
+            <div className="flex items-center border-b border-border overflow-x-auto bg-primary/5">
               {(editBom.postColorBoms || []).map(cb => (
                 <button
                   key={cb.color}
                   onClick={() => setActivePostColor(cb.color)}
                   className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                     activePostColor === cb.color
-                      ? 'border-blue-500 text-blue-600 bg-white'
-                      : 'border-transparent text-stone-400 hover:text-stone-600'
+                      ? 'border-primary text-primary bg-card'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {cb.color}
                   <span
                     onClick={e => { e.stopPropagation(); removeColorBom(cb.color, 'post'); }}
-                    className="w-4 h-4 rounded-full bg-stone-200 hover:bg-red-200 text-stone-500 hover:text-red-600 flex items-center justify-center text-[10px] cursor-pointer"
+                    className="w-4 h-4 rounded-full bg-[var(--fill-tertiary)] hover:bg-[var(--system-red)]/20 text-muted-foreground hover:text-[var(--system-red)] flex items-center justify-center text-[11px] cursor-pointer"
                   >×</span>
                 </button>
               ))}
               <button
                 onClick={() => { setAddColorForTab('post'); setShowAddColorModal(true); }}
-                className="px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-stone-400 hover:text-blue-600 transition-colors whitespace-nowrap"
+                className="px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-muted-foreground hover:text-primary transition-colors whitespace-nowrap"
               >+ 컬러 추가</button>
             </div>
           )}
@@ -3550,25 +3550,25 @@ export default function BomManagement() {
                 <div className="space-y-4 py-2">
                   {/* 마이그레이션 안내 */}
                   {addColorForTab === 'pre' && (editBom.colorBoms || []).length === 0 && editBom.lines.some(l => l.itemName) && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
-                      <span className="font-semibold">📋 기존 BOM 데이터 감지</span>
-                      <p className="mt-1 text-amber-700">첫 번째 컬러 탭이 생성되면 기존 BOM 데이터가 자동으로 복사됩니다.</p>
+                    <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2.5 text-xs text-primary">
+                      <span className="font-semibold">기존 BOM 데이터 감지</span>
+                      <p className="mt-1 text-primary">첫 번째 컬러 탭이 생성되면 기존 BOM 데이터가 자동으로 복사됩니다.</p>
                     </div>
                   )}
                   {addColorForTab === 'pre' && (editBom.colorBoms || []).length > 0 && (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 text-xs text-emerald-800">
-                      <span className="font-semibold">✨ 자동 복사</span>
-                      <p className="mt-1 text-emerald-700">[{editBom.colorBoms?.[0]?.color}] 탭의 전체 BOM이 복사됩니다.</p>
+                    <div className="bg-[var(--system-green)]/10 border border-[var(--system-green)]/20 rounded-lg px-3 py-2.5 text-xs text-[var(--system-green)]">
+                      <span className="font-semibold">자동 복사</span>
+                      <p className="mt-1 text-[var(--system-green)]">[{editBom.colorBoms?.[0]?.color}] 탭의 전체 BOM이 복사됩니다.</p>
                     </div>
                   )}
                   {addColorForTab === 'post' && (editBom.postColorBoms || []).length > 0 && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 text-xs text-blue-800">
-                      <span className="font-semibold">✨ 자동 복사</span>
-                      <p className="mt-1 text-blue-700">[{editBom.postColorBoms?.[0]?.color}] 탭의 전체 BOM이 복사됩니다.</p>
+                    <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2.5 text-xs text-primary">
+                      <span className="font-semibold">자동 복사</span>
+                      <p className="mt-1 text-primary">[{editBom.postColorBoms?.[0]?.color}] 탭의 전체 BOM이 복사됩니다.</p>
                     </div>
                   )}
                   <div>
-                    <label className="text-xs text-stone-500 mb-1 block">컬러명</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">컬러명</label>
                     <Input
                       value={newColorName}
                       onChange={e => setNewColorName(e.target.value)}
@@ -3592,11 +3592,11 @@ export default function BomManagement() {
                         .filter(name => name && !existingColors.includes(name));
                       if (itemColors.length === 0) return null;
                       const btnClass = addColorForTab === 'post'
-                        ? 'border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100'
-                        : 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100';
+                        ? 'border-primary/30 text-primary bg-primary/5 hover:bg-primary/15'
+                        : 'border-[var(--system-green)]/30 text-[var(--system-green)] bg-[var(--system-green)]/10 hover:bg-[var(--system-green)]/15';
                       return (
                         <div className="mt-2">
-                          <p className="text-[10px] text-stone-400 mb-1">품목 마스터 컬러에서 선택:</p>
+                          <p className="text-[11px] text-muted-foreground mb-1">품목 마스터 컬러에서 선택:</p>
                           <div className="flex flex-wrap gap-1">
                             {itemColors.map(name => (
                               <button
@@ -3628,7 +3628,7 @@ export default function BomManagement() {
                         }
                       }}
                       disabled={!newColorName.trim()}
-                      className={addColorForTab === 'post' ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-emerald-700 hover:bg-emerald-800 text-white'}
+                      className={addColorForTab === 'post' ? 'bg-primary hover:bg-primary/90 text-primary-foreground' : 'bg-[var(--system-green)] hover:bg-[var(--system-green)]/90 text-white'}
                     >
                       추가
                     </Button>
@@ -3640,11 +3640,11 @@ export default function BomManagement() {
 
           {/* 사전원가 - 컬러 탭 없는 경우 안내 */}
           {mainTab === 'pre' && !activeColorBom && (editBom.colorBoms || []).length === 0 && (
-            <div className="bg-stone-50 border border-dashed border-emerald-300 rounded-xl p-10 text-center">
-              <div className="text-4xl mb-3">🎨</div>
-              <p className="text-stone-700 text-sm font-semibold mb-1">사전원가 컬러 탭이 없습니다</p>
-              <p className="text-stone-400 text-xs mb-4">BOM을 관리하려면 먼저 컬러를 추가하세요. 기존 엑셀 데이터가 있으면 첫 컬러 탭에 자동 복사됩니다.</p>
-              <Button size="sm" onClick={() => { setAddColorForTab('pre'); setShowAddColorModal(true); }} className="bg-emerald-700 hover:bg-emerald-800 text-white gap-1.5">
+            <div className="bg-[var(--fill-quaternary)] border border-dashed border-[var(--system-green)]/30 rounded-xl p-10 text-center">
+              <Calculator className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-foreground text-sm font-semibold mb-1">사전원가 컬러 탭이 없습니다</p>
+              <p className="text-muted-foreground text-xs mb-4">BOM을 관리하려면 먼저 컬러를 추가하세요. 기존 엑셀 데이터가 있으면 첫 컬러 탭에 자동 복사됩니다.</p>
+              <Button size="sm" onClick={() => { setAddColorForTab('pre'); setShowAddColorModal(true); }} className="bg-[var(--system-green)] hover:bg-[var(--system-green)]/90 text-white gap-1.5">
                 <Plus className="w-4 h-4" /> 첫 번째 컬러 추가
               </Button>
               {(editBom.postColorBoms || []).length > 0 && (
@@ -3652,7 +3652,7 @@ export default function BomManagement() {
                   size="sm"
                   variant="outline"
                   onClick={copyAllPostToPre}
-                  className="border-purple-300 text-purple-700 hover:bg-purple-50 gap-1.5 mt-2"
+                  className="border-[var(--system-indigo)]/30 text-[var(--system-indigo)] hover:bg-[var(--system-indigo)]/10 gap-1.5 mt-2"
                 >
                   사후원가 전체 불러오기 → (컬러 {(editBom.postColorBoms || []).length}개)
                 </Button>
@@ -3674,11 +3674,11 @@ export default function BomManagement() {
             return (
               <div className="space-y-4">
                 {/* 컬러 BOM 컨트롤 바 */}
-                <div className="bg-white rounded-xl border border-stone-200 p-4 shadow-sm">
+                <div className="bg-card rounded-xl border border-border p-4">
                   <div className="flex flex-wrap items-end gap-4">
                     {/* 제조국 선택 */}
                     <div>
-                      <label className="text-xs text-stone-500 mb-1 block font-medium">제조국</label>
+                      <label className="text-xs text-muted-foreground mb-1 block font-medium">제조국</label>
                       <div className="flex gap-1">
                         {(['중국', '한국', '기타'] as const).map(country => (
                           <button
@@ -3690,8 +3690,8 @@ export default function BomManagement() {
                             }}
                             className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
                               editBom.preManufacturingCountry === country
-                                ? 'bg-stone-800 text-white border-stone-800'
-                                : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
                             }`}
                           >
                             {country}
@@ -3701,7 +3701,7 @@ export default function BomManagement() {
                     </div>
                     {/* 통화 선택 */}
                     <div>
-                      <label className="text-xs text-stone-500 mb-1 block font-medium">입력 통화</label>
+                      <label className="text-xs text-muted-foreground mb-1 block font-medium">입력 통화</label>
                       <div className="flex gap-1">
                         {(['CNY', 'USD', 'KRW'] as const).map(cur => (
                           <button
@@ -3709,8 +3709,8 @@ export default function BomManagement() {
                             onClick={() => updateField('preCurrency', cur)}
                             className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
                               (editBom.preCurrency || 'CNY') === cur
-                                ? 'bg-amber-600 text-white border-amber-600'
-                                : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
                             }`}
                           >
                             {cur === 'CNY' ? '¥ CNY' : cur === 'USD' ? '$ USD' : '₩ KRW'}
@@ -3721,34 +3721,34 @@ export default function BomManagement() {
                     {/* 환율 CNY */}
                     {(editBom.preCurrency || 'CNY') !== 'KRW' && (
                       <div>
-                        <label className="text-xs text-stone-500 mb-1 block font-medium">CNY→KRW 환율</label>
-                        <Input type="number" value={editBom.preExchangeRateCny ?? editBom.snapshotCnyKrw} onChange={e => updateField('preExchangeRateCny', Number(e.target.value))} className="h-8 text-xs border-stone-200 text-right w-28" />
+                        <label className="text-xs text-muted-foreground mb-1 block font-medium">CNY→KRW 환율</label>
+                        <Input type="number" value={editBom.preExchangeRateCny ?? editBom.snapshotCnyKrw} onChange={e => updateField('preExchangeRateCny', Number(e.target.value))} className="h-8 text-xs border-border text-right w-28" />
                       </div>
                     )}
                     {/* 환율 USD */}
                     {(editBom.preCurrency || 'CNY') !== 'KRW' && (
                       <div>
-                        <label className="text-xs text-stone-500 mb-1 block font-medium">USD→KRW 환율</label>
-                        <Input type="number" value={editBom.preExchangeRateUsd ?? settings.usdKrw} onChange={e => updateField('preExchangeRateUsd', Number(e.target.value))} className="h-8 text-xs border-stone-200 text-right w-28" />
+                        <label className="text-xs text-muted-foreground mb-1 block font-medium">USD→KRW 환율</label>
+                        <Input type="number" value={editBom.preExchangeRateUsd ?? settings.usdKrw} onChange={e => updateField('preExchangeRateUsd', Number(e.target.value))} className="h-8 text-xs border-border text-right w-28" />
                       </div>
                     )}
                     {/* 원가표 업로드 */}
-                    <Button variant="outline" size="sm" onClick={() => preFileRef.current?.click()} className="gap-1.5 text-xs border-blue-300 text-blue-700 hover:bg-blue-50">
+                    <Button variant="outline" size="sm" onClick={() => preFileRef.current?.click()} className="gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/10">
                       <Upload className="w-3.5 h-3.5" /> 원가표 불러오기
                     </Button>
                     {editBom.preSourceFileName && (
-                      <span className="text-xs text-stone-400 flex items-center gap-1">
-                        <FileText className="w-3 h-3 text-blue-400" /> {editBom.preSourceFileName}
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <FileText className="w-3 h-3 text-primary" /> {editBom.preSourceFileName}
                       </span>
                     )}
                     {/* 다른 컬러에서 복사 드롭다운 */}
                     {otherColors.length > 0 && (
                       <div className="ml-auto flex items-center gap-2">
-                        <label className="text-xs text-stone-500 whitespace-nowrap">다른 컬러에서 복사:</label>
+                        <label className="text-xs text-muted-foreground whitespace-nowrap">다른 컬러에서 복사:</label>
                         <select
                           value={copyFromColor}
                           onChange={e => setCopyFromColor(e.target.value)}
-                          className="h-8 text-xs border border-stone-200 rounded px-2 text-stone-700"
+                          className="h-8 text-xs border border-border rounded px-2 text-foreground"
                         >
                           <option value="">선택...</option>
                           {otherColors.map(cb => (
@@ -3760,7 +3760,7 @@ export default function BomManagement() {
                           variant="outline"
                           disabled={!copyFromColor}
                           onClick={() => copyFromColor && copyColorBom(colorBom.color, copyFromColor, 'pre')}
-                          className="gap-1 text-xs border-emerald-400 text-emerald-700 hover:bg-emerald-50"
+                          className="gap-1 text-xs border-[var(--system-green)] text-[var(--system-green)] hover:bg-[var(--system-green)]/10"
                         >
                           <Copy className="w-3 h-3" /> 복사
                         </Button>
@@ -3770,16 +3770,16 @@ export default function BomManagement() {
                 </div>
 
                 {/* BOM 테이블 (전체 섹션) */}
-                <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-                  <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between bg-emerald-50">
+                <div className="bg-card rounded-xl border border-border overflow-hidden">
+                  <div className="px-5 py-3 border-b border-border flex items-center justify-between bg-[var(--system-green)]/10">
                     <div className="flex items-center gap-3">
-                      <h2 className="text-sm font-semibold text-emerald-800">BOM 자재 명세 — [{colorBom.color}]</h2>
+                      <h2 className="text-sm font-semibold text-[var(--system-green)]">BOM 자재 명세 — [{colorBom.color}]</h2>
                       {/* 사후원가에서 불러오기 버튼 */}
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => copyPostToPre(colorBom.color)}
-                        className="h-7 gap-1 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+                        className="h-7 gap-1 text-xs border-primary/30 text-primary hover:bg-primary/10"
                       >
                         <Copy className="w-3 h-3" /> 사후원가 [{colorBom.color}] 불러오기 →
                       </Button>
@@ -3787,7 +3787,7 @@ export default function BomManagement() {
                         variant="outline"
                         size="sm"
                         onClick={copyAllPostToPre}
-                        className="h-7 gap-1 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                        className="h-7 gap-1 text-xs border-[var(--system-indigo)]/30 text-[var(--system-indigo)] hover:bg-[var(--system-indigo)]/10"
                       >
                         <Copy className="w-3 h-3" /> 사후원가 전체 불러오기 →
                       </Button>
@@ -3795,19 +3795,19 @@ export default function BomManagement() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleBulkDeletePreLines(colorBom.color)}
-                        className="h-7 gap-1 text-xs border-red-300 text-red-600 hover:bg-red-50"
+                        className="h-7 gap-1 text-xs border-[var(--system-red)]/30 text-[var(--system-red)] hover:bg-[var(--system-red)]/10"
                       >
                         <Trash2 className="w-3 h-3" /> 전체 삭제
                       </Button>
                     </div>
-                    <span className="text-xs text-stone-400">
+                    <span className="text-xs text-muted-foreground">
                       입력 통화: {preCur} {preCur !== 'KRW' && `| CNY→KRW ${preCnyKrw} | USD→KRW ${preUsdKrw}`}
                     </span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="bg-emerald-800 text-white text-[11px]">
+                        <tr className="border-b border-border text-[11px] font-semibold text-muted-foreground">
                           <th className="px-2 py-2 text-left">부위 | 자재명</th>
                           <th className="px-2 py-2 text-left w-20">규격</th>
                           <th className="px-2 py-2 text-center w-20">단위</th>
@@ -3830,24 +3830,24 @@ export default function BomManagement() {
                           const collapsed = collapsedSections.has(cat);
                           return (
                             <React.Fragment key={cat}>
-                              <tr className={`border-y ${isRawMaterial ? 'bg-amber-50 border-amber-200' : 'bg-stone-100 border-stone-200'}`}>
+                              <tr className={`border-y ${isRawMaterial ? 'bg-primary/5 border-primary/20' : 'bg-[var(--fill-tertiary)] border-border'}`}>
                                 <td colSpan={11} className="px-3 py-1.5">
                                   <div className="flex items-center justify-between">
-                                    <button onClick={() => toggleSection(cat)} className={`flex items-center gap-2 font-semibold text-xs hover:opacity-80 ${isRawMaterial ? 'text-amber-800' : 'text-stone-700'}`}>
+                                    <button onClick={() => toggleSection(cat)} className={`flex items-center gap-2 font-semibold text-xs hover:opacity-80 ${isRawMaterial ? 'text-primary' : 'text-foreground'}`}>
                                       {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                       {cat}
                                       {!isRawMaterial && filledLines.length > 0 && (
-                                        <span className="text-[10px] font-normal text-stone-500">({filledLines.length})</span>
+                                        <span className="text-[11px] font-normal text-muted-foreground">({filledLines.length})</span>
                                       )}
                                     </button>
                                     <div className="flex items-center gap-3">
                                       {catTotal > 0 && (
-                                        <span className="text-xs text-stone-500">
-                                          소계: <span className="font-semibold text-stone-700">{fmt(catTotal)} {curSymbol}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          소계: <span className="font-semibold text-foreground">{fmt(catTotal)} {curSymbol}</span>
                                           {preCur !== 'KRW' && <> = <span className="font-semibold text-[#C9A96E]">{fmtKrw(catTotal * preRate)}</span></>}
                                         </span>
                                       )}
-                                      <button onClick={() => addColorBomLine(colorBom.color, cat)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-amber-700 font-medium">
+                                      <button onClick={() => addColorBomLine(colorBom.color, cat)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-primary/80 font-medium">
                                         <Plus className="w-3 h-3" /> 행 추가
                                       </button>
                                     </div>
@@ -3871,17 +3871,17 @@ export default function BomManagement() {
                         })}
 
                         {/* 후가공 섹션 */}
-                        <tr className="bg-stone-100 border-y border-stone-200">
+                        <tr className="bg-[var(--fill-tertiary)] border-y border-border">
                           <td colSpan={11} className="px-3 py-1.5">
                             <div className="flex items-center justify-between">
-                              <button onClick={() => toggleSection('후가공')} className="flex items-center gap-2 text-stone-700 font-semibold text-xs hover:text-stone-900">
+                              <button onClick={() => toggleSection('후가공')} className="flex items-center gap-2 text-foreground font-semibold text-xs hover:opacity-80">
                                 {collapsedSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                 후가공비
                                 {(colorBom.postProcessLines ?? []).filter(l => l.name).length > 0 && (
-                                  <span className="text-[10px] font-normal text-stone-500">({(colorBom.postProcessLines ?? []).filter(l => l.name).length})</span>
+                                  <span className="text-[11px] font-normal text-muted-foreground">({(colorBom.postProcessLines ?? []).filter(l => l.name).length})</span>
                                 )}
                               </button>
-                              <button onClick={() => addColorPostLine(colorBom.color)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-amber-700 font-medium">
+                              <button onClick={() => addColorPostLine(colorBom.color)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-primary/80 font-medium">
                                 <Plus className="w-3 h-3" /> 행 추가
                               </button>
                             </div>
@@ -3890,50 +3890,50 @@ export default function BomManagement() {
                         {!collapsedSections.has('후가공') && (colorBom.postProcessLines ?? []).map(line => {
                           const lineAmt = line.netQty * line.unitPrice;
                           return (
-                            <tr key={line.id} className="group hover:bg-amber-50/30 transition-colors border-b border-stone-100">
+                            <tr key={line.id} className="group hover:bg-[var(--fill-quaternary)] transition-colors border-b border-border">
                               <td className="px-1 py-1" colSpan={3}>
                                 <div className="flex items-center gap-1">
                                   <Select value={(line as PostProcessLine & { subPart?: string }).subPart || ''} onValueChange={v => updateColorPostLine(colorBom.color, line.id, 'subPart' as keyof PostProcessLine, v)}>
-                                    <SelectTrigger className="h-7 text-xs border-stone-200 w-20 shrink-0"><SelectValue placeholder="-" /></SelectTrigger>
+                                    <SelectTrigger className="h-7 text-xs border-border w-20 shrink-0"><SelectValue placeholder="-" /></SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="none" className="text-xs text-stone-400">-</SelectItem>
+                                      <SelectItem value="none" className="text-xs text-muted-foreground">-</SelectItem>
                                       {SECTION_SUB_PARTS['후가공'].map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
                                     </SelectContent>
                                   </Select>
-                                  <Input value={line.name} onChange={e => updateColorPostLine(colorBom.color, line.id, 'name', e.target.value)} className="h-7 text-xs border-stone-200 bg-white min-w-[80px]" placeholder="후가공 품목명" />
+                                  <Input value={line.name} onChange={e => updateColorPostLine(colorBom.color, line.id, 'name', e.target.value)} className="h-7 text-xs border-border bg-card min-w-[80px]" placeholder="후가공 품목명" />
                                 </div>
                               </td>
-                              <td className="px-1 py-1"><Input type="number" value={line.unitPrice || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'unitPrice', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder={`단가(${curSymbol})`} /></td>
-                              <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'netQty', Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder="수량" /></td>
-                              <td className="px-2 py-1 text-center text-xs text-stone-300">-</td>
-                              <td className="px-2 py-1 text-right text-xs text-stone-500 tabular-nums">{fmt(line.netQty)}</td>
+                              <td className="px-1 py-1"><Input type="number" value={line.unitPrice || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'unitPrice', Number(e.target.value))} className="h-7 text-xs border-border bg-card text-right w-20" placeholder={`단가(${curSymbol})`} /></td>
+                              <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'netQty', Number(e.target.value))} className="h-7 text-xs border-border bg-card text-right w-20" placeholder="수량" /></td>
+                              <td className="px-2 py-1 text-center text-xs text-muted-foreground">-</td>
+                              <td className="px-2 py-1 text-right text-xs text-muted-foreground tabular-nums">{fmt(line.netQty)}</td>
                               <td className="px-2 py-1 text-right tabular-nums">
                                 <div style={{fontWeight:600}}>${((lineAmt * preRate) / (preUsdKrw || 1380)).toFixed(2)}</div>
                                 <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round(lineAmt * preRate).toLocaleString()}</div>
                               </td>
                               <td></td><td></td>
-                              <td className="px-1 py-1"><button onClick={() => deleteColorPostLine(colorBom.color, line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-stone-300 hover:text-red-400 p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                              <td className="px-1 py-1"><button onClick={() => deleteColorPostLine(colorBom.color, line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-[var(--system-red)] p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
                             </tr>
                           );
                         })}
 
                         {/* 임가공비 */}
-                        <tr className="bg-amber-50/50 border-y border-stone-200">
+                        <tr className="bg-primary/5 border-y border-border">
                           <td colSpan={11} className="px-3 py-1.5">
-                            <span className="text-xs font-semibold text-stone-600">임가공비</span>
-                            <span className="text-[10px] text-stone-400 ml-2">자재비와 별도 항목</span>
+                            <span className="text-xs font-semibold text-muted-foreground">임가공비</span>
+                            <span className="text-[11px] text-muted-foreground ml-2">자재비와 별도 항목</span>
                           </td>
                         </tr>
-                        <tr className="bg-amber-50/30 border-b border-stone-200">
+                        <tr className="bg-primary/5 border-b border-border">
                           <td className="px-1 py-1" colSpan={3}>
-                            <span className="text-xs text-stone-600 px-2">임가공비 (NET)</span>
+                            <span className="text-xs text-muted-foreground px-2">임가공비 (NET)</span>
                           </td>
                           <td className="px-1 py-1">
-                            <Input type="number" value={colorBom.processingFee || ''} onChange={e => updateColorProcessingFee(colorBom.color, Number(e.target.value))} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder={curSymbol} />
+                            <Input type="number" value={colorBom.processingFee || ''} onChange={e => updateColorProcessingFee(colorBom.color, Number(e.target.value))} className="h-7 text-xs border-border bg-card text-right w-20" placeholder={curSymbol} />
                           </td>
-                          <td className="px-1 py-1"><span className="text-xs text-stone-400 px-2">1</span></td>
+                          <td className="px-1 py-1"><span className="text-xs text-muted-foreground px-2">1</span></td>
                           <td></td>
-                          <td className="px-2 py-1 text-right text-xs text-stone-400">1</td>
+                          <td className="px-2 py-1 text-right text-xs text-muted-foreground">1</td>
                           <td className="px-2 py-1 text-right tabular-nums">
                             <div style={{fontWeight:600}}>${(((colorBom.processingFee ?? 0) * preRate) / (preUsdKrw || 1380)).toFixed(2)}</div>
                             <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round((colorBom.processingFee ?? 0) * preRate).toLocaleString()}</div>
@@ -3947,12 +3947,12 @@ export default function BomManagement() {
 
                 {/* 사전원가 요약 */}
                 {summary && (
-                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-3 border-b border-stone-100 bg-stone-800 text-white">
-                      <h2 className="text-sm font-semibold">사전 원가 요약 <span className="text-stone-400 text-xs font-normal ml-2">— [{colorBom.color}] 기준</span></h2>
+                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                    <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
+                      <h2 className="text-sm font-semibold">사전 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— [{colorBom.color}] 기준</span></h2>
                     </div>
                     <table className="w-full text-xs">
-                      <thead><tr className="bg-stone-100 text-stone-600"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-stone-400">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
+                      <thead><tr className="bg-[var(--fill-tertiary)] text-muted-foreground"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-muted-foreground">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
                       <tbody>
                         {[
                           { key: '원', label: '원부자재 합산', desc: `원자재 + 부자재 + 보강재 + 포장재 (${summary.preCur}, 본사/업체제공 포함)`, val: summary.totalMaterialKrw + summary.postProcessKrw, editable: false },
@@ -3960,28 +3960,28 @@ export default function BomManagement() {
                           { key: '자', label: '물류비', desc: 'PCS 배분 물류비', val: summary.logisticsKrw, editable: true, field: 'logisticsCostKrw' as keyof ExtBom },
                           { key: '재', label: '포장/검사비', desc: '포장 잡비, 검사 인건비', val: summary.packagingKrw, editable: true, field: 'packagingCostKrw' as keyof ExtBom },
                         ].map(row => (
-                          <tr key={row.key} className="border-b border-stone-100 hover:bg-stone-50">
-                            <td className="px-4 py-2 font-bold text-stone-400">{row.key}</td>
-                            <td className="px-4 py-2 font-medium text-stone-700">{row.label}</td>
-                            <td className="px-4 py-2 text-stone-400">{row.desc}</td>
+                          <tr key={row.key} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                            <td className="px-4 py-2 font-bold text-muted-foreground">{row.key}</td>
+                            <td className="px-4 py-2 font-medium text-foreground">{row.label}</td>
+                            <td className="px-4 py-2 text-muted-foreground">{row.desc}</td>
                             <td className="px-4 py-2 text-right font-semibold tabular-nums">
                               {row.editable && row.field ? (
-                                <Input type="number" value={(editBom[row.field] as number) || ''} onChange={e => updateField(row.field!, Number(e.target.value) as ExtBom[typeof row.field])} className="h-6 text-xs border-stone-200 text-right w-36 ml-auto" placeholder="0" />
+                                <Input type="number" value={(editBom[row.field] as number) || ''} onChange={e => updateField(row.field!, Number(e.target.value) as ExtBom[typeof row.field])} className="h-6 text-xs border-border text-right w-36 ml-auto" placeholder="0" />
                               ) : (
-                                <span className={row.val === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(row.val)}</span>
+                                <span className={row.val === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(row.val)}</span>
                               )}
                             </td>
                           </tr>
                         ))}
-                        <tr className="border-b border-stone-100 hover:bg-stone-50">
-                          <td className="px-4 py-2 font-bold text-stone-400">패</td>
-                          <td className="px-4 py-2 font-medium text-stone-700">패킹재</td>
-                          <td className="px-4 py-2 text-stone-400">
+                        <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                          <td className="px-4 py-2 font-bold text-muted-foreground">패</td>
+                          <td className="px-4 py-2 font-medium text-foreground">패킹재</td>
+                          <td className="px-4 py-2 text-muted-foreground">
                             <Select
                               value={editBom.packingItemId || '_none'}
                               onValueChange={selectPackingItem}
                             >
-                              <SelectTrigger className="h-7 text-xs border-stone-200 w-full max-w-[280px]">
+                              <SelectTrigger className="h-7 text-xs border-border w-full max-w-[280px]">
                                 <SelectValue placeholder="품목마스터 PACK 선택" />
                               </SelectTrigger>
                               <SelectContent className="max-h-64">
@@ -3996,36 +3996,36 @@ export default function BomManagement() {
                               </SelectContent>
                             </Select>
                             {editBom.packingItemStyleNo ? (
-                              <div className="text-[10px] text-amber-700 mt-0.5">{editBom.packingItemStyleNo} 연동</div>
+                              <div className="text-[11px] text-primary mt-0.5">{editBom.packingItemStyleNo} 연동</div>
                             ) : null}
                           </td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums">
-                            <span className={summary.packingKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(summary.packingKrw)}</span>
+                            <span className={summary.packingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(summary.packingKrw)}</span>
                           </td>
                         </tr>
-                        <tr className="border-b border-stone-100 hover:bg-stone-50">
-                          <td className="px-4 py-2 font-bold text-stone-400">마</td>
-                          <td className="px-4 py-2 font-medium text-stone-700">생산마진</td>
-                          <td className="px-4 py-2 text-stone-400">
+                        <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                          <td className="px-4 py-2 font-bold text-muted-foreground">마</td>
+                          <td className="px-4 py-2 font-medium text-foreground">생산마진</td>
+                          <td className="px-4 py-2 text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <Input
                                 type="number"
                                 value={Math.round((editBom.productionMarginRate ?? 0.16) * 100)}
                                 onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)}
-                                className="h-6 text-xs border-stone-200 text-right w-16"
+                                className="h-6 text-xs border-border text-right w-16"
                                 placeholder="0"
                               />
-                              <span className="text-stone-500 text-xs">%</span>
+                              <span className="text-muted-foreground text-xs">%</span>
                             </div>
                           </td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums">
-                            <span className={summary.productionMarginKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(summary.productionMarginKrw)}</span>
+                            <span className={summary.productionMarginKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(summary.productionMarginKrw)}</span>
                           </td>
                         </tr>
-                        <tr className="bg-stone-800 text-white">
+                        <tr className="bg-primary text-primary-foreground">
                           <td className="px-4 py-3 font-bold">사</td>
                           <td className="px-4 py-3 font-bold text-base" colSpan={2}>총 원 가 액</td>
-                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums text-[#C9A96E]">{fmtKrw(summary.totalCostKrw)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums">{fmtKrw(summary.totalCostKrw)}</td>
                         </tr>
                         {(() => {
                           const linkedItem = items.find(i => i.id === editBom.styleId);
@@ -4033,27 +4033,27 @@ export default function BomManagement() {
                           if (!deliveryPrice || deliveryPrice <= 0) return null;
                           const marginAmt = deliveryPrice - displayTotalCostKrw;
                           const marginPct = (marginAmt / deliveryPrice) * 100;
-                          const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 20 ? 'text-amber-600' : marginPct <= 30 ? 'text-green-600' : 'text-orange-600';
-                          const marginBg = marginPct < 15 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
+                          const marginClass = marginPct < 15 ? 'text-[var(--system-red)]' : marginPct < 20 ? 'text-[var(--system-orange)]' : marginPct <= 30 ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]';
+                          const marginBg = marginPct < 15 ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20' : marginPct < 30 ? 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20';
                           return (
                             <>
-                              <tr className="bg-blue-50 border-t border-blue-200">
-                                <td className="px-4 py-2.5 text-xs font-medium text-blue-600">연동</td>
-                                <td className="px-4 py-2.5 text-sm font-semibold text-blue-800" colSpan={2}>납품가 (품목 마스터 연동)</td>
-                                <td className="px-4 py-2.5 text-right font-mono font-bold text-blue-800">{fmtKrw(deliveryPrice)}</td>
+                              <tr className="bg-primary/10 border-t border-primary/20">
+                                <td className="px-4 py-2.5 text-xs font-medium text-primary">연동</td>
+                                <td className="px-4 py-2.5 text-sm font-semibold text-primary" colSpan={2}>납품가 (품목 마스터 연동)</td>
+                                <td className="px-4 py-2.5 text-right font-mono font-bold text-primary">{fmtKrw(deliveryPrice)}</td>
                               </tr>
                               <tr>
                                 <td colSpan={4} className="px-4 py-2">
                                   <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border ${marginBg}`}>
                                     <div className="flex items-center gap-4">
-                                      <span className="text-xs text-stone-500">마진금액</span>
+                                      <span className="text-xs text-muted-foreground">마진금액</span>
                                       <span className={`font-mono font-bold text-sm ${marginClass}`}>{fmtKrw(marginAmt)}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <span className="text-xs text-stone-500">마진율</span>
+                                      <span className="text-xs text-muted-foreground">마진율</span>
                                       <span className={`font-mono font-bold text-lg ${marginClass}`}>{marginPct.toFixed(1)}%</span>
-                                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${marginPct > 30 ? 'bg-orange-100 text-orange-700' : marginPct >= 20 ? 'bg-green-100 text-green-700' : marginPct >= 15 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                                        {marginPct > 30 ? '🟠 초과주의' : marginPct >= 20 ? '🟢 좋음' : marginPct >= 15 ? '🟡 적정' : '🔴 미달'}
+                                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${marginPct > 30 ? 'bg-[var(--system-orange)]/10 text-[var(--system-orange)]' : marginPct >= 20 ? 'bg-[var(--system-green)]/10 text-[var(--system-green)]' : marginPct >= 15 ? 'bg-[var(--system-orange)]/10 text-[var(--system-orange)]' : 'bg-[var(--system-red)]/10 text-[var(--system-red)]'}`}>
+                                        {marginPct > 30 ? '초과주의' : marginPct >= 20 ? '좋음' : marginPct >= 15 ? '적정' : '미달'}
                                       </span>
                                     </div>
                                   </div>
@@ -4077,13 +4077,13 @@ export default function BomManagement() {
                   return (
                     <>
                       {hqLines.length > 0 && (
-                        <div className="bg-white rounded-xl border border-orange-200 shadow-sm overflow-hidden">
-                          <div className="px-5 py-3 border-b border-orange-100 bg-orange-50">
-                            <h4 className="font-semibold text-sm text-orange-800">📦 본사제공 자재 목록</h4>
+                        <div className="bg-card rounded-xl border border-primary/20 overflow-hidden">
+                          <div className="px-5 py-3 border-b border-primary/10 bg-primary/5">
+                            <h4 className="font-semibold text-sm text-primary">본사제공 자재 목록</h4>
                           </div>
                           <table className="w-full text-xs">
                             <thead>
-                              <tr className="bg-orange-50 text-orange-700">
+                              <tr className="bg-primary/5 text-[13px] font-semibold text-muted-foreground">
                                 <th className="px-3 py-2 text-left">부위</th>
                                 <th className="px-3 py-2 text-left">자재명</th>
                                 <th className="px-3 py-2 text-left">규격</th>
@@ -4096,15 +4096,15 @@ export default function BomManagement() {
                             </thead>
                             <tbody>
                               {hqLines.map((l, i) => (
-                                <tr key={i} className="border-b border-orange-50 hover:bg-orange-50">
-                                  <td className="px-3 py-1.5 text-stone-600">{l.category}</td>
-                                  <td className="px-3 py-1.5 font-medium text-stone-800">{l.materialName || l.itemName}</td>
-                                  <td className="px-3 py-1.5 text-stone-500">{l.spec || '-'}</td>
-                                  <td className="px-3 py-1.5 text-stone-500">{l.unit || '-'}</td>
-                                  <td className="px-3 py-1.5 text-right text-stone-600">{l.unitPriceCny}</td>
-                                  <td className="px-3 py-1.5 text-right text-stone-600">{calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate).toFixed(3)}</td>
+                                <tr key={i} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                                  <td className="px-3 py-1.5 text-muted-foreground">{l.category}</td>
+                                  <td className="px-3 py-1.5 font-medium text-foreground">{l.materialName || l.itemName}</td>
+                                  <td className="px-3 py-1.5 text-muted-foreground">{l.spec || '-'}</td>
+                                  <td className="px-3 py-1.5 text-muted-foreground">{l.unit || '-'}</td>
+                                  <td className="px-3 py-1.5 text-right text-muted-foreground">{l.unitPriceCny}</td>
+                                  <td className="px-3 py-1.5 text-right text-muted-foreground">{calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate).toFixed(3)}</td>
                                   <td className="px-3 py-1.5 text-right font-semibold text-[#C9A96E]">₩{Math.round(calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * toKrw).toLocaleString()}</td>
-                                  <td className="px-3 py-1.5 text-stone-500">{l.vendorName || '-'}</td>
+                                  <td className="px-3 py-1.5 text-muted-foreground">{l.vendorName || '-'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -4112,13 +4112,13 @@ export default function BomManagement() {
                         </div>
                       )}
                       {vendorLines.length > 0 && (
-                        <div className="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
-                          <div className="px-5 py-3 border-b border-blue-100 bg-blue-50">
-                            <h4 className="font-semibold text-sm text-blue-800">🏭 업체제공 자재 목록</h4>
+                        <div className="bg-card rounded-xl border border-[var(--system-teal)]/30 overflow-hidden">
+                          <div className="px-5 py-3 border-b border-[var(--system-teal)]/20 bg-[var(--system-teal)]/10">
+                            <h4 className="font-semibold text-sm text-[var(--system-teal)]">업체제공 자재 목록</h4>
                           </div>
                           <table className="w-full text-xs">
                             <thead>
-                              <tr className="bg-blue-50 text-blue-700">
+                              <tr className="bg-[var(--system-teal)]/10 text-[13px] font-semibold text-muted-foreground">
                                 <th className="px-3 py-2 text-left">부위</th>
                                 <th className="px-3 py-2 text-left">자재명</th>
                                 <th className="px-3 py-2 text-left">규격</th>
@@ -4131,15 +4131,15 @@ export default function BomManagement() {
                             </thead>
                             <tbody>
                               {vendorLines.map((l, i) => (
-                                <tr key={i} className="border-b border-blue-50 hover:bg-blue-50">
-                                  <td className="px-3 py-1.5 text-stone-600">{l.category}</td>
-                                  <td className="px-3 py-1.5 font-medium text-stone-800">{l.materialName || l.itemName}</td>
-                                  <td className="px-3 py-1.5 text-stone-500">{l.spec || '-'}</td>
-                                  <td className="px-3 py-1.5 text-stone-500">{l.unit || '-'}</td>
-                                  <td className="px-3 py-1.5 text-right text-stone-600">{l.unitPriceCny}</td>
-                                  <td className="px-3 py-1.5 text-right text-stone-600">{calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate).toFixed(3)}</td>
+                                <tr key={i} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                                  <td className="px-3 py-1.5 text-muted-foreground">{l.category}</td>
+                                  <td className="px-3 py-1.5 font-medium text-foreground">{l.materialName || l.itemName}</td>
+                                  <td className="px-3 py-1.5 text-muted-foreground">{l.spec || '-'}</td>
+                                  <td className="px-3 py-1.5 text-muted-foreground">{l.unit || '-'}</td>
+                                  <td className="px-3 py-1.5 text-right text-muted-foreground">{l.unitPriceCny}</td>
+                                  <td className="px-3 py-1.5 text-right text-muted-foreground">{calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate).toFixed(3)}</td>
                                   <td className="px-3 py-1.5 text-right font-semibold text-[#C9A96E]">₩{Math.round(calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * toKrw).toLocaleString()}</td>
-                                  <td className="px-3 py-1.5 text-stone-500">{l.vendorName || '-'}</td>
+                                  <td className="px-3 py-1.5 text-muted-foreground">{l.vendorName || '-'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -4152,13 +4152,13 @@ export default function BomManagement() {
 
                 {/* P&L 분석 */}
                 {summary && editBom.pnl && pnlResult && (
-                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-3 border-b border-stone-100 bg-stone-800 text-white">
-                      <h2 className="text-sm font-semibold">P&L 분석 <span className="text-stone-400 text-xs font-normal ml-2">— [{colorBom.color}] 기준</span></h2>
+                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                    <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
+                      <h2 className="text-sm font-semibold">P&L 분석 <span className="text-muted-foreground text-xs font-normal ml-2">— [{colorBom.color}] 기준</span></h2>
                     </div>
                     <div className="p-5 space-y-5">
-                      <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-                        <h3 className="text-xs font-semibold text-stone-600 mb-3">가정 (Assumptions)</h3>
+                      <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                        <h3 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h3>
                         <div className="grid grid-cols-3 gap-4">
                           {([
                             { label: '할인율 (Discount)', field: 'discountRate' as keyof BomPnlAssumptions },
@@ -4166,26 +4166,26 @@ export default function BomManagement() {
                             { label: '인건비 / 판관비', field: 'sgaRate' as keyof BomPnlAssumptions },
                           ] as const).map(item => (
                             <div key={item.field}>
-                              <label className="text-[11px] text-stone-500 mb-1 block">{item.label}</label>
+                              <label className="text-[11px] text-muted-foreground mb-1 block">{item.label}</label>
                               <div className="flex items-center gap-1">
-                                <Input type="number" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className="h-7 text-xs border-stone-200 text-right w-20" />
-                                <span className="text-xs text-stone-500">%</span>
+                                <Input type="number" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className="h-7 text-xs border-border text-right w-20" />
+                                <span className="text-xs text-muted-foreground">%</span>
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
-                      <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-                        <h3 className="text-xs font-semibold text-stone-600 mb-3">배수 가이드 (국내 B2C)</h3>
+                      <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                        <h3 className="text-xs font-semibold text-muted-foreground mb-3">배수 가이드 (국내 B2C)</h3>
                         <div className="space-y-2">
                           {[
                             { label: '3.5배 기준 최소 판매가', val: pnlResult.price35 },
                             { label: '4.0배 기준 목표 판매가', val: pnlResult.price40 },
                             { label: '4.5배 기준 이상적 판매가', val: pnlResult.price45 },
                           ].map(item => (
-                            <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-stone-200 last:border-0">
-                              <span className="text-xs text-stone-600">{item.label}</span>
-                              <span className="text-sm font-bold text-stone-800 tabular-nums">{fmtKrw(item.val)}</span>
+                            <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                              <span className="text-xs text-muted-foreground">{item.label}</span>
+                              <span className="text-sm font-bold text-foreground tabular-nums">{fmtKrw(item.val)}</span>
                             </div>
                           ))}
                         </div>
@@ -4196,23 +4196,23 @@ export default function BomManagement() {
                         onPatch={patchPnl}
                       />
                       {editBom.pnl.confirmedSalePrice ? (
-                        <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-                          <h3 className="text-xs font-semibold text-stone-600 mb-3">영업이익 분석 (P&L) — 국내 B2C</h3>
+                        <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                          <h3 className="text-xs font-semibold text-muted-foreground mb-3">영업이익 분석 (P&L) — 국내 B2C</h3>
                           <div className="space-y-1">
                             {[
-                              { no: '①', label: `정가 (${SALES_PRICE_LABELS.kmsrpFull})`, desc: '', val: editBom.pnl.confirmedSalePrice, color: 'text-stone-800', bold: false },
-                              { no: '②', label: '(-) 할인', desc: `${Math.round(editBom.pnl.discountRate * 100)}%`, val: -(editBom.pnl.confirmedSalePrice * editBom.pnl.discountRate), color: 'text-red-500', bold: false },
-                              { no: '③', label: '실판가 (Net Sale)', desc: '', val: pnlResult.netSale, color: 'text-stone-700', bold: true },
-                              { no: '④', label: '(-) 플랫폼 수수료', desc: `${Math.round(editBom.pnl.platformFeeRate * 100)}%`, val: -(pnlResult.netSale * editBom.pnl.platformFeeRate), color: 'text-red-500', bold: false },
-                              { no: '⑤', label: '(-) 인건비 / 판관비', desc: `${Math.round(editBom.pnl.sgaRate * 100)}%`, val: -(pnlResult.netSale * editBom.pnl.sgaRate), color: 'text-red-500', bold: false },
-                              { no: '⑥', label: '(-) 매출원가 (COGS)', desc: '총 원가액', val: -summary.totalCostKrw, color: 'text-red-500', bold: false },
-                              { no: '⑦', label: '영업이익', desc: '', val: pnlResult.operatingProfit, color: pnlResult.operatingProfit >= 0 ? 'text-green-600' : 'text-red-600', bold: true },
-                              { no: '★', label: '영업이익률', desc: '', val: null, color: pnlResult.operatingMargin >= 0 ? 'text-green-600' : 'text-red-600', bold: true, rate: pnlResult.operatingMargin },
+                              { no: '①', label: `정가 (${SALES_PRICE_LABELS.kmsrpFull})`, desc: '', val: editBom.pnl.confirmedSalePrice, color: 'text-foreground', bold: false },
+                              { no: '②', label: '(-) 할인', desc: `${Math.round(editBom.pnl.discountRate * 100)}%`, val: -(editBom.pnl.confirmedSalePrice * editBom.pnl.discountRate), color: 'text-[var(--system-red)]', bold: false },
+                              { no: '③', label: '실판가 (Net Sale)', desc: '', val: pnlResult.netSale, color: 'text-foreground', bold: true },
+                              { no: '④', label: '(-) 플랫폼 수수료', desc: `${Math.round(editBom.pnl.platformFeeRate * 100)}%`, val: -(pnlResult.netSale * editBom.pnl.platformFeeRate), color: 'text-[var(--system-red)]', bold: false },
+                              { no: '⑤', label: '(-) 인건비 / 판관비', desc: `${Math.round(editBom.pnl.sgaRate * 100)}%`, val: -(pnlResult.netSale * editBom.pnl.sgaRate), color: 'text-[var(--system-red)]', bold: false },
+                              { no: '⑥', label: '(-) 매출원가 (COGS)', desc: '총 원가액', val: -summary.totalCostKrw, color: 'text-[var(--system-red)]', bold: false },
+                              { no: '⑦', label: '영업이익', desc: '', val: pnlResult.operatingProfit, color: pnlResult.operatingProfit >= 0 ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]', bold: true },
+                              { no: '★', label: '영업이익률', desc: '', val: null, color: pnlResult.operatingMargin >= 0 ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]', bold: true, rate: pnlResult.operatingMargin },
                             ].map(row => (
-                              <div key={row.no} className={`flex items-center justify-between py-1.5 px-3 rounded ${row.bold ? 'bg-white border border-stone-200' : ''}`}>
+                              <div key={row.no} className={`flex items-center justify-between py-1.5 px-3 rounded ${row.bold ? 'bg-card border border-border' : ''}`}>
                                 <div className="flex items-center gap-3">
-                                  <span className="text-[11px] text-stone-400 w-5">{row.no}</span>
-                                  <span className={`text-xs ${row.bold ? 'font-semibold text-stone-800' : 'text-stone-600'}`}>{row.label} <span className="text-stone-400 font-normal">{row.desc}</span></span>
+                                  <span className="text-[11px] text-muted-foreground w-5">{row.no}</span>
+                                  <span className={`text-xs ${row.bold ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{row.label} <span className="text-muted-foreground font-normal">{row.desc}</span></span>
                                 </div>
                                 <span className={`text-sm tabular-nums font-semibold ${row.color}`}>
                                   {'rate' in row && row.rate !== undefined ? `${(row.rate * 100).toFixed(1)}%` : row.val !== null ? fmtKrw(row.val) : '—'}
@@ -4222,8 +4222,8 @@ export default function BomManagement() {
                           </div>
                         </div>
                       ) : (
-                        <div className="bg-stone-50 rounded-lg p-4 border border-dashed border-stone-300 text-center text-xs text-stone-400">
-                          <TrendingUp className="w-6 h-6 mx-auto mb-2 text-stone-300" />
+                        <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-dashed border-border text-center text-xs text-muted-foreground">
+                          <TrendingUp className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
                           {SALES_PRICE_LABELS.kmsrpFull}을 입력하면 국내 B2C 영업이익 P&L이 표시됩니다
                         </div>
                       )}
@@ -4236,11 +4236,11 @@ export default function BomManagement() {
 
           {/* 사후원가 - 컬러 탭 없는 경우 안내 */}
           {mainTab === 'post' && !activePostColorBom && (editBom.postColorBoms || []).length === 0 && (
-            <div className="bg-stone-50 border border-dashed border-blue-300 rounded-xl p-10 text-center">
-              <div className="text-4xl mb-3">🏭</div>
-              <p className="text-stone-700 text-sm font-semibold mb-1">사후원가 컬러 탭이 없습니다</p>
-              <p className="text-stone-400 text-xs mb-4">공장 원가표를 관리하려면 컬러를 추가하세요.</p>
-              <Button size="sm" onClick={() => { setAddColorForTab('post'); setShowAddColorModal(true); }} className="bg-blue-700 hover:bg-blue-800 text-white gap-1.5">
+            <div className="bg-[var(--fill-quaternary)] border border-dashed border-blue-300 rounded-xl p-10 text-center">
+              <Factory className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-foreground text-sm font-semibold mb-1">사후원가 컬러 탭이 없습니다</p>
+              <p className="text-muted-foreground text-xs mb-4">공장 원가표를 관리하려면 컬러를 추가하세요.</p>
+              <Button size="sm" onClick={() => { setAddColorForTab('post'); setShowAddColorModal(true); }} className="bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5">
                 <Plus className="w-4 h-4" /> 첫 번째 컬러 추가
               </Button>
               {(editBom.colorBoms || []).length > 0 && (
@@ -4248,7 +4248,7 @@ export default function BomManagement() {
                   size="sm"
                   variant="outline"
                   onClick={copyAllPreToPost}
-                  className="border-purple-300 text-purple-700 hover:bg-purple-50 gap-1.5 mt-2"
+                  className="border-[var(--system-indigo)]/30 text-[var(--system-indigo)] hover:bg-[var(--system-indigo)]/10 gap-1.5 mt-2"
                 >
                   <Copy className="w-4 h-4" /> ← 사전원가 전체 불러오기 (컬러 {(editBom.colorBoms || []).length}개)
                 </Button>
@@ -4262,11 +4262,11 @@ export default function BomManagement() {
           {mainTab === 'post' && activePostColorBom && (
             <>
               {/* 사후원가 컨트롤 바 */}
-              <div className="bg-white rounded-xl border border-stone-200 p-4 shadow-sm">
+              <div className="bg-card rounded-xl border border-border p-4">
                 <div className="flex flex-wrap items-end gap-4">
                   {/* 제조국 선택 */}
                   <div>
-                    <label className="text-xs text-stone-500 mb-1 block font-medium">제조국</label>
+                    <label className="text-xs text-muted-foreground mb-1 block font-medium">제조국</label>
                     <div className="flex gap-1">
                       {(['중국', '한국', '기타'] as const).map(country => (
                         <button
@@ -4278,8 +4278,8 @@ export default function BomManagement() {
                           }}
                           className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
                             editBom.manufacturingCountry === country
-                              ? 'bg-stone-800 text-white border-stone-800'
-                              : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
                           }`}
                         >
                           {country}
@@ -4289,7 +4289,7 @@ export default function BomManagement() {
                   </div>
                   {/* 통화 선택 (3가지) */}
                   <div>
-                    <label className="text-xs text-stone-500 mb-1 block font-medium">입력 통화</label>
+                    <label className="text-xs text-muted-foreground mb-1 block font-medium">입력 통화</label>
                     <div className="flex gap-1">
                       {(['CNY', 'USD', 'KRW'] as const).map(cur => (
                         <button
@@ -4297,8 +4297,8 @@ export default function BomManagement() {
                           onClick={() => updateField('currency', cur)}
                           className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
                             (editBom.currency || 'CNY') === cur
-                              ? 'bg-amber-600 text-white border-amber-600'
-                              : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
                           }`}
                         >
                           {cur === 'CNY' ? '¥ CNY' : cur === 'USD' ? '$ USD' : '₩ KRW'}
@@ -4309,24 +4309,24 @@ export default function BomManagement() {
                   {/* 환율 — CNY */}
                   {(editBom.currency || 'CNY') !== 'KRW' && (
                     <div>
-                      <label className="text-xs text-stone-500 mb-1 block font-medium">CNY→KRW 환율</label>
+                      <label className="text-xs text-muted-foreground mb-1 block font-medium">CNY→KRW 환율</label>
                       <Input
                         type="number"
                         value={editBom.exchangeRateCny || editBom.snapshotCnyKrw}
                         onChange={e => updateField('exchangeRateCny', Number(e.target.value))}
-                        className="h-8 text-xs border-stone-200 text-right w-28"
+                        className="h-8 text-xs border-border text-right w-28"
                       />
                     </div>
                   )}
                   {/* 환율 — USD */}
                   {(editBom.currency || 'CNY') !== 'KRW' && (
                     <div>
-                      <label className="text-xs text-stone-500 mb-1 block font-medium">USD→KRW 환율</label>
+                      <label className="text-xs text-muted-foreground mb-1 block font-medium">USD→KRW 환율</label>
                       <Input
                         type="number"
                         value={editBom.exchangeRateUsd || settings.usdKrw}
                         onChange={e => updateField('exchangeRateUsd', Number(e.target.value))}
-                        className="h-8 text-xs border-stone-200 text-right w-28"
+                        className="h-8 text-xs border-border text-right w-28"
                       />
                     </div>
                   )}
@@ -4336,17 +4336,17 @@ export default function BomManagement() {
                     variant="outline"
                     size="sm"
                     onClick={() => postFileRef.current?.click()}
-                    className="gap-1.5 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+                    className="gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/10"
                   >
                     <Upload className="w-3.5 h-3.5" /> 공장 원가표 업로드
                   </Button>
                   {editBom.postSourceFileName && (
-                    <span className="text-xs text-stone-400 flex items-center gap-1">
-                      <FileText className="w-3 h-3 text-blue-400" /> {editBom.postSourceFileName}
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <FileText className="w-3 h-3 text-primary" /> {editBom.postSourceFileName}
                     </span>
                   )}
                   {/* 업체용 견적서 발행 */}
-                  <Button variant="outline" size="sm" onClick={() => setShowQuote(true)} className="gap-1.5 text-xs border-[#C9A96E] text-[#C9A96E] hover:bg-amber-50">
+                  <Button variant="outline" size="sm" onClick={() => setShowQuote(true)} className="gap-1.5 text-xs text-primary">
                     <FileText className="w-3.5 h-3.5" /> 업체용 견적서
                   </Button>
                   {/* 원가계산서 출력 */}
@@ -4354,8 +4354,8 @@ export default function BomManagement() {
                     const linked = items.find(i => i.id === editBom?.styleId)?.imageUrl;
                     setCostSheetProductImage(editBom?.productImage || linked || null);
                     setShowCostSheetModal(true);
-                  }} className="gap-1.5 text-xs border-stone-400 text-stone-700 hover:bg-stone-50">
-                    📄 원가계산서
+                  }} className="gap-1.5 text-xs">
+                    <FileText className="w-3.5 h-3.5" /> 원가계산서
                   </Button>
                 </div>
               </div>
@@ -4370,16 +4370,16 @@ export default function BomManagement() {
                 const curSymbol = postCur === 'CNY' ? '¥' : postCur === 'USD' ? '$' : '₩';
                 const otherPostColors = (editBom.postColorBoms || []).filter(cb => cb.color !== postColorBom.color);
                 return (
-                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between bg-blue-50">
+                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                    <div className="px-5 py-3 border-b border-border flex items-center justify-between bg-primary/5">
                       <div className="flex items-center gap-3">
-                        <h2 className="text-sm font-semibold text-blue-800">사후원가 자재 명세 — [{postColorBom.color}]</h2>
+                        <h2 className="text-sm font-semibold text-primary">사후원가 자재 명세 — [{postColorBom.color}]</h2>
                         {/* 사전원가에서 불러오기 버튼 */}
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => copyPreToPost(postColorBom.color)}
-                          className="h-7 gap-1 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                          className="h-7 gap-1 text-xs border-[var(--system-green)]/30 text-[var(--system-green)] hover:bg-[var(--system-green)]/10"
                         >
                           <Copy className="w-3 h-3" /> ← 사전원가 [{postColorBom.color}] 불러오기
                         </Button>
@@ -4387,7 +4387,7 @@ export default function BomManagement() {
                           variant="outline"
                           size="sm"
                           onClick={copyAllPreToPost}
-                          className="h-7 gap-1 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                          className="h-7 gap-1 text-xs border-[var(--system-indigo)]/30 text-[var(--system-indigo)] hover:bg-[var(--system-indigo)]/10"
                         >
                           <Copy className="w-3 h-3" /> ← 사전원가 전체 불러오기
                         </Button>
@@ -4395,27 +4395,27 @@ export default function BomManagement() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleBulkDeletePostLines(postColorBom.color)}
-                          className="h-7 gap-1 text-xs border-red-300 text-red-600 hover:bg-red-50"
+                          className="h-7 gap-1 text-xs border-[var(--system-red)]/30 text-[var(--system-red)] hover:bg-[var(--system-red)]/10"
                         >
                           <Trash2 className="w-3 h-3" /> 전체 삭제
                         </Button>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-stone-400">입력 통화: {postCur} {postCur !== 'KRW' && `| CNY→KRW ${postCnyKrw} | USD→KRW ${postUsdKrw}`}</span>
+                        <span className="text-xs text-muted-foreground">입력 통화: {postCur} {postCur !== 'KRW' && `| CNY→KRW ${postCnyKrw} | USD→KRW ${postUsdKrw}`}</span>
                         {/* 다른 컬러에서 복사 */}
                         {otherPostColors.length > 0 && (
                           <div className="flex items-center gap-2">
                             <select
                               value={copyFromColor}
                               onChange={e => setCopyFromColor(e.target.value)}
-                              className="h-7 text-xs border border-stone-200 rounded px-2 text-stone-700"
+                              className="h-7 text-xs border border-border rounded px-2 text-foreground"
                             >
                               <option value="">다른 컬러에서 복사...</option>
                               {otherPostColors.map(cb => <option key={cb.color} value={cb.color}>{cb.color}</option>)}
                             </select>
                             <Button size="sm" variant="outline" disabled={!copyFromColor}
                               onClick={() => copyFromColor && copyColorBom(postColorBom.color, copyFromColor, 'post')}
-                              className="gap-1 text-xs h-7 border-blue-400 text-blue-700 hover:bg-blue-50">
+                              className="gap-1 text-xs h-7 border-primary text-primary hover:bg-primary/10">
                               <Copy className="w-3 h-3" /> 복사
                             </Button>
                           </div>
@@ -4425,7 +4425,7 @@ export default function BomManagement() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="bg-stone-800 text-white text-[11px]">
+                          <tr className="border-b border-border text-[11px] font-semibold text-muted-foreground">
                             <th className="px-2 py-2 text-left">부위 | 자재명</th>
                             <th className="px-2 py-2 text-left w-20">규격</th>
                             <th className="px-2 py-2 text-center w-20">단위</th>
@@ -4449,24 +4449,24 @@ export default function BomManagement() {
                             const isRawMaterial = cat === '원자재';
                             return (
                               <React.Fragment key={cat}>
-                                <tr className={`border-y ${isRawMaterial ? 'bg-amber-50 border-amber-200' : 'bg-stone-100 border-stone-200'}`}>
+                                <tr className={`border-y ${isRawMaterial ? 'bg-primary/5 border-primary/20' : 'bg-[var(--fill-tertiary)] border-border'}`}>
                                   <td colSpan={colCount} className="px-3 py-1.5">
                                     <div className="flex items-center justify-between">
-                                      <button onClick={() => togglePostSection(cat)} className={`flex items-center gap-2 font-semibold text-xs hover:opacity-80 ${isRawMaterial ? 'text-amber-800' : 'text-stone-700'}`}>
+                                      <button onClick={() => togglePostSection(cat)} className={`flex items-center gap-2 font-semibold text-xs hover:opacity-80 ${isRawMaterial ? 'text-primary' : 'text-foreground'}`}>
                                         {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                         {cat}
                                         {!isRawMaterial && filledLines.length > 0 && (
-                                          <span className="text-[10px] font-normal text-stone-500">({filledLines.length})</span>
+                                          <span className="text-[11px] font-normal text-muted-foreground">({filledLines.length})</span>
                                         )}
                                       </button>
                                       <div className="flex items-center gap-3">
                                         {catTotal > 0 && (
-                                          <span className="text-xs text-stone-500">
-                                            소계: <span className="font-semibold text-stone-700">{fmt(catTotal)} {curSymbol}</span>
+                                          <span className="text-xs text-muted-foreground">
+                                            소계: <span className="font-semibold text-foreground">{fmt(catTotal)} {curSymbol}</span>
                                             {postCur !== 'KRW' && <> = <span className="font-semibold text-[#C9A96E]">{fmtKrw(catTotal * postRate)}</span></>}
                                           </span>
                                         )}
-                                        <button onClick={() => addPostColorBomLine(postColorBom.color, cat)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-amber-700 font-medium">
+                                        <button onClick={() => addPostColorBomLine(postColorBom.color, cat)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-primary/80 font-medium">
                                           <Plus className="w-3 h-3" /> 행 추가
                                         </button>
                                       </div>
@@ -4491,33 +4491,33 @@ export default function BomManagement() {
                           })}
                           {/* 후가공 섹션 (postColorBom 기반) */}
                           <React.Fragment key="후가공-post">
-                            <tr className="bg-stone-100 border-y border-stone-200">
+                            <tr className="bg-[var(--fill-tertiary)] border-y border-border">
                               <td colSpan={11} className="px-3 py-1.5">
                                 <div className="flex items-center justify-between">
-                                  <button onClick={() => togglePostSection('후가공')} className="flex items-center gap-2 font-semibold text-xs text-stone-700 hover:opacity-80">
+                                  <button onClick={() => togglePostSection('후가공')} className="flex items-center gap-2 font-semibold text-xs text-foreground hover:opacity-80">
                                     {collapsedPostSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                     후가공
                                     {(postColorBom.postProcessLines ?? []).filter(l => l.name).length > 0 && (
-                                      <span className="text-[10px] font-normal text-stone-500">({(postColorBom.postProcessLines ?? []).filter(l => l.name).length})</span>
+                                      <span className="text-[11px] font-normal text-muted-foreground">({(postColorBom.postProcessLines ?? []).filter(l => l.name).length})</span>
                                     )}
                                   </button>
-                                  <button onClick={() => addPostColorPostLine(postColorBom.color)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-amber-700 font-medium">
+                                  <button onClick={() => addPostColorPostLine(postColorBom.color)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-primary/80 font-medium">
                                     <Plus className="w-3 h-3" /> 행 추가
                                   </button>
                                 </div>
                               </td>
                             </tr>
                             {!collapsedPostSections.has('후가공') && (postColorBom.postProcessLines ?? []).map(line => (
-                              <tr key={line.id} className="border-b border-stone-100 hover:bg-stone-50">
+                              <tr key={line.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
                                 <td className="px-2 py-1" colSpan={2}>
-                                  <Input value={line.name} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'name', e.target.value)} placeholder="후가공 작업명" className="h-7 text-xs border-stone-200 w-full" />
+                                  <Input value={line.name} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'name', e.target.value)} placeholder="후가공 작업명" className="h-7 text-xs border-border w-full" />
                                 </td>
                                 <td className="px-1 py-1"></td>
                                 <td className="px-1 py-1">
-                                  <Input type="number" value={line.netQty || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'netQty', Number(e.target.value))} placeholder="NET" className="h-7 text-xs border-stone-200 w-16 text-right" />
+                                  <Input type="number" value={line.netQty || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'netQty', Number(e.target.value))} placeholder="NET" className="h-7 text-xs border-border w-16 text-right" />
                                 </td>
                                 <td className="px-1 py-1">
-                                  <Input type="number" value={line.unitPrice || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'unitPrice', Number(e.target.value))} placeholder="단가" className="h-7 text-xs border-stone-200 w-20 text-right" />
+                                  <Input type="number" value={line.unitPrice || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'unitPrice', Number(e.target.value))} placeholder="단가" className="h-7 text-xs border-border w-20 text-right" />
                                 </td>
                                 <td className="px-1 py-1"></td>
                                 <td className="px-2 py-1 text-right tabular-nums">
@@ -4526,28 +4526,28 @@ export default function BomManagement() {
                                 </td>
                                 <td colSpan={3}></td>
                                 <td className="px-1 py-1 text-center">
-                                  <button onClick={() => deletePostColorPostLine(postColorBom.color, line.id)} className="text-stone-300 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                                  <button onClick={() => deletePostColorPostLine(postColorBom.color, line.id)} className="text-muted-foreground hover:text-[var(--system-red)]"><Trash2 className="w-3.5 h-3.5" /></button>
                                 </td>
                               </tr>
                             ))}
                           </React.Fragment>
                           {/* 임가공비 (postColorBom 기반) */}
-                          <tr className="bg-amber-50/50 border-y border-stone-200">
+                          <tr className="bg-primary/5 border-y border-border">
                             <td colSpan={11} className="px-3 py-1.5">
-                              <span className="text-xs font-semibold text-stone-600">임가공비</span>
-                              <span className="text-[10px] text-stone-400 ml-2">자재비와 별도 항목</span>
+                              <span className="text-xs font-semibold text-muted-foreground">임가공비</span>
+                              <span className="text-[11px] text-muted-foreground ml-2">자재비와 별도 항목</span>
                             </td>
                           </tr>
-                          <tr className="bg-amber-50/30 border-b border-stone-200">
+                          <tr className="bg-primary/5 border-b border-border">
                             <td className="px-1 py-1" colSpan={3}>
-                              <span className="text-xs text-stone-600 px-2">임가공비 (NET)</span>
+                              <span className="text-xs text-muted-foreground px-2">임가공비 (NET)</span>
                             </td>
                             <td className="px-1 py-1">
-                              <Input type="number" value={postColorBom.processingFee || ''} onChange={e => updateColorProcessingFee(postColorBom.color, Number(e.target.value), 'post')} className="h-7 text-xs border-stone-200 bg-white text-right w-20" placeholder={curSymbol} />
+                              <Input type="number" value={postColorBom.processingFee || ''} onChange={e => updateColorProcessingFee(postColorBom.color, Number(e.target.value), 'post')} className="h-7 text-xs border-border bg-card text-right w-20" placeholder={curSymbol} />
                             </td>
-                            <td className="px-1 py-1"><span className="text-xs text-stone-400 px-2">1</span></td>
+                            <td className="px-1 py-1"><span className="text-xs text-muted-foreground px-2">1</span></td>
                             <td></td>
-                            <td className="px-2 py-1 text-right text-xs text-stone-400">1</td>
+                            <td className="px-2 py-1 text-right text-xs text-muted-foreground">1</td>
                             <td className="px-2 py-1 text-right tabular-nums">
                               <div style={{fontWeight:600}}>${(((postColorBom.processingFee ?? 0) * postRate) / (postUsdKrw || 1380)).toFixed(2)}</div>
                               <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round((postColorBom.processingFee ?? 0) * postRate).toLocaleString()}</div>
@@ -4576,89 +4576,89 @@ export default function BomManagement() {
                 const finalCost = postMarginRate > 0 ? postTotalWithMarginKrw : ps.totalCostKrw;
                 const marginAmt = deliveryPrice > 0 ? deliveryPrice - finalCost : 0;
                 const marginPct = deliveryPrice > 0 ? (marginAmt / deliveryPrice) * 100 : 0;
-                const marginClass = marginPct < 15 ? 'text-red-600' : marginPct < 20 ? 'text-amber-600' : marginPct <= 30 ? 'text-green-600' : 'text-orange-600';
-                const marginBg = marginPct < 15 ? 'bg-red-50 border-red-200' : marginPct < 30 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200';
+                const marginClass = marginPct < 15 ? 'text-[var(--system-red)]' : marginPct < 20 ? 'text-[var(--system-orange)]' : marginPct <= 30 ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]';
+                const marginBg = marginPct < 15 ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20' : marginPct < 30 ? 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20';
                 return (
-                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-3 border-b border-stone-100 bg-stone-800 text-white">
-                      <h2 className="text-sm font-semibold">사후 원가 요약 <span className="text-stone-400 text-xs font-normal ml-2">— [{activePostColorBom?.color}] 기준</span></h2>
+                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                    <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
+                      <h2 className="text-sm font-semibold">사후 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— [{activePostColorBom?.color}] 기준</span></h2>
                     </div>
                     <table className="w-full text-xs">
-                      <thead><tr className="bg-stone-100 text-stone-600"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-stone-400">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
+                      <thead><tr className="bg-[var(--fill-tertiary)] text-muted-foreground"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-muted-foreground">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
                       <tbody>
                         {/* 1. 공장구매 자재 */}
-                        <tr className="border-b border-stone-100 hover:bg-stone-50">
-                          <td className="px-4 py-2 font-bold text-stone-400">자</td>
-                          <td className="px-4 py-2 font-medium text-stone-700">공장구매 자재</td>
-                          <td className="px-4 py-2 text-stone-400">본사제공 제외 ({postCur})</td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.factoryMaterialKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.factoryMaterialKrw)}</span></td>
+                        <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                          <td className="px-4 py-2 font-bold text-muted-foreground">자</td>
+                          <td className="px-4 py-2 font-medium text-foreground">공장구매 자재</td>
+                          <td className="px-4 py-2 text-muted-foreground">본사제공 제외 ({postCur})</td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.factoryMaterialKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.factoryMaterialKrw)}</span></td>
                         </tr>
                         {/* 2. 본사제공 자재 */}
-                        <tr className="border-b border-stone-100 hover:bg-stone-50">
-                          <td className="px-4 py-2 font-bold text-stone-400">본</td>
-                          <td className="px-4 py-2 font-medium text-stone-700">본사제공 자재</td>
-                          <td className="px-4 py-2 text-stone-400">본사에서 공급</td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.hqMaterialKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.hqMaterialKrw)}</span></td>
+                        <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                          <td className="px-4 py-2 font-bold text-muted-foreground">본</td>
+                          <td className="px-4 py-2 font-medium text-foreground">본사제공 자재</td>
+                          <td className="px-4 py-2 text-muted-foreground">본사에서 공급</td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.hqMaterialKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.hqMaterialKrw)}</span></td>
                         </tr>
                         {/* 3. 임가공비 */}
-                        <tr className="border-b border-stone-100 hover:bg-stone-50">
-                          <td className="px-4 py-2 font-bold text-stone-400">공</td>
-                          <td className="px-4 py-2 font-medium text-stone-700">임가공비</td>
-                          <td className="px-4 py-2 text-stone-400">NET ({postCur})</td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.processingKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.processingKrw)}</span></td>
+                        <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                          <td className="px-4 py-2 font-bold text-muted-foreground">공</td>
+                          <td className="px-4 py-2 font-medium text-foreground">임가공비</td>
+                          <td className="px-4 py-2 text-muted-foreground">NET ({postCur})</td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.processingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.processingKrw)}</span></td>
                         </tr>
                         {/* 4. 공장단가 (amber 강조) */}
-                        <tr className="bg-amber-50 border-y border-amber-200">
-                          <td className="px-4 py-3 font-bold text-amber-600">🏭</td>
-                          <td className="px-4 py-3 font-bold text-stone-800">공장단가</td>
-                          <td className="px-4 py-3 text-stone-500 text-[11px]">공장구매자재 + 임가공 + 후가공 (관세 제외, 공장 결제금액)</td>
-                          <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">
+                        <tr className="bg-primary/5 border-y border-primary/20">
+                          <td className="px-4 py-3 font-bold text-primary"><Factory className="w-4 h-4" /></td>
+                          <td className="px-4 py-3 font-bold text-foreground">공장단가</td>
+                          <td className="px-4 py-3 text-muted-foreground text-[11px]">공장구매자재 + 임가공 + 후가공 (관세 제외, 공장 결제금액)</td>
+                          <td className="px-4 py-3 text-right font-bold text-primary tabular-nums">
                             {fmtKrw(ps.factoryUnitCostKrw)}
                             {postCur !== 'KRW' && ps.factoryUnitCostKrw > 0 && postUsdKrwSummary > 0 && (
-                              <div className="text-[10px] text-stone-400 font-normal mt-0.5">${(ps.factoryUnitCostKrw / postUsdKrwSummary).toFixed(2)}</div>
+                              <div className="text-[11px] text-muted-foreground font-normal mt-0.5">${(ps.factoryUnitCostKrw / postUsdKrwSummary).toFixed(2)}</div>
                             )}
                           </td>
                         </tr>
                         {/* 5. 관세 (율 > 0일 때만) */}
                         {/* 관세율 - 직접 입력 */}
-                        <tr className="border-b border-stone-100 hover:bg-stone-50">
-                          <td className="px-4 py-2 font-bold text-stone-400">관</td>
-                          <td className="px-4 py-2 font-medium text-stone-700">
+                        <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                          <td className="px-4 py-2 font-bold text-muted-foreground">관</td>
+                          <td className="px-4 py-2 font-medium text-foreground">
                             관세
-                            <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className="inline-block h-6 text-xs border-stone-200 text-right w-14 ml-1" placeholder="%" />
-                            <span className="text-xs text-stone-400 ml-1">%</span>
+                            <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className="inline-block h-6 text-xs border-border text-right w-14 ml-1" placeholder="%" />
+                            <span className="text-xs text-muted-foreground ml-1">%</span>
                           </td>
-                          <td className="px-4 py-2 text-stone-400 text-xs">임가공비 × 관세율</td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.customsKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.customsKrw)}</span></td>
+                          <td className="px-4 py-2 text-muted-foreground text-xs">임가공비 × 관세율</td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.customsKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.customsKrw)}</span></td>
                         </tr>
                         {/* 물류비 - 직접 입력 */}
-                        <tr className="border-b border-stone-100 hover:bg-stone-50">
-                          <td className="px-4 py-2 font-bold text-stone-400">물</td>
-                          <td className="px-4 py-2 font-medium text-stone-700">물류비</td>
-                          <td className="px-4 py-2 text-stone-400">
-                            <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className="h-6 text-xs border-stone-200 text-right w-24" placeholder="₩" />
+                        <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                          <td className="px-4 py-2 font-bold text-muted-foreground">물</td>
+                          <td className="px-4 py-2 font-medium text-foreground">물류비</td>
+                          <td className="px-4 py-2 text-muted-foreground">
+                            <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className="h-6 text-xs border-border text-right w-24" placeholder="₩" />
                           </td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-stone-800">{fmtKrw(ps.logisticsKrw)}</span></td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-foreground">{fmtKrw(ps.logisticsKrw)}</span></td>
                         </tr>
                         {/* 포장/검사비 - 직접 입력 */}
-                        <tr className="border-b border-stone-100 hover:bg-stone-50">
-                          <td className="px-4 py-2 font-bold text-stone-400">포</td>
-                          <td className="px-4 py-2 font-medium text-stone-700">포장/검사비</td>
-                          <td className="px-4 py-2 text-stone-400">
-                            <Input type="number" value={editBom.packagingCostKrw || ''} onChange={e => updateField('packagingCostKrw', Number(e.target.value))} className="h-6 text-xs border-stone-200 text-right w-24" placeholder="₩" />
+                        <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                          <td className="px-4 py-2 font-bold text-muted-foreground">포</td>
+                          <td className="px-4 py-2 font-medium text-foreground">포장/검사비</td>
+                          <td className="px-4 py-2 text-muted-foreground">
+                            <Input type="number" value={editBom.packagingCostKrw || ''} onChange={e => updateField('packagingCostKrw', Number(e.target.value))} className="h-6 text-xs border-border text-right w-24" placeholder="₩" />
                           </td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.packagingKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.packagingKrw)}</span></td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.packagingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.packagingKrw)}</span></td>
                         </tr>
                         {/* 패킹재 — 품목마스터 PACK 선택 */}
-                        <tr className="border-b border-stone-100 hover:bg-stone-50">
-                          <td className="px-4 py-2 font-bold text-stone-400">패</td>
-                          <td className="px-4 py-2 font-medium text-stone-700">패킹재</td>
-                          <td className="px-4 py-2 text-stone-400">
+                        <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                          <td className="px-4 py-2 font-bold text-muted-foreground">패</td>
+                          <td className="px-4 py-2 font-medium text-foreground">패킹재</td>
+                          <td className="px-4 py-2 text-muted-foreground">
                             <Select
                               value={editBom.packingItemId || '_none'}
                               onValueChange={selectPackingItem}
                             >
-                              <SelectTrigger className="h-7 text-xs border-stone-200 w-full max-w-[260px]">
+                              <SelectTrigger className="h-7 text-xs border-border w-full max-w-[260px]">
                                 <SelectValue placeholder="품목마스터 PACK 선택" />
                               </SelectTrigger>
                               <SelectContent className="max-h-64">
@@ -4673,64 +4673,64 @@ export default function BomManagement() {
                               </SelectContent>
                             </Select>
                             {editBom.packingItemStyleNo ? (
-                              <div className="text-[10px] text-amber-700 mt-0.5">{editBom.packingItemStyleNo} 연동</div>
+                              <div className="text-[11px] text-primary mt-0.5">{editBom.packingItemStyleNo} 연동</div>
                             ) : null}
                           </td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums">
-                            <span className={ps.packingKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(ps.packingKrw)}</span>
+                            <span className={ps.packingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.packingKrw)}</span>
                           </td>
                         </tr>
                         {/* 9. 제품 총원가 (생산마진 전 실원가) */}
-                        <tr className="bg-amber-50 border-y border-amber-200">
-                          <td className="px-4 py-2 font-bold text-amber-600">제</td>
-                          <td className="px-4 py-2 font-semibold text-amber-800" colSpan={2}>제품 총원가 <span className="text-xs text-amber-500 font-normal">(생산마진 전 실원가)</span></td>
-                          <td className="px-4 py-2 text-right font-bold tabular-nums text-amber-700">{fmtKrw(ps.totalCostKrw)}</td>
+                        <tr className="bg-primary/5 border-y border-primary/20">
+                          <td className="px-4 py-2 font-bold text-primary">제</td>
+                          <td className="px-4 py-2 font-semibold text-primary" colSpan={2}>제품 총원가 <span className="text-xs text-primary/70 font-normal">(생산마진 전 실원가)</span></td>
+                          <td className="px-4 py-2 text-right font-bold tabular-nums text-primary">{fmtKrw(ps.totalCostKrw)}</td>
                         </tr>
                         {/* 10. 생산마진 - 직접 입력 가능 */}
-                        <tr className="border-b border-stone-100 hover:bg-stone-50">
-                          <td className="px-4 py-2 font-bold text-stone-400">마</td>
-                          <td className="px-4 py-2 font-medium text-stone-700">생산마진</td>
+                        <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                          <td className="px-4 py-2 font-bold text-muted-foreground">마</td>
+                          <td className="px-4 py-2 font-medium text-foreground">생산마진</td>
                           <td className="px-4 py-2">
                             <div className="flex items-center gap-1">
                               <Input
                                 type="number"
                                 value={Math.round((editBom.productionMarginRate ?? 0) * 100)}
                                 onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)}
-                                className="h-6 text-xs border-stone-200 text-right w-16"
+                                className="h-6 text-xs border-border text-right w-16"
                                 placeholder="0"
                               />
-                              <span className="text-stone-500 text-xs">%</span>
+                              <span className="text-muted-foreground text-xs">%</span>
                             </div>
                           </td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums">
-                            <span className={postProductionMarginKrw === 0 ? 'text-stone-300' : 'text-stone-800'}>{fmtKrw(postProductionMarginKrw)}</span>
+                            <span className={postProductionMarginKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(postProductionMarginKrw)}</span>
                           </td>
                         </tr>
                         {/* 11. 총원가액 */}
-                        <tr className="bg-stone-800 text-white">
-                          <td className="px-4 py-3 font-bold">📦</td>
+                        <tr className="bg-primary text-primary-foreground">
+                          <td className="px-4 py-3 font-bold"><Package className="w-4 h-4" /></td>
                           <td className="px-4 py-3 font-bold text-base" colSpan={2}>{postMarginRate > 0 ? '총 원 가 액' : '제 품 원 가'}</td>
-                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums text-[#C9A96E]">{fmtKrw(finalCost)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums">{fmtKrw(finalCost)}</td>
                         </tr>
                         {deliveryPrice > 0 && (
                           <>
-                            <tr className="bg-blue-50 border-t border-blue-200">
-                              <td className="px-4 py-2.5 text-xs font-medium text-blue-600">연동</td>
-                              <td className="px-4 py-2.5 text-sm font-semibold text-blue-800" colSpan={2}>납품가 (품목 마스터 연동)</td>
-                              <td className="px-4 py-2.5 text-right font-mono font-bold text-blue-800">{fmtKrw(deliveryPrice)}</td>
+                            <tr className="bg-primary/10 border-t border-primary/20">
+                              <td className="px-4 py-2.5 text-xs font-medium text-primary">연동</td>
+                              <td className="px-4 py-2.5 text-sm font-semibold text-primary" colSpan={2}>납품가 (품목 마스터 연동)</td>
+                              <td className="px-4 py-2.5 text-right font-mono font-bold text-primary">{fmtKrw(deliveryPrice)}</td>
                             </tr>
                             <tr>
                               <td colSpan={4} className="px-4 py-2">
                                 <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border ${marginBg}`}>
                                   <div className="flex items-center gap-4">
-                                    <span className="text-xs text-stone-500">마진금액</span>
+                                    <span className="text-xs text-muted-foreground">마진금액</span>
                                     <span className={`font-mono font-bold text-sm ${marginClass}`}>{fmtKrw(marginAmt)}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <span className="text-xs text-stone-500">마진율</span>
+                                    <span className="text-xs text-muted-foreground">마진율</span>
                                     <span className={`font-mono font-bold text-lg ${marginClass}`}>{marginPct.toFixed(1)}%</span>
-                                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${marginPct > 30 ? 'bg-orange-100 text-orange-700' : marginPct >= 20 ? 'bg-green-100 text-green-700' : marginPct >= 15 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                                      {marginPct > 30 ? '🟠 초과주의' : marginPct >= 20 ? '🟢 좋음' : marginPct >= 15 ? '🟡 적정' : '🔴 미달'}
+                                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${marginPct > 30 ? 'bg-[var(--system-orange)]/10 text-[var(--system-orange)]' : marginPct >= 20 ? 'bg-[var(--system-green)]/10 text-[var(--system-green)]' : marginPct >= 15 ? 'bg-[var(--system-orange)]/10 text-[var(--system-orange)]' : 'bg-[var(--system-red)]/10 text-[var(--system-red)]'}`}>
+                                      {marginPct > 30 ? '초과주의' : marginPct >= 20 ? '좋음' : marginPct >= 15 ? '적정' : '미달'}
                                     </span>
                                   </div>
                                 </div>
@@ -4742,8 +4742,8 @@ export default function BomManagement() {
                     </table>
 
                     {/* 납품가 입력 */}
-                    <div className="px-4 py-3 border-t border-stone-200 flex items-center gap-3">
-                      <label className="text-xs font-semibold text-stone-700 whitespace-nowrap">납품가 (KRW)</label>
+                    <div className="px-4 py-3 border-t border-border flex items-center gap-3">
+                      <label className="text-xs font-semibold text-foreground whitespace-nowrap">납품가 (KRW)</label>
                       <Input
                         type="number"
                         value={editBom.postDeliveryPrice != null ? editBom.postDeliveryPrice : (linkedItem?.deliveryPrice ?? '')}
@@ -4752,11 +4752,11 @@ export default function BomManagement() {
                           updateField('postDeliveryPrice', val as any);
                           if (editBom.styleId) import('@/lib/supabaseQueries').then(m => m.upsertItem({ id: editBom.styleId, deliveryPrice: val ?? 0 } as any)).catch(() => {});
                         }}
-                        className="h-8 text-sm border-stone-300 text-right w-36 font-semibold"
+                        className="h-8 text-sm border-border text-right w-36 font-semibold"
                         placeholder="납품가 입력"
                       />
                       {linkedItem?.deliveryPrice && linkedItem.deliveryPrice !== editBom.postDeliveryPrice && (
-                        <span className="text-[10px] text-stone-400">품목마스터: {fmtKrw(linkedItem.deliveryPrice)}</span>
+                        <span className="text-[11px] text-muted-foreground">품목마스터: {fmtKrw(linkedItem.deliveryPrice)}</span>
                       )}
                     </div>
                   </div>
@@ -4772,13 +4772,13 @@ export default function BomManagement() {
                 const postPnlResult = editBom?.pnl ? calcPnl(finalCost, editBom.pnl) : null;
                 if (!editBom?.pnl || !postPnlResult) return null;
                 return (
-                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-3 border-b border-stone-100 bg-stone-800 text-white">
-                      <h2 className="text-sm font-semibold">P&L 분석 <span className="text-stone-400 text-xs font-normal ml-2">— 사후원가 [{activePostColorBom?.color}] 기준</span></h2>
+                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                    <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
+                      <h2 className="text-sm font-semibold">P&L 분석 <span className="text-muted-foreground text-xs font-normal ml-2">— 사후원가 [{activePostColorBom?.color}] 기준</span></h2>
                     </div>
                     <div className="p-5 space-y-5">
-                      <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-                        <h3 className="text-xs font-semibold text-stone-600 mb-3">가정 (Assumptions)</h3>
+                      <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                        <h3 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h3>
                         <div className="grid grid-cols-3 gap-4">
                           {([
                             { label: '할인율 (Discount)', field: 'discountRate' as keyof BomPnlAssumptions },
@@ -4786,26 +4786,26 @@ export default function BomManagement() {
                             { label: '인건비 / 판관비', field: 'sgaRate' as keyof BomPnlAssumptions },
                           ] as const).map(item => (
                             <div key={item.field}>
-                              <label className="text-[11px] text-stone-500 mb-1 block">{item.label}</label>
+                              <label className="text-[11px] text-muted-foreground mb-1 block">{item.label}</label>
                               <div className="flex items-center gap-1">
-                                <Input type="number" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className="h-7 text-xs border-stone-200 text-right w-20" />
-                                <span className="text-xs text-stone-500">%</span>
+                                <Input type="number" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className="h-7 text-xs border-border text-right w-20" />
+                                <span className="text-xs text-muted-foreground">%</span>
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
-                      <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-                        <h3 className="text-xs font-semibold text-stone-600 mb-3">배수 가이드 (국내 B2C)</h3>
+                      <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                        <h3 className="text-xs font-semibold text-muted-foreground mb-3">배수 가이드 (국내 B2C)</h3>
                         <div className="space-y-2">
                           {[
                             { label: '3.5배 기준 최소 판매가', val: postPnlResult.price35 },
                             { label: '4.0배 기준 목표 판매가', val: postPnlResult.price40 },
                             { label: '4.5배 기준 이상적 판매가', val: postPnlResult.price45 },
                           ].map(item => (
-                            <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-stone-200 last:border-0">
-                              <span className="text-xs text-stone-600">{item.label}</span>
-                              <span className="text-sm font-bold text-stone-800 tabular-nums">{fmtKrw(item.val)}</span>
+                            <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                              <span className="text-xs text-muted-foreground">{item.label}</span>
+                              <span className="text-sm font-bold text-foreground tabular-nums">{fmtKrw(item.val)}</span>
                             </div>
                           ))}
                         </div>
@@ -4816,23 +4816,23 @@ export default function BomManagement() {
                         onPatch={patchPnl}
                       />
                       {editBom.pnl.confirmedSalePrice ? (
-                        <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-                          <h3 className="text-xs font-semibold text-stone-600 mb-3">영업이익 분석 (P&L) — 국내 B2C</h3>
+                        <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                          <h3 className="text-xs font-semibold text-muted-foreground mb-3">영업이익 분석 (P&L) — 국내 B2C</h3>
                           <div className="space-y-1">
                             {[
-                              { no: '①', label: `정가 (${SALES_PRICE_LABELS.kmsrpFull})`, desc: '', val: editBom.pnl.confirmedSalePrice, color: 'text-stone-800', bold: false },
-                              { no: '②', label: '(-) 할인', desc: `${Math.round(editBom.pnl.discountRate * 100)}%`, val: -(editBom.pnl.confirmedSalePrice * editBom.pnl.discountRate), color: 'text-red-500', bold: false },
-                              { no: '③', label: '실판가 (Net Sale)', desc: '', val: postPnlResult.netSale, color: 'text-stone-700', bold: true },
-                              { no: '④', label: '(-) 플랫폼 수수료', desc: `${Math.round(editBom.pnl.platformFeeRate * 100)}%`, val: -(postPnlResult.netSale * editBom.pnl.platformFeeRate), color: 'text-red-500', bold: false },
-                              { no: '⑤', label: '(-) 인건비 / 판관비', desc: `${Math.round(editBom.pnl.sgaRate * 100)}%`, val: -(postPnlResult.netSale * editBom.pnl.sgaRate), color: 'text-red-500', bold: false },
-                              { no: '⑥', label: '(-) 매출원가 (COGS)', desc: '총 원가액', val: -finalCost, color: 'text-red-500', bold: false },
-                              { no: '⑦', label: '영업이익', desc: '', val: postPnlResult.operatingProfit, color: postPnlResult.operatingProfit >= 0 ? 'text-green-600' : 'text-red-600', bold: true },
-                              { no: '★', label: '영업이익률', desc: '', val: null, color: postPnlResult.operatingMargin >= 0 ? 'text-green-600' : 'text-red-600', bold: true, rate: postPnlResult.operatingMargin },
+                              { no: '①', label: `정가 (${SALES_PRICE_LABELS.kmsrpFull})`, desc: '', val: editBom.pnl.confirmedSalePrice, color: 'text-foreground', bold: false },
+                              { no: '②', label: '(-) 할인', desc: `${Math.round(editBom.pnl.discountRate * 100)}%`, val: -(editBom.pnl.confirmedSalePrice * editBom.pnl.discountRate), color: 'text-[var(--system-red)]', bold: false },
+                              { no: '③', label: '실판가 (Net Sale)', desc: '', val: postPnlResult.netSale, color: 'text-foreground', bold: true },
+                              { no: '④', label: '(-) 플랫폼 수수료', desc: `${Math.round(editBom.pnl.platformFeeRate * 100)}%`, val: -(postPnlResult.netSale * editBom.pnl.platformFeeRate), color: 'text-[var(--system-red)]', bold: false },
+                              { no: '⑤', label: '(-) 인건비 / 판관비', desc: `${Math.round(editBom.pnl.sgaRate * 100)}%`, val: -(postPnlResult.netSale * editBom.pnl.sgaRate), color: 'text-[var(--system-red)]', bold: false },
+                              { no: '⑥', label: '(-) 매출원가 (COGS)', desc: '총 원가액', val: -finalCost, color: 'text-[var(--system-red)]', bold: false },
+                              { no: '⑦', label: '영업이익', desc: '', val: postPnlResult.operatingProfit, color: postPnlResult.operatingProfit >= 0 ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]', bold: true },
+                              { no: '★', label: '영업이익률', desc: '', val: null, color: postPnlResult.operatingMargin >= 0 ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]', bold: true, rate: postPnlResult.operatingMargin },
                             ].map(row => (
-                              <div key={row.no} className={`flex items-center justify-between py-1.5 px-3 rounded ${row.bold ? 'bg-white border border-stone-200' : ''}`}>
+                              <div key={row.no} className={`flex items-center justify-between py-1.5 px-3 rounded ${row.bold ? 'bg-card border border-border' : ''}`}>
                                 <div className="flex items-center gap-3">
-                                  <span className="text-[11px] text-stone-400 w-5">{row.no}</span>
-                                  <span className={`text-xs ${row.bold ? 'font-semibold text-stone-800' : 'text-stone-600'}`}>{row.label} <span className="text-stone-400 font-normal">{row.desc}</span></span>
+                                  <span className="text-[11px] text-muted-foreground w-5">{row.no}</span>
+                                  <span className={`text-xs ${row.bold ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{row.label} <span className="text-muted-foreground font-normal">{row.desc}</span></span>
                                 </div>
                                 <span className={`text-sm tabular-nums font-semibold ${row.color}`}>
                                   {'rate' in row && row.rate !== undefined ? `${(row.rate * 100).toFixed(1)}%` : row.val !== null ? fmtKrw(row.val) : '—'}
@@ -4842,8 +4842,8 @@ export default function BomManagement() {
                           </div>
                         </div>
                       ) : (
-                        <div className="bg-stone-50 rounded-lg p-4 border border-dashed border-stone-300 text-center text-xs text-stone-400">
-                          <TrendingUp className="w-6 h-6 mx-auto mb-2 text-stone-300" />
+                        <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-dashed border-border text-center text-xs text-muted-foreground">
+                          <TrendingUp className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
                           {SALES_PRICE_LABELS.kmsrpFull}을 입력하면 국내 B2C 영업이익 P&L이 표시됩니다
                         </div>
                       )}
@@ -4956,10 +4956,10 @@ export default function BomManagement() {
               toast.success(`${mainTab === 'post' ? '사후원가' : '사전원가'} BOM에 소요량이 적용되었습니다`);
             };
 
-            const thCls = 'text-[11px] text-stone-500 font-semibold text-center py-2 px-2';
+            const thCls = 'text-[11px] text-muted-foreground font-semibold text-center py-2 px-2';
             const tdCls = 'px-2 py-1';
-            const inputCls = 'w-full border border-stone-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-amber-400';
-            const inputClsRO = 'w-full border border-stone-100 rounded px-2 py-1 text-sm text-center bg-stone-50 text-stone-500 cursor-default';
+            const inputCls = 'w-full border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-ring';
+            const inputClsRO = 'w-full border border-border rounded px-2 py-1 text-sm text-center bg-[var(--fill-quaternary)] text-muted-foreground cursor-default';
 
             return (
               <div className="space-y-4">
@@ -4969,13 +4969,13 @@ export default function BomManagement() {
                     <button
                       onClick={() => setYardageTab('leather')}
                       className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-                        yardageTab === 'leather' ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                        yardageTab === 'leather' ? 'bg-primary text-primary-foreground' : 'bg-[var(--fill-tertiary)] text-muted-foreground hover:bg-[var(--fill-secondary)]'
                       }`}
                     >가죽 (SF)</button>
                     <button
                       onClick={() => setYardageTab('fabric')}
                       className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-                        yardageTab === 'fabric' ? 'bg-sky-600 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                        yardageTab === 'fabric' ? 'bg-sky-600 text-white' : 'bg-[var(--fill-tertiary)] text-muted-foreground hover:bg-[var(--fill-secondary)]'
                       }`}
                     >원단 (YD)</button>
                   </div>
@@ -4985,10 +4985,10 @@ export default function BomManagement() {
                     <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => yardageFileRef.current?.click()}>
                       <Upload className="w-3.5 h-3.5" /> CAD 파일 업로드
                     </Button>
-                    <Button size="sm" variant="outline" className="gap-1.5 text-xs border-purple-300 text-purple-700 hover:bg-purple-50" onClick={() => ocrFileRef.current?.click()}>
-                      📷 손글씨로 입력
+                    <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => ocrFileRef.current?.click()}>
+                      <Camera className="w-3.5 h-3.5" /> 손글씨로 입력
                     </Button>
-                    <Button size="sm" className="gap-1.5 text-xs bg-amber-600 hover:bg-amber-700 text-white" onClick={applyToBom}>
+                    <Button size="sm" className="gap-1.5 text-xs" onClick={applyToBom}>
                       <Calculator className="w-3.5 h-3.5" /> BOM에 적용
                     </Button>
                   </div>
@@ -4996,21 +4996,21 @@ export default function BomManagement() {
 
                 {/* 가죽 탭 */}
                 {yardageTab === 'leather' && (
-                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+                  <div className="bg-card rounded-xl border border-border overflow-hidden">
                     {/* 로스율 헤더 */}
-                    <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border-b border-stone-200">
-                      <span className="text-xs text-stone-500 font-semibold whitespace-nowrap">로스율 (%)</span>
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border-b border-border">
+                      <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">로스율 (%)</span>
                       <input
                         type="number"
                         value={leatherLossRate}
                         onChange={e => setLeatherLossRate(parseFloat(e.target.value) || 0)}
-                        className="w-20 border border-stone-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-amber-400"
+                        className="w-20 border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-ring"
                         min={0} max={100}
                       />
-                      <span className="text-xs text-stone-400">최종 = Net × (1 + 로스율/100)</span>
+                      <span className="text-xs text-muted-foreground">최종 = Net × (1 + 로스율/100)</span>
                     </div>
                     <table className="w-full">
-                      <thead className="bg-amber-50/60 border-b border-stone-200">
+                      <thead className="bg-primary/5 border-b border-border">
                         <tr>
                           <th className={thCls} style={{width:'22%'}}>부위</th>
                           <th className={thCls} style={{width:'10%'}}>가로 CM</th>
@@ -5028,16 +5028,16 @@ export default function BomManagement() {
                           const sero5 = r.세로 + 0.5;
                           const rowNet = garo5 * sero5 * r.수량 / 10000 * 10.764;
                           return (
-                            <tr key={r.id} className="border-b border-stone-100 hover:bg-stone-50">
+                            <tr key={r.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
                               <td className={tdCls}><input className={inputCls} value={r.부위} onChange={e => updateLeather(r.id, '부위', e.target.value)} placeholder="바디" /></td>
                               <td className={tdCls}><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => updateLeather(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
                               <td className={tdCls}><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => updateLeather(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
                               <td className={tdCls}><input className={inputClsRO} value={garo5.toFixed(1)} readOnly /></td>
                               <td className={tdCls}><input className={inputClsRO} value={sero5.toFixed(1)} readOnly /></td>
                               <td className={tdCls}><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => updateLeather(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
-                              <td className={tdCls}><input className={inputClsRO + ' font-semibold text-amber-700'} value={rowNet.toFixed(3)} readOnly /></td>
+                              <td className={tdCls}><input className={inputClsRO + ' font-semibold text-primary'} value={rowNet.toFixed(3)} readOnly /></td>
                               <td className={tdCls + ' text-center'}>
-                                <button onClick={() => setLeatherRows(p => p.filter(x => x.id !== r.id))} className="text-stone-300 hover:text-red-400 text-lg leading-none">×</button>
+                                <button onClick={() => setLeatherRows(p => p.filter(x => x.id !== r.id))} className="text-muted-foreground hover:text-[var(--system-red)] text-lg leading-none">×</button>
                               </td>
                             </tr>
                           );
@@ -5045,15 +5045,15 @@ export default function BomManagement() {
                       </tbody>
                     </table>
                     <div className="p-3 flex items-center justify-between">
-                      <button onClick={addLeatherRow} className="text-xs text-amber-600 hover:text-amber-800 font-semibold">+ 행 추가</button>
+                      <button onClick={addLeatherRow} className="text-xs text-primary hover:text-primary/80 font-semibold">+ 행 추가</button>
                       <div className="flex items-center gap-6">
                         <div className="text-right">
-                          <span className="text-xs text-stone-400 mr-2">Net</span>
-                          <span className="text-base font-bold text-amber-600">{netSF.toFixed(3)} SF</span>
+                          <span className="text-xs text-muted-foreground mr-2">Net</span>
+                          <span className="text-base font-bold text-primary">{netSF.toFixed(3)} SF</span>
                         </div>
                         <div className="text-right">
-                          <span className="text-xs text-stone-400 mr-2">최종 (+{leatherLossRate}%)</span>
-                          <span className="text-lg font-bold text-amber-700">{finalSF.toFixed(3)} SF</span>
+                          <span className="text-xs text-muted-foreground mr-2">최종 (+{leatherLossRate}%)</span>
+                          <span className="text-lg font-bold text-primary">{finalSF.toFixed(3)} SF</span>
                         </div>
                       </div>
                     </div>
@@ -5062,31 +5062,31 @@ export default function BomManagement() {
 
                 {/* 원단 탭 */}
                 {yardageTab === 'fabric' && (
-                  <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-                    <div className="flex items-center gap-4 px-4 py-2.5 bg-sky-50 border-b border-stone-200 flex-wrap">
+                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                    <div className="flex items-center gap-4 px-4 py-2.5 bg-sky-50 border-b border-border flex-wrap">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-stone-500 font-semibold whitespace-nowrap">원단 폭 (cm)</span>
+                        <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">원단 폭 (cm)</span>
                         <input
                           type="number"
                           value={fabricWidth}
                           onChange={e => setFabricWidth(parseFloat(e.target.value) || 150)}
-                          className="w-24 border border-stone-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-sky-400"
+                          className="w-24 border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-sky-400"
                         />
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-stone-500 font-semibold whitespace-nowrap">로스율 (%)</span>
+                        <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">로스율 (%)</span>
                         <input
                           type="number"
                           value={fabricLossRate}
                           onChange={e => setFabricLossRate(parseFloat(e.target.value) || 0)}
-                          className="w-20 border border-stone-200 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-sky-400"
+                          className="w-20 border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-sky-400"
                           min={0} max={100}
                         />
                       </div>
-                      <span className="text-xs text-stone-400">최종 = Net × (1 + 로스율/100)</span>
+                      <span className="text-xs text-muted-foreground">최종 = Net × (1 + 로스율/100)</span>
                     </div>
                     <table className="w-full">
-                      <thead className="bg-sky-50/60 border-b border-stone-200">
+                      <thead className="bg-sky-50/60 border-b border-border">
                         <tr>
                           <th className={thCls} style={{width:'36%'}}>부위</th>
                           <th className={thCls} style={{width:'18%'}}>가로 CM</th>
@@ -5097,13 +5097,13 @@ export default function BomManagement() {
                       </thead>
                       <tbody>
                         {fabricRows.map((r) => (
-                          <tr key={r.id} className="border-b border-stone-100 hover:bg-stone-50">
+                          <tr key={r.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
                             <td className={tdCls}><input className={inputCls} value={r.부위} onChange={e => updateFabric(r.id, '부위', e.target.value)} placeholder="바디" /></td>
                             <td className={tdCls}><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => updateFabric(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
                             <td className={tdCls}><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => updateFabric(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
                             <td className={tdCls}><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => updateFabric(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
                             <td className={tdCls + ' text-center'}>
-                              <button onClick={() => setFabricRows(p => p.filter(x => x.id !== r.id))} className="text-stone-300 hover:text-red-400 text-lg leading-none">×</button>
+                              <button onClick={() => setFabricRows(p => p.filter(x => x.id !== r.id))} className="text-muted-foreground hover:text-[var(--system-red)] text-lg leading-none">×</button>
                             </td>
                           </tr>
                         ))}
@@ -5113,11 +5113,11 @@ export default function BomManagement() {
                       <button onClick={addFabricRow} className="text-xs text-sky-600 hover:text-sky-800 font-semibold">+ 행 추가</button>
                       <div className="flex items-center gap-6">
                         <div className="text-right">
-                          <span className="text-xs text-stone-400 mr-2">Net</span>
+                          <span className="text-xs text-muted-foreground mr-2">Net</span>
                           <span className="text-base font-bold text-sky-600">{netYD.toFixed(3)} YD</span>
                         </div>
                         <div className="text-right">
-                          <span className="text-xs text-stone-400 mr-2">최종 (+{fabricLossRate}%)</span>
+                          <span className="text-xs text-muted-foreground mr-2">최종 (+{fabricLossRate}%)</span>
                           <span className="text-lg font-bold text-sky-700">{finalYD.toFixed(3)} YD</span>
                         </div>
                       </div>
@@ -5135,7 +5135,7 @@ export default function BomManagement() {
                 <DialogHeader><DialogTitle>유사 스타일 BOM 복사</DialogTitle></DialogHeader>
                 <div className="space-y-4 py-2">
                   <div>
-                    <label className="text-xs text-stone-500 mb-1 block">복사할 원본 BOM 선택</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">복사할 원본 BOM 선택</label>
                     <Select value={copySourceId} onValueChange={setCopySourceId}>
                       <SelectTrigger className="text-sm"><SelectValue placeholder="원본 BOM 선택..." /></SelectTrigger>
                       <SelectContent>
@@ -5144,7 +5144,7 @@ export default function BomManagement() {
                     </Select>
                   </div>
                   <div>
-                    <label className="text-xs text-stone-500 mb-1 block">복사 대상 스타일</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">복사 대상 스타일</label>
                     <Select value={selectedStyleId} onValueChange={setSelectedStyleId}>
                       <SelectTrigger className="text-sm"><SelectValue placeholder="대상 스타일 선택..." /></SelectTrigger>
                       <SelectContent>
@@ -5154,7 +5154,7 @@ export default function BomManagement() {
                   </div>
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => setShowCopyModal(false)}>취소</Button>
-                    <Button size="sm" onClick={handleCopyBom} className="bg-stone-800 text-white">복사 실행</Button>
+                    <Button size="sm" onClick={handleCopyBom}>복사 실행</Button>
                   </div>
                 </div>
               </DialogContent>
@@ -5178,10 +5178,10 @@ export default function BomManagement() {
                   #cost-sheet-print, #cost-sheet-print * { visibility: visible; }
                   #cost-sheet-print { position: absolute; top: 0; left: 0; width: 100%; }
                 }`}</style>
-                <div id="cost-sheet-print" className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
+                <div id="cost-sheet-print" className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
                   {/* 헤더 */}
-                  <div className="sticky top-0 z-10 bg-stone-800 text-white px-6 py-4 flex items-center justify-between rounded-t-2xl print:hidden">
-                    <h2 className="text-base font-bold">📄 원가계산서</h2>
+                  <div className="sticky top-0 z-10 bg-card border-b border-border text-foreground px-6 py-4 flex items-center justify-between rounded-t-2xl print:hidden">
+                    <h2 className="text-base font-bold">원가계산서</h2>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={async () => {
@@ -5210,30 +5210,30 @@ export default function BomManagement() {
                             window.print();
                           }
                         }}
-                        className="px-4 py-1.5 bg-[#C9A96E] hover:bg-[#b8924f] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
+                        className="px-4 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-lg flex items-center gap-1.5"
                       >
-                        🖨️ PDF 다운로드
+                        <Printer className="w-3.5 h-3.5" /> PDF 다운로드
                       </button>
                       <button
                         onClick={() => setShowCostSheetModal(false)}
-                        className="w-8 h-8 rounded-full bg-stone-700 hover:bg-stone-600 text-white flex items-center justify-center text-sm"
+                        className="w-8 h-8 rounded-full bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground flex items-center justify-center text-sm"
                       >✕</button>
                     </div>
                   </div>
 
                   <div id="cost-sheet-print-content" className="p-6 space-y-6">
                     {/* 섹션 1: 제품 기본정보 */}
-                    <div className="border border-stone-200 rounded-xl overflow-hidden">
+                    <div className="border border-border rounded-xl overflow-hidden">
                       <div className="bg-stone-800 text-white px-5 py-3 flex items-center justify-between">
                         <h3 className="text-sm font-bold">제품 기본정보</h3>
-                        <span className="text-xs text-stone-400">작성일: {today}</span>
+                        <span className="text-xs text-muted-foreground">작성일: {today}</span>
                       </div>
                       <div className="p-5">
                         <div className="flex gap-5">
                           {/* 제품 사진 */}
                           <div className="flex-shrink-0">
                             <div
-                              className="w-32 h-32 border-2 border-dashed border-stone-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-stone-500 hover:bg-stone-50 transition-colors overflow-hidden"
+                              className="w-32 h-32 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-border0 hover:bg-[var(--fill-quaternary)] transition-colors overflow-hidden"
                               onClick={() => document.getElementById('cost-sheet-img-input')?.click()}
                               onPaste={e => {
                                 const items = Array.from(e.clipboardData?.items || []);
@@ -5253,8 +5253,8 @@ export default function BomManagement() {
                                 <img src={costSheetProductImage} alt="제품사진" className="w-full h-full object-cover" />
                               ) : (
                                 <>
-                                  <span className="text-2xl mb-1">📷</span>
-                                  <span className="text-[10px] text-stone-400 text-center px-1 print:hidden">제품사진<br/>클릭 또는 Ctrl+V</span>
+                                  <Camera className="w-6 h-6 mb-1 text-muted-foreground" />
+                                  <span className="text-[11px] text-muted-foreground text-center px-1 print:hidden">제품사진<br/>클릭 또는 Ctrl+V</span>
                                 </>
                               )}
                             </div>
@@ -5273,7 +5273,7 @@ export default function BomManagement() {
                               }}
                             />
                             {costSheetProductImage && (
-                              <button onClick={() => setCostSheetProductImage(null)} className="mt-1 text-[10px] text-red-400 hover:text-red-600 w-full text-center print:hidden">✕ 제거</button>
+                              <button onClick={() => setCostSheetProductImage(null)} className="mt-1 text-[11px] text-[var(--system-red)] hover:text-[var(--system-red)] w-full text-center print:hidden">✕ 제거</button>
                             )}
                           </div>
                           {/* 정보 그리드 */}
@@ -5289,8 +5289,8 @@ export default function BomManagement() {
                               { label: '제조국', val: editBom.manufacturingCountry || '—' },
                             ].map(item => (
                               <div key={item.label} className="flex flex-col">
-                                <span className="text-stone-400 text-[10px] font-medium">{item.label}</span>
-                                <span className="text-stone-800 font-semibold">{item.val}</span>
+                                <span className="text-muted-foreground text-[11px] font-medium">{item.label}</span>
+                                <span className="text-foreground font-semibold">{item.val}</span>
                               </div>
                             ))}
                           </div>
@@ -5299,61 +5299,61 @@ export default function BomManagement() {
                     </div>
 
                     {/* 섹션 2: 사후원가 요약 테이블 */}
-                    <div className="border border-stone-200 rounded-xl overflow-hidden">
+                    <div className="border border-border rounded-xl overflow-hidden">
                       <div className="bg-stone-800 text-white px-5 py-3">
                         <h3 className="text-sm font-bold">사후원가 요약</h3>
                       </div>
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="bg-stone-100 text-stone-600">
+                          <tr className="bg-[var(--fill-tertiary)] text-muted-foreground">
                             <th className="px-4 py-2 text-left">항목</th>
                             <th className="px-4 py-2 text-right">금액 (KRW)</th>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr className="border-b border-stone-100">
-                            <td className="px-4 py-2 text-stone-600">공장구매 자재</td>
+                          <tr className="border-b border-border">
+                            <td className="px-4 py-2 text-muted-foreground">공장구매 자재</td>
                             <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.factoryMaterialKrw)}</td>
                           </tr>
-                          <tr className="border-b border-stone-100">
-                            <td className="px-4 py-2 text-stone-600">본사제공 자재</td>
+                          <tr className="border-b border-border">
+                            <td className="px-4 py-2 text-muted-foreground">본사제공 자재</td>
                             <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.hqMaterialKrw)}</td>
                           </tr>
-                          <tr className="border-b border-stone-100">
-                            <td className="px-4 py-2 text-stone-600">임가공비</td>
+                          <tr className="border-b border-border">
+                            <td className="px-4 py-2 text-muted-foreground">임가공비</td>
                             <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.processingKrw)}</td>
                           </tr>
-                          <tr className="border-b border-amber-200 bg-amber-50">
-                            <td className="px-4 py-2.5 font-bold text-stone-800">🏭 공장단가</td>
-                            <td className="px-4 py-2.5 text-right font-bold text-amber-700 tabular-nums">{fmtKrw(psSheet.factoryUnitCostKrw)}</td>
+                          <tr className="border-b border-primary/20 bg-primary/5">
+                            <td className="px-4 py-2.5 font-bold text-foreground">공장단가</td>
+                            <td className="px-4 py-2.5 text-right font-bold text-primary tabular-nums">{fmtKrw(psSheet.factoryUnitCostKrw)}</td>
                           </tr>
-                          <tr className="border-b border-stone-100">
-                            <td className="px-4 py-2 text-stone-600">관세 ({psSheet.customsRate}%)</td>
+                          <tr className="border-b border-border">
+                            <td className="px-4 py-2 text-muted-foreground">관세 ({psSheet.customsRate}%)</td>
                             <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.customsKrw)}</td>
                           </tr>
-                          <tr className="border-b border-stone-100">
-                            <td className="px-4 py-2 text-stone-600">물류비</td>
+                          <tr className="border-b border-border">
+                            <td className="px-4 py-2 text-muted-foreground">물류비</td>
                             <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.logisticsKrw)}</td>
                           </tr>
-                          <tr className="border-b border-stone-100">
-                            <td className="px-4 py-2 text-stone-600">포장/검사비</td>
+                          <tr className="border-b border-border">
+                            <td className="px-4 py-2 text-muted-foreground">포장/검사비</td>
                             <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.packagingKrw)}</td>
                           </tr>
-                          <tr className="border-b border-stone-100">
-                            <td className="px-4 py-2 text-stone-600">
+                          <tr className="border-b border-border">
+                            <td className="px-4 py-2 text-muted-foreground">
                               패킹재
                               {editBom.packingItemStyleNo ? (
-                                <span className="text-[10px] text-amber-600 ml-1">({editBom.packingItemStyleNo})</span>
+                                <span className="text-[11px] text-primary ml-1">({editBom.packingItemStyleNo})</span>
                               ) : null}
                             </td>
                             <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.packingKrw)}</td>
                           </tr>
-                          <tr className="border-b border-amber-200 bg-amber-50">
-                            <td className="px-4 py-2.5 font-semibold text-amber-800">제품 총원가 <span className="text-[10px] font-normal text-amber-500">(생산마진 전)</span></td>
-                            <td className="px-4 py-2.5 text-right font-semibold text-amber-700 tabular-nums">{fmtKrw(psSheet.totalCostKrw)}</td>
+                          <tr className="border-b border-primary/20 bg-primary/5">
+                            <td className="px-4 py-2.5 font-semibold text-primary">제품 총원가 <span className="text-[11px] font-normal text-primary/70">(생산마진 전)</span></td>
+                            <td className="px-4 py-2.5 text-right font-semibold text-primary tabular-nums">{fmtKrw(psSheet.totalCostKrw)}</td>
                           </tr>
-                          <tr className="border-b border-stone-100">
-                            <td className="px-4 py-2 text-stone-600">생산마진 ({Math.round(postMarginRateSheet * 100)}%)</td>
+                          <tr className="border-b border-border">
+                            <td className="px-4 py-2 text-muted-foreground">생산마진 ({Math.round(postMarginRateSheet * 100)}%)</td>
                             <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(postProductionMarginKrwSheet)}</td>
                           </tr>
                           <tr className="bg-stone-800">
@@ -5366,78 +5366,78 @@ export default function BomManagement() {
 
                     {/* 섹션 3: P&L 분석 */}
                     {editBom.pnl && postPnlResultSheet && (
-                      <div className="border border-stone-200 rounded-xl overflow-hidden">
+                      <div className="border border-border rounded-xl overflow-hidden">
                         <div className="bg-stone-800 text-white px-5 py-3">
                           <h3 className="text-sm font-bold">P&L 분석</h3>
                         </div>
                         <div className="p-5 space-y-4">
                           {/* 기가정 */}
-                          <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-                            <h4 className="text-xs font-semibold text-stone-600 mb-3">가정 (Assumptions)</h4>
+                          <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                            <h4 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h4>
                             <div className="grid grid-cols-3 gap-4 text-xs">
-                              <div><span className="text-stone-400 text-[10px] block">할인율</span><span className="font-semibold text-stone-800">{Math.round(editBom.pnl.discountRate * 100)}%</span></div>
-                              <div><span className="text-stone-400 text-[10px] block">플랫폼 수수료</span><span className="font-semibold text-stone-800">{Math.round(editBom.pnl.platformFeeRate * 100)}%</span></div>
-                              <div><span className="text-stone-400 text-[10px] block">인건비/판관비</span><span className="font-semibold text-stone-800">{Math.round(editBom.pnl.sgaRate * 100)}%</span></div>
+                              <div><span className="text-muted-foreground text-[11px] block">할인율</span><span className="font-semibold text-foreground">{Math.round(editBom.pnl.discountRate * 100)}%</span></div>
+                              <div><span className="text-muted-foreground text-[11px] block">플랫폼 수수료</span><span className="font-semibold text-foreground">{Math.round(editBom.pnl.platformFeeRate * 100)}%</span></div>
+                              <div><span className="text-muted-foreground text-[11px] block">인건비/판관비</span><span className="font-semibold text-foreground">{Math.round(editBom.pnl.sgaRate * 100)}%</span></div>
                             </div>
                           </div>
                           {/* 배수 분석 */}
-                          <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-                            <h4 className="text-xs font-semibold text-stone-600 mb-3">배수 분석</h4>
+                          <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                            <h4 className="text-xs font-semibold text-muted-foreground mb-3">배수 분석</h4>
                             <div className="space-y-2 text-xs">
                               {[
                                 { label: '3.5배 기준 최소 판매가', val: postPnlResultSheet.price35 },
                                 { label: '4.0배 기준 목표 판매가', val: postPnlResultSheet.price40 },
                                 { label: '4.5배 기준 이상적 판매가', val: postPnlResultSheet.price45 },
                               ].map(item => (
-                                <div key={item.label} className="flex justify-between py-1.5 border-b border-stone-200 last:border-0">
-                                  <span className="text-stone-600">{item.label}</span>
-                                  <span className="font-bold text-stone-800 tabular-nums">{fmtKrw(item.val)}</span>
+                                <div key={item.label} className="flex justify-between py-1.5 border-b border-border last:border-0">
+                                  <span className="text-muted-foreground">{item.label}</span>
+                                  <span className="font-bold text-foreground tabular-nums">{fmtKrw(item.val)}</span>
                                 </div>
                               ))}
                               {editBom.pnl.confirmedSalePrice && (
-                                <div className="flex justify-between py-1.5 border-t-2 border-stone-300">
-                                  <span className="font-semibold text-stone-700">{SALES_PRICE_LABELS.kmsrpFull}</span>
-                                  <span className="font-bold text-stone-800 tabular-nums">{fmtKrw(editBom.pnl.confirmedSalePrice)}</span>
+                                <div className="flex justify-between py-1.5 border-t-2 border-border">
+                                  <span className="font-semibold text-foreground">{SALES_PRICE_LABELS.kmsrpFull}</span>
+                                  <span className="font-bold text-foreground tabular-nums">{fmtKrw(editBom.pnl.confirmedSalePrice)}</span>
                                 </div>
                               )}
                               {editBom.pnl.globalSalePrice ? (
                                 <div className="flex justify-between py-1.5">
-                                  <span className="font-semibold text-stone-700">{SALES_PRICE_LABELS.globalMsrp}</span>
-                                  <span className="font-bold text-stone-800 tabular-nums">{fmtKrw(editBom.pnl.globalSalePrice)}</span>
+                                  <span className="font-semibold text-foreground">{SALES_PRICE_LABELS.globalMsrp}</span>
+                                  <span className="font-bold text-foreground tabular-nums">{fmtKrw(editBom.pnl.globalSalePrice)}</span>
                                 </div>
                               ) : null}
                               {editBom.pnl.wholesalePrice ? (
                                 <div className="flex justify-between py-1.5">
-                                  <span className="font-semibold text-stone-700">
+                                  <span className="font-semibold text-foreground">
                                     {SALES_PRICE_LABELS.wholesale}
                                     {editBom.pnl.wholesaleDiscountRate != null
                                       ? ` (−${Math.round(editBom.pnl.wholesaleDiscountRate * 100)}%)`
                                       : ''}
                                   </span>
-                                  <span className="font-bold text-stone-800 tabular-nums">{fmtKrw(editBom.pnl.wholesalePrice)}</span>
+                                  <span className="font-bold text-foreground tabular-nums">{fmtKrw(editBom.pnl.wholesalePrice)}</span>
                                 </div>
                               ) : null}
                             </div>
                           </div>
                           {/* 영업이익 분석 */}
                           {editBom.pnl.confirmedSalePrice && (
-                            <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
-                              <h4 className="text-xs font-semibold text-stone-600 mb-3">영업이익 분석 (P&L)</h4>
+                            <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                              <h4 className="text-xs font-semibold text-muted-foreground mb-3">영업이익 분석 (P&L)</h4>
                               <div className="space-y-1">
                                 {[
-                                  { no: '①', label: `정가 (${SALES_PRICE_LABELS.kmsrpFull})`, desc: '', val: editBom.pnl.confirmedSalePrice, color: 'text-stone-800', bold: false },
-                                  { no: '②', label: '(-) 할인', desc: `${Math.round(editBom.pnl.discountRate * 100)}%`, val: -(editBom.pnl.confirmedSalePrice * editBom.pnl.discountRate), color: 'text-red-500', bold: false },
-                                  { no: '③', label: '실판가 (Net Sale)', desc: '', val: postPnlResultSheet.netSale, color: 'text-stone-700', bold: true },
-                                  { no: '④', label: '(-) 플랫폼 수수료', desc: `${Math.round(editBom.pnl.platformFeeRate * 100)}%`, val: -(postPnlResultSheet.netSale * editBom.pnl.platformFeeRate), color: 'text-red-500', bold: false },
-                                  { no: '⑤', label: '(-) 인건비 / 판관비', desc: `${Math.round(editBom.pnl.sgaRate * 100)}%`, val: -(postPnlResultSheet.netSale * editBom.pnl.sgaRate), color: 'text-red-500', bold: false },
-                                  { no: '⑥', label: '(-) 매출원가 (COGS)', desc: '총 원가액', val: -finalCostSheet, color: 'text-red-500', bold: false },
-                                  { no: '⑦', label: '영업이익', desc: '', val: postPnlResultSheet.operatingProfit, color: postPnlResultSheet.operatingProfit >= 0 ? 'text-green-600' : 'text-red-600', bold: true },
-                                  { no: '★', label: '영업이익률', desc: '', val: null as number | null, color: postPnlResultSheet.operatingMargin >= 0 ? 'text-green-600' : 'text-red-600', bold: true, rate: postPnlResultSheet.operatingMargin },
+                                  { no: '①', label: `정가 (${SALES_PRICE_LABELS.kmsrpFull})`, desc: '', val: editBom.pnl.confirmedSalePrice, color: 'text-foreground', bold: false },
+                                  { no: '②', label: '(-) 할인', desc: `${Math.round(editBom.pnl.discountRate * 100)}%`, val: -(editBom.pnl.confirmedSalePrice * editBom.pnl.discountRate), color: 'text-[var(--system-red)]', bold: false },
+                                  { no: '③', label: '실판가 (Net Sale)', desc: '', val: postPnlResultSheet.netSale, color: 'text-foreground', bold: true },
+                                  { no: '④', label: '(-) 플랫폼 수수료', desc: `${Math.round(editBom.pnl.platformFeeRate * 100)}%`, val: -(postPnlResultSheet.netSale * editBom.pnl.platformFeeRate), color: 'text-[var(--system-red)]', bold: false },
+                                  { no: '⑤', label: '(-) 인건비 / 판관비', desc: `${Math.round(editBom.pnl.sgaRate * 100)}%`, val: -(postPnlResultSheet.netSale * editBom.pnl.sgaRate), color: 'text-[var(--system-red)]', bold: false },
+                                  { no: '⑥', label: '(-) 매출원가 (COGS)', desc: '총 원가액', val: -finalCostSheet, color: 'text-[var(--system-red)]', bold: false },
+                                  { no: '⑦', label: '영업이익', desc: '', val: postPnlResultSheet.operatingProfit, color: postPnlResultSheet.operatingProfit >= 0 ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]', bold: true },
+                                  { no: '★', label: '영업이익률', desc: '', val: null as number | null, color: postPnlResultSheet.operatingMargin >= 0 ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]', bold: true, rate: postPnlResultSheet.operatingMargin },
                                 ].map(row => (
-                                  <div key={row.no} className={`flex items-center justify-between py-1.5 px-3 rounded ${row.bold ? 'bg-white border border-stone-200' : ''}`}>
+                                  <div key={row.no} className={`flex items-center justify-between py-1.5 px-3 rounded ${row.bold ? 'bg-card border border-border' : ''}`}>
                                     <div className="flex items-center gap-3">
-                                      <span className="text-[11px] text-stone-400 w-5">{row.no}</span>
-                                      <span className={`text-xs ${row.bold ? 'font-semibold text-stone-800' : 'text-stone-600'}`}>{row.label} <span className="text-stone-400 font-normal">{row.desc}</span></span>
+                                      <span className="text-[11px] text-muted-foreground w-5">{row.no}</span>
+                                      <span className={`text-xs ${row.bold ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{row.label} <span className="text-muted-foreground font-normal">{row.desc}</span></span>
                                     </div>
                                     <span className={`text-sm tabular-nums font-semibold ${row.color}`}>
                                       {'rate' in row && row.rate !== undefined ? `${(row.rate * 100).toFixed(1)}%` : row.val !== null ? fmtKrw(row.val) : '—'}
@@ -5446,16 +5446,16 @@ export default function BomManagement() {
                                 ))}
                               </div>
                               {/* 실현배수 + 원가절감 */}
-                              <div className={`flex items-center justify-between py-2 px-3 rounded mt-2 ${postPnlResultSheet.meets35x ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                              <div className={`flex items-center justify-between py-2 px-3 rounded mt-2 ${postPnlResultSheet.meets35x ? 'bg-[var(--system-green)]/10 border border-[var(--system-green)]/20' : 'bg-[var(--system-red)]/10 border border-[var(--system-red)]/20'}`}>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[11px] text-stone-400 w-5">⚡</span>
-                                  <span className="text-xs font-semibold text-stone-700">실현 배수</span>
+                                  <span className="text-[11px] text-muted-foreground w-5">★</span>
+                                  <span className="text-xs font-semibold text-foreground">실현 배수</span>
                                 </div>
                                 <div className="text-right">
-                                  <span className={`text-sm font-bold ${postPnlResultSheet.meets35x ? 'text-green-600' : 'text-red-500'}`}>{postPnlResultSheet.actualMultiple.toFixed(2)}x</span>
+                                  <span className={`text-sm font-bold ${postPnlResultSheet.meets35x ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]'}`}>{postPnlResultSheet.actualMultiple.toFixed(2)}x</span>
                                   {postPnlResultSheet.meets35x
-                                    ? <div className="text-[10px] text-green-600">✅ 목표 달성 (3.5x 이상)</div>
-                                    : <div className="text-[10px] text-red-500">⚠️ 원가 절감 필요: {fmtKrw(postPnlResultSheet.costReductionNeeded)}</div>
+                                    ? <div className="text-[11px] text-[var(--system-green)]">목표 달성 (3.5x 이상)</div>
+                                    : <div className="text-[11px] text-[var(--system-red)]">원가 절감 필요: {fmtKrw(postPnlResultSheet.costReductionNeeded)}</div>
                                   }
                                 </div>
                               </div>
@@ -5510,7 +5510,7 @@ export default function BomManagement() {
             <DialogHeader><DialogTitle>유사 스타일 BOM 복사</DialogTitle></DialogHeader>
             <div className="space-y-4 py-2">
               <div>
-                <label className="text-xs text-stone-500 mb-1 block">복사할 원본 BOM 선택</label>
+                <label className="text-xs text-muted-foreground mb-1 block">복사할 원본 BOM 선택</label>
                 <Select value={copySourceId} onValueChange={setCopySourceId}>
                   <SelectTrigger className="text-sm"><SelectValue placeholder="원본 BOM 선택..." /></SelectTrigger>
                   <SelectContent>
@@ -5519,7 +5519,7 @@ export default function BomManagement() {
                 </Select>
               </div>
               <div>
-                <label className="text-xs text-stone-500 mb-1 block">복사 대상 스타일</label>
+                <label className="text-xs text-muted-foreground mb-1 block">복사 대상 스타일</label>
                 <Select value={selectedStyleId} onValueChange={setSelectedStyleId}>
                   <SelectTrigger className="text-sm"><SelectValue placeholder="대상 스타일 선택..." /></SelectTrigger>
                   <SelectContent>
@@ -5529,7 +5529,7 @@ export default function BomManagement() {
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => setShowCopyModal(false)}>취소</Button>
-                <Button size="sm" onClick={handleCopyBom} className="bg-stone-800 text-white">복사 실행</Button>
+                <Button size="sm" onClick={handleCopyBom}>복사 실행</Button>
               </div>
             </div>
           </DialogContent>

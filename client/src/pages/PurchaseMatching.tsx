@@ -22,17 +22,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Trash2, ShoppingCart, FileText, Receipt, Printer, X, Mail, Eye } from 'lucide-react';
+import { Plus, Trash2, ShoppingCart, FileText, Receipt, Printer, X, Mail, Eye, Camera } from 'lucide-react';
 
 const CURRENCIES: Currency[] = ['KRW', 'USD', 'CNY'];
 const PAYMENT_METHODS: ExpenseType[] = ['법인카드', '계좌이체', '현금'];
 const PURCHASE_STATUSES = ['미발주', '발주완료', '입고완료', '발송완료'] as const;
 
 const STATUS_COLOR: Record<string, string> = {
-  '미발주': 'bg-stone-50 text-stone-500 border-stone-200',
-  '발주완료': 'bg-blue-50 text-blue-700 border-blue-200',
-  '입고완료': 'bg-amber-50 text-amber-700 border-amber-200',
-  '발송완료': 'bg-green-50 text-green-700 border-green-200',
+  '미발주': 'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
+  '발주완료': 'bg-primary/10 text-primary border-transparent',
+  '입고완료': 'bg-[var(--system-orange)]/10 text-[var(--system-orange)] border-transparent',
+  '발송완료': 'bg-[var(--system-green)]/10 text-[var(--system-green)] border-transparent',
 };
 
 interface ExpenseFormState {
@@ -333,20 +333,20 @@ export default function PurchaseMatching() {
           if (relatedOrder && (relatedOrder.status === '발주생성' || !relatedOrder.status)) {
             await upsertOrder({ ...relatedOrder, status: '생산중', updatedAt: new Date().toISOString() });
             store.updateOrder(relatedOrder.id, { status: '생산중' });
-            toast.success(`✅ 생산발주 [${item.orderNo}] → 생산중으로 자동 변경됐어요`);
+            toast.success(`생산발주 [${item.orderNo}] → 생산중으로 자동 변경됐어요`);
           } else {
             const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
             if (localOrder && localOrder.status === '발주생성') {
               store.updateOrder(localOrder.id, { status: '생산중' });
               upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(() => {});
-              toast.success(`✅ 생산발주 [${item.orderNo}] → 생산중으로 변경됐어요`);
+              toast.success(`생산발주 [${item.orderNo}] → 생산중으로 변경됐어요`);
             }
           }
         } catch {
           const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
           if (localOrder) {
             store.updateOrder(localOrder.id, { status: '생산중' });
-            toast.success(`✅ 생산발주 [${item.orderNo}] → 생산중으로 변경됐어요`);
+            toast.success(`생산발주 [${item.orderNo}] → 생산중으로 변경됐어요`);
           }
         }
       }
@@ -512,14 +512,14 @@ export default function PurchaseMatching() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ to: email, subject, body, account: 'info@atlm.kr' }),
       });
-      if (resp.ok) { toast.success(`📧 ${vendor} 발주서를 ${email}로 발송했습니다`); return; }
+      if (resp.ok) { toast.success(`${vendor} 발주서를 ${email}로 발송했습니다`); return; }
     } catch { /* API 없음 */ }
     const gogCmd = `gog gmail send --to "${email}" --subject "${subject}" --body "${body.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}" --account info@atlm.kr`;
     try {
       await navigator.clipboard.writeText(gogCmd);
-      toast.success(`📋 ${vendor} 발주서 이메일 명령어가 클립보드에 복사됐습니다!\n터미널에 붙여넣기해서 실행하세요`);
+      toast.success(`${vendor} 발주서 이메일 명령어가 클립보드에 복사됐습니다!\n터미널에 붙여넣기해서 실행하세요`);
     } catch {
-      toast.info(`📧 ${vendor} 발주서\n수신: ${email}\n수동으로 gog 명령어를 실행해주세요`);
+      toast.info(`${vendor} 발주서\n수신: ${email}\n수동으로 gog 명령어를 실행해주세요`);
     }
   };
 
@@ -527,24 +527,24 @@ export default function PurchaseMatching() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">자재 구매</h1>
-          <p className="text-sm text-stone-500 mt-0.5">발주번호 매칭 · 본사제공 자재 구매 이력 관리</p>
+          <h1 className="text-2xl font-bold text-foreground">자재 구매</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">발주번호 매칭 · 본사제공 자재 구매 이력 관리</p>
         </div>
         <div className="flex gap-2">
           {/* 자재 장바구니 버튼 */}
           <button
             onClick={() => { refreshCart(); setCartModal(true); }}
-            className="relative px-3 py-2 rounded-lg border border-blue-300 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors flex items-center gap-1.5"
+            className="relative px-3 py-2 rounded-lg border border-transparent text-xs font-medium text-primary bg-primary/15 hover:bg-primary/20 transition-colors flex items-center gap-1.5"
           >
             <ShoppingCart className="w-3.5 h-3.5" />
             자재 장바구니
             {cartItems.length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-primary text-primary-foreground text-[11px] rounded-full flex items-center justify-center font-bold">
                 {cartItems.length}
               </span>
             )}
           </button>
-          <Button onClick={openNew} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">
+          <Button onClick={openNew} className="gap-2">
             <Plus className="w-4 h-4" />구매 등록
           </Button>
         </div>
@@ -552,14 +552,14 @@ export default function PurchaseMatching() {
 
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label: '전체 구매건', value: `${stats.total}건`, color: 'text-stone-800' },
-          { label: '미발주', value: `${stats.unpurchased}건`, color: 'text-amber-700' },
-          { label: '총 구매금액', value: formatKRW(stats.totalKrw), color: 'text-stone-800' },
-          { label: '전표 연결됨', value: `${stats.linked}건`, color: 'text-emerald-700' },
+          { label: '전체 구매건', value: `${stats.total}건`, color: 'text-foreground' },
+          { label: '미발주', value: `${stats.unpurchased}건`, color: 'text-[var(--system-orange)]' },
+          { label: '총 구매금액', value: formatKRW(stats.totalKrw), color: 'text-foreground' },
+          { label: '전표 연결됨', value: `${stats.linked}건`, color: 'text-[var(--system-green)]' },
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-stone-200 p-4">
+          <div key={s.label} className="bg-card rounded-xl border border-border p-4">
             <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-stone-500 mt-0.5">{s.label}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
@@ -579,10 +579,10 @@ export default function PurchaseMatching() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50">
+            <tr className="border-b border-border">
               <th className="w-10 px-3 py-3">
                 <input
                   type="checkbox"
@@ -594,22 +594,22 @@ export default function PurchaseMatching() {
                   className="cursor-pointer"
                 />
               </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">발주번호</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">품목명</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">공급업체</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">구매일</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">수량</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">단가</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">금액(KRW)</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">결제</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 w-28">상태</th>
-              <th className="text-center px-4 py-3 text-xs font-medium text-stone-500 w-20">전표</th>
-              <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">발주번호</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">품목명</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">공급업체</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">구매일</th>
+              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">수량</th>
+              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">단가</th>
+              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">결제</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground w-28">상태</th>
+              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground w-20">전표</th>
+              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={11} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={11} className="text-center py-12 text-muted-foreground">
                 <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 구매 내역이 없습니다</p>
               </td></tr>
@@ -629,7 +629,7 @@ export default function PurchaseMatching() {
                   <React.Fragment key={orderNo}>
                     {/* 그룹 헤더 */}
                     <tr
-                      className="border-b border-stone-200 bg-stone-50 cursor-pointer hover:bg-amber-50/30"
+                      className="border-b border-border bg-[var(--fill-quaternary)] cursor-pointer hover:bg-[var(--fill-tertiary)]"
                       onClick={() => toggleGroup(orderNo)}
                     >
                       <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
@@ -645,45 +645,45 @@ export default function PurchaseMatching() {
                       </td>
                       <td colSpan={10} className="px-4 py-2.5">
                         <div className="flex items-center gap-3 flex-wrap">
-                          <span className="text-stone-400 text-xs w-3">{isOpen ? '▼' : '▶'}</span>
-                          <span className="font-mono font-semibold text-stone-700">{orderNo}</span>
-                          <span className="text-xs text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">{groupItems.length}종</span>
+                          <span className="text-muted-foreground text-xs w-3">{isOpen ? '▼' : '▶'}</span>
+                          <span className="font-mono font-semibold text-foreground">{orderNo}</span>
+                          <span className="text-xs text-muted-foreground bg-[var(--fill-tertiary)] px-2 py-0.5 rounded-full">{groupItems.length}종</span>
                           {unpurchased > 0 && (
-                            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">미구매 {unpurchased}건</span>
+                            <span className="text-xs bg-[var(--system-orange)]/10 text-[var(--system-orange)] px-2 py-0.5 rounded-full">미구매 {unpurchased}건</span>
                           )}
                           <span className="ml-auto flex items-center gap-2 flex-wrap">
-                            <span className="text-xs text-stone-500">공급가액 {formatKRW(totalKrw)}</span>
-                            <span className="text-xs text-stone-400">+ 세액 {formatKRW(Math.round(totalKrw * 0.1))}</span>
-                            <span className="text-xs font-semibold text-stone-700">= {formatKRW(totalKrw + Math.round(totalKrw * 0.1))}</span>
+                            <span className="text-xs text-muted-foreground">공급가액 {formatKRW(totalKrw)}</span>
+                            <span className="text-xs text-muted-foreground">+ 세액 {formatKRW(Math.round(totalKrw * 0.1))}</span>
+                            <span className="text-xs font-semibold text-foreground">= {formatKRW(totalKrw + Math.round(totalKrw * 0.1))}</span>
                             {/* 전표 일괄발행 버튼 (작업 4) */}
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                              className="h-7 text-xs"
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 await handleGroupBulkExpense(orderNo, groupItems);
                               }}
                             >
-                              📄 전표 일괄발행
+                              전표 일괄발행
                             </Button>
                             {/* 일괄수정 버튼 (작업 6) */}
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 text-xs text-blue-600 border-blue-300 hover:bg-blue-50"
+                              className="h-7 text-xs"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openBulkEditModal(orderNo, groupItems);
                               }}
                             >
-                              ✏ 일괄수정
+                              일괄수정
                             </Button>
                             {/* 일괄삭제 버튼 (작업 5) */}
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 text-xs text-red-500"
+                              className="h-7 text-xs text-[var(--system-red)]"
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 if (!confirm(`[${orderNo}] 발주의 자재 ${groupItems.length}종을 모두 삭제하시겠습니까?`)) return;
@@ -694,7 +694,7 @@ export default function PurchaseMatching() {
                                 toast.success(`${groupItems.length}종 삭제 완료`);
                               }}
                             >
-                              🗑 일괄삭제
+                              일괄삭제
                             </Button>
                             <div onClick={e => e.stopPropagation()}>
                               <Select onValueChange={(v) => handleGroupStatusChange(orderNo, groupItems, v)}>
@@ -712,7 +712,7 @@ export default function PurchaseMatching() {
                     </tr>
                     {/* 그룹 내 자재 행들 */}
                     {isOpen && groupItems.map(p => (
-                      <tr key={p.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${selectedPurchaseIds.has(p.id) ? 'bg-amber-50/60' : ''}`}>
+                      <tr key={p.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${selectedPurchaseIds.has(p.id) ? 'bg-primary/5' : ''}`}>
                         <td className="px-3 py-3">
                           <input
                             type="checkbox"
@@ -721,13 +721,13 @@ export default function PurchaseMatching() {
                             className="cursor-pointer"
                           />
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-stone-500">{p.orderNo || '-'}</td>
-                        <td className="px-4 py-3 font-medium text-stone-800">{p.itemName}</td>
-                        <td className="px-4 py-3 text-stone-600">{p.vendorName || '-'}</td>
-                        <td className="px-4 py-3 text-stone-600">{p.purchaseDate}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.orderNo || '-'}</td>
+                        <td className="px-4 py-3 font-medium text-foreground">{p.itemName}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{p.vendorName || '-'}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{p.purchaseDate}</td>
                         <td className="px-4 py-3 text-right font-mono">{formatNumber(p.qty)} {p.unit}</td>
-                        <td className="px-4 py-3 text-right font-mono text-stone-600">{formatNumber(p.unitPriceCny, 2)} {p.currency}</td>
-                        <td className="px-4 py-3 text-right font-mono font-semibold text-stone-800">{formatKRW(p.amountKrw)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-muted-foreground">{formatNumber(p.unitPriceCny, 2)} {p.currency}</td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{formatKRW(p.amountKrw)}</td>
                         <td className="px-4 py-3"><Badge variant="outline" className="text-xs">{p.paymentMethod}</Badge></td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
@@ -743,9 +743,9 @@ export default function PurchaseMatching() {
                         </td>
                         <td className="px-3 py-3 text-center w-20">
                           {p.statementNo ? (
-                            <span title="지출결의 연결됨" className="text-emerald-600 text-sm">📄</span>
+                            <span title="지출결의 연결됨" className="inline-flex justify-center text-[var(--system-green)]"><FileText className="w-4 h-4" /></span>
                           ) : (
-                            <span title="지출결의 미생성" className="text-stone-300 text-sm">—</span>
+                            <span title="지출결의 미생성" className="text-muted-foreground text-sm">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -756,10 +756,10 @@ export default function PurchaseMatching() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 text-xs px-2 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
+                                className="h-7 text-xs px-2"
                                 onClick={() => viewLinkedExpense(p.statementNo!)}
                               >
-                                <FileText className="w-3.5 h-3.5 mr-1" />📄 전표 보기
+                                <FileText className="w-3.5 h-3.5 mr-1" />전표 보기
                               </Button>
                             ) : (
                               <DropdownMenu>
@@ -767,9 +767,9 @@ export default function PurchaseMatching() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-7 text-xs px-2 text-stone-600 hover:text-stone-800 hover:bg-stone-100"
+                                    className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]"
                                   >
-                                    📋 전표 ▾
+                                    전표 ▾
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-40">
@@ -777,18 +777,18 @@ export default function PurchaseMatching() {
                                     className="text-xs cursor-pointer"
                                     onClick={() => openLinkExpenseModal(p.id)}
                                   >
-                                    📄 기존전표 연결
+                                    기존전표 연결
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     className="text-xs cursor-pointer"
                                     onClick={() => openExpenseModal(p)}
                                   >
-                                    🧾 새전표 생성
+                                    새전표 생성
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             )}
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(p.id)}>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(p.id)}>
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </div>
@@ -866,7 +866,7 @@ export default function PurchaseMatching() {
               </div>
               <div className="space-y-1.5">
                 <Label>KRW 금액 (자동)</Label>
-                <div className="h-9 flex items-center px-3 bg-stone-50 rounded border border-stone-200 text-sm font-semibold text-stone-700">
+                <div className="h-9 flex items-center px-3 bg-[var(--fill-quaternary)] rounded border border-border text-sm font-semibold text-foreground">
                   {formatKRW(form.amountKrw || 0)}
                 </div>
               </div>
@@ -892,7 +892,7 @@ export default function PurchaseMatching() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
-            <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">{editId ? '수정' : '등록'}</Button>
+            <Button onClick={handleSave}>{editId ? '수정' : '등록'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -902,15 +902,15 @@ export default function PurchaseMatching() {
         <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4 text-blue-700" />
+              <ShoppingCart className="w-4 h-4 text-primary" />
               자재 통합 발주 장바구니
               {cartItems.length > 0 && (
-                <span className="ml-1 text-sm font-normal text-stone-500">({cartItems.length}종)</span>
+                <span className="ml-1 text-sm font-normal text-muted-foreground">({cartItems.length}종)</span>
               )}
             </DialogTitle>
           </DialogHeader>
           {cartItems.length === 0 ? (
-            <div className="py-12 text-center text-stone-400">
+            <div className="py-12 text-center text-muted-foreground">
               <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-20" />
               <p className="text-sm">장바구니가 비어 있습니다</p>
               <p className="text-xs mt-1">생산발주 탭에서 발주 등록 시 자동으로 담깁니다</p>
@@ -920,18 +920,18 @@ export default function PurchaseMatching() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-stone-200 bg-stone-50">
-                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">자재명</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">규격</th>
-                      <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">단위</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">단가(CNY)</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">소요수량</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">보유재고</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">발주수량</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">금액(KRW)</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">담긴 발주</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">구매처</th>
-                      <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">삭제</th>
+                    <tr className="border-b border-border bg-[var(--fill-quaternary)]">
+                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">자재명</th>
+                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">규격</th>
+                      <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">단위</th>
+                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">단가(CNY)</th>
+                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">소요수량</th>
+                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">보유재고</th>
+                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">발주수량</th>
+                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
+                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">담긴 발주</th>
+                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">구매처</th>
+                      <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">삭제</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -942,14 +942,14 @@ export default function PurchaseMatching() {
                       const unitPriceCny = item.unitPriceCny ?? 0;
                       const amountKrw = Math.round(orderQty * unitPriceCny * settings.cnyKrw);
                       return (
-                      <tr key={idx} className="border-b border-stone-100 hover:bg-stone-50">
-                        <td className="px-3 py-2 font-medium text-stone-800">{item.materialName}</td>
-                        <td className="px-3 py-2 text-stone-500 text-xs">{item.spec || '-'}</td>
-                        <td className="px-3 py-2 text-center text-stone-600">{item.unit}</td>
-                        <td className="px-3 py-2 text-right font-mono text-stone-600 text-xs">
-                          {unitPriceCny > 0 ? formatNumber(unitPriceCny, 2) : <span className="text-stone-300">-</span>}
+                      <tr key={idx} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                        <td className="px-3 py-2 font-medium text-foreground">{item.materialName}</td>
+                        <td className="px-3 py-2 text-muted-foreground text-xs">{item.spec || '-'}</td>
+                        <td className="px-3 py-2 text-center text-muted-foreground">{item.unit}</td>
+                        <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
+                          {unitPriceCny > 0 ? formatNumber(unitPriceCny, 2) : <span className="text-muted-foreground">-</span>}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-stone-600 text-sm">
+                        <td className="px-3 py-2 text-right font-mono text-muted-foreground text-sm">
                           {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                         </td>
                         <td className="px-3 py-2 text-right">
@@ -964,7 +964,7 @@ export default function PurchaseMatching() {
                               store.updateCartItemStock(item.materialName, item.unit, val);
                               refreshCart();
                             }}
-                            className="w-20 h-7 text-right font-mono text-sm border border-stone-200 rounded px-2 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                            className="w-20 h-7 text-right font-mono text-sm border border-border rounded px-2 focus:outline-none focus:ring-1 focus:ring-ring"
                           />
                         </td>
                         <td className="px-3 py-2 text-right">
@@ -981,27 +981,27 @@ export default function PurchaseMatching() {
                             }}
                             className={`w-24 h-7 text-right font-mono text-sm border rounded px-2 focus:outline-none focus:ring-1 ${
                               isSufficient
-                                ? 'border-green-300 text-green-700 bg-green-50 focus:ring-green-300'
-                                : 'border-amber-300 text-amber-700 bg-amber-50 focus:ring-amber-300'
+                                ? 'border-[var(--system-green)] text-[var(--system-green)] bg-[var(--system-green)]/10 focus:ring-[var(--system-green)]'
+                                : 'border-[var(--system-orange)] text-[var(--system-orange)] bg-[var(--system-orange)]/10 focus:ring-[var(--system-orange)]'
                             }`}
                           />
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-xs text-stone-600">
-                          {amountKrw > 0 ? formatKRW(amountKrw) : <span className="text-stone-300">-</span>}
+                        <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
+                          {amountKrw > 0 ? formatKRW(amountKrw) : <span className="text-muted-foreground">-</span>}
                         </td>
-                        <td className="px-3 py-2 text-xs text-stone-500">
+                        <td className="px-3 py-2 text-xs text-muted-foreground">
                           {item.orders.map((o, i) => (
                             <span key={i}>
-                              {i > 0 && <span className="mx-1 text-stone-300">+</span>}
-                              <span className="text-stone-600 font-medium">{o.styleNo}</span>
-                              <span className="text-stone-400">({o.qty % 1 === 0 ? o.qty.toLocaleString() : o.qty.toFixed(3)})</span>
+                              {i > 0 && <span className="mx-1 text-muted-foreground">+</span>}
+                              <span className="text-muted-foreground font-medium">{o.styleNo}</span>
+                              <span className="text-muted-foreground">({o.qty % 1 === 0 ? o.qty.toLocaleString() : o.qty.toFixed(3)})</span>
                             </span>
                           ))}
                         </td>
-                        <td className="px-3 py-2 text-xs text-stone-500">{item.vendorName || <span className="text-stone-300">-</span>}</td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">{item.vendorName || <span className="text-muted-foreground">-</span>}</td>
                         <td className="px-3 py-2 text-center">
                           <button
-                            className="text-stone-300 hover:text-red-500 transition-colors"
+                            className="text-muted-foreground hover:text-[var(--system-red)] transition-colors"
                             onClick={() => {
                               store.removeCartItem(item.materialName, item.unit);
                               refreshCart();
@@ -1016,7 +1016,7 @@ export default function PurchaseMatching() {
                   </tbody>
                 </table>
               </div>
-              <p className="text-xs text-stone-400">💡 보유재고 입력 시 발주수량이 자동으로 차감됩니다. 발주수량도 직접 조정 가능합니다.</p>
+              <p className="text-xs text-muted-foreground">보유재고 입력 시 발주수량이 자동으로 차감됩니다. 발주수량도 직접 조정 가능합니다.</p>
             </div>
           )}
           <DialogFooter className="gap-2 flex-wrap">
@@ -1024,7 +1024,7 @@ export default function PurchaseMatching() {
               <>
                 <Button
                   variant="outline"
-                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  className="text-[var(--system-red)]"
                   onClick={() => {
                     if (confirm('장바구니를 전체 비우시겠습니까?')) {
                       store.clearMaterialCart();
@@ -1035,7 +1035,6 @@ export default function PurchaseMatching() {
                   전체 비우기
                 </Button>
                 <Button
-                  className="bg-blue-700 hover:bg-blue-800 text-white"
                   onClick={() => { setCartModal(false); setVendorOrderModal(true); }}
                 >
                   <Printer className="w-4 h-4 mr-1.5" />
@@ -1070,19 +1069,19 @@ export default function PurchaseMatching() {
               }
               const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
               if (grouped.size === 0) {
-                return <p className="text-center text-stone-400 py-8">발주가 필요한 자재가 없습니다 (보유재고로 충당 가능)</p>;
+                return <p className="text-center text-muted-foreground py-8">발주가 필요한 자재가 없습니다 (보유재고로 충당 가능)</p>;
               }
               return Array.from(grouped.entries()).map(([vendor, items]) => (
-                <div key={vendor} className="border border-stone-200 rounded-lg overflow-hidden">
-                  <div className="bg-stone-800 text-white px-4 py-3 flex items-center justify-between">
+                <div key={vendor} className="border border-border rounded-lg overflow-hidden">
+                  <div className="bg-[var(--fill-quaternary)] border-b border-border px-4 py-3 flex items-center justify-between">
                     <div>
-                      <p className="font-bold text-base">{vendor === '미지정' ? '구매처 미지정' : vendor}</p>
-                      <p className="text-xs text-stone-300 mt-0.5">발주일: {today} · {items.length}종</p>
+                      <p className="font-bold text-base text-foreground">{vendor === '미지정' ? '구매처 미지정' : vendor}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">발주일: {today} · {items.length}종</p>
                     </div>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 text-xs text-stone-800 border-stone-200 bg-white hover:bg-stone-100"
+                      className="h-7 text-xs"
                       onClick={() => window.print()}
                     >
                       <Printer className="w-3 h-3 mr-1" />인쇄
@@ -1090,18 +1089,18 @@ export default function PurchaseMatching() {
                   </div>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-stone-50 border-b border-stone-200">
-                        <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-8">No.</th>
-                        <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-10">이미지</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">자재명</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">규격</th>
-                        <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">단위</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">단가(CNY)</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">소요수량</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">보유재고</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">발주수량</th>
-                        <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">금액(KRW)</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">비고</th>
+                      <tr className="border-b border-border">
+                        <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-8">No.</th>
+                        <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-10">이미지</th>
+                        <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">자재명</th>
+                        <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">규격</th>
+                        <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">단위</th>
+                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">단가(CNY)</th>
+                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">소요수량</th>
+                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">보유재고</th>
+                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">발주수량</th>
+                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
+                        <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">비고</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1109,34 +1108,34 @@ export default function PurchaseMatching() {
                         const unitPriceCny = item.unitPriceCny ?? 0;
                         const amountKrw = Math.round(item.orderQty * unitPriceCny * settings.cnyKrw);
                         return (
-                        <tr key={i} className="border-b border-stone-100">
-                          <td className="px-3 py-2 text-center text-stone-400 text-xs">{i + 1}</td>
+                        <tr key={i} className="border-b border-border">
+                          <td className="px-3 py-2 text-center text-muted-foreground text-xs">{i + 1}</td>
                           <td className="px-2 py-1 text-center">
                             {item.imageUrl ? (
-                              <img src={item.imageUrl} alt={item.materialName} className="w-14 h-14 object-cover rounded cursor-pointer border border-stone-200 hover:scale-110 transition-transform" onClick={() => window.open(item.imageUrl, '_blank')} />
+                              <img src={item.imageUrl} alt={item.materialName} className="w-14 h-14 object-cover rounded cursor-pointer border border-border hover:scale-110 transition-transform" onClick={() => window.open(item.imageUrl, '_blank')} />
                             ) : (
-                              <span className="text-stone-300 text-base">📷</span>
+                              <Camera className="w-4 h-4 mx-auto text-muted-foreground" />
                             )}
                           </td>
-                          <td className="px-3 py-2 font-medium text-stone-800">{item.materialName}</td>
-                          <td className="px-3 py-2 text-stone-500 text-xs">{item.spec || '-'}</td>
-                          <td className="px-3 py-2 text-center text-stone-600">{item.unit}</td>
-                          <td className="px-3 py-2 text-right font-mono text-stone-600 text-xs">
+                          <td className="px-3 py-2 font-medium text-foreground">{item.materialName}</td>
+                          <td className="px-3 py-2 text-muted-foreground text-xs">{item.spec || '-'}</td>
+                          <td className="px-3 py-2 text-center text-muted-foreground">{item.unit}</td>
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
                             {unitPriceCny > 0 ? formatNumber(unitPriceCny, 2) : '-'}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-stone-500 text-xs">
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
                             {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-stone-500 text-xs">
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
                             {(item.stockQty ?? 0) % 1 === 0 ? (item.stockQty ?? 0).toLocaleString() : (item.stockQty ?? 0).toFixed(3)}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono font-semibold text-amber-700">
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-primary">
                             {item.orderQty % 1 === 0 ? item.orderQty.toLocaleString() : item.orderQty.toFixed(3)}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-xs text-stone-600">
+                          <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
                             {amountKrw > 0 ? formatKRW(amountKrw) : '-'}
                           </td>
-                          <td className="px-3 py-2 text-xs text-stone-400">
+                          <td className="px-3 py-2 text-xs text-muted-foreground">
                             {item.orders.map((o, j) => (
                               <span key={j}>
                                 {j > 0 && ' + '}
@@ -1149,19 +1148,19 @@ export default function PurchaseMatching() {
                       })}
                     </tbody>
                     <tfoot>
-                      <tr className="bg-stone-50 border-t border-stone-200">
-                        <td colSpan={8} className="px-3 py-2 text-xs font-medium text-stone-600 text-right">합계 {items.length}종</td>
-                        <td className="px-3 py-2 text-right text-xs font-bold text-amber-700">
+                      <tr className="bg-[var(--fill-quaternary)] border-t border-border">
+                        <td colSpan={8} className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">합계 {items.length}종</td>
+                        <td className="px-3 py-2 text-right text-xs font-bold text-primary">
                           {items.reduce((s, i) => s + i.orderQty, 0).toFixed(0)}
                         </td>
-                        <td className="px-3 py-2 text-right text-xs font-bold text-stone-700">
+                        <td className="px-3 py-2 text-right text-xs font-bold text-foreground">
                           {formatKRW(items.reduce((s, i) => s + Math.round(i.orderQty * (i.unitPriceCny ?? 0) * settings.cnyKrw), 0))}
                         </td>
                         <td className="px-3 py-2"></td>
                       </tr>
                     </tfoot>
                   </table>
-                  <div className="px-4 py-3 border-t border-stone-100 grid grid-cols-3 gap-4 text-xs text-stone-500">
+                  <div className="px-4 py-3 border-t border-border grid grid-cols-3 gap-4 text-xs text-muted-foreground">
                     <div>발주담당: ___________</div>
                     <div>확인: ___________</div>
                     <div>수령: ___________</div>
@@ -1170,7 +1169,7 @@ export default function PurchaseMatching() {
               ));
             })()}
             {cartItems.length === 0 && (
-              <p className="text-center text-stone-400 py-8">장바구니에 담긴 자재가 없습니다</p>
+              <p className="text-center text-muted-foreground py-8">장바구니에 담긴 자재가 없습니다</p>
             )}
           </div>
           <DialogFooter className="flex flex-wrap gap-2 justify-between">
@@ -1207,17 +1206,17 @@ export default function PurchaseMatching() {
                       key={`email-${vendor}`}
                       variant="outline"
                       size="sm"
-                      className="h-8 text-xs text-blue-700 border-blue-300 hover:bg-blue-50"
+                      className="h-8 text-xs"
                       onClick={handleSendEmail}
                     >
-                      <Mail className="w-3.5 h-3.5 mr-1" />📧 {vendor} 이메일
+                      <Mail className="w-3.5 h-3.5 mr-1" />{vendor} 이메일
                     </Button>
                   );
                 });
               })()}
               {/* 발주 확정 버튼 */}
               <Button
-                className="h-8 text-xs bg-green-700 hover:bg-green-800 text-white"
+                className="h-8 text-xs"
                 onClick={async () => {
                   // 정본: lib/confirmMaterialOrder.ts
                   // 예전엔 여기 사본에 1단계(Supabase materials 저장)와
@@ -1239,7 +1238,7 @@ export default function PurchaseMatching() {
                         description: r.skippedNoOrder.join(', '),
                       });
                     }
-                    toast.success(`✅ 자재 ${r.materialCount}종 저장 · 자재구매 전표 ${r.purchaseCount}건 생성`);
+                    toast.success(`자재 ${r.materialCount}종 저장 · 자재구매 전표 ${r.purchaseCount}건 생성`);
                     setVendorOrderModal(false);
                   } catch (e: any) {
                     console.error('발주 확정 오류:', e);
@@ -1247,7 +1246,7 @@ export default function PurchaseMatching() {
                   }
                 }}
               >
-                ✅ 발주 확정
+                발주 확정
               </Button>
               <Button variant="outline" onClick={() => setVendorOrderModal(false)}>닫기</Button>
             </div>
@@ -1262,7 +1261,7 @@ export default function PurchaseMatching() {
             <DialogTitle>이메일 주소 입력</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <p className="text-sm text-stone-600">
+            <p className="text-sm text-muted-foreground">
               <span className="font-semibold">{pendingEmailVendor}</span> 거래처의 이메일 주소가 등록되어 있지 않습니다.
             </p>
             <div className="space-y-1.5">
@@ -1284,7 +1283,6 @@ export default function PurchaseMatching() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEmailInputModal(false)}>취소</Button>
             <Button
-              className="bg-blue-700 hover:bg-blue-800 text-white"
               disabled={!emailInputValue.trim()}
               onClick={() => {
                 setEmailInputModal(false);
@@ -1302,7 +1300,7 @@ export default function PurchaseMatching() {
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-amber-700" />
+              <Receipt className="w-4 h-4 text-primary" />
               지출결의 생성 (자재)
             </DialogTitle>
           </DialogHeader>
@@ -1326,7 +1324,7 @@ export default function PurchaseMatching() {
               </div>
               <div className="space-y-1.5">
                 <Label>카테고리</Label>
-                <div className="h-9 flex items-center px-3 bg-stone-50 rounded border border-stone-200 text-sm text-stone-600">
+                <div className="h-9 flex items-center px-3 bg-[var(--fill-quaternary)] rounded border border-border text-sm text-muted-foreground">
                   자재구매 (고정)
                 </div>
               </div>
@@ -1339,7 +1337,7 @@ export default function PurchaseMatching() {
                   placeholder="0"
                 />
                 {expenseForm.amountKrw > 0 && (
-                  <div className="text-right text-xs text-stone-400">{formatKRW(expenseForm.amountKrw)}</div>
+                  <div className="text-right text-xs text-muted-foreground">{formatKRW(expenseForm.amountKrw)}</div>
                 )}
               </div>
               <div className="space-y-1.5">
@@ -1353,7 +1351,7 @@ export default function PurchaseMatching() {
               </div>
               <div className="space-y-1.5">
                 <Label>발주번호</Label>
-                <div className="h-9 flex items-center px-3 bg-stone-50 rounded border border-stone-200 text-sm font-mono text-stone-600">
+                <div className="h-9 flex items-center px-3 bg-[var(--fill-quaternary)] rounded border border-border text-sm font-mono text-muted-foreground">
                   {expenseForm.orderNo || '-'}
                 </div>
               </div>
@@ -1387,16 +1385,16 @@ export default function PurchaseMatching() {
             </div>
 
             {/* 미리보기 */}
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
-              <p className="text-xs font-medium text-amber-800">전표 미리보기</p>
-              <p className="text-xs text-amber-700">{expenseForm.description}</p>
-              <p className="text-sm font-bold text-amber-900">{formatKRW(expenseForm.amountKrw)}</p>
-              <p className="text-xs text-amber-600">{expenseForm.expenseDate} · {expenseForm.expenseType} · {expenseForm.vendorName || '거래처 미지정'}</p>
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
+              <p className="text-xs font-medium text-primary">전표 미리보기</p>
+              <p className="text-xs text-muted-foreground">{expenseForm.description}</p>
+              <p className="text-sm font-bold text-foreground">{formatKRW(expenseForm.amountKrw)}</p>
+              <p className="text-xs text-muted-foreground">{expenseForm.expenseDate} · {expenseForm.expenseType} · {expenseForm.vendorName || '거래처 미지정'}</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setExpenseModal(false)}>취소</Button>
-            <Button onClick={handleSaveExpense} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">
+            <Button onClick={handleSaveExpense} className="gap-2">
               <FileText className="w-4 h-4" />전표 저장
             </Button>
           </DialogFooter>
@@ -1408,7 +1406,7 @@ export default function PurchaseMatching() {
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              📄 기존 지출결의 연결
+              <FileText className="w-4 h-4" />기존 지출결의 연결
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -1433,25 +1431,25 @@ export default function PurchaseMatching() {
                 .map(p => (
                   <div
                     key={p.id}
-                    className="flex items-center justify-between p-3 border border-stone-200 rounded-lg hover:bg-stone-50 cursor-pointer"
+                    className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-[var(--fill-quaternary)] cursor-pointer"
                     onClick={() => handleLinkExpense(p.id)}
                   >
                     <div className="space-y-0.5 flex-1 min-w-0">
-                      <p className="text-sm font-medium text-stone-800 truncate">{p.memo || p.vendorName}</p>
-                      <p className="text-xs text-stone-500">
+                      <p className="text-sm font-medium text-foreground truncate">{p.memo || p.vendorName}</p>
+                      <p className="text-xs text-muted-foreground">
                         {p.dueDate} · {p.vendorName || '거래처 미지정'}
                         {p.orderNo ? ` · ${p.orderNo}` : ''}
                         {p.projectNo ? ` · ${p.projectNo}` : ''}
                       </p>
                     </div>
                     <div className="text-right ml-3">
-                      <p className="text-sm font-semibold text-stone-800">{formatKRW(p.amountKrw)}</p>
-                      <span className="text-xs bg-stone-100 text-stone-500 px-1.5 py-0.5 rounded">{p.status}</span>
+                      <p className="text-sm font-semibold text-foreground">{formatKRW(p.amountKrw)}</p>
+                      <span className="text-xs bg-[var(--fill-tertiary)] text-muted-foreground px-1.5 py-0.5 rounded">{p.status}</span>
                     </div>
                   </div>
                 ))}
               {phase1.getPayables().filter(p => p.sourceType === 'purchase').length === 0 && (
-                <p className="text-center py-8 text-stone-400 text-sm">등록된 자재 지출결의가 없습니다</p>
+                <p className="text-center py-8 text-muted-foreground text-sm">등록된 자재 지출결의가 없습니다</p>
               )}
             </div>
           </div>
@@ -1465,7 +1463,7 @@ export default function PurchaseMatching() {
       <Dialog open={bulkEditModal} onOpenChange={setBulkEditModal}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>✏ 일괄수정 — [{bulkEditOrderNo}] {bulkEditItems.length}종</DialogTitle>
+            <DialogTitle>일괄수정 — [{bulkEditOrderNo}] {bulkEditItems.length}종</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="flex items-center gap-3">
@@ -1480,43 +1478,43 @@ export default function PurchaseMatching() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse">
                 <thead>
-                  <tr className="bg-stone-100">
-                    <th className="text-left px-2 py-2 border border-stone-200">품목명</th>
-                    <th className="text-center px-2 py-2 border border-stone-200 w-20">수량</th>
-                    <th className="text-center px-2 py-2 border border-stone-200 w-28">단가({bulkEditItems[0]?.currency || 'CNY'})</th>
-                    <th className="text-right px-2 py-2 border border-stone-200 w-28">금액(KRW)</th>
-                    <th className="text-center px-2 py-2 border border-stone-200 w-28">상태</th>
+                  <tr className="bg-[var(--fill-quaternary)] text-[13px] font-semibold text-muted-foreground">
+                    <th className="text-left px-2 py-2 border border-border">품목명</th>
+                    <th className="text-center px-2 py-2 border border-border w-20">수량</th>
+                    <th className="text-center px-2 py-2 border border-border w-28">단가({bulkEditItems[0]?.currency || 'CNY'})</th>
+                    <th className="text-right px-2 py-2 border border-border w-28">금액(KRW)</th>
+                    <th className="text-center px-2 py-2 border border-border w-28">상태</th>
                   </tr>
                 </thead>
                 <tbody>
                   {bulkEditItems.map((item, idx) => (
-                    <tr key={item.id} className="hover:bg-stone-50">
-                      <td className="px-2 py-1 border border-stone-200 font-medium">{item.itemName}</td>
-                      <td className="px-1 py-1 border border-stone-200">
+                    <tr key={item.id} className="hover:bg-[var(--fill-quaternary)]">
+                      <td className="px-2 py-1 border border-border font-medium">{item.itemName}</td>
+                      <td className="px-1 py-1 border border-border">
                         <input
                           type="number"
                           value={item.qty}
                           onChange={e => updateBulkItem(idx, 'qty', e.target.value)}
-                          className="w-full text-center border border-stone-200 rounded px-1 py-0.5 text-xs"
+                          className="w-full text-center border border-border rounded px-1 py-0.5 text-xs"
                         />
                       </td>
-                      <td className="px-1 py-1 border border-stone-200">
+                      <td className="px-1 py-1 border border-border">
                         <input
                           type="number"
                           value={item.unitPriceCny}
                           onChange={e => updateBulkItem(idx, 'unitPriceCny', e.target.value)}
-                          className="w-full text-center border border-stone-200 rounded px-1 py-0.5 text-xs"
+                          className="w-full text-center border border-border rounded px-1 py-0.5 text-xs"
                           step="0.01"
                         />
                       </td>
-                      <td className="px-2 py-1 border border-stone-200 text-right text-amber-700 font-medium">
+                      <td className="px-2 py-1 border border-border text-right text-primary font-medium">
                         {formatKRW(item.amountKrw)}
                       </td>
-                      <td className="px-1 py-1 border border-stone-200">
+                      <td className="px-1 py-1 border border-border">
                         <select
                           value={item.purchaseStatus}
                           onChange={e => updateBulkItem(idx, 'purchaseStatus', e.target.value)}
-                          className="w-full border border-stone-200 rounded px-1 py-0.5 text-xs bg-white"
+                          className="w-full border border-border rounded px-1 py-0.5 text-xs bg-card"
                         >
                           {PURCHASE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
@@ -1526,14 +1524,13 @@ export default function PurchaseMatching() {
                 </tbody>
               </table>
             </div>
-            <div className="p-2 bg-blue-50 rounded-lg text-xs text-blue-700">
+            <div className="p-2 bg-primary/10 rounded-lg text-xs text-primary">
               총 {bulkEditItems.length}종 · 합계 {formatKRW(bulkEditItems.reduce((s, i) => s + i.amountKrw, 0))}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkEditModal(false)}>취소</Button>
             <Button
-              className="bg-blue-700 hover:bg-blue-800 text-white"
               onClick={handleBulkEdit}
             >
               일괄 수정 저장
@@ -1547,27 +1544,27 @@ export default function PurchaseMatching() {
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-green-600" />
+              <FileText className="w-5 h-5 text-[var(--system-green)]" />
               지출결의가 생성되었습니다
             </DialogTitle>
           </DialogHeader>
           {justCreatedPayable && (
             <div className="space-y-3 py-2">
-              <div className="bg-stone-50 rounded-lg p-3 text-sm space-y-1">
-                <p><span className="text-stone-500 text-xs">내용</span></p>
-                <p className="font-medium text-stone-800">{justCreatedPayable.memo}</p>
-                <p className="text-stone-600">{justCreatedPayable.dueDate} · {justCreatedPayable.status}</p>
-                {justCreatedPayable.vendorName && <p className="text-stone-600">거래처: {justCreatedPayable.vendorName}</p>}
-                {justCreatedPayable.orderNo && <p className="text-stone-600">발주번호: {justCreatedPayable.orderNo}</p>}
-                {justCreatedPayable.projectNo && <p className="text-stone-600">프로젝트: {justCreatedPayable.projectNo}</p>}
-                <p className="font-bold text-amber-700 text-base">{formatKRW(justCreatedPayable.amountKrw)}</p>
+              <div className="bg-[var(--fill-quaternary)] rounded-lg p-3 text-sm space-y-1">
+                <p><span className="text-muted-foreground text-xs">내용</span></p>
+                <p className="font-medium text-foreground">{justCreatedPayable.memo}</p>
+                <p className="text-muted-foreground">{justCreatedPayable.dueDate} · {justCreatedPayable.status}</p>
+                {justCreatedPayable.vendorName && <p className="text-muted-foreground">거래처: {justCreatedPayable.vendorName}</p>}
+                {justCreatedPayable.orderNo && <p className="text-muted-foreground">발주번호: {justCreatedPayable.orderNo}</p>}
+                {justCreatedPayable.projectNo && <p className="text-muted-foreground">프로젝트: {justCreatedPayable.projectNo}</p>}
+                <p className="font-bold text-primary text-base">{formatKRW(justCreatedPayable.amountKrw)}</p>
               </div>
             </div>
           )}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setJustCreatedPayable(null)}>닫기</Button>
             <Button
-              className="bg-amber-700 hover:bg-amber-800 text-white gap-1"
+              className="gap-1"
               onClick={() => {
                 if (justCreatedPayable) {
                   setSelectedPayable(justCreatedPayable);
@@ -1590,12 +1587,12 @@ export default function PurchaseMatching() {
             </DialogHeader>
             <div className="space-y-2 text-sm py-2">
               <p className="font-medium">{selectedPayable.memo}</p>
-              <p className="text-stone-600">거래처: {selectedPayable.vendorName}</p>
-              <p className="text-stone-600">프로젝트: {selectedPayable.projectNo || '—'}</p>
-              <p className="text-stone-600">발주: {selectedPayable.orderNo || '—'} · 품목: {selectedPayable.styleNo || '—'}</p>
-              <p className="text-stone-600">상태: {selectedPayable.status} · 지급예정: {selectedPayable.dueDate}</p>
+              <p className="text-muted-foreground">거래처: {selectedPayable.vendorName}</p>
+              <p className="text-muted-foreground">프로젝트: {selectedPayable.projectNo || '—'}</p>
+              <p className="text-muted-foreground">발주: {selectedPayable.orderNo || '—'} · 품목: {selectedPayable.styleNo || '—'}</p>
+              <p className="text-muted-foreground">상태: {selectedPayable.status} · 지급예정: {selectedPayable.dueDate}</p>
               <p className="font-bold text-lg">{formatKRW(selectedPayable.amountKrw)}</p>
-              <p className="text-xs text-stone-400">결제·미지급 관리는 지출결의(/payables) 메뉴에서 진행합니다</p>
+              <p className="text-xs text-muted-foreground">결제·미지급 관리는 지출결의(/payables) 메뉴에서 진행합니다</p>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setSelectedPayable(null)}>닫기</Button>
@@ -1675,65 +1672,65 @@ function ExpenseDetailInlineModal({
       <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-amber-700" />
+            <FileText className="w-5 h-5 text-primary" />
             지출전표 상세
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 py-2">
-          <div className="grid grid-cols-2 gap-3 text-sm bg-stone-50 rounded-lg p-3">
+          <div className="grid grid-cols-2 gap-3 text-sm bg-[var(--fill-quaternary)] rounded-lg p-3">
             <div>
-              <span className="text-stone-500 text-xs">전표번호</span>
-              <p className="font-mono font-bold text-amber-700">{expenseNo}</p>
+              <span className="text-muted-foreground text-xs">전표번호</span>
+              <p className="font-mono font-bold text-primary">{expenseNo}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">발주번호</span>
-              <p className="font-medium text-stone-800">{expense.orderNo || '-'}</p>
+              <span className="text-muted-foreground text-xs">발주번호</span>
+              <p className="font-medium text-foreground">{expense.orderNo || '-'}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">거래처</span>
-              <p className="font-medium text-stone-800">{expense.vendorName || '-'}</p>
+              <span className="text-muted-foreground text-xs">거래처</span>
+              <p className="font-medium text-foreground">{expense.vendorName || '-'}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">결제방법</span>
-              <p className="font-medium text-stone-800">{expense.expenseType}</p>
+              <span className="text-muted-foreground text-xs">결제방법</span>
+              <p className="font-medium text-foreground">{expense.expenseType}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">카테고리</span>
-              <p className="font-medium text-stone-800">{expense.category}</p>
+              <span className="text-muted-foreground text-xs">카테고리</span>
+              <p className="font-medium text-foreground">{expense.category}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">날짜</span>
-              <p className="font-medium text-stone-800">{expense.expenseDate}</p>
+              <span className="text-muted-foreground text-xs">날짜</span>
+              <p className="font-medium text-foreground">{expense.expenseDate}</p>
             </div>
           </div>
 
-          <div className="border border-stone-200 rounded-lg overflow-hidden">
-            <div className="bg-stone-50 px-4 py-2 flex items-center justify-between border-b border-stone-200">
-              <p className="text-xs font-medium text-stone-600">품목/내역</p>
+          <div className="border border-border rounded-lg overflow-hidden">
+            <div className="bg-[var(--fill-quaternary)] px-4 py-2 flex items-center justify-between border-b border-border">
+              <p className="text-xs font-medium text-muted-foreground">품목/내역</p>
               <Button size="sm" variant="outline" onClick={addDetailLine} className="h-7 text-xs gap-1">
                 <Plus className="w-3.5 h-3.5" />항목 추가
               </Button>
             </div>
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-stone-50 border-b border-stone-100">
-                  <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">품목/내역</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-16">수량</th>
-                  <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-14">단위</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">단가</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">금액</th>
+                <tr className="bg-[var(--fill-quaternary)] border-b border-border">
+                  <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">품목/내역</th>
+                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">수량</th>
+                  <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-14">단위</th>
+                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">단가</th>
+                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">금액</th>
                   <th className="w-8 px-2"></th>
                 </tr>
               </thead>
               <tbody>
                 {detailLines.map((line) => (
-                  <tr key={line.id} className="border-b border-stone-50">
+                  <tr key={line.id} className="border-b border-border">
                     <td className="px-2 py-1.5">
                       <input
                         value={line.description}
                         onChange={e => updateDetailLine(line.id, 'description', e.target.value)}
                         placeholder="품목명"
-                        className="h-8 text-sm border border-stone-200 rounded px-2 w-full"
+                        className="h-8 text-sm border border-border rounded px-2 w-full"
                       />
                     </td>
                     <td className="px-2 py-1.5">
@@ -1741,7 +1738,7 @@ function ExpenseDetailInlineModal({
                         type="number"
                         value={line.qty}
                         onChange={e => updateDetailLine(line.id, 'qty', parseFloat(e.target.value) || 0)}
-                        className="h-8 text-sm text-right border border-stone-200 rounded px-2 w-16"
+                        className="h-8 text-sm text-right border border-border rounded px-2 w-16"
                         min={0}
                       />
                     </td>
@@ -1749,7 +1746,7 @@ function ExpenseDetailInlineModal({
                       <input
                         value={line.unit}
                         onChange={e => updateDetailLine(line.id, 'unit', e.target.value)}
-                        className="h-8 text-sm text-center border border-stone-200 rounded px-2 w-14"
+                        className="h-8 text-sm text-center border border-border rounded px-2 w-14"
                         placeholder="개"
                       />
                     </td>
@@ -1758,16 +1755,16 @@ function ExpenseDetailInlineModal({
                         type="number"
                         value={line.unitPrice}
                         onChange={e => updateDetailLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                        className="h-8 text-sm text-right border border-stone-200 rounded px-2 w-24"
+                        className="h-8 text-sm text-right border border-border rounded px-2 w-24"
                         min={0}
                       />
                     </td>
-                    <td className="px-3 py-1.5 text-right text-sm font-medium text-stone-700">
+                    <td className="px-3 py-1.5 text-right text-sm font-medium text-foreground">
                       {formatKRW(line.amountKrw)}
                     </td>
                     <td className="px-2 py-1.5">
                       <button
-                        className="text-stone-400 hover:text-red-500"
+                        className="text-muted-foreground hover:text-[var(--system-red)]"
                         onClick={() => removeDetailLine(line.id)}
                       >
                         <X className="w-3.5 h-3.5" />
@@ -1779,24 +1776,24 @@ function ExpenseDetailInlineModal({
             </table>
           </div>
 
-          <div className="bg-amber-50 rounded-lg p-3 space-y-1.5 text-sm">
-            <div className="flex justify-between text-stone-600">
+          <div className="bg-[var(--fill-quaternary)] rounded-lg p-3 space-y-1.5 text-sm">
+            <div className="flex justify-between text-muted-foreground">
               <span>공급가액</span>
               <span className="font-mono">{formatKRW(supplyAmount)}</span>
             </div>
-            <div className="flex justify-between text-stone-600">
+            <div className="flex justify-between text-muted-foreground">
               <span>세액 (10%)</span>
               <span className="font-mono">{formatKRW(taxAmount)}</span>
             </div>
-            <div className="flex justify-between font-bold text-stone-800 text-base pt-1 border-t border-amber-200">
+            <div className="flex justify-between font-bold text-foreground text-base pt-1 border-t border-border">
               <span>합계</span>
-              <span className="font-mono text-amber-900">{formatKRW(detailTotal)}</span>
+              <span className="font-mono text-primary">{formatKRW(detailTotal)}</span>
             </div>
           </div>
         </div>
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>닫기</Button>
-          <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">
+          <Button onClick={handleSave}>
             수정 저장
           </Button>
         </DialogFooter>

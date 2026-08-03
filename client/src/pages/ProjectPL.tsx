@@ -36,8 +36,8 @@ export default function ProjectPL() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">발주 손익</h1>
-          <p className="text-sm text-stone-500">
+          <h1 className="text-2xl font-bold text-foreground">발주 손익</h1>
+          <p className="text-sm text-muted-foreground">
             발주번호 — 자재·임가공(지출결의) · 품목/컬러 배분 원가
           </p>
         </div>
@@ -48,9 +48,9 @@ export default function ProjectPL() {
 
       <div className="flex flex-wrap gap-2">
         {allOrderNos.length === 0 ? (
-          <p className="text-sm text-stone-400">등록된 발주가 없습니다</p>
+          <p className="text-sm text-muted-foreground">등록된 발주가 없습니다</p>
         ) : allOrderNos.map(no => (
-          <Button key={no} size="sm" variant={selectedNo === no ? 'default' : 'outline'}
+          <Button key={no} size="sm" variant={selectedNo === no ? 'secondary' : 'outline'}
             onClick={() => setSelectedNo(no)} className="font-mono text-xs">
             {no}
           </Button>
@@ -76,10 +76,10 @@ export default function ProjectPL() {
             />
           </div>
 
-          <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="bg-card rounded-xl border overflow-hidden">
             <div className="px-4 py-3 border-b font-semibold text-sm">연결 발주 ({projOrders.length}건)</div>
             <table className="w-full text-sm">
-              <thead className="bg-stone-50 text-xs text-stone-500">
+              <thead className="text-[13px] font-semibold text-muted-foreground">
                 <tr>
                   <th className="text-left px-4 py-2">발주번호</th>
                   <th className="text-left px-4 py-2">품목</th>
@@ -88,9 +88,9 @@ export default function ProjectPL() {
                   <th className="text-right px-4 py-2">입고</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border">
                 {projOrders.map(o => (
-                  <tr key={o.id} className="border-t">
+                  <tr key={o.id} className="hover:bg-[var(--fill-quaternary)]">
                     <td className="px-4 py-3 font-mono text-xs">{o.orderNo}</td>
                     <td className="px-4 py-3">{o.styleName || o.styleNo}</td>
                     <td className="px-4 py-3 text-right">{o.qty}</td>
@@ -102,16 +102,16 @@ export default function ProjectPL() {
             </table>
           </div>
 
-          <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="bg-card rounded-xl border overflow-hidden">
             <div className="px-4 py-3 border-b font-semibold text-sm">
               품목 · 컬러별 실제원가
-              <span className="ml-2 font-normal text-stone-400 text-xs">
+              <span className="ml-2 font-normal text-muted-foreground text-xs">
                 자재/임가공을 colorQtys 비중으로 배분 (컬러 지정 입고결의는 해당 컬러에 직접 반영)
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[640px]">
-                <thead className="bg-stone-50 text-xs text-stone-500">
+                <thead className="text-[13px] font-semibold text-muted-foreground">
                   <tr>
                     <th className="text-left px-4 py-2">발주</th>
                     <th className="text-left px-4 py-2">스타일</th>
@@ -123,18 +123,18 @@ export default function ProjectPL() {
                     <th className="text-right px-4 py-2">PCS당</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border">
                   {(pl.byStyleColor || []).length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-stone-400 text-sm">
+                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground text-sm">
                         배분할 발주/원가 데이터가 없습니다
                       </td>
                     </tr>
                   ) : (pl.byStyleColor || []).map((row, i) => (
-                    <tr key={`${row.orderNo}-${row.color}-${i}`} className="border-t">
+                    <tr key={`${row.orderNo}-${row.color}-${i}`} className="hover:bg-[var(--fill-quaternary)]">
                       <td className="px-4 py-2.5 font-mono text-xs">{row.orderNo}</td>
                       <td className="px-4 py-2.5">
-                        <span className="font-mono text-xs text-stone-500">{row.styleNo}</span>
+                        <span className="font-mono text-xs text-muted-foreground">{row.styleNo}</span>
                         {row.styleName ? <span className="block text-xs">{row.styleName}</span> : null}
                       </td>
                       <td className="px-4 py-2.5">{row.color}</td>
@@ -142,16 +142,16 @@ export default function ProjectPL() {
                       <td className="px-4 py-2.5 text-right">{formatKRW(row.materialCost)}</td>
                       <td className="px-4 py-2.5 text-right">{formatKRW(row.factoryCost)}</td>
                       <td className="px-4 py-2.5 text-right font-medium">{formatKRW(row.totalCost)}</td>
-                      <td className="px-4 py-2.5 text-right text-stone-500">
+                      <td className="px-4 py-2.5 text-right text-muted-foreground">
                         {row.qty > 0 ? formatKRW(Math.round(row.totalCost / row.qty)) : '—'}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 {(pl.byStyleColor || []).length > 0 && (
-                  <tfoot className="bg-stone-50 border-t font-medium text-sm">
+                  <tfoot className="bg-muted border-t font-medium text-sm">
                     <tr>
-                      <td colSpan={4} className="px-4 py-2.5 text-right text-stone-500">합계</td>
+                      <td colSpan={4} className="px-4 py-2.5 text-right text-muted-foreground">합계</td>
                       <td className="px-4 py-2.5 text-right">
                         {formatKRW((pl.byStyleColor || []).reduce((s, r) => s + r.materialCost, 0))}
                       </td>
@@ -169,11 +169,11 @@ export default function ProjectPL() {
             </div>
           </div>
 
-          <div className="bg-stone-50 rounded-xl border p-4 text-sm">
-            <p className="font-semibold text-stone-700">손익 요약</p>
-            <p className="mt-2 text-stone-600">
+          <div className="bg-muted rounded-xl border p-4 text-sm">
+            <p className="font-semibold text-foreground">손익 요약</p>
+            <p className="mt-2 text-muted-foreground">
               매출 {formatKRW(pl.revenue)} − 생산비 {formatKRW(pl.actualCost)} − 자재 {formatKRW(pl.purchaseCost)}
-              = <span className="font-bold text-stone-800">{formatKRW(pl.profit)}</span>
+              = <span className="font-bold text-foreground">{formatKRW(pl.profit)}</span>
             </p>
           </div>
         </>
@@ -184,10 +184,10 @@ export default function ProjectPL() {
 
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="bg-white rounded-xl border p-4">
-      <p className="text-xs text-stone-500">{label}</p>
-      <p className="text-lg font-bold text-stone-800 mt-1">{value}</p>
-      {sub && <p className="text-[10px] text-stone-400 mt-0.5">{sub}</p>}
+    <div className="bg-card rounded-xl border p-4">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-lg font-bold text-foreground mt-1">{value}</p>
+      {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
     </div>
   );
 }

@@ -99,57 +99,57 @@ function TaskMentionsBlock({
   const pendingCount = checks.filter(c => !c.checked).length;
 
   return (
-    <div className="mt-1 border-t border-stone-100 pt-2">
+    <div className="mt-1 border-t border-border pt-2">
       <button
         type="button"
-        className="flex items-center gap-1.5 text-[11px] text-stone-600 hover:text-[#C9A96E]"
+        className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary"
         onClick={() => setOpen(o => !o)}
       >
         <MessageSquare className="w-3.5 h-3.5" />
         멘션 · 메시지
-        {messages.length > 0 && <span className="text-stone-400">({messages.length})</span>}
+        {messages.length > 0 && <span className="text-muted-foreground">({messages.length})</span>}
         {pendingCount > 0 && (
-          <Badge variant="outline" className="text-[9px] h-4 px-1 border-amber-300 text-amber-700">
+          <Badge variant="outline" className="text-[11px] h-4 px-1 border-border text-[var(--system-orange)]">
             체크대기 {pendingCount}
           </Badge>
         )}
         {pendingForMe.length > 0 && (
-          <Badge className="text-[9px] h-4 px-1 bg-amber-500">내 체크 {pendingForMe.length}</Badge>
+          <Badge className="text-[11px] h-4 px-1 bg-[var(--system-orange)]">내 체크 {pendingForMe.length}</Badge>
         )}
       </button>
 
       {open && (
         <div className="mt-2 space-y-2">
           {messages.length === 0 && (
-            <p className="text-[10px] text-stone-400">아직 메시지가 없습니다. @멘션으로 체크를 요청하세요.</p>
+            <p className="text-[11px] text-muted-foreground">아직 메시지가 없습니다. @멘션으로 체크를 요청하세요.</p>
           )}
           {messages.map(msg => {
             const msgChecks = checks.filter(c => c.messageId === msg.id);
             return (
-              <div key={msg.id} className="rounded-md bg-stone-50 border border-stone-100 p-2 text-xs space-y-1.5">
+              <div key={msg.id} className="rounded-md bg-muted border border-border p-2 text-xs space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-stone-700">{msg.authorName}</span>
-                  <span className="text-[10px] text-stone-400">
+                  <span className="font-semibold text-foreground">{msg.authorName}</span>
+                  <span className="text-[11px] text-muted-foreground">
                     {new Date(msg.createdAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <p className="text-stone-700 whitespace-pre-wrap">{msg.text}</p>
+                <p className="text-foreground whitespace-pre-wrap">{msg.text}</p>
                 {msg.mentions.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {msg.mentions.map(m => (
-                      <span key={m} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                      <span key={m} className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
                         <AtSign className="w-2.5 h-2.5" />{m}
                       </span>
                     ))}
                   </div>
                 )}
                 {msgChecks.length > 0 && (
-                  <div className="space-y-1 pt-1 border-t border-stone-200/80">
+                  <div className="space-y-1 pt-1 border-t border-border">
                     {msgChecks.map(c => {
                       const isMine = me && (c.targetName === me.name || c.targetName.toLowerCase() === me.name.toLowerCase());
                       return (
                         <div key={c.id} className="flex items-center justify-between gap-2">
-                          <span className={`text-[10px] ${c.checked ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          <span className={`text-[11px] ${c.checked ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]'}`}>
                             {c.checked
                               ? `✓ ${c.targetName} 확인 (${c.checkedBy || ''}${c.checkedAt ? ` · ${new Date(c.checkedAt).toLocaleDateString('ko-KR')}` : ''})`
                               : `◯ ${c.targetName} 체크 대기`}
@@ -158,8 +158,8 @@ function TaskMentionsBlock({
                             <Button
                               type="button"
                               size="sm"
-                              variant={c.checked ? 'outline' : 'default'}
-                              className="h-6 text-[10px] px-2"
+                              variant={c.checked ? 'outline' : 'secondary'}
+                              className="h-6 text-[11px] px-2"
                               onClick={() => doCheck(c.id)}
                             >
                               <Check className="w-3 h-3 mr-0.5" />
@@ -175,7 +175,7 @@ function TaskMentionsBlock({
             );
           })}
 
-          <div className="rounded-md border border-dashed border-stone-300 p-2 space-y-2 bg-white">
+          <div className="rounded-md border border-dashed border-border p-2 space-y-2 bg-card">
             <textarea
               className="w-full text-xs border rounded-md px-2 py-1.5 min-h-[56px] resize-y"
               placeholder="메시지 입력... (예: 할인율 재확인 부탁해요)"
@@ -183,7 +183,7 @@ function TaskMentionsBlock({
               onChange={e => setText(e.target.value)}
             />
             <div>
-              <p className="text-[10px] text-stone-500 mb-1 flex items-center gap-1">
+              <p className="text-[11px] text-muted-foreground mb-1 flex items-center gap-1">
                 <AtSign className="w-3 h-3" />멘션할 사람
               </p>
               <div className="flex flex-wrap gap-1 mb-1.5">
@@ -194,8 +194,8 @@ function TaskMentionsBlock({
                       key={name}
                       type="button"
                       onClick={() => toggleMention(name)}
-                      className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                        on ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-stone-600 border-stone-200 hover:border-blue-300'
+                      className={`text-[11px] px-1.5 py-0.5 rounded border ${
+                        on ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:border-primary/50'
                       }`}
                     >
                       @{name}
@@ -216,16 +216,16 @@ function TaskMentionsBlock({
                 </Button>
               </div>
             </div>
-            <label className="flex items-center gap-1.5 text-[11px] text-stone-600 cursor-pointer">
+            <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
               <input
                 type="checkbox"
-                className="accent-[#C9A96E]"
+                className="accent-primary"
                 checked={askCheck}
                 onChange={e => setAskCheck(e.target.checked)}
               />
               멘션한 사람에게 체크 요청
             </label>
-            <Button type="button" size="sm" className="h-7 w-full text-xs" onClick={send}>
+            <Button type="button" size="sm" variant="secondary" className="h-7 w-full text-xs" onClick={send}>
               메시지 등록
             </Button>
           </div>
@@ -308,7 +308,7 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
         <DialogHeader>
           <div className="flex flex-wrap items-start gap-2">
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-stone-500">{detail.channel} · {detail.startDate} – {detail.endDate}</p>
+              <p className="text-xs text-muted-foreground">{detail.channel} · {detail.startDate} – {detail.endDate}</p>
               <DialogTitle className="text-lg">{detail.title}</DialogTitle>
             </div>
             <Badge>{STATUS_LABEL[detail.status]}</Badge>
@@ -317,7 +317,7 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
           {detail.pushSkus?.length ? (
             <div className="flex flex-wrap gap-1 mt-2">
               {detail.pushSkus.map(s => (
-                <Badge key={s} variant="secondary" className="font-mono text-[10px]">{s}</Badge>
+                <Badge key={s} variant="secondary" className="font-mono text-[11px]">{s}</Badge>
               ))}
             </div>
           ) : null}
@@ -329,15 +329,15 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
               <span className="font-semibold">전체 완료율</span>
               <span>{progress}%</span>
             </div>
-            <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
-              <div className="h-full bg-[#C9A96E]" style={{ width: `${progress}%` }} />
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
             </div>
             <div className="flex flex-wrap gap-2 mt-2">
               {CAMPAIGN_TEAMS.map(team => {
                 const pct = phase1.getCampaignTeamProgress(detail, team);
                 const cnt = detail.tasks.filter(t => t.team === team).length;
                 return (
-                  <span key={team} className="text-[10px] px-2 py-0.5 rounded-full bg-stone-100 text-stone-600">
+                  <span key={team} className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--fill-quaternary)] text-muted-foreground">
                     {team} {cnt ? `${pct}%` : '—'}
                   </span>
                 );
@@ -346,8 +346,8 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
           </div>
 
           {detail.status === 'draft' && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
-              <p className="text-amber-900">미온보딩 상태입니다. 온보딩 후 팀별로 업무를 직접 등록하세요.</p>
+            <div className="bg-muted border border-border rounded-lg p-3 text-sm">
+              <p className="text-foreground">미온보딩 상태입니다. 온보딩 후 팀별로 업무를 직접 등록하세요.</p>
               <Button size="sm" className="mt-2" onClick={onboard}>캘린더 온보딩</Button>
             </div>
           )}
@@ -374,37 +374,37 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
                 const tasksForTeam = phase1.getCampaignTasksByTeam(detail, team);
                 return (
                 <TabsContent key={team} value={team} className="mt-3 space-y-2">
-                  <div className="flex justify-between text-xs text-stone-500 mb-2">
+                  <div className="flex justify-between text-xs text-muted-foreground mb-2">
                     <span>{team} 팀 업무</span>
                     <span>{tasksForTeam.length ? `${phase1.getCampaignTeamProgress(detail, team)}% 완료` : '직접 추가'}</span>
                   </div>
 
                   {tasksForTeam.length === 0 && (
-                    <p className="text-xs text-stone-400 py-1">등록된 업무가 없습니다. 아래에서 직접 입력해 추가하세요.</p>
+                    <p className="text-xs text-muted-foreground py-1">등록된 업무가 없습니다. 아래에서 직접 입력해 추가하세요.</p>
                   )}
 
                   {tasksForTeam.map(task => (
-                    <div key={task.id} className={`border rounded-lg p-3 space-y-2 ${task.done ? 'bg-stone-50 opacity-90' : 'bg-white'}`}>
+                    <div key={task.id} className={`border rounded-lg p-3 space-y-2 ${task.done ? 'bg-muted opacity-90' : 'bg-card'}`}>
                       <div className="flex items-start gap-2">
                         <button
                           type="button"
                           onClick={() => toggleTask(task.id)}
-                          className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center text-[10px] shrink-0 ${
-                            task.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-stone-300'
+                          className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center text-[11px] shrink-0 ${
+                            task.done ? 'bg-[var(--system-green)] border-[var(--system-green)] text-white' : 'border-border'
                           }`}
                         >
-                          {task.done ? '✓' : ''}
+                          {task.done ? <Check className="w-3 h-3" /> : ''}
                         </button>
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <Input
-                            className={`h-8 text-sm font-medium ${task.done ? 'line-through text-stone-400' : ''}`}
+                            className={`h-8 text-sm font-medium ${task.done ? 'line-through text-muted-foreground' : ''}`}
                             value={task.label}
                             onChange={e => patchTask(task.id, { label: e.target.value })}
                             placeholder="업무명"
                           />
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className="text-[10px] text-stone-500">담당자</label>
+                              <label className="text-[11px] text-muted-foreground">담당자</label>
                               <Input
                                 className="h-8 text-xs"
                                 placeholder="담당자 이름"
@@ -413,7 +413,7 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] text-stone-500">예상완료일</label>
+                              <label className="text-[11px] text-muted-foreground">예상완료일</label>
                               <Input
                                 type="date"
                                 className="h-8 text-xs"
@@ -436,7 +436,7 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
                         </div>
                         <div className="flex flex-col gap-1 shrink-0">
                           <select
-                            className="text-[10px] border rounded px-1.5 py-1 h-7"
+                            className="text-[11px] border rounded px-1.5 py-1 h-7"
                             value={task.status}
                             onChange={e => setTaskStatus(task.id, e.target.value as CampaignTaskStatus)}
                           >
@@ -448,7 +448,7 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-stone-400 hover:text-red-600"
+                            className="h-7 w-7 text-muted-foreground hover:text-[var(--system-red)]"
                             onClick={() => removeTask(task.id, task.label)}
                             title="업무 삭제"
                           >
@@ -460,10 +460,10 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
                   ))}
 
                   {/* 팀별 업무 직접 추가 */}
-                  <div className="border border-dashed border-amber-300 rounded-lg p-3 bg-amber-50/40 space-y-2">
-                    <p className="text-xs font-semibold text-amber-900">{team} 업무 추가</p>
+                  <div className="border border-dashed border-border rounded-lg p-3 bg-muted space-y-2">
+                    <p className="text-xs font-semibold text-foreground">{team} 업무 추가</p>
                     <Input
-                      className="h-8 text-sm bg-white"
+                      className="h-8 text-sm bg-card"
                       placeholder="업무명 (직접 입력)"
                       value={team === teamTab ? newLabel : ''}
                       onChange={e => setNewLabel(e.target.value)}
@@ -471,20 +471,20 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <Input
-                        className="h-8 text-xs bg-white"
+                        className="h-8 text-xs bg-card"
                         placeholder="담당자"
                         value={team === teamTab ? newAssignee : ''}
                         onChange={e => setNewAssignee(e.target.value)}
                       />
                       <Input
                         type="date"
-                        className="h-8 text-xs bg-white"
+                        className="h-8 text-xs bg-card"
                         value={team === teamTab ? newDueDate : ''}
                         onChange={e => setNewDueDate(e.target.value)}
                         title="예상완료일"
                       />
                     </div>
-                    <Button size="sm" className="w-full h-8" onClick={addTask}>
+                    <Button size="sm" variant="secondary" className="w-full h-8" onClick={addTask}>
                       <Plus className="w-3.5 h-3.5 mr-1" />업무 생성
                     </Button>
                   </div>

@@ -126,10 +126,10 @@ export default function DocumentOutput() {
         <div className="lg:col-span-2 space-y-3">
           {DOC_TYPES.map(doc => (
             <Card key={doc.id}
-              className={`border-border/60 shadow-sm cursor-pointer transition-all ${selectedDoc === doc.id ? 'ring-2 ring-[#C9A96E] border-[#C9A96E]' : 'hover:border-[#C9A96E]/50'}`}
+              className={`border-border cursor-pointer transition-all ${selectedDoc === doc.id ? 'ring-2 ring-primary border-primary' : 'hover:border-primary/50'}`}
               onClick={() => setSelectedDoc(doc.id)}>
               <CardContent className="p-4 flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedDoc === doc.id ? 'bg-[#C9A96E] text-white' : 'bg-muted text-muted-foreground'}`}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedDoc === doc.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                   <FileText size={18} />
                 </div>
                 <div>
@@ -143,7 +143,7 @@ export default function DocumentOutput() {
 
         {/* Options panel */}
         <div>
-          <Card className="border-border/60 shadow-sm sticky top-4">
+          <Card className="border-border sticky top-4">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">출력 옵션</CardTitle>
             </CardHeader>
@@ -163,7 +163,7 @@ export default function DocumentOutput() {
                 </div>
               )}
 
-              <Button onClick={handlePrint} className="w-full bg-[#C9A96E] hover:bg-[#B8985D] text-white">
+              <Button onClick={handlePrint} className="w-full">
                 <Printer size={16} className="mr-2" />출력 / PDF 저장
               </Button>
             </CardContent>

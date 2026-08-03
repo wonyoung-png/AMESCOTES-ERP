@@ -258,7 +258,7 @@ export default function CostSheetPrint() {
                 </tr>
               )}
               <tr className="border-b border-amber-200 bg-amber-50">
-                <td className="px-4 py-2.5 font-bold text-stone-800">🏭 공장단가</td>
+                <td className="px-4 py-2.5 font-bold text-stone-800">공장단가</td>
                 <td className="px-4 py-2.5 text-right font-bold text-amber-700 tabular-nums">{fmtKrw(psSheet.factoryUnitCostKrw)}</td>
               </tr>
               <tr className="border-b border-stone-100">
@@ -382,7 +382,7 @@ export default function CostSheetPrint() {
                   {/* 실현배수 */}
                   <div className={`flex items-center justify-between py-2 px-3 rounded mt-2 ${postPnlResultSheet.meets35x ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-stone-400 w-5">⚡</span>
+                      <span className="text-[11px] text-stone-400 w-5">★</span>
                       <span className="text-xs font-semibold text-stone-700">실현 배수</span>
                     </div>
                     <div className="text-right">
@@ -390,8 +390,8 @@ export default function CostSheetPrint() {
                         {postPnlResultSheet.actualMultiple.toFixed(2)}x
                       </span>
                       {postPnlResultSheet.meets35x
-                        ? <div className="text-[10px] text-green-600">✅ 목표 달성 (3.5x 이상)</div>
-                        : <div className="text-[10px] text-red-500">⚠️ 원가 절감 필요: {fmtKrw(postPnlResultSheet.costReductionNeeded)}</div>
+                        ? <div className="text-[10px] text-green-600">목표 달성 (3.5x 이상)</div>
+                        : <div className="text-[10px] text-red-500">원가 절감 필요: {fmtKrw(postPnlResultSheet.costReductionNeeded)}</div>
                       }
                     </div>
                   </div>

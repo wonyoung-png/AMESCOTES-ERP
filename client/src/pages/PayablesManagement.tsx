@@ -46,27 +46,27 @@ export default function PayablesManagement() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">미지급 · 불량차감</h1>
-          <p className="text-sm text-stone-500">매입 미지급 · 불량 차감 이월 (다음 명세 자동 반영)</p>
+          <h1 className="text-2xl font-bold text-foreground">미지급 · 불량차감</h1>
+          <p className="text-sm text-muted-foreground">매입 미지급 · 불량 차감 이월 (다음 명세 자동 반영)</p>
         </div>
         <Button onClick={() => setPayModal(true)}>+ 미지급 등록</Button>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border p-4">
-          <p className="text-xs text-stone-500">미지급 잔액</p>
-          <p className="text-2xl font-bold text-red-600">{formatKRW(stats.pending)}</p>
+        <div className="bg-card rounded-xl border p-4">
+          <p className="text-xs text-muted-foreground">미지급 잔액</p>
+          <p className="text-2xl font-bold text-[var(--system-red)]">{formatKRW(stats.pending)}</p>
         </div>
-        <div className="bg-white rounded-xl border p-4">
-          <p className="text-xs text-stone-500">불량 차감 대기</p>
-          <p className="text-2xl font-bold text-amber-600">{formatKRW(stats.defectPending)}</p>
+        <div className="bg-card rounded-xl border p-4">
+          <p className="text-xs text-muted-foreground">불량 차감 대기</p>
+          <p className="text-2xl font-bold text-[var(--system-orange)]">{formatKRW(stats.defectPending)}</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border overflow-hidden">
+      <div className="bg-card rounded-xl border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">미지급 목록</div>
         <table className="w-full text-sm">
-          <thead className="bg-stone-50 text-xs text-stone-500">
+          <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
               <th className="text-left px-4 py-2">거래처</th>
               <th className="text-left px-4 py-2">결제경로</th>
@@ -77,24 +77,24 @@ export default function PayablesManagement() {
               <th className="px-4 py-2">지급처리</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {payables.map(p => (
-              <tr key={p.id} className="border-t border-stone-100">
+              <tr key={p.id} className="hover:bg-[var(--fill-quaternary)]">
                 <td className="px-4 py-3">{p.vendorName}</td>
                 <td className="px-4 py-3">
                   {p.payeeType === 'china_corp' ? (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">중국법인</span>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">중국법인</span>
                   ) : p.payeeType === 'factory_direct' ? (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-100">공장 다이렉트</span>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--fill-quaternary)] text-[var(--system-orange)] border border-border">공장 다이렉트</span>
                   ) : (
-                    <span className="text-[10px] text-stone-400">—</span>
+                    <span className="text-[11px] text-muted-foreground">—</span>
                   )}
                 </td>
                 <td className="px-4 py-3 font-mono text-xs">{p.projectNo || '—'}</td>
                 <td className="px-4 py-3 text-right">{formatKRW(p.amountKrw)}</td>
-                <td className="px-4 py-3 text-right text-green-700">{formatKRW(p.paidAmountKrw)}</td>
+                <td className="px-4 py-3 text-right text-[var(--system-green)]">{formatKRW(p.paidAmountKrw)}</td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded ${p.status === 'paid' ? 'bg-green-100 text-green-700' : p.status === 'partial' ? 'bg-amber-100 text-amber-700' : 'bg-stone-100'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded ${p.status === 'paid' ? 'bg-[var(--fill-quaternary)] text-[var(--system-green)]' : p.status === 'partial' ? 'bg-[var(--fill-quaternary)] text-[var(--system-orange)]' : 'bg-[var(--fill-quaternary)] text-muted-foreground'}`}>
                     {p.status === 'paid' ? '완료' : p.status === 'partial' ? '부분' : '대기'}
                   </span>
                 </td>
@@ -105,7 +105,7 @@ export default function PayablesManagement() {
                         value={payAmount[p.id] ?? ''}
                         onChange={e => setPayAmount(a => ({ ...a, [p.id]: +e.target.value }))}
                         placeholder="금액" />
-                      <Button size="sm" className="h-7 text-xs" onClick={() => {
+                      <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={() => {
                         const amt = payAmount[p.id];
                         if (!amt || amt <= 0) return;
                         phase1.recordPayablePayment(p.id, amt);
@@ -121,10 +121,10 @@ export default function PayablesManagement() {
         </table>
       </div>
 
-      <div className="bg-white rounded-xl border overflow-hidden">
+      <div className="bg-card rounded-xl border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">불량 차감 이월</div>
         <table className="w-full text-sm">
-          <thead className="bg-stone-50 text-xs text-stone-500">
+          <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
               <th className="text-left px-4 py-2">발주</th>
               <th className="text-left px-4 py-2">거래처</th>
@@ -133,15 +133,15 @@ export default function PayablesManagement() {
               <th className="text-left px-4 py-2">상태</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {defects.map(d => (
-              <tr key={d.id} className="border-t border-stone-100">
+              <tr key={d.id} className="hover:bg-[var(--fill-quaternary)]">
                 <td className="px-4 py-3 font-mono text-xs">{d.orderNo}</td>
                 <td className="px-4 py-3">{d.vendorName}</td>
-                <td className="px-4 py-3 text-right text-red-600">{formatKRW(d.amountKrw)}</td>
-                <td className="px-4 py-3 text-stone-600">{d.reason}</td>
+                <td className="px-4 py-3 text-right text-[var(--system-red)]">{formatKRW(d.amountKrw)}</td>
+                <td className="px-4 py-3 text-muted-foreground">{d.reason}</td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded ${d.status === 'applied' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded ${d.status === 'applied' ? 'bg-[var(--fill-quaternary)] text-[var(--system-green)]' : 'bg-[var(--fill-quaternary)] text-[var(--system-orange)]'}`}>
                     {d.status === 'applied' ? '반영됨' : '대기'}
                   </span>
                 </td>

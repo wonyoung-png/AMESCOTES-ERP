@@ -27,10 +27,10 @@ const STATUS_LABEL: Record<CampaignStatus, string> = {
 };
 
 const STATUS_STYLE: Record<CampaignStatus, string> = {
-  draft: 'border-dashed opacity-50 bg-stone-100',
-  onboarded: 'bg-blue-50 border-blue-200',
-  active: 'bg-emerald-50 border-emerald-300 font-medium',
-  closed: 'bg-stone-50 opacity-50',
+  draft: 'border-dashed opacity-50 bg-muted',
+  onboarded: 'bg-primary/10 border-primary/20',
+  active: 'bg-[var(--fill-quaternary)] border-[var(--system-green)] font-medium',
+  closed: 'bg-muted opacity-50',
 };
 
 interface PlacedEvent extends Campaign {
@@ -122,14 +122,14 @@ export default function OperationalCalendar() {
           key={i}
           type="button"
           onClick={() => handleZoom(ymd(c))}
-          className={`absolute top-0 h-full flex flex-col items-center justify-center text-[10px] border-r border-stone-100 hover:bg-stone-100 ${
-            isSunday(c) ? 'text-red-500' : isWeekend(c) ? 'bg-stone-50' : ''
-          } ${isToday ? 'bg-[#C9A96E]/20 font-bold' : 'text-stone-500'}`}
+          className={`absolute top-0 h-full flex flex-col items-center justify-center text-[11px] border-r border-border hover:bg-[var(--fill-quaternary)] ${
+            isSunday(c) ? 'text-[var(--system-red)]' : isWeekend(c) ? 'bg-[var(--fill-quaternary)]' : ''
+          } ${isToday ? 'bg-primary/15 font-bold' : 'text-muted-foreground'}`}
           style={{ left: i * colWidth, width: colWidth }}
         >
-          <span className="text-xs font-semibold text-stone-800">{label}</span>
-          <span className="text-[9px]">{sub}</span>
-          {isToday && <span className="text-[8px] text-[#C9A96E] font-bold">오늘</span>}
+          <span className="text-xs font-semibold text-foreground">{label}</span>
+          <span className="text-[11px]">{sub}</span>
+          {isToday && <span className="text-[11px] text-primary font-bold">오늘</span>}
         </button>
       );
     });
@@ -145,20 +145,20 @@ export default function OperationalCalendar() {
       const rowH = Math.max(34, laneCount * laneH + 4);
 
       return (
-        <div key={`${bandIdx}-${ch}`} className="flex border-b border-stone-100">
+        <div key={`${bandIdx}-${ch}`} className="flex border-b border-border">
           <div
-            className="w-[120px] shrink-0 px-3 py-2 text-xs font-medium text-stone-700 border-r border-stone-200 bg-white sticky left-0 z-10 flex items-center"
+            className="w-[120px] shrink-0 px-3 py-2 text-xs font-medium text-foreground border-r border-border bg-card sticky left-0 z-10 flex items-center"
             style={{ minHeight: rowH }}
           >
             <span>{ch}</span>
             {laneCount > 1 && (
-              <span className="ml-1.5 text-[9px] text-stone-400 font-normal">{laneCount}건</span>
+              <span className="ml-1.5 text-[11px] text-muted-foreground font-normal">{laneCount}건</span>
             )}
           </div>
           <div className="relative" style={{ width: totalW, height: rowH }}>
             {band.unit === 'day' && band.cols.map((c, i) => (
               isWeekend(c) ? (
-                <div key={i} className="absolute top-0 h-full bg-stone-50/80 pointer-events-none" style={{ left: i * colWidth, width: colWidth }} />
+                <div key={i} className="absolute top-0 h-full bg-[var(--fill-quaternary)] pointer-events-none" style={{ left: i * colWidth, width: colWidth }} />
               ) : null
             ))}
             {evs.map(ev => {
@@ -171,7 +171,7 @@ export default function OperationalCalendar() {
                   key={ev.id}
                   type="button"
                   onClick={() => setSelected(ev)}
-                  className={`absolute h-[24px] rounded-md border text-[10px] px-1.5 truncate text-left z-10 ${STATUS_STYLE[ev.status]}`}
+                  className={`absolute h-[24px] rounded-md border text-[11px] px-1.5 truncate text-left z-10 ${STATUS_STYLE[ev.status]}`}
                   style={{ left, width, top }}
                   title={`${ev.title} (${ev.startDate}~${ev.endDate}) ${pct}%`}
                 >
@@ -187,8 +187,8 @@ export default function OperationalCalendar() {
 
     return (
       <div key={bandIdx} className={bandIdx > 0 ? 'mt-4' : ''}>
-        <div className="flex border-b border-stone-200 bg-stone-50 sticky top-0 z-20">
-          <div className="w-[120px] shrink-0 px-3 py-2 text-xs font-semibold text-stone-500 border-r border-stone-200">채널</div>
+        <div className="flex border-b border-border bg-muted sticky top-0 z-20">
+          <div className="w-[120px] shrink-0 px-3 py-2 text-xs font-semibold text-muted-foreground border-r border-border">채널</div>
           <div className="relative h-11" style={{ width: totalW }}>
             {headerCells}
           </div>
@@ -206,20 +206,20 @@ export default function OperationalCalendar() {
     <div className="p-6 space-y-4">
       <div className="flex flex-wrap justify-between gap-3 items-start">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">운영 캘린더 · 기획전</h1>
-          <p className="text-sm text-stone-500">{ws} — 기획전별 팀 프로젝트 · 주/월/분기/반기/연간 뷰</p>
+          <h1 className="text-2xl font-bold text-foreground">운영 캘린더 · 기획전</h1>
+          <p className="text-sm text-muted-foreground">{ws} — 기획전별 팀 프로젝트 · 주/월/분기/반기/연간 뷰</p>
         </div>
         <Button onClick={() => setShowNew(true)}><Plus className="w-4 h-4 mr-1" />기획전</Button>
       </div>
 
       {/* 뷰 전환: 연간 · 반기 · 분기 · 월 · 주 · 일 */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex bg-stone-100 rounded-lg p-1 gap-0.5">
+        <div className="flex bg-muted rounded-lg p-1 gap-0.5">
           {VIEW_MODES.map(v => (
             <Button
               key={v}
               size="sm"
-              variant={viewMode === v ? 'default' : 'ghost'}
+              variant={viewMode === v ? 'secondary' : 'ghost'}
               className="h-8 text-xs px-3"
               onClick={() => setViewMode(v)}
             >
@@ -234,16 +234,16 @@ export default function OperationalCalendar() {
           <Button variant="outline" size="sm" className="h-8 ml-1" onClick={goToday}>오늘</Button>
         </div>
         {(['all', 'active', 'onboarded', 'draft', 'closed'] as const).map(s => (
-          <Button key={s} size="sm" variant={statusFilter === s ? 'default' : 'outline'} onClick={() => setStatusFilter(s)}>
+          <Button key={s} size="sm" variant={statusFilter === s ? 'secondary' : 'outline'} onClick={() => setStatusFilter(s)}>
             {s === 'all' ? '전체' : STATUS_LABEL[s]}
           </Button>
         ))}
       </div>
 
-      <p className="text-xs text-stone-400">{hint}</p>
+      <p className="text-xs text-muted-foreground">{hint}</p>
 
       {/* 타임라인 */}
-      <div className="bg-white rounded-xl border border-stone-200 overflow-x-auto">
+      <div className="bg-card rounded-xl border border-border overflow-x-auto">
         <div style={{ minWidth: 120 + (bands[0]?.cols.length || 1) * colWidth }}>
           {bands.map((band, i) => renderBand(band, i))}
         </div>
@@ -256,26 +256,26 @@ export default function OperationalCalendar() {
             key={c.id}
             type="button"
             onClick={() => setSelected(c)}
-            className="text-left bg-white border rounded-xl p-4 hover:border-[#C9A96E] transition-colors"
+            className="text-left bg-card border border-border rounded-xl p-4 hover:border-primary transition-colors"
           >
             <div className="flex justify-between items-start gap-2">
               <span className="font-medium text-sm">{c.title}</span>
-              <Badge variant="outline" className="text-[10px] shrink-0">{STATUS_LABEL[c.status]}</Badge>
+              <Badge variant="outline" className="text-[11px] shrink-0">{STATUS_LABEL[c.status]}</Badge>
             </div>
-            <p className="text-xs text-stone-500 mt-1">{c.channel} · {c.startDate} ~ {c.endDate}</p>
+            <p className="text-xs text-muted-foreground mt-1">{c.channel} · {c.startDate} ~ {c.endDate}</p>
             <div className="flex flex-wrap gap-1 mt-2">
               {['MD', '마케팅', '비주얼', '디자인', '물류'].map(team => {
                 const pct = phase1.getCampaignTeamProgress(c, team);
                 if (!c.tasks.some(t => t.team === team)) return null;
                 return (
-                  <span key={team} className={`text-[9px] px-1.5 py-0.5 rounded ${pct === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-500'}`}>
+                  <span key={team} className={`text-[11px] px-1.5 py-0.5 rounded ${pct === 100 ? 'bg-[var(--fill-quaternary)] text-[var(--system-green)]' : 'bg-[var(--fill-quaternary)] text-muted-foreground'}`}>
                     {team} {pct}%
                   </span>
                 );
               })}
             </div>
-            <div className="mt-2 h-1.5 bg-stone-100 rounded-full overflow-hidden">
-              <div className="h-full bg-[#C9A96E] rounded-full" style={{ width: `${phase1.getCampaignProgress(c)}%` }} />
+            <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="h-full bg-primary rounded-full" style={{ width: `${phase1.getCampaignProgress(c)}%` }} />
             </div>
           </button>
         ))}
@@ -296,7 +296,7 @@ export default function OperationalCalendar() {
       <Dialog open={showNew} onOpenChange={setShowNew}>
         <DialogContent>
           <DialogHeader><DialogTitle>기획전 생성</DialogTitle></DialogHeader>
-          <p className="text-xs text-stone-500 -mt-2">업무는 자동 생성되지 않습니다. 생성 후 팀 탭에서 직접 등록하세요.</p>
+          <p className="text-xs text-muted-foreground -mt-2">업무는 자동 생성되지 않습니다. 생성 후 팀 탭에서 직접 등록하세요.</p>
           <div className="space-y-3">
             <div><Label>이름</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="여름 시즌오프" /></div>
             <div>

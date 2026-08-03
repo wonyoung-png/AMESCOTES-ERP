@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Search, Pencil, Trash2, FileText, X, Receipt, Printer, Download, Eye } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, FileText, X, Receipt, Printer, Download, Eye, CheckCircle } from 'lucide-react';
 
 // 공급자 고정값 (우리 회사)
 const SUPPLIER = {
@@ -25,9 +25,9 @@ const SUPPLIER = {
 const STATUSES: TradeStatementStatus[] = ['미청구', '청구완료', '수금완료'];
 
 const STATUS_COLOR: Record<TradeStatementStatus, string> = {
-  '미청구':   'bg-stone-50 text-stone-500 border-stone-200',
-  '청구완료': 'bg-amber-50 text-amber-700 border-amber-200',
-  '수금완료': 'bg-green-50 text-green-700 border-green-200',
+  '미청구':   'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
+  '청구완료': 'bg-[var(--fill-quaternary)] text-[var(--system-orange)] border-border',
+  '수금완료': 'bg-[var(--fill-quaternary)] text-[var(--system-green)] border-border',
 };
 
 function newLine(): TradeStatementLine {
@@ -361,18 +361,18 @@ export default function TradeStatement() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-stone-800">거래명세표</h1>
-          <p className="text-xs md:text-sm text-stone-500 mt-0.5 hidden sm:block">전표번호: YYYYMM-거래처코드-순번 · 건별 세율 설정 지원</p>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">거래명세표</h1>
+          <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">전표번호: YYYYMM-거래처코드-순번 · 건별 세율 설정 지원</p>
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
             onClick={() => { openNew(); setShowOrderModal(true); }}
-            className="hidden sm:flex gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+            className="hidden sm:flex gap-2"
           >
             <Download className="w-4 h-4" />발주에서 불러오기
           </Button>
-          <Button onClick={openNew} className="bg-amber-700 hover:bg-amber-800 text-white gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
+          <Button onClick={openNew} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
             <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />명세표 발행
           </Button>
         </div>
@@ -381,20 +381,20 @@ export default function TradeStatement() {
       {/* KPI */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-3">
         {[
-          { label: '전체',       value: `${stats.total}건`,              color: 'text-stone-800' },
-          { label: '미청구',     value: `${stats.unclaimed}건`,          color: 'text-amber-700' },
-          { label: '미청구 금액', value: formatKRW(stats.unclaimedAmount), color: 'text-amber-700' },
-          { label: '청구 완료',  value: formatKRW(stats.billedAmount),   color: 'text-blue-700' },
+          { label: '전체',       value: `${stats.total}건`,              color: 'text-foreground' },
+          { label: '미청구',     value: `${stats.unclaimed}건`,          color: 'text-[var(--system-orange)]' },
+          { label: '미청구 금액', value: formatKRW(stats.unclaimedAmount), color: 'text-[var(--system-orange)]' },
+          { label: '청구 완료',  value: formatKRW(stats.billedAmount),   color: 'text-primary' },
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-stone-200 p-4">
+          <div key={s.label} className="bg-card rounded-xl border border-border p-4">
             <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-stone-500 mt-0.5">{s.label}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
 
       {/* 상태 탭 필터 */}
-      <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl w-fit">
+      <div className="flex items-center gap-1 bg-muted p-1 rounded-xl w-fit">
         {[
           { value: 'all', label: '전체', count: stats.total },
           { value: '미청구', label: '미청구', count: stats.unclaimed },
@@ -406,12 +406,12 @@ export default function TradeStatement() {
             onClick={() => setFilterStatus(opt.value)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
               filterStatus === opt.value
-                ? 'bg-white text-stone-800 shadow-sm'
-                : 'text-stone-500 hover:text-stone-700'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {opt.label}
-            <span className="ml-1.5 text-[10px] opacity-60">{opt.count}</span>
+            <span className="ml-1.5 text-[11px] opacity-60">{opt.count}</span>
           </button>
         ))}
       </div>
@@ -419,7 +419,7 @@ export default function TradeStatement() {
       {/* 검색 + 바이어 필터 */}
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="전표번호 / 거래처 검색" className="pl-9 h-9" />
         </div>
         <Select value={filterBuyer} onValueChange={setFilterBuyer}>
@@ -434,40 +434,40 @@ export default function TradeStatement() {
       </div>
 
       {/* 테이블 (데스크탑) */}
-      <div className="hidden md:block bg-white rounded-xl border border-stone-200 overflow-hidden">
+      <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50">
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">전표번호</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">거래처</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">발행일</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">공급가액</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">부가세</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">합계</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">상태</th>
-              <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">세금계산서</th>
-              <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
+            <tr className="border-b border-border">
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">전표번호</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">거래처</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">발행일</th>
+              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">공급가액</th>
+              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">부가세</th>
+              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">합계</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">상태</th>
+              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">세금계산서</th>
+              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border">
             {filtered.length === 0 ? (
-              <tr><td colSpan={9} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">
                 <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">발행된 명세표가 없습니다</p>
               </td></tr>
             ) : filtered.map(s => {
               const calc = calcStatement(s.lines);
               return (
-                <tr key={s.id} className="border-b border-stone-50 hover:bg-stone-50/50">
-                  <td className="px-4 py-3 font-mono text-xs font-bold text-amber-700">{s.statementNo}</td>
+                <tr key={s.id} className="hover:bg-[var(--fill-quaternary)]">
+                  <td className="px-4 py-3 font-mono text-xs font-bold text-primary">{s.statementNo}</td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-stone-800">{s.vendorName}</p>
-                    {s.vendorCode && <p className="text-xs text-stone-400">코드: {s.vendorCode}</p>}
+                    <p className="font-medium text-foreground">{s.vendorName}</p>
+                    {s.vendorCode && <p className="text-xs text-muted-foreground">코드: {s.vendorCode}</p>}
                   </td>
-                  <td className="px-4 py-3 text-stone-600 text-xs">{s.issueDate}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs text-stone-700">{formatKRW(calc.taxableSupply + calc.exemptAmount)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs text-stone-500">{formatKRW(calc.taxableVat)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs font-bold text-stone-800">{formatKRW(calc.grandTotal)}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">{s.issueDate}</td>
+                  <td className="px-4 py-3 text-right font-mono text-xs text-foreground">{formatKRW(calc.taxableSupply + calc.exemptAmount)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">{formatKRW(calc.taxableVat)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-xs font-bold text-foreground">{formatKRW(calc.grandTotal)}</td>
                   <td className="px-4 py-3">
                     <Select value={s.status} onValueChange={v => {
                       const newStatus = v as TradeStatementStatus;
@@ -523,10 +523,10 @@ export default function TradeStatement() {
                         onClick={() => openTaxPreview(s)}
                         className="inline-flex flex-col items-center gap-0.5 group"
                       >
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 group-hover:bg-green-100 transition-colors">
-                          ✅ 발행완료
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--system-green)] bg-[var(--fill-quaternary)] border border-border rounded-full px-2 py-0.5 group-hover:bg-[var(--fill-tertiary)] transition-colors">
+                          <CheckCircle className="w-3 h-3" />발행완료
                         </span>
-                        <span className="text-[10px] text-stone-400">
+                        <span className="text-[11px] text-muted-foreground">
                           {s.taxInvoice.issuedAt ? new Date(s.taxInvoice.issuedAt).toLocaleDateString('ko-KR') : ''}
                         </span>
                       </button>
@@ -534,7 +534,7 @@ export default function TradeStatement() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-7 text-xs gap-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                        className="h-7 text-xs gap-1"
                         onClick={() => openTaxModal(s)}
                       >
                         <Receipt className="w-3 h-3" />계산서 발행
@@ -543,16 +543,16 @@ export default function TradeStatement() {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1 flex-wrap">
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-amber-700 hover:text-amber-900" onClick={() => setDetailStatement(s)}>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setDetailStatement(s)}>
                         <Eye className="w-3.5 h-3.5 mr-1" />보기
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-blue-700 hover:text-blue-900" onClick={() => handlePrintStatement(s)}>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handlePrintStatement(s)}>
                         <Printer className="w-3.5 h-3.5 mr-1" />PDF
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(s)}>
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(s.id)}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -567,43 +567,43 @@ export default function TradeStatement() {
       {/* 카드 리스트 (모바일) */}
       <div className="md:hidden space-y-3">
         {filtered.length === 0 ? (
-          <div className="text-center py-12 text-stone-400 bg-white rounded-xl border border-stone-200">
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
             <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
             <p className="text-sm">발행된 명세표가 없습니다</p>
           </div>
         ) : filtered.map(s => {
           const calc = calcStatement(s.lines);
           return (
-            <div key={s.id} className="bg-white rounded-xl border border-stone-200 p-4">
+            <div key={s.id} className="bg-card rounded-xl border border-border p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="font-mono font-bold text-amber-700 text-sm">{s.statementNo}</p>
-                  <p className="font-medium text-stone-800 mt-0.5">{s.vendorName}</p>
-                  <p className="text-xs text-stone-400">{s.issueDate}</p>
+                  <p className="font-mono font-bold text-primary text-sm">{s.statementNo}</p>
+                  <p className="font-medium text-foreground mt-0.5">{s.vendorName}</p>
+                  <p className="text-xs text-muted-foreground">{s.issueDate}</p>
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLOR[s.status]}`}>{s.status}</span>
               </div>
-              <div className="mt-3 pt-3 border-t border-stone-100">
+              <div className="mt-3 pt-3 border-t border-border">
                 <div className="flex items-center justify-between">
-                  <div className="text-xs text-stone-500">
+                  <div className="text-xs text-muted-foreground">
                     <span>공급가: {formatKRW(calc.taxableSupply + calc.exemptAmount)}</span>
-                    <span className="mx-1.5 text-stone-300">|</span>
+                    <span className="mx-1.5 text-muted-foreground">|</span>
                     <span>부가세: {formatKRW(calc.taxableVat)}</span>
                   </div>
-                  <p className="font-mono font-bold text-stone-800">{formatKRW(calc.grandTotal)}</p>
+                  <p className="font-mono font-bold text-foreground">{formatKRW(calc.grandTotal)}</p>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-1 mt-3">
-                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-amber-700" onClick={() => setDetailStatement(s)}>
+                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setDetailStatement(s)}>
                   <Eye className="w-3.5 h-3.5 mr-1" />보기
                 </Button>
-                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-blue-700" onClick={() => handlePrintStatement(s)}>
+                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => handlePrintStatement(s)}>
                   <Printer className="w-3.5 h-3.5 mr-1" />PDF
                 </Button>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEdit(s)}>
                   <Pencil className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(s.id)}>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </div>
@@ -617,25 +617,25 @@ export default function TradeStatement() {
         <DialogContent className="w-[95vw] max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-amber-700" />
+              <Receipt className="w-5 h-5 text-primary" />
               세금계산서 발행
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {/* 공급자 (고정) */}
-            <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 space-y-1.5">
-              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">공급자</p>
+            <div className="rounded-lg border border-border bg-muted p-3 space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">공급자</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                <div><span className="text-stone-500">상호</span><span className="ml-2 font-medium text-stone-800">{SUPPLIER.companyName}</span></div>
-                <div><span className="text-stone-500">대표자</span><span className="ml-2 font-medium text-stone-800">{SUPPLIER.ceo}</span></div>
-                <div><span className="text-stone-500">사업자번호</span><span className="ml-2 font-mono text-stone-700">{SUPPLIER.bizRegNo}</span></div>
-                <div className="col-span-2"><span className="text-stone-500">주소</span><span className="ml-2 text-stone-700">{SUPPLIER.address}</span></div>
+                <div><span className="text-muted-foreground">상호</span><span className="ml-2 font-medium text-foreground">{SUPPLIER.companyName}</span></div>
+                <div><span className="text-muted-foreground">대표자</span><span className="ml-2 font-medium text-foreground">{SUPPLIER.ceo}</span></div>
+                <div><span className="text-muted-foreground">사업자번호</span><span className="ml-2 font-mono text-foreground">{SUPPLIER.bizRegNo}</span></div>
+                <div className="col-span-2"><span className="text-muted-foreground">주소</span><span className="ml-2 text-foreground">{SUPPLIER.address}</span></div>
               </div>
             </div>
 
             {/* 공급받는자 */}
-            <div className="rounded-lg border border-amber-200 bg-amber-50/30 p-3 space-y-3">
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">공급받는자</p>
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-3">
+              <p className="text-xs font-semibold text-primary uppercase tracking-wider">공급받는자</p>
               <div className="space-y-2">
                 <div className="space-y-1">
                   <Label className="text-xs">상호 *</Label>
@@ -678,8 +678,8 @@ export default function TradeStatement() {
             </div>
 
             {/* 금액 */}
-            <div className="rounded-lg border border-stone-200 p-3 space-y-3">
-              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">금액</p>
+            <div className="rounded-lg border border-border p-3 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">금액</p>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <Label className="text-xs w-24 shrink-0">공급가액</Label>
@@ -693,7 +693,7 @@ export default function TradeStatement() {
                     }}
                     className="h-8 text-sm text-right font-mono"
                   />
-                  <span className="text-sm text-stone-500 shrink-0">원</span>
+                  <span className="text-sm text-muted-foreground shrink-0">원</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <Label className="text-xs w-24 shrink-0">세액 (10%)</Label>
@@ -703,7 +703,7 @@ export default function TradeStatement() {
                     onChange={e => setTaxForm(f => ({ ...f, taxAmount: parseInt(e.target.value) || 0 }))}
                     className="h-8 text-sm text-right font-mono"
                   />
-                  <span className="text-sm text-stone-500 shrink-0">원</span>
+                  <span className="text-sm text-muted-foreground shrink-0">원</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <Label className="text-xs w-24 shrink-0 font-bold">합계금액</Label>
@@ -718,7 +718,7 @@ export default function TradeStatement() {
                     }}
                     className="h-8 text-sm text-right font-mono font-bold"
                   />
-                  <span className="text-sm text-stone-500 shrink-0">원</span>
+                  <span className="text-sm text-muted-foreground shrink-0">원</span>
                 </div>
               </div>
             </div>
@@ -736,7 +736,7 @@ export default function TradeStatement() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTaxModal(false)}>취소</Button>
-            <Button onClick={handleTaxIssue} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">
+            <Button onClick={handleTaxIssue} className="gap-2">
               <Receipt className="w-4 h-4" />발행 완료
             </Button>
           </DialogFooter>
@@ -748,15 +748,15 @@ export default function TradeStatement() {
         <DialogContent className="w-[95vw] max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-green-700" />
+              <Receipt className="w-5 h-5 text-[var(--system-green)]" />
               세금계산서 발행 내역
             </DialogTitle>
           </DialogHeader>
           {taxPreviewData && (
             <div className="space-y-4 py-2" id="tax-invoice-print">
-              <div className="text-center border-b border-stone-200 pb-3">
-                <h2 className="text-xl font-bold text-stone-800">세금계산서</h2>
-                <p className="text-sm text-stone-500 mt-1">
+              <div className="text-center border-b border-border pb-3">
+                <h2 className="text-xl font-bold text-foreground">세금계산서</h2>
+                <p className="text-sm text-muted-foreground mt-1">
                   전표번호: {taxPreviewData.statement.statementNo}
                   {taxPreviewData.invoice.issuedAt && (
                     <> · 발행일: {new Date(taxPreviewData.invoice.issuedAt).toLocaleDateString('ko-KR')}</>
@@ -764,43 +764,43 @@ export default function TradeStatement() {
                 </p>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-lg border border-stone-200 p-3 space-y-1">
-                  <p className="text-xs font-semibold text-stone-500 mb-2">공급자</p>
-                  <p className="text-sm font-bold text-stone-800">{SUPPLIER.companyName}</p>
-                  <p className="text-xs text-stone-600">사업자번호: {SUPPLIER.bizRegNo}</p>
-                  <p className="text-xs text-stone-600">대표자: {SUPPLIER.ceo}</p>
-                  <p className="text-xs text-stone-500">{SUPPLIER.address}</p>
+                <div className="rounded-lg border border-border p-3 space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">공급자</p>
+                  <p className="text-sm font-bold text-foreground">{SUPPLIER.companyName}</p>
+                  <p className="text-xs text-muted-foreground">사업자번호: {SUPPLIER.bizRegNo}</p>
+                  <p className="text-xs text-muted-foreground">대표자: {SUPPLIER.ceo}</p>
+                  <p className="text-xs text-muted-foreground">{SUPPLIER.address}</p>
                 </div>
-                <div className="rounded-lg border border-amber-200 bg-amber-50/30 p-3 space-y-1">
-                  <p className="text-xs font-semibold text-amber-700 mb-2">공급받는자</p>
-                  <p className="text-sm font-bold text-stone-800">{taxPreviewData.invoice.buyerCompanyName}</p>
-                  <p className="text-xs text-stone-600">사업자번호: {taxPreviewData.invoice.buyerBizRegNo}</p>
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-1">
+                  <p className="text-xs font-semibold text-primary mb-2">공급받는자</p>
+                  <p className="text-sm font-bold text-foreground">{taxPreviewData.invoice.buyerCompanyName}</p>
+                  <p className="text-xs text-muted-foreground">사업자번호: {taxPreviewData.invoice.buyerBizRegNo}</p>
                   {taxPreviewData.invoice.buyerAddress && (
-                    <p className="text-xs text-stone-500">{taxPreviewData.invoice.buyerAddress}</p>
+                    <p className="text-xs text-muted-foreground">{taxPreviewData.invoice.buyerAddress}</p>
                   )}
                   {taxPreviewData.invoice.buyerEmail && (
-                    <p className="text-xs text-stone-400">{taxPreviewData.invoice.buyerEmail}</p>
+                    <p className="text-xs text-muted-foreground">{taxPreviewData.invoice.buyerEmail}</p>
                   )}
                 </div>
               </div>
-              <div className="rounded-lg border border-stone-200 overflow-hidden">
+              <div className="rounded-lg border border-border overflow-hidden">
                 <table className="w-full text-sm">
                   <tbody>
-                    <tr className="border-b border-stone-100">
-                      <td className="px-4 py-2.5 text-stone-600 bg-stone-50 w-40">공급가액</td>
-                      <td className="px-4 py-2.5 text-right font-mono font-bold text-stone-800">
+                    <tr className="border-b border-border">
+                      <td className="px-4 py-2.5 text-muted-foreground bg-muted w-40">공급가액</td>
+                      <td className="px-4 py-2.5 text-right font-mono font-bold text-foreground">
                         {formatKRW(taxPreviewData.invoice.supplyAmount)}
                       </td>
                     </tr>
-                    <tr className="border-b border-stone-100">
-                      <td className="px-4 py-2.5 text-stone-600 bg-stone-50">세액 (10%)</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-stone-600">
+                    <tr className="border-b border-border">
+                      <td className="px-4 py-2.5 text-muted-foreground bg-muted">세액 (10%)</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">
                         {formatKRW(taxPreviewData.invoice.taxAmount)}
                       </td>
                     </tr>
                     <tr>
-                      <td className="px-4 py-2.5 font-bold text-stone-800 bg-stone-50">합계금액</td>
-                      <td className="px-4 py-2.5 text-right font-mono font-bold text-lg text-amber-700">
+                      <td className="px-4 py-2.5 font-bold text-foreground bg-muted">합계금액</td>
+                      <td className="px-4 py-2.5 text-right font-mono font-bold text-lg text-primary">
                         {formatKRW(taxPreviewData.invoice.totalAmount)}
                       </td>
                     </tr>
@@ -808,16 +808,16 @@ export default function TradeStatement() {
                 </table>
               </div>
               {taxPreviewData.invoice.memo && (
-                <div className="rounded-lg border border-stone-100 bg-stone-50 px-4 py-2.5">
-                  <span className="text-xs text-stone-500">비고: </span>
-                  <span className="text-sm text-stone-700">{taxPreviewData.invoice.memo}</span>
+                <div className="rounded-lg border border-border bg-muted px-4 py-2.5">
+                  <span className="text-xs text-muted-foreground">비고: </span>
+                  <span className="text-sm text-foreground">{taxPreviewData.invoice.memo}</span>
                 </div>
               )}
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => window.print()} className="gap-2">
-              🖨️ 인쇄
+              <Printer className="w-4 h-4" />인쇄
             </Button>
             <Button onClick={() => setShowTaxPreview(false)}>닫기</Button>
           </DialogFooter>
@@ -829,7 +829,7 @@ export default function TradeStatement() {
         <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-lg sm:max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Download className="w-4 h-4 text-amber-700" />
+              <Download className="w-4 h-4 text-primary" />
               발주에서 불러오기 (입고완료)
             </DialogTitle>
           </DialogHeader>
@@ -847,18 +847,18 @@ export default function TradeStatement() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="border border-stone-200 rounded-lg overflow-hidden">
+            <div className="border border-border rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-stone-50 border-b border-stone-200">
-                    <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">발주번호</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">스타일</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-stone-500">수량</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">바이어</th>
-                    <th className="text-center px-3 py-2 text-xs font-medium text-stone-500">선택</th>
+                  <tr className="border-b border-border">
+                    <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">발주번호</th>
+                    <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">스타일</th>
+                    <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">수량</th>
+                    <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">바이어</th>
+                    <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">선택</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border">
                   {completedOrders
                     .filter(o => {
                       if (orderFilterBuyer === 'all') return true;
@@ -869,18 +869,19 @@ export default function TradeStatement() {
                       const item = store.getItems().find(i => i.id === o.styleId);
                       const buyer = item?.buyerId ? vendors.find(v => v.id === item.buyerId) : null;
                       return (
-                        <tr key={o.id} className="border-b border-stone-50 hover:bg-stone-50">
-                          <td className="px-3 py-2 font-mono text-xs font-bold text-amber-700">{o.orderNo}</td>
+                        <tr key={o.id} className="hover:bg-[var(--fill-quaternary)]">
+                          <td className="px-3 py-2 font-mono text-xs font-bold text-primary">{o.orderNo}</td>
                           <td className="px-3 py-2">
-                            <p className="font-medium text-stone-700">{o.styleNo}</p>
-                            <p className="text-xs text-stone-400">{o.styleName}</p>
+                            <p className="font-medium text-foreground">{o.styleNo}</p>
+                            <p className="text-xs text-muted-foreground">{o.styleName}</p>
                           </td>
                           <td className="px-3 py-2 text-right font-mono text-xs">{formatNumber(o.qty)}</td>
-                          <td className="px-3 py-2 text-xs text-stone-600">{buyer?.name ?? '-'}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">{buyer?.name ?? '-'}</td>
                           <td className="px-3 py-2 text-center">
                             <Button
                               size="sm"
-                              className="h-7 text-xs bg-amber-700 hover:bg-amber-800 text-white"
+                              variant="secondary"
+                              className="h-7 text-xs"
                               onClick={() => handleImportFromOrder(o)}
                             >
                               불러오기
@@ -895,7 +896,7 @@ export default function TradeStatement() {
                     return item?.buyerId === orderFilterBuyer;
                   }).length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-center py-8 text-stone-400 text-sm">
+                      <td colSpan={5} className="text-center py-8 text-muted-foreground text-sm">
                         입고완료된 발주가 없습니다
                       </td>
                     </tr>
@@ -923,7 +924,7 @@ export default function TradeStatement() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+                  className="h-8 text-xs gap-1.5"
                   onClick={() => setShowOrderModal(true)}
                 >
                   <Download className="w-3.5 h-3.5" />발주에서 불러오기
@@ -944,9 +945,9 @@ export default function TradeStatement() {
                   </SelectContent>
                 </Select>
                 {form.vendorCode && (
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-muted-foreground">
                     전표번호 예시:{' '}
-                    <span className="font-mono font-bold text-amber-700">
+                    <span className="font-mono font-bold text-primary">
                       {new Date().toISOString().slice(0, 7).replace('-', '')}-{form.vendorCode}-001
                     </span>
                   </p>
@@ -976,26 +977,26 @@ export default function TradeStatement() {
                   <Plus className="w-3 h-3" />항목 추가
                 </Button>
               </div>
-              <div className="rounded-lg border border-stone-200 overflow-hidden">
+              <div className="rounded-lg border border-border overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-stone-50 border-b border-stone-200">
-                      <th className="text-center px-3 py-2.5 font-medium text-stone-400 w-10">No</th>
-                      <th className="text-left px-4 py-2.5 font-medium text-stone-600">품목/내역</th>
-                      <th className="text-center px-3 py-2.5 font-medium text-stone-600 w-20">수량</th>
-                      <th className="text-right px-3 py-2.5 font-medium text-stone-600 w-32">단가 (원)</th>
-                      <th className="text-right px-3 py-2.5 font-medium text-stone-600 w-32">공급가액</th>
-                      <th className="text-right px-3 py-2.5 font-medium text-stone-600 w-28">부가세</th>
-                      <th className="text-right px-3 py-2.5 font-medium text-stone-600 w-32">합계</th>
+                    <tr className="border-b border-border">
+                      <th className="text-center px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-10">No</th>
+                      <th className="text-left px-4 py-2.5 text-[13px] font-semibold text-muted-foreground">품목/내역</th>
+                      <th className="text-center px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-20">수량</th>
+                      <th className="text-right px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-32">단가 (원)</th>
+                      <th className="text-right px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-32">공급가액</th>
+                      <th className="text-right px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-28">부가세</th>
+                      <th className="text-right px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-32">합계</th>
                       <th className="w-8"></th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border">
                     {lines.map((line, idx) => {
                       const calc = calcLine(line);
                       return (
-                        <tr key={line.id} className="border-b border-stone-50">
-                          <td className="px-2 py-1.5 text-center text-xs text-stone-400 font-mono">{idx + 1}</td>
+                        <tr key={line.id}>
+                          <td className="px-2 py-1.5 text-center text-xs text-muted-foreground font-mono">{idx + 1}</td>
                           <td className="px-2 py-1.5">
                             <Input value={line.description} onChange={e => updateLine(idx, 'description', e.target.value)} placeholder="품목명 또는 내역" className="h-8 text-sm min-w-[220px]" />
                           </td>
@@ -1006,12 +1007,12 @@ export default function TradeStatement() {
                             <Input type="number" min="0" value={(!line.unitPrice || isNaN(line.unitPrice)) ? '' : line.unitPrice} onChange={e => updateLine(idx, 'unitPrice', parseFloat(e.target.value) || 0)} placeholder="0" className="h-8 text-sm text-right w-28" />
                           </td>
 
-                          <td className="px-2 py-1.5 text-right text-stone-700 font-mono">{formatKRW(calc.supply)}</td>
-                          <td className="px-2 py-1.5 text-right text-stone-500 font-mono">{formatKRW(calc.tax)}</td>
-                          <td className="px-2 py-1.5 text-right text-stone-800 font-mono font-semibold">{formatKRW(calc.total)}</td>
+                          <td className="px-2 py-1.5 text-right text-foreground font-mono">{formatKRW(calc.supply)}</td>
+                          <td className="px-2 py-1.5 text-right text-muted-foreground font-mono">{formatKRW(calc.tax)}</td>
+                          <td className="px-2 py-1.5 text-right text-foreground font-mono font-semibold">{formatKRW(calc.total)}</td>
                           <td className="px-2 py-1.5 text-center">
                             {lines.length > 1 && (
-                              <button onClick={() => setLines(ls => ls.filter((_, i) => i !== idx))} className="text-stone-300 hover:text-red-500">
+                              <button onClick={() => setLines(ls => ls.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-[var(--system-red)]">
                                 <X className="w-3.5 h-3.5" />
                               </button>
                             )}
@@ -1023,22 +1024,22 @@ export default function TradeStatement() {
                 </table>
               </div>
               {/* 합계 */}
-              <div className="p-3 bg-stone-50 rounded-lg border border-stone-100 text-sm space-y-1">
-                <div className="flex justify-between text-stone-600">
+              <div className="p-3 bg-muted rounded-lg border border-border text-sm space-y-1">
+                <div className="flex justify-between text-muted-foreground">
                   <span>과세 공급가액</span>
                   <span className="font-mono">{formatKRW(currentTotal.taxableSupply)}</span>
                 </div>
                 {currentTotal.exemptAmount > 0 && (
-                  <div className="flex justify-between text-stone-600">
+                  <div className="flex justify-between text-muted-foreground">
                     <span>면세 공급가액</span>
                     <span className="font-mono">{formatKRW(currentTotal.exemptAmount)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-stone-600">
+                <div className="flex justify-between text-muted-foreground">
                   <span>부가세 (10%)</span>
                   <span className="font-mono">{formatKRW(currentTotal.taxableVat)}</span>
                 </div>
-                <div className="flex justify-between font-bold text-stone-800 text-base pt-2 border-t border-stone-200">
+                <div className="flex justify-between font-bold text-foreground text-base pt-2 border-t border-border">
                   <span>합계</span>
                   <span className="font-mono">{formatKRW(currentTotal.grandTotal)}</span>
                 </div>
@@ -1065,7 +1066,7 @@ export default function TradeStatement() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
-            <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">{isEdit ? '수정' : '발행'}</Button>
+            <Button onClick={handleSave}>{isEdit ? '수정' : '발행'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1137,37 +1138,37 @@ function TradeStatementDetailModal({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-amber-700" />
+            <FileText className="w-5 h-5 text-primary" />
             거래명세표 상세
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3 py-2">
           {/* 헤더 정보 */}
-          <div className="grid grid-cols-2 gap-3 text-sm bg-stone-50 rounded-lg p-3">
+          <div className="grid grid-cols-2 gap-3 text-sm bg-muted rounded-lg p-3">
             <div>
-              <span className="text-stone-500 text-xs">전표번호</span>
-              <p className="font-mono font-bold text-amber-700">{statement.statementNo}</p>
+              <span className="text-muted-foreground text-xs">전표번호</span>
+              <p className="font-mono font-bold text-primary">{statement.statementNo}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">발행일</span>
-              <p className="font-medium text-stone-800">{statement.issueDate}</p>
+              <span className="text-muted-foreground text-xs">발행일</span>
+              <p className="font-medium text-foreground">{statement.issueDate}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">거래처</span>
-              <p className="font-medium text-stone-800">{statement.vendorName}</p>
-              {vendor?.bizRegNo && <p className="text-xs text-stone-500">사업자번호: {vendor.bizRegNo}</p>}
+              <span className="text-muted-foreground text-xs">거래처</span>
+              <p className="font-medium text-foreground">{statement.vendorName}</p>
+              {vendor?.bizRegNo && <p className="text-xs text-muted-foreground">사업자번호: {vendor.bizRegNo}</p>}
             </div>
             <div>
-              <span className="text-stone-500 text-xs">상태</span>
-              <p className="font-medium text-stone-800">{statement.status}</p>
+              <span className="text-muted-foreground text-xs">상태</span>
+              <p className="font-medium text-foreground">{statement.status}</p>
             </div>
           </div>
 
           {/* 품목 테이블 */}
-          <div className="border border-stone-200 rounded-lg overflow-hidden">
-            <div className="bg-stone-50 px-4 py-2 flex items-center justify-between border-b border-stone-200">
-              <p className="text-xs font-medium text-stone-600">품목 명세</p>
+          <div className="border border-border rounded-lg overflow-hidden">
+            <div className="bg-muted px-4 py-2 flex items-center justify-between border-b border-border">
+              <p className="text-xs font-medium text-muted-foreground">품목 명세</p>
               <div className="flex items-center gap-2">
                 {isEditing && (
                   <Button size="sm" variant="outline" onClick={addItem} className="h-7 text-xs gap-1">
@@ -1177,7 +1178,7 @@ function TradeStatementDetailModal({
                 <Button
                   size="sm"
                   variant={isEditing ? 'default' : 'outline'}
-                  className={`h-7 text-xs gap-1 ${isEditing ? 'bg-amber-700 hover:bg-amber-800 text-white' : ''}`}
+                  className="h-7 text-xs gap-1"
                   onClick={() => setIsEditing(!isEditing)}
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -1187,31 +1188,31 @@ function TradeStatementDetailModal({
             </div>
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-stone-50 border-b border-stone-100">
-                  <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">품목/내역</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-16">수량</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-28">단가</th>
-                  <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-16">세율</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">공급가</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">합계</th>
+                <tr className="border-b border-border">
+                  <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">품목/내역</th>
+                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">수량</th>
+                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-28">단가</th>
+                  <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">세율</th>
+                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">공급가</th>
+                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">합계</th>
                   {isEditing && <th className="w-8 px-2"></th>}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border">
                 {displayLines.map((line) => {
                   const lCalc = calcLine(line);
                   return (
-                    <tr key={line.id} className="border-b border-stone-50">
+                    <tr key={line.id}>
                       <td className="px-2 py-1.5">
                         {isEditing ? (
                           <input
                             value={line.description}
                             onChange={e => updateItemDesc(line.id, e.target.value)}
-                            className="h-8 text-sm border border-stone-200 rounded px-2 w-full"
+                            className="h-8 text-sm border border-border rounded px-2 w-full"
                             placeholder="품목명"
                           />
                         ) : (
-                          <span className="text-stone-800">{line.description}</span>
+                          <span className="text-foreground">{line.description}</span>
                         )}
                       </td>
                       <td className="px-2 py-1.5">
@@ -1220,11 +1221,11 @@ function TradeStatementDetailModal({
                             type="number"
                             value={line.qty}
                             onChange={e => updateItemPrice(line.id, 'qty', parseInt(e.target.value) || 1)}
-                            className="h-8 text-sm text-right border border-stone-200 rounded px-2 w-16"
+                            className="h-8 text-sm text-right border border-border rounded px-2 w-16"
                             min={1}
                           />
                         ) : (
-                          <span className="text-right block text-stone-700">{formatNumber(line.qty)}</span>
+                          <span className="text-right block text-foreground">{formatNumber(line.qty)}</span>
                         )}
                       </td>
                       <td className="px-2 py-1.5">
@@ -1233,22 +1234,22 @@ function TradeStatementDetailModal({
                             type="number"
                             value={line.unitPrice}
                             onChange={e => updateItemPrice(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                            className="h-8 text-sm text-right border border-stone-200 rounded px-2 w-28"
+                            className="h-8 text-sm text-right border border-border rounded px-2 w-28"
                             min={0}
                           />
                         ) : (
-                          <span className={`text-right block ${line.unitPrice === 0 ? 'text-red-400 italic' : 'text-stone-700'}`}>
+                          <span className={`text-right block ${line.unitPrice === 0 ? 'text-[var(--system-red)] italic' : 'text-foreground'}`}>
                             {line.unitPrice === 0 ? '0 (미입력)' : formatKRW(line.unitPrice)}
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-1.5 text-center text-xs text-stone-500">{line.taxType}</td>
-                      <td className="px-3 py-1.5 text-right text-sm text-stone-700 font-mono">{formatKRW(lCalc.supply)}</td>
-                      <td className="px-3 py-1.5 text-right text-sm font-semibold text-stone-800 font-mono">{formatKRW(lCalc.total)}</td>
+                      <td className="px-3 py-1.5 text-center text-xs text-muted-foreground">{line.taxType}</td>
+                      <td className="px-3 py-1.5 text-right text-sm text-foreground font-mono">{formatKRW(lCalc.supply)}</td>
+                      <td className="px-3 py-1.5 text-right text-sm font-semibold text-foreground font-mono">{formatKRW(lCalc.total)}</td>
                       {isEditing && (
                         <td className="px-2 py-1.5">
                           <button
-                            className="text-stone-400 hover:text-red-500"
+                            className="text-muted-foreground hover:text-[var(--system-red)]"
                             onClick={() => removeItem(line.id)}
                           >
                             <X className="w-3.5 h-3.5" />
@@ -1263,24 +1264,24 @@ function TradeStatementDetailModal({
           </div>
 
           {/* 합계 */}
-          <div className="bg-amber-50 rounded-lg p-3 space-y-1.5 text-sm">
-            <div className="flex justify-between text-stone-600">
+          <div className="bg-muted rounded-lg p-3 space-y-1.5 text-sm">
+            <div className="flex justify-between text-muted-foreground">
               <span>과세 공급가액</span>
               <span className="font-mono">{formatKRW(calc.taxableSupply)}</span>
             </div>
             {calc.exemptAmount > 0 && (
-              <div className="flex justify-between text-stone-600">
+              <div className="flex justify-between text-muted-foreground">
                 <span>면세 공급가액</span>
                 <span className="font-mono">{formatKRW(calc.exemptAmount)}</span>
               </div>
             )}
-            <div className="flex justify-between text-stone-600">
+            <div className="flex justify-between text-muted-foreground">
               <span>부가세 (10%)</span>
               <span className="font-mono">{formatKRW(calc.taxableVat)}</span>
             </div>
-            <div className="flex justify-between font-bold text-stone-800 text-base pt-1 border-t border-amber-200">
+            <div className="flex justify-between font-bold text-foreground text-base pt-1 border-t border-border">
               <span>합계</span>
-              <span className="font-mono text-amber-900">{formatKRW(calc.grandTotal)}</span>
+              <span className="font-mono text-foreground">{formatKRW(calc.grandTotal)}</span>
             </div>
           </div>
         </div>
@@ -1289,7 +1290,7 @@ function TradeStatementDetailModal({
           <Button variant="outline" onClick={onClose}>닫기</Button>
           <Button
             variant="outline"
-            className="gap-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+            className="gap-1"
             onClick={() => onPrint(statement)}
           >
             <Printer className="w-4 h-4" />PDF 출력
@@ -1299,7 +1300,7 @@ function TradeStatementDetailModal({
               <Button variant="outline" onClick={() => { setIsEditing(false); setEditLines([...statement.lines]); }}>
                 취소
               </Button>
-              <Button onClick={handleSaveEdit} className="bg-amber-700 hover:bg-amber-800 text-white">
+              <Button onClick={handleSaveEdit}>
                 수정 저장
               </Button>
             </>

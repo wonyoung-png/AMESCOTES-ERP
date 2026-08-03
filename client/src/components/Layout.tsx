@@ -127,7 +127,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F5F4EF]">
+    <div className="flex h-screen overflow-hidden bg-background">
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-30 md:hidden"
@@ -137,7 +137,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
       <aside
         className={`
-          flex flex-col bg-[#1C1C1E] text-white shrink-0 transition-all duration-200
+          flex flex-col bg-sidebar text-white shrink-0 transition-all duration-200
           md:relative md:translate-x-0
           fixed inset-y-0 left-0 z-40
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -146,13 +146,13 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         `}
       >
         <div className={`flex items-center gap-3 px-4 py-5 border-b border-white/8 ${collapsed ? 'justify-center px-2' : ''}`}>
-          <div className="w-8 h-8 rounded-lg bg-[#C9A96E] flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
             <span className="text-white font-bold text-xs leading-none">AT</span>
           </div>
           {!collapsed && (
             <div className="overflow-hidden flex-1">
               <h1 className="text-sm font-bold text-white tracking-wide leading-tight">ATLM ERP</h1>
-              <p className="text-[10px] text-white/35 tracking-wider leading-tight">제조 · Phase 1</p>
+              <p className="text-[11px] text-white/35 tracking-wider leading-tight">제조 · Phase 1</p>
             </div>
           )}
           {!collapsed && (
@@ -177,8 +177,8 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     type="button"
                     onClick={() => setWorkspace(ws)}
                     className={`
-                      flex-1 text-[10px] font-semibold py-1.5 rounded-md transition-all
-                      ${active ? 'bg-[#C9A96E] text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/5'}
+                      flex-1 text-[11px] font-semibold py-1.5 rounded-md transition-all
+                      ${active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-white/50 hover:text-white/80 hover:bg-white/5'}
                     `}
                   >
                     {ws}
@@ -186,7 +186,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                 );
               })}
             </div>
-            <p className="text-[9px] text-white/25 mt-1.5 px-1">
+            <p className="text-[11px] text-white/25 mt-1.5 px-1">
               {workspace === 'OEM' ? 'OEM + 브랜드 생산 공유' : `${workspace} 브랜드 발주`}
             </p>
           </div>
@@ -200,7 +200,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             <div key={gi} className="mb-1">
               {group.label && !collapsed && (
                 <div className="px-3 pt-4 pb-1.5">
-                  <span className="text-[10px] font-semibold text-white/25 uppercase tracking-[0.15em]">
+                  <span className="text-[11px] font-semibold text-white/25 uppercase tracking-[0.15em]">
                     {group.label}
                   </span>
                 </div>
@@ -217,27 +217,27 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     className={`
                       flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 mb-0.5
                       ${active
-                        ? 'bg-[#C9A96E]/15 text-[#C9A96E] font-medium border border-[#C9A96E]/20'
+                        ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium border border-sidebar-primary/20'
                         : 'text-white/55 hover:text-white/90 hover:bg-white/8'
                       }
                       ${collapsed ? 'justify-center px-2' : ''}
                     `}
                   >
-                    <span className={`shrink-0 ${active ? 'text-[#C9A96E]' : ''}`}>
+                    <span className={`shrink-0 ${active ? 'text-sidebar-primary' : ''}`}>
                       {item.icon}
                     </span>
                     {!collapsed && (
                       <span className="flex-1 min-w-0">
                         <span className="block truncate">{item.label}</span>
                         {item.table && (
-                          <span className="block text-[9px] font-mono opacity-30 truncate leading-tight">
+                          <span className="block text-[11px] font-mono opacity-30 truncate leading-tight">
                             {item.table}
                           </span>
                         )}
                       </span>
                     )}
                     {active && !collapsed && (
-                      <span className="ml-auto w-1 h-4 rounded-full bg-[#C9A96E] shrink-0" />
+                      <span className="ml-auto w-1 h-4 rounded-full bg-sidebar-primary shrink-0" />
                     )}
                   </Link>
                 );
@@ -256,7 +256,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           )}
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-white/35 hover:text-red-400 hover:bg-white/8 transition-colors text-xs ${collapsed ? 'justify-center' : ''}`}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-white/35 hover:text-[var(--system-red)] hover:bg-white/8 transition-colors text-xs ${collapsed ? 'justify-center' : ''}`}
           >
             <LogOut size={14} />
             {!collapsed && <span>로그아웃</span>}
@@ -271,33 +271,33 @@ export default function Layout({ children, onLogout }: LayoutProps) {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="h-12 bg-white border-b border-stone-200 flex items-center justify-between px-4 md:px-6 shrink-0">
+        <header className="h-12 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="md:hidden p-1.5 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100"
+              className="md:hidden p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
             >
               <Menu size={20} />
             </button>
-            <div className="text-xs text-stone-400">
-              <span className="font-semibold text-stone-600">{workspace}</span>
-              <span className="mx-1.5 text-stone-300">·</span>
-              시즌 <span className="font-semibold text-stone-600">{settings.currentSeason}</span>
+            <div className="text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">{workspace}</span>
+              <span className="mx-1.5 text-muted-foreground">·</span>
+              시즌 <span className="font-semibold text-foreground">{settings.currentSeason}</span>
             </div>
           </div>
-          <div className="flex items-center gap-3 text-xs text-stone-500">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="hidden sm:flex items-center gap-1">
               <DollarSign className="w-3 h-3" />
               USD {settings.usdKrw.toLocaleString()}
             </span>
-            <span className="hidden sm:inline text-stone-300">|</span>
+            <span className="hidden sm:inline text-muted-foreground">|</span>
             <span className="hidden sm:inline">CNY {settings.cnyKrw.toLocaleString()}</span>
             {currentUser && (
               <div className="flex items-center gap-1.5 ml-2">
-                <div className="w-7 h-7 rounded-full bg-[#C9A96E] flex items-center justify-center text-white text-xs font-bold">
+                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
                   {currentUser.name.slice(0, 1)}
                 </div>
-                <span className="text-stone-600 font-medium hidden sm:inline">{currentUser.name}</span>
+                <span className="text-foreground font-medium hidden sm:inline">{currentUser.name}</span>
               </div>
             )}
           </div>
@@ -308,7 +308,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         </main>
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-stone-200 z-20 safe-area-pb">
+      <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-card border-t border-border z-20 safe-area-pb">
         <div className="flex items-center justify-around">
           {bottomTabs.map((tab) => {
             const active = tab.isMore ? false : isActive(tab.path);
@@ -318,11 +318,11 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                 href={tab.isMore ? '#' : tab.path}
                 onClick={tab.isMore ? (e) => { e.preventDefault(); setSidebarOpen(true); } : undefined}
                 className={`flex flex-col items-center justify-center py-2 px-3 flex-1 gap-0.5 transition-colors ${
-                  active ? 'text-[#C9A96E]' : 'text-stone-400 hover:text-stone-600'
+                  active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <span>{tab.icon}</span>
-                <span className="text-[10px] font-medium">{tab.label}</span>
+                <span className="text-[11px] font-medium">{tab.label}</span>
               </Link>
             );
           })}

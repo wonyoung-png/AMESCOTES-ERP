@@ -140,8 +140,8 @@ function ChipBtn({
       onClick={onClick}
       className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
         primary
-          ? 'bg-stone-800 text-stone-50 border-stone-800 hover:bg-stone-700'
-          : 'bg-white text-stone-600 border-stone-200 hover:border-amber-400 hover:text-amber-800'
+          ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'
+          : 'bg-card text-muted-foreground border-border hover:border-primary hover:text-primary'
       }`}
     >
       {children}
@@ -268,29 +268,29 @@ export default function LineSheet() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-[1400px]">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-stone-200 pb-4">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-4">
         <div>
-          <div className="flex items-center gap-2 text-stone-800">
-            <FileSpreadsheet size={20} className="text-amber-700" />
+          <div className="flex items-center gap-2 text-foreground">
+            <FileSpreadsheet size={20} className="text-primary" />
             <h1 className="text-xl font-bold tracking-tight">라인시트</h1>
-            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-800">LUMEN</span>
+            <span className="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-primary/20 bg-primary/10 text-primary">LUMEN</span>
           </div>
-          <p className="text-xs text-stone-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Wholesale Line Sheet · 품목 마스터 기반 · 국가별 현지통화
           </p>
         </div>
-        <div className="text-right text-xs text-stone-500">
-          <div><span className="font-semibold text-stone-700">{market.name}</span> · 1 KRW = <b>{rate}</b> {market.currency}</div>
+        <div className="text-right text-xs text-muted-foreground">
+          <div><span className="font-semibold text-foreground">{market.name}</span> · 1 KRW = <b>{rate}</b> {market.currency}</div>
           <div>R-{Math.round(disc * 100)}% · {ROUND_LABELS.find(r => r.value === roundMode)?.label}</div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4 items-start">
         {/* 품목 지정 */}
-        <aside className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-stone-100 bg-stone-50">
-            <h2 className="text-sm font-semibold text-stone-700">품목 지정</h2>
-            <p className="text-[11px] text-stone-400 mt-0.5 leading-relaxed">
+        <aside className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-muted">
+            <h2 className="text-sm font-semibold text-foreground">품목 지정</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
               필터 후 일괄 선택 · 시즌/카테고리 일괄 · KMSRP·이미지 있는 것만 · 개별 체크
             </p>
           </div>
@@ -336,40 +336,40 @@ export default function LineSheet() {
               <ChipBtn onClick={() => selectIds(filtered.filter(i => !!i.imageUrl).map(i => i.id), 'add')}>이미지 있는 것만</ChipBtn>
             </div>
 
-            <div className="max-h-[420px] overflow-y-auto border border-stone-200 rounded-lg">
+            <div className="max-h-[420px] overflow-y-auto border border-border rounded-lg">
               {filtered.length === 0 ? (
-                <div className="p-6 text-center text-xs text-stone-400">조건에 맞는 품목 없음</div>
+                <div className="p-6 text-center text-xs text-muted-foreground">조건에 맞는 품목 없음</div>
               ) : filtered.map(i => (
                 <label
                   key={i.id}
-                  className="flex items-center gap-2 px-2 py-1.5 border-b border-stone-100 hover:bg-stone-50 cursor-pointer"
+                  className="flex items-center gap-2 px-2 py-1.5 border-b border-border hover:bg-[var(--fill-quaternary)] cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     checked={selected.has(i.id)}
                     onChange={() => toggle(i.id)}
-                    className="accent-amber-700"
+                    className="accent-primary"
                   />
                   {i.imageUrl ? (
-                    <img src={i.imageUrl} alt="" className="w-9 h-9 rounded object-cover border border-stone-200" />
+                    <img src={i.imageUrl} alt="" className="w-9 h-9 rounded object-cover border border-border" />
                   ) : (
-                    <div className="w-9 h-9 rounded bg-stone-100 border border-stone-200" />
+                    <div className="w-9 h-9 rounded bg-muted border border-border" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-stone-800 truncate">{i.nameEn || i.name}</div>
-                    <div className="text-[10px] text-stone-400 truncate">
+                    <div className="text-xs font-medium text-foreground truncate">{i.nameEn || i.name}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">
                       {i.styleNo} · {i.season || '-'} · {i.erpCategory} · {i.colors.length}c
                     </div>
                   </div>
-                  <div className="text-[10px] font-mono text-stone-600 whitespace-nowrap">
+                  <div className="text-[11px] font-mono text-muted-foreground whitespace-nowrap">
                     {i.kmsrp > 0 ? formatKRW(i.kmsrp) : '—'}
                   </div>
                 </label>
               ))}
             </div>
-            <p className="text-[11px] text-stone-500">
-              선택 <strong className="text-stone-800">{selected.size}</strong> 품목
-              · 라인 행 <strong className="text-stone-800">{sheetRows.length}</strong>
+            <p className="text-[11px] text-muted-foreground">
+              선택 <strong className="text-foreground">{selected.size}</strong> 품목
+              · 라인 행 <strong className="text-foreground">{sheetRows.length}</strong>
               · 마스터 {catalog.length}건
             </p>
           </div>
@@ -377,10 +377,10 @@ export default function LineSheet() {
 
         {/* 시트 */}
         <section className="space-y-3">
-          <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-3">
+          <div className="bg-card rounded-xl border border-border p-3">
             <div className="flex flex-wrap gap-3 items-end">
               <div>
-                <label className="text-[10px] uppercase tracking-wide text-stone-400 block mb-1">Market</label>
+                <label className="text-[11px] uppercase tracking-wide text-muted-foreground block mb-1">Market</label>
                 <Select value={marketCode} onValueChange={applyMarket}>
                   <SelectTrigger className="h-8 text-xs w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -391,7 +391,7 @@ export default function LineSheet() {
                 </Select>
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-wide text-stone-400 block mb-1">환율 (1 KRW→Local)</label>
+                <label className="text-[11px] uppercase tracking-wide text-muted-foreground block mb-1">환율 (1 KRW→Local)</label>
                 <Input
                   type="number"
                   step="any"
@@ -401,7 +401,7 @@ export default function LineSheet() {
                 />
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-wide text-stone-400 block mb-1">Discount %</label>
+                <label className="text-[11px] uppercase tracking-wide text-muted-foreground block mb-1">Discount %</label>
                 <Input
                   type="number"
                   min={0}
@@ -412,7 +412,7 @@ export default function LineSheet() {
                 />
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-wide text-stone-400 block mb-1">반올림</label>
+                <label className="text-[11px] uppercase tracking-wide text-muted-foreground block mb-1">반올림</label>
                 <Select value={roundMode} onValueChange={v => setRoundMode(v as RoundMode)}>
                   <SelectTrigger className="h-8 text-xs w-36"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -422,70 +422,70 @@ export default function LineSheet() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="ml-auto grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-stone-500">
+              <div className="ml-auto grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
                 <span>Total pcs</span>
-                <strong className="text-stone-800 text-right tabular-nums">{totalPcs} pcs</strong>
+                <strong className="text-foreground text-right tabular-nums">{totalPcs} pcs</strong>
                 <span>Total (Local)</span>
-                <strong className="text-stone-800 text-right tabular-nums">
+                <strong className="text-foreground text-right tabular-nums">
                   {totalPcs ? fmtLocal(totalLocal, market.symbol, roundMode) : '—'}
                 </strong>
                 <span>Total (KRW)</span>
-                <strong className="text-stone-800 text-right tabular-nums">
+                <strong className="text-foreground text-right tabular-nums">
                   {totalPcs ? formatKRW(totalKrw) : '—'}
                 </strong>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-stone-100 bg-stone-800 text-white text-sm font-semibold">
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-border bg-sidebar text-white text-sm font-semibold">
               Line Sheet
             </div>
             <div className="overflow-auto max-h-[70vh]">
               {sheetRows.length === 0 ? (
-                <div className="p-12 text-center text-sm text-stone-400">왼쪽에서 품목을 선택하세요.</div>
+                <div className="p-12 text-center text-sm text-muted-foreground">왼쪽에서 품목을 선택하세요.</div>
               ) : (
                 <table className="w-full text-xs min-w-[1080px]">
                   <thead className="sticky top-0 z-10">
-                    <tr className="bg-stone-800 text-stone-100">
-                      <th className="px-2 py-2.5 text-left font-medium">Season</th>
-                      <th className="px-2 py-2.5 text-left font-medium">Photo</th>
-                      <th className="px-2 py-2.5 text-left font-medium">SKU</th>
-                      <th className="px-2 py-2.5 text-left font-medium">Model</th>
-                      <th className="px-2 py-2.5 text-left font-medium">Colour</th>
-                      <th className="px-2 py-2.5 text-left font-medium">COO</th>
-                      <th className="px-2 py-2.5 text-right font-medium">KMSRP<br />KRW</th>
-                      <th className="px-2 py-2.5 text-right font-medium">Global<br />KRW</th>
-                      <th className="px-2 py-2.5 text-right font-medium">MSRP<br />{market.currency}</th>
-                      <th className="px-2 py-2.5 text-right font-medium bg-stone-700">Wholesale<br />{market.currency}</th>
-                      <th className="px-2 py-2.5 text-right font-medium bg-stone-700">Submit Qty</th>
+                    <tr className="bg-muted text-[13px] font-semibold text-muted-foreground">
+                      <th className="px-2 py-2.5 text-left font-semibold">Season</th>
+                      <th className="px-2 py-2.5 text-left font-semibold">Photo</th>
+                      <th className="px-2 py-2.5 text-left font-semibold">SKU</th>
+                      <th className="px-2 py-2.5 text-left font-semibold">Model</th>
+                      <th className="px-2 py-2.5 text-left font-semibold">Colour</th>
+                      <th className="px-2 py-2.5 text-left font-semibold">COO</th>
+                      <th className="px-2 py-2.5 text-right font-semibold">KMSRP<br />KRW</th>
+                      <th className="px-2 py-2.5 text-right font-semibold">Global<br />KRW</th>
+                      <th className="px-2 py-2.5 text-right font-semibold">MSRP<br />{market.currency}</th>
+                      <th className="px-2 py-2.5 text-right font-semibold bg-[var(--fill-tertiary)]">Wholesale<br />{market.currency}</th>
+                      <th className="px-2 py-2.5 text-right font-semibold bg-[var(--fill-tertiary)]">Submit Qty</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border">
                     {sheetRows.map(row => {
                       const localMsrp = roundMoney(row.global * rate, roundMode);
                       const wsLocal = roundMoney(row.global * rate * (1 - disc), roundMode);
                       const q = qtys[row.key] || 0;
                       return (
-                        <tr key={row.key} className="border-b border-stone-100 hover:bg-stone-50">
+                        <tr key={row.key} className="hover:bg-[var(--fill-quaternary)]">
                           <td className="px-2 py-2">{row.season || '—'}</td>
                           <td className="px-2 py-2">
                             {row.img ? (
-                              <img src={row.img} alt="" className="w-11 h-11 rounded object-cover border border-stone-200" />
+                              <img src={row.img} alt="" className="w-11 h-11 rounded object-cover border border-border" />
                             ) : (
-                              <div className="w-11 h-11 rounded bg-stone-100 border border-stone-200" />
+                              <div className="w-11 h-11 rounded bg-muted border border-border" />
                             )}
                           </td>
                           <td className="px-2 py-2 font-mono text-[11px]">{row.sku}</td>
                           <td className="px-2 py-2 font-medium">{row.model}</td>
-                          <td className="px-2 py-2 text-stone-500">{row.colour}</td>
+                          <td className="px-2 py-2 text-muted-foreground">{row.colour}</td>
                           <td className="px-2 py-2">{row.coo}</td>
                           <td className="px-2 py-2 text-right tabular-nums">{row.kmsrp ? formatKRW(row.kmsrp) : '—'}</td>
                           <td className="px-2 py-2 text-right tabular-nums">{row.global ? formatKRW(row.global) : '—'}</td>
                           <td className="px-2 py-2 text-right tabular-nums">
                             {row.global ? fmtLocal(localMsrp, market.symbol, roundMode) : '—'}
                           </td>
-                          <td className="px-2 py-2 text-right tabular-nums font-semibold text-amber-900">
+                          <td className="px-2 py-2 text-right tabular-nums font-semibold text-primary">
                             {row.global ? fmtLocal(wsLocal, market.symbol, roundMode) : '—'}
                           </td>
                           <td className="px-2 py-2 text-right">
@@ -508,7 +508,7 @@ export default function LineSheet() {
                 </table>
               )}
             </div>
-            <div className="px-4 py-2 border-t border-stone-100 text-[10px] text-stone-400">
+            <div className="px-4 py-2 border-t border-border text-[11px] text-muted-foreground">
               Wholesale = round(Global MSRP(KRW) × FX × (1 − Discount)). KMSRP/Global은 BOM·품목 마스터 연동.
             </div>
           </div>

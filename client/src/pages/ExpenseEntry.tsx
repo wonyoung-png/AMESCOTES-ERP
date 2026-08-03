@@ -24,9 +24,9 @@ const TYPE_ICON: Record<ExpenseType, React.ReactNode> = {
 };
 
 const TYPE_COLOR: Record<ExpenseType, string> = {
-  '법인카드': 'bg-blue-50 text-blue-700 border-blue-200',
-  '계좌이체': 'bg-green-50 text-green-700 border-green-200',
-  '현금': 'bg-stone-50 text-stone-700 border-stone-200',
+  '법인카드': 'bg-primary/10 text-primary border-primary/20',
+  '계좌이체': 'bg-[var(--fill-quaternary)] text-[var(--system-green)] border-border',
+  '현금': 'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
 };
 
 const EMPTY_HEADER = {
@@ -136,67 +136,67 @@ function ExpenseDetailModal({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-amber-700" />
+            <FileText className="w-5 h-5 text-primary" />
             지출전표 상세
           </DialogTitle>
         </DialogHeader>
 
         {/* 헤더 정보 */}
         <div className="space-y-3 py-2">
-          <div className="grid grid-cols-2 gap-3 text-sm bg-stone-50 rounded-lg p-3">
+          <div className="grid grid-cols-2 gap-3 text-sm bg-muted rounded-lg p-3">
             <div>
-              <span className="text-stone-500 text-xs">전표번호</span>
-              <p className="font-mono font-bold text-amber-700">{expenseNo}</p>
+              <span className="text-muted-foreground text-xs">전표번호</span>
+              <p className="font-mono font-bold text-primary">{expenseNo}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">발주번호</span>
-              <p className="font-medium text-stone-800">{expense.orderNo || '-'}</p>
+              <span className="text-muted-foreground text-xs">발주번호</span>
+              <p className="font-medium text-foreground">{expense.orderNo || '-'}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">거래처</span>
-              <p className="font-medium text-stone-800">{expense.vendorName || '-'}</p>
+              <span className="text-muted-foreground text-xs">거래처</span>
+              <p className="font-medium text-foreground">{expense.vendorName || '-'}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">카테고리</span>
-              <p className="font-medium text-stone-800">{expense.category}</p>
+              <span className="text-muted-foreground text-xs">카테고리</span>
+              <p className="font-medium text-foreground">{expense.category}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">결제방법</span>
-              <p className="font-medium text-stone-800">{expense.expenseType}</p>
+              <span className="text-muted-foreground text-xs">결제방법</span>
+              <p className="font-medium text-foreground">{expense.expenseType}</p>
             </div>
             <div>
-              <span className="text-stone-500 text-xs">날짜</span>
-              <p className="font-medium text-stone-800">{expense.expenseDate}</p>
+              <span className="text-muted-foreground text-xs">날짜</span>
+              <p className="font-medium text-foreground">{expense.expenseDate}</p>
             </div>
           </div>
 
           {/* 품목 테이블 - 편집 가능 */}
-          <div className="border border-stone-200 rounded-lg overflow-hidden">
-            <div className="bg-stone-50 px-4 py-2 flex items-center justify-between border-b border-stone-200">
-              <p className="text-xs font-medium text-stone-600">품목/내역</p>
+          <div className="border border-border rounded-lg overflow-hidden">
+            <div className="bg-muted px-4 py-2 flex items-center justify-between border-b border-border">
+              <p className="text-xs font-medium text-muted-foreground">품목/내역</p>
               <Button size="sm" variant="outline" onClick={addDetailLine} className="h-7 text-xs gap-1">
                 <Plus className="w-3.5 h-3.5" />항목 추가
               </Button>
             </div>
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-stone-50 border-b border-stone-100">
-                  <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">스타일번호</th>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-stone-500">품명</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-16">수량</th>
-                  <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-14">단위</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">단가(원)</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-24">금액(원)</th>
+                <tr className="border-b border-border">
+                  <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">스타일번호</th>
+                  <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">품명</th>
+                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">수량</th>
+                  <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-14">단위</th>
+                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">단가(원)</th>
+                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">금액(원)</th>
                   <th className="w-8 px-2"></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border">
                 {detailLines.map((line) => {
                   const parsed = parseDescription(line.description);
                   const styleNo = parsed.styleNo;
                   const itemName = parsed.styleNo ? parsed.itemName : line.description;
                   return (
-                    <tr key={line.id} className="border-b border-stone-50">
+                    <tr key={line.id}>
                       <td className="px-2 py-1.5">
                         <Input
                           value={styleNo}
@@ -259,18 +259,18 @@ function ExpenseDetailModal({
                             min={0}
                           />
                           {line.unitPrice > 0 && (
-                            <div className="text-right text-[10px] text-stone-400">{formatKRW(line.unitPrice)}</div>
+                            <div className="text-right text-[11px] text-muted-foreground">{formatKRW(line.unitPrice)}</div>
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-1.5 text-right text-sm font-medium text-stone-700">
+                      <td className="px-3 py-1.5 text-right text-sm font-medium text-foreground">
                         {formatKRW(line.amountKrw)}
                       </td>
                       <td className="px-2 py-1.5">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 w-7 p-0 text-stone-400 hover:text-red-500"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]"
                           onClick={() => removeDetailLine(line.id)}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -284,18 +284,18 @@ function ExpenseDetailModal({
           </div>
 
           {/* 합계 */}
-          <div className="bg-amber-50 rounded-lg p-3 space-y-1.5 text-sm">
-            <div className="flex justify-between text-stone-600">
+          <div className="bg-muted rounded-lg p-3 space-y-1.5 text-sm">
+            <div className="flex justify-between text-muted-foreground">
               <span>공급가액</span>
               <span className="font-mono">{formatKRW(supplyAmount)}</span>
             </div>
-            <div className="flex justify-between text-stone-600">
+            <div className="flex justify-between text-muted-foreground">
               <span>세액 (10%)</span>
               <span className="font-mono">{formatKRW(taxAmount)}</span>
             </div>
-            <div className="flex justify-between font-bold text-stone-800 text-base pt-1 border-t border-amber-200">
+            <div className="flex justify-between font-bold text-foreground text-base pt-1 border-t border-border">
               <span>합계</span>
-              <span className="font-mono text-amber-900">{formatKRW(detailTotal)}</span>
+              <span className="font-mono text-foreground">{formatKRW(detailTotal)}</span>
             </div>
           </div>
         </div>
@@ -304,12 +304,12 @@ function ExpenseDetailModal({
           <Button variant="outline" onClick={onClose}>닫기</Button>
           <Button
             variant="outline"
-            className="gap-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+            className="gap-1"
             onClick={() => onPrintTradeStatement(expense)}
           >
             <Printer className="w-4 h-4" />거래명세표 출력
           </Button>
-          <Button onClick={handleDetailSave} className="bg-amber-700 hover:bg-amber-800 text-white">
+          <Button onClick={handleDetailSave}>
             수정 저장
           </Button>
         </DialogFooter>
@@ -513,33 +513,33 @@ export default function ExpenseEntry() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">지출 전표</h1>
-          <p className="text-sm text-stone-500 mt-0.5">법인카드 / 계좌이체 / 현금 지출 기록</p>
+          <h1 className="text-2xl font-bold text-foreground">지출 전표</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">법인카드 / 계좌이체 / 현금 지출 기록</p>
         </div>
-        <Button onClick={() => setShowModal(true)} className="bg-amber-700 hover:bg-amber-800 text-white gap-2">
+        <Button onClick={() => setShowModal(true)} className="gap-2">
           <Plus className="w-4 h-4" />전표 등록
         </Button>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-stone-200 p-4">
-          <p className="text-xs text-stone-500 mb-1">총 지출</p>
-          <p className="text-lg font-bold text-stone-800">{formatKRW(totalAmount)}</p>
-          <p className="text-xs text-stone-400 mt-1">{expenses.length}건</p>
+        <div className="bg-card rounded-xl border border-border p-4">
+          <p className="text-xs text-muted-foreground mb-1">총 지출</p>
+          <p className="text-lg font-bold text-foreground">{formatKRW(totalAmount)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{expenses.length}건</p>
         </div>
         {EXPENSE_TYPES.map(t => (
-          <div key={t} className="bg-white rounded-xl border border-stone-200 p-4">
+          <div key={t} className="bg-card rounded-xl border border-border p-4">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-stone-500">{TYPE_ICON[t]}</span>
-              <p className="text-xs text-stone-500">{t}</p>
+              <span className="text-muted-foreground">{TYPE_ICON[t]}</span>
+              <p className="text-xs text-muted-foreground">{t}</p>
             </div>
-            <p className="text-lg font-bold text-stone-800">{formatKRW(byType[t] || 0)}</p>
+            <p className="text-lg font-bold text-foreground">{formatKRW(byType[t] || 0)}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-stone-200">
-        <div className="flex items-center gap-3 p-4 border-b border-stone-100">
+      <div className="bg-card rounded-xl border border-border">
+        <div className="flex items-center gap-3 p-4 border-b border-border">
           <Select value={filterType} onValueChange={setFilterType}>
             <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="결제 방법" /></SelectTrigger>
             <SelectContent>
@@ -558,63 +558,63 @@ export default function ExpenseEntry() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50">
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">날짜</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">결제</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">카테고리</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">내용</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">항목수</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">발주번호</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">거래처</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">세금계산서</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">금액</th>
+              <tr className="border-b border-border">
+                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">날짜</th>
+                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">결제</th>
+                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">카테고리</th>
+                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">내용</th>
+                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">항목수</th>
+                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">발주번호</th>
+                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">거래처</th>
+                <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">세금계산서</th>
+                <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">금액</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
-                <tr><td colSpan={10} className="text-center py-12 text-stone-400 text-sm">등록된 전표가 없습니다</td></tr>
+                <tr><td colSpan={10} className="text-center py-12 text-muted-foreground text-sm">등록된 전표가 없습니다</td></tr>
               ) : filtered.map(e => (
                 <tr
                   key={e.id}
-                  className="border-b border-stone-50 hover:bg-stone-50/50 cursor-pointer"
+                  className="hover:bg-[var(--fill-quaternary)] cursor-pointer"
                   onClick={() => setDetailExpense(e)}
                 >
-                  <td className="px-4 py-3 text-stone-600">{e.expenseDate}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{e.expenseDate}</td>
                   <td className="px-4 py-3">
                     <Badge variant="outline" className={`text-xs gap-1 ${TYPE_COLOR[e.expenseType]}`}>
                       {TYPE_ICON[e.expenseType]}{e.expenseType}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full">{e.category}</span>
+                    <span className="text-xs bg-[var(--fill-quaternary)] text-muted-foreground px-2 py-0.5 rounded-full">{e.category}</span>
                   </td>
-                  <td className="px-4 py-3 font-medium text-stone-800">{e.description}</td>
+                  <td className="px-4 py-3 font-medium text-foreground">{e.description}</td>
                   <td className="px-4 py-3 text-center">
                     {e.lines && e.lines.length > 0
-                      ? <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">{e.lines.length}항목</span>
-                      : <span className="text-xs text-stone-400">-</span>}
+                      ? <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded-full">{e.lines.length}항목</span>
+                      : <span className="text-xs text-muted-foreground">-</span>}
                   </td>
-                  <td className="px-4 py-3 text-stone-500 text-xs">{e.orderNo || '-'}</td>
-                  <td className="px-4 py-3 text-stone-500 text-xs">{e.vendorName || '-'}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">{e.orderNo || '-'}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">{e.vendorName || '-'}</td>
                   <td className="px-4 py-3 text-center">
                     {e.hasTaxInvoice
-                      ? <FileText className="w-4 h-4 text-green-600 mx-auto" />
-                      : <span className="text-stone-300 text-xs">-</span>}
+                      ? <FileText className="w-4 h-4 text-[var(--system-green)] mx-auto" />
+                      : <span className="text-muted-foreground text-xs">-</span>}
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-stone-800">{formatKRW(e.amountKrw)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-foreground">{formatKRW(e.amountKrw)}</td>
                   <td className="px-4 py-3" onClick={ev => ev.stopPropagation()}>
                     <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 px-2 text-xs text-amber-700 hover:text-amber-900"
+                        className="h-7 px-2 text-xs"
                         onClick={() => setDetailExpense(e)}
                         title="상세보기"
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(e.id)}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(e.id)}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -676,27 +676,27 @@ export default function ExpenseEntry() {
             </div>
 
             {/* 항목 테이블 */}
-            <div className="border border-stone-200 rounded-lg overflow-hidden">
-              <div className="bg-stone-50 px-4 py-2 flex items-center justify-between border-b border-stone-200">
-                <p className="text-xs font-medium text-stone-600">항목 명세</p>
+            <div className="border border-border rounded-lg overflow-hidden">
+              <div className="bg-muted px-4 py-2 flex items-center justify-between border-b border-border">
+                <p className="text-xs font-medium text-muted-foreground">항목 명세</p>
                 <Button size="sm" variant="outline" onClick={addLine} className="h-7 text-xs gap-1">
                   <Plus className="w-3.5 h-3.5" />항목 추가
                 </Button>
               </div>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-stone-50 border-b border-stone-100">
-                    <th className="text-left px-3 py-2 text-xs font-medium text-stone-500 w-1/3">품목명</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-16">수량</th>
-                    <th className="text-center px-3 py-2 text-xs font-medium text-stone-500 w-16">단위</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-28">단가(KRW)</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-stone-500 w-28">금액</th>
+                  <tr className="border-b border-border">
+                    <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground w-1/3">품목명</th>
+                    <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">수량</th>
+                    <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">단위</th>
+                    <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-28">단가(KRW)</th>
+                    <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-28">금액</th>
                     <th className="w-8 px-2 py-2"></th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border">
                   {lines.map((line, idx) => (
-                    <tr key={line.id} className="border-b border-stone-50">
+                    <tr key={line.id}>
                       <td className="px-2 py-1.5">
                         <Input
                           value={line.description}
@@ -732,15 +732,15 @@ export default function ExpenseEntry() {
                             min={0}
                           />
                           {line.unitPrice > 0 && (
-                            <div className="text-right text-[10px] text-stone-400">{formatKRW(line.unitPrice)}</div>
+                            <div className="text-right text-[11px] text-muted-foreground">{formatKRW(line.unitPrice)}</div>
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-1.5 text-right text-sm font-medium text-stone-700">
+                      <td className="px-3 py-1.5 text-right text-sm font-medium text-foreground">
                         {formatKRW(line.amountKrw)}
                       </td>
                       <td className="px-2 py-1.5">
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => removeLine(line.id)}>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => removeLine(line.id)}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </td>
@@ -748,9 +748,9 @@ export default function ExpenseEntry() {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-amber-50 border-t border-amber-200">
-                    <td colSpan={4} className="px-3 py-2 text-right text-sm font-medium text-amber-800">합계</td>
-                    <td className="px-3 py-2 text-right text-base font-bold text-amber-900">{formatKRW(linesTotal)}</td>
+                  <tr className="bg-muted border-t border-border">
+                    <td colSpan={4} className="px-3 py-2 text-right text-sm font-medium text-muted-foreground">합계</td>
+                    <td className="px-3 py-2 text-right text-base font-bold text-foreground">{formatKRW(linesTotal)}</td>
                     <td></td>
                   </tr>
                 </tfoot>
@@ -758,7 +758,7 @@ export default function ExpenseEntry() {
             </div>
 
             {/* 세금계산서 */}
-            <div className="border border-stone-200 rounded-lg p-3 space-y-3">
+            <div className="border border-border rounded-lg p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">세금계산서</Label>
                 <Switch checked={header.hasTaxInvoice} onCheckedChange={v => setHeader(f => ({ ...f, hasTaxInvoice: v }))} />
@@ -791,7 +791,7 @@ export default function ExpenseEntry() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowModal(false); setHeader({ ...EMPTY_HEADER }); setLines([newLine()]); }}>취소</Button>
-            <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">저장</Button>
+            <Button onClick={handleSave}>저장</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

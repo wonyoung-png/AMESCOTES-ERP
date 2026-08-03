@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarClock, List, Calendar, BarChart3 } from 'lucide-react';
+import { CalendarClock, List, Calendar, BarChart3, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MILESTONE_LABELS: Partial<Record<MilestoneStage, string>> = {
@@ -46,7 +46,7 @@ export default function DeadlineManagement() {
 
     // 입고완료 시 상태만 갱신 (매출관리는 Phase 2)
     if (updatePayload.status === '입고완료') {
-      toast.success(`"${milestones[nextIdx].stage}" 완료 → 발주 "입고완료" ✅`);
+      toast.success(`"${milestones[nextIdx].stage}" 완료 → 발주 "입고완료"`);
     } else {
       toast.success(`"${milestones[nextIdx].stage}" 마일스톤 완료 처리`);
     }
@@ -83,7 +83,7 @@ export default function DeadlineManagement() {
         (o.milestones || []).forEach(m => {
           if (m.plannedDate === dateStr || m.actualDate === dateStr) {
             const dd = calcDDay(m.plannedDate!);
-            const color = dd < 0 ? 'bg-red-500' : dd <= 3 ? 'bg-orange-500' : dd <= 7 ? 'bg-yellow-500' : 'bg-green-500';
+            const color = dd < 0 ? 'bg-[var(--system-red)]' : dd <= 3 ? 'bg-[var(--system-orange)]' : dd <= 7 ? 'bg-[var(--system-yellow)]' : 'bg-[var(--system-green)]';
             events.push({ orderNo: o.orderNo, milestone: MILESTONE_LABELS[m.stage] || m.stage, color });
           }
         });
@@ -119,16 +119,16 @@ export default function DeadlineManagement() {
             const dDaySource = order.deliveryDate || nextMilestone?.plannedDate;
             const d = dDaySource ? Math.ceil((new Date(dDaySource).getTime() - Date.now()) / 86400000) : null;
             return (
-              <Card key={order.id} className="border-border/60 shadow-sm">
+              <Card key={order.id} className="border-border">
                 <CardContent className="p-4 flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-lg flex flex-col items-center justify-center text-xs font-medium shrink-0 ${d !== null ? dDayColor(d) : 'bg-stone-100 text-stone-400'}`}>
+                  <div className={`w-14 h-14 rounded-lg flex flex-col items-center justify-center text-xs font-medium shrink-0 ${d !== null ? dDayColor(d) : 'bg-muted text-muted-foreground'}`}>
                     {d !== null ? (
                       <>
                         <span className="text-lg font-number font-bold">{d < 0 ? `+${Math.abs(d)}` : d}</span>
-                        <span className="text-[10px]">{d < 0 ? '지연' : 'D-day'}</span>
+                        <span className="text-[11px]">{d < 0 ? '지연' : 'D-day'}</span>
                       </>
                     ) : (
-                      <span className="text-[9px] text-center px-1">납기일<br/>미설정</span>
+                      <span className="text-[11px] text-center px-1">납기일<br/>미설정</span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -147,7 +147,7 @@ export default function DeadlineManagement() {
                   {milestones.length > 0 && (
                     <div className="hidden md:flex items-center gap-1">
                       {milestones.map((m, i) => (
-                        <div key={i} className={`w-2 h-2 rounded-full ${m.actualDate ? 'bg-green-500' : 'bg-border'}`}
+                        <div key={i} className={`w-2 h-2 rounded-full ${m.actualDate ? 'bg-[var(--system-green)]' : 'bg-border'}`}
                           title={`${MILESTONE_LABELS[m.stage] || m.stage}: ${m.actualDate || m.plannedDate || '미정'}`} />
                       ))}
                     </div>
@@ -157,10 +157,10 @@ export default function DeadlineManagement() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 px-3 text-xs text-green-700 border-green-300 hover:bg-green-50 shrink-0"
+                      className="h-8 px-3 text-xs text-[var(--system-green)] shrink-0"
                       onClick={() => handleCompleteMilestone(order.id, milestones)}
                     >
-                      ✅ 완료
+                      <Check className="w-4 h-4" />완료
                     </Button>
                   )}
                 </CardContent>
@@ -168,7 +168,7 @@ export default function DeadlineManagement() {
             );
           })}
           {activeOrders.length === 0 && (
-            <Card className="border-border/60"><CardContent className="py-12 text-center text-muted-foreground">
+            <Card className="border-border"><CardContent className="py-12 text-center text-muted-foreground">
               <CalendarClock size={32} className="mx-auto mb-2 opacity-30" />진행중인 발주가 없습니다
             </CardContent></Card>
           )}
@@ -176,15 +176,15 @@ export default function DeadlineManagement() {
 
         {/* Calendar View */}
         <TabsContent value="calendar" className="mt-4">
-          <Card className="border-border/60 shadow-sm">
+          <Card className="border-border">
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <Button variant="outline" size="sm" onClick={() => {
                 if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1); } else setCalMonth(calMonth - 1);
-              }}>◀</Button>
+              }}><ChevronLeft className="w-4 h-4" /></Button>
               <CardTitle className="text-base">{calYear}년 {calMonth + 1}월</CardTitle>
               <Button variant="outline" size="sm" onClick={() => {
                 if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1); } else setCalMonth(calMonth + 1);
-              }}>▶</Button>
+              }}><ChevronRight className="w-4 h-4" /></Button>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-7 gap-px bg-border rounded overflow-hidden">
@@ -195,16 +195,16 @@ export default function DeadlineManagement() {
                   <div key={i} className={`bg-card min-h-[80px] p-1 ${cell.day === 0 ? 'bg-muted/20' : ''}`}>
                     {cell.day > 0 && (
                       <>
-                        <span className={`text-xs font-number ${cell.day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear() ? 'bg-[#C9A96E] text-white w-5 h-5 rounded-full flex items-center justify-center' : ''}`}>
+                        <span className={`text-xs font-number ${cell.day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear() ? 'bg-primary text-primary-foreground w-5 h-5 rounded-full flex items-center justify-center' : ''}`}>
                           {cell.day}
                         </span>
                         <div className="mt-1 space-y-0.5">
                           {cell.events.slice(0, 3).map((ev, j) => (
-                            <div key={j} className={`text-[9px] px-1 py-0.5 rounded text-white truncate ${ev.color}`}>
+                            <div key={j} className={`text-[11px] px-1 py-0.5 rounded text-white truncate ${ev.color}`}>
                               {ev.orderNo.split('-')[0].slice(-4)}-{ev.milestone.slice(0, 2)}
                             </div>
                           ))}
-                          {cell.events.length > 3 && <span className="text-[9px] text-muted-foreground">+{cell.events.length - 3}</span>}
+                          {cell.events.length > 3 && <span className="text-[11px] text-muted-foreground">+{cell.events.length - 3}</span>}
                         </div>
                       </>
                     )}
@@ -217,7 +217,7 @@ export default function DeadlineManagement() {
 
         {/* Timeline/Gantt View */}
         <TabsContent value="timeline" className="mt-4">
-          <Card className="border-border/60 shadow-sm overflow-hidden">
+          <Card className="border-border overflow-hidden">
             <CardContent className="p-4">
               <div className="space-y-3">
                 {orders.filter(o => o.status !== '입고완료').map(order => {
@@ -235,11 +235,11 @@ export default function DeadlineManagement() {
                     <div key={order.id} className="flex items-center gap-3">
                       <div className="w-32 shrink-0">
                         <p className="font-mono text-xs font-medium truncate">{order.orderNo}</p>
-                        <p className="text-[10px] text-muted-foreground">{order.status}</p>
+                        <p className="text-[11px] text-muted-foreground">{order.status}</p>
                       </div>
                       <div className="flex-1 relative h-6 bg-muted/50 rounded">
                         {/* Today marker */}
-                        <div className="absolute top-0 bottom-0 w-px bg-red-400 z-10" style={{ left: `${Math.min(todayPos, 100)}%` }} />
+                        <div className="absolute top-0 bottom-0 w-px bg-[var(--system-red)] z-10" style={{ left: `${Math.min(todayPos, 100)}%` }} />
                         {/* Milestone dots */}
                         {milestones.map((m, i) => {
                           const date = m.actualDate || m.plannedDate;
@@ -247,7 +247,7 @@ export default function DeadlineManagement() {
                           const pos = ((new Date(date).getTime() - minDate) / range) * 100;
                           return (
                             <div key={i}
-                              className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white ${m.actualDate ? 'bg-green-500' : 'bg-[#C9A96E]'}`}
+                              className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white ${m.actualDate ? 'bg-[var(--system-green)]' : 'bg-primary'}`}
                               style={{ left: `${Math.min(pos, 98)}%` }}
                               title={`${MILESTONE_LABELS[m.stage] || m.stage}: ${date}`}
                             />
@@ -258,7 +258,7 @@ export default function DeadlineManagement() {
                           const completed = milestones.filter(m => m.actualDate).length;
                           const total = milestones.length;
                           const pct = (completed / total) * 100;
-                          return <div className="absolute top-0 left-0 bottom-0 bg-green-200 rounded-l" style={{ width: `${pct}%` }} />;
+                          return <div className="absolute top-0 left-0 bottom-0 bg-status-normal opacity-25 rounded-l" style={{ width: `${pct}%` }} />;
                         })()}
                       </div>
                     </div>
@@ -266,9 +266,9 @@ export default function DeadlineManagement() {
                 })}
               </div>
               <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500" />완료</span>
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[#C9A96E]" />예정</span>
-                <span className="flex items-center gap-1"><div className="w-3 h-px bg-red-400" />오늘</span>
+                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[var(--system-green)]" />완료</span>
+                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-primary" />예정</span>
+                <span className="flex items-center gap-1"><div className="w-3 h-px bg-[var(--system-red)]" />오늘</span>
               </div>
             </CardContent>
           </Card>

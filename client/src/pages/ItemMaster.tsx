@@ -62,7 +62,7 @@ const CATEGORY_CODE_MAP: Partial<Record<Category, string>> = {
 const ERP_CAT_COLOR: Record<ErpCategory, string> = {
   'HB':   'bg-blue-50 text-blue-700 border-blue-200',
   'ACC':  'bg-purple-50 text-purple-700 border-purple-200',
-  'SHOES':'bg-green-50 text-green-700 border-green-200',
+  'SHOES':'bg-green-50 text-[var(--system-green)] border-green-200',
   'PACK':'bg-amber-50 text-amber-700 border-amber-200',
 };
 
@@ -1033,9 +1033,9 @@ export default function ItemMaster() {
    * 30% 이상: 초록, 15~30%: 노란색, 15% 미만: 빨간색
    */
   const marginColorClass = (rate: number): string => {
-    if (rate >= 30) return 'text-green-600';
-    if (rate >= 15) return 'text-amber-600';
-    return 'text-red-500';
+    if (rate >= 30) return 'text-[var(--system-green)]';
+    if (rate >= 15) return 'text-[var(--system-orange)]';
+    return 'text-[var(--system-red)]';
   };
 
   const activeFilterCount = [
@@ -1069,7 +1069,7 @@ export default function ItemMaster() {
   };
 
   const SortIcon = ({ field }: { field: string }) => (
-    <span className={`ml-1 text-[10px] ${sortField === field ? 'text-amber-500' : 'text-stone-300'}`}>
+    <span className={`ml-1 text-[11px] ${sortField === field ? 'text-primary' : 'text-muted-foreground'}`}>
       {sortField === field ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}
     </span>
   );
@@ -1901,7 +1901,10 @@ export default function ItemMaster() {
   };
 
   // 27SS LUMEN RRP 없으면 자동 등록
+  // 운영에서는 비활성(VITE_ENABLE_DEMO_SEED) — 데이터 로딩 지연 시 강제 시드가 실행돼
+  // 접속 브라우저마다 운영 DB에 중복 데모를 만들던 원인. 수동 등록 버튼은 그대로 사용 가능.
   useEffect(() => {
+    if (import.meta.env.VITE_ENABLE_DEMO_SEED !== 'true') return;
     if (lumen27AutoTried.current) return;
     if (hasLumen27ssItems(itemsRaw as Item[])) return;
     lumen27AutoTried.current = true;
@@ -1910,6 +1913,7 @@ export default function ItemMaster() {
 
   // LUMEN/AETALOOP — PACKAGE 키트 없으면 자동 시드 (브랜드 워크스페이스만)
   useEffect(() => {
+    if (import.meta.env.VITE_ENABLE_DEMO_SEED !== 'true') return;
     if (!isBrand) return;
     if (packAutoTried.current) return;
     if (hasPackageKitItems()) return;
@@ -1921,20 +1925,20 @@ export default function ItemMaster() {
     <div className="p-6 space-y-5">
       {/* 원가 일괄수정 저장 바 — 변경된 품목이 있을 때만 노출 */}
       {dirtyCostIds.size > 0 && (
-        <div className="fixed bottom-6 right-8 z-50 flex items-center gap-3 bg-white border border-stone-300 shadow-xl rounded-lg px-4 py-3">
-          <span className="text-sm text-stone-700">{dirtyCostIds.size}개 품목 원가 변경됨</span>
+        <div className="fixed bottom-6 right-8 z-50 flex items-center gap-3 bg-card border border-border shadow-xl rounded-lg px-4 py-3">
+          <span className="text-sm text-foreground">{dirtyCostIds.size}개 품목 원가 변경됨</span>
           <button onClick={() => { setCostEdits({}); setPackEdits({}); }} disabled={savingCosts}
-            className="text-xs text-stone-500 hover:text-stone-800 px-2 py-1 disabled:opacity-40">취소</button>
+            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 disabled:opacity-40">취소</button>
           <button onClick={saveCostEdits} disabled={savingCosts}
-            className="text-sm font-medium bg-[#20E39B] text-black rounded px-3 py-1.5 hover:brightness-95 disabled:opacity-50">
+            className="text-sm font-medium bg-primary text-primary-foreground rounded px-3 py-1.5 hover:bg-primary/90 disabled:opacity-50">
             {savingCosts ? '저장 중…' : '저장'}
           </button>
         </div>
       )}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">품목 마스터</h1>
-          <p className="text-sm text-stone-500 mt-0.5">
+          <h1 className="text-2xl font-bold text-foreground">품목 마스터</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             스타일별 품목 · HB / ACC / SHOES / PACK
             {isBrand ? ' (박스SS~XL-HB · 핸드백)' : ' (패킹재)'}
           </p>
@@ -1944,7 +1948,7 @@ export default function ItemMaster() {
             variant="outline"
             onClick={() => runLumen27Seed(false)}
             disabled={isLumen27Loading}
-            className="gap-2 border-rose-300 text-rose-800 hover:bg-rose-50"
+            className="gap-2"
           >
             <Upload size={16} />
             {isLumen27Loading ? '등록 중...' : `LUMEN 27SS 등록 (${getLumen27ssProductCount()})`}
@@ -1953,21 +1957,21 @@ export default function ItemMaster() {
             variant="outline"
             onClick={loadLumenPacking}
             disabled={isPackLoading}
-            className="gap-2 border-amber-300 text-amber-800 hover:bg-amber-50"
+            className="gap-2"
           >
             <Package size={16} />
             {isPackLoading ? '불러오는 중...' : '핸드백 패키지 등록'}
           </Button>
-          <Button variant="outline" onClick={() => setColSettingsOpen(true)} className="gap-2 border-stone-300 text-stone-600 hover:bg-stone-50">
+          <Button variant="outline" onClick={() => setColSettingsOpen(true)} className="gap-2">
             <Columns3 size={16} />열 설정
           </Button>
-          <Button variant="outline" onClick={() => setShowSeasonStats(true)} className="gap-2 border-stone-300 text-stone-600 hover:bg-stone-50">
+          <Button variant="outline" onClick={() => setShowSeasonStats(true)} className="gap-2">
             <BarChart2 size={16} />시즌별 현황
           </Button>
-          <Button variant="outline" onClick={downloadTemplate} className="gap-2 border-stone-300 text-stone-600 hover:bg-stone-50">
+          <Button variant="outline" onClick={downloadTemplate} className="gap-2">
             <Download size={16} />양식 다운로드
           </Button>
-          <Button variant="outline" onClick={() => excelUploadRef.current?.click()} className="gap-2 border-stone-300 text-stone-600 hover:bg-stone-50">
+          <Button variant="outline" onClick={() => excelUploadRef.current?.click()} className="gap-2">
             <Upload size={16} />엑셀 일괄 등록
           </Button>
           <input
@@ -1981,11 +1985,11 @@ export default function ItemMaster() {
             variant="outline"
             onClick={syncPostCost}
             disabled={isSyncing}
-            className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+            className="gap-2"
           >
             {isSyncing ? '동기화 중...' : '원가 동기화'}
           </Button>
-          <Button onClick={() => openAdd()} className="bg-[#C9A96E] hover:bg-[#B8985D] text-white gap-2">
+          <Button onClick={() => openAdd()} className="gap-2">
             <Plus size={16} />품목 등록
           </Button>
         </div>
@@ -1996,9 +2000,9 @@ export default function ItemMaster() {
         {([
           { key: 'HB', label: 'HB (핸드백)', count: tabCounts.HB, active: 'bg-blue-100 border-blue-400 ring-2 ring-blue-300', idle: 'bg-blue-50 border-blue-200 hover:border-blue-400', num: 'text-blue-700', sub: 'text-blue-600' },
           { key: 'ACC', label: 'ACC (소품)', count: tabCounts.ACC, active: 'bg-purple-100 border-purple-400 ring-2 ring-purple-300', idle: 'bg-purple-50 border-purple-200 hover:border-purple-400', num: 'text-purple-700', sub: 'text-purple-600' },
-          { key: 'SHOES', label: 'SHOES (슈즈)', count: tabCounts.SHOES, active: 'bg-green-100 border-green-400 ring-2 ring-green-300', idle: 'bg-green-50 border-green-200 hover:border-green-400', num: 'text-green-700', sub: 'text-green-600' },
+          { key: 'SHOES', label: 'SHOES (슈즈)', count: tabCounts.SHOES, active: 'bg-green-100 border-green-400 ring-2 ring-green-300', idle: 'bg-green-50 border-green-200 hover:border-green-400', num: 'text-[var(--system-green)]', sub: 'text-[var(--system-green)]' },
           { key: 'PACK' as const, label: 'PACK (패키지)', count: tabCounts.PACK, active: 'bg-amber-100 border-amber-400 ring-2 ring-amber-300', idle: 'bg-amber-50 border-amber-200 hover:border-amber-400', num: 'text-amber-700', sub: 'text-amber-600' },
-          { key: '전체', label: '전체', count: tabCounts.전체, active: 'bg-stone-100 border-stone-400 ring-2 ring-stone-300', idle: 'bg-white border-stone-200 hover:border-stone-400', num: 'text-stone-800', sub: 'text-stone-500' },
+          { key: '전체', label: '전체', count: tabCounts.전체, active: 'bg-[var(--fill-tertiary)] border-border ring-2 ring-primary/30', idle: 'bg-card border-border hover:border-border', num: 'text-foreground', sub: 'text-muted-foreground' },
         ] as const).map(tab => {
           const selected = filterErpCategory === tab.key;
           return (
@@ -2019,19 +2023,19 @@ export default function ItemMaster() {
         })}
       </div>
       {filterBuyer !== '전체' && (
-        <p className="text-xs text-stone-500 -mt-2">
+        <p className="text-xs text-muted-foreground -mt-2">
           바이어 필터 적용 중 — 탭·목록에 해당 바이어 품목만 표시됩니다
         </p>
       )}
 
       {/* 품목목록 / 누적생산량 */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border border-stone-200 bg-white p-0.5">
+        <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
           <button
             type="button"
             onClick={() => setListTab('items')}
             className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-              listTab === 'items' ? 'bg-stone-800 text-white' : 'text-stone-600 hover:bg-stone-50'
+              listTab === 'items' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-[var(--fill-quaternary)]'
             }`}
           >
             품목목록
@@ -2040,7 +2044,7 @@ export default function ItemMaster() {
             type="button"
             onClick={() => setListTab('production')}
             className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1.5 transition-colors ${
-              listTab === 'production' ? 'bg-stone-800 text-white' : 'text-stone-600 hover:bg-stone-50'
+              listTab === 'production' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-[var(--fill-quaternary)]'
             }`}
           >
             <Factory size={14} />
@@ -2048,14 +2052,14 @@ export default function ItemMaster() {
           </button>
         </div>
         {listTab === 'production' && (
-          <div className="flex flex-wrap items-center gap-3 text-xs text-stone-500">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span>
               누적발주 {prodSummary.ordersN.toLocaleString()}회 · 스타일 {prodSummary.styles}종 · 누적 {prodSummary.qty.toLocaleString()}pcs
             </span>
             <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
               <input
                 type="checkbox"
-                className="accent-[#C9A96E]"
+                className="accent-primary"
                 checked={prodOrderedOnly}
                 onChange={e => setProdOrderedOnly(e.target.checked)}
               />
@@ -2066,16 +2070,16 @@ export default function ItemMaster() {
       </div>
 
       {/* 필터 */}
-      <Card className="border-stone-200">
+      <Card className="border-border">
         <CardContent className="p-3 space-y-2">
           {/* 1행: 텍스트 검색 + 바이어 + 입희화 */}
           <div className="flex flex-wrap gap-2 items-center">
             <div className="relative flex-1 min-w-[150px]">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input placeholder="스타일번호 검색" value={filterStyleNo} onChange={e => setFilterStyleNo(e.target.value)} className="pl-8 h-9 text-sm" />
             </div>
             <div className="relative flex-1 min-w-[150px]">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input placeholder="품명 검색 (한/영)" value={filterName} onChange={e => setFilterName(e.target.value)} className="pl-8 h-9 text-sm" />
             </div>
             <Select value={filterBuyer} onValueChange={setFilterBuyer}>
@@ -2087,11 +2091,11 @@ export default function ItemMaster() {
             </Select>
             <button
               onClick={resetFilters}
-              className="h-9 px-3 rounded-lg border border-stone-200 text-xs font-medium text-stone-500 hover:bg-stone-50 flex items-center gap-1.5 whitespace-nowrap"
+              className="h-9 px-3 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-[var(--fill-quaternary)] flex items-center gap-1.5 whitespace-nowrap"
             >
               <X size={13} />필터 초기화
               {activeFilterCount > 0 && (
-                <span className="ml-0.5 inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4">
+                <span className="ml-0.5 inline-flex items-center justify-center bg-primary text-primary-foreground text-[11px] font-bold rounded-full w-4 h-4">
                   {activeFilterCount}
                 </span>
               )}
@@ -2127,7 +2131,7 @@ export default function ItemMaster() {
             </Select>
             <button
               onClick={() => setFilterNoBom(v => !v)}
-              className={`h-9 px-3 rounded-lg border text-xs font-medium transition-colors ${filterNoBom ? 'bg-red-50 border-red-300 text-red-700' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
+              className={`h-9 px-3 rounded-lg border text-xs font-medium transition-colors ${filterNoBom ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
             >
               BOM 미작성 {filterNoBom && `(${items.filter(i => !i.hasBom).length}건)`}
             </button>
@@ -2137,50 +2141,50 @@ export default function ItemMaster() {
 
       {/* 다중 선택 액션 바 */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-stone-800 text-white rounded-xl">
-          <span className="text-sm font-medium">{selectedIds.size}개 선택됨</span>
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-xl">
+          <span className="text-sm font-medium text-foreground">{selectedIds.size}개 선택됨</span>
           <button
             onClick={handleBulkOrder}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-medium transition-colors"
           >
-            📦 선택 발주
+            <Package className="w-4 h-4" />선택 발주
           </button>
           <button
             onClick={openBatchCostUpload}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/15 hover:bg-primary/20 text-primary rounded-lg text-xs font-medium transition-colors"
           >
-            🏭 공장 원가표 업로드
+            <Factory className="w-4 h-4" />공장 원가표 업로드
           </button>
           <button
             onClick={downloadSelectedItemsExcel}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-lg text-xs font-medium transition-colors"
           >
             <Download size={13} />엑셀 다운로드
           </button>
           <button
             onClick={handleBulkDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-lg text-xs font-medium transition-colors"
           >
-            🗑️ 선택 삭제
+            <Trash2 className="w-4 h-4" />선택 삭제
           </button>
           <button
             onClick={() => setShowSelectedOnly(v => !v)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${showSelectedOnly ? 'bg-blue-500 hover:bg-blue-600' : 'bg-stone-600 hover:bg-stone-500'} text-white`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${showSelectedOnly ? 'bg-primary/15 text-primary hover:bg-primary/20' : 'bg-[var(--fill-tertiary)] text-foreground hover:bg-[var(--fill-secondary)]'}`}
           >
-            {showSelectedOnly ? '👁 선택만 보기 ON' : '👁 선택만 보기'}
+            {showSelectedOnly ? '선택만 보기 ON' : '선택만 보기'}
           </button>
           <button
             onClick={() => { setSelectedIds(new Set()); setShowSelectedOnly(false); }}
-            className="flex items-center gap-1 px-3 py-1.5 bg-stone-600 hover:bg-stone-500 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-lg text-xs font-medium transition-colors"
           >
-            ✕ 선택 해제
+            선택 해제
           </button>
         </div>
       )}
 
       {/* 테이블 */}
       {listTab === 'items' ? (
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="text-sm table-fixed w-full" style={{ minWidth: 40 + 70 + ITEM_COLUMN_DEFS.filter(c => showCol(c.key)).reduce((s, c) => s + (colWidths[c.key] || 80), 0) }}>
             <colgroup>
@@ -2191,157 +2195,157 @@ export default function ItemMaster() {
               <col style={{ width: colWidths.action }} />
             </colgroup>
             <thead>
-              <tr className="border-b border-stone-100 bg-stone-50">
+              <tr className="border-b border-border bg-[var(--fill-quaternary)]">
                 <th className="px-4 py-3" style={{ width: 40 }}>
                   <input
                     type="checkbox"
                     checked={isAllSelected}
                     ref={el => { if (el) el.indeterminate = isIndeterminate; }}
                     onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
+                    className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                   />
                 </th>
                 {orderNodes(colOrder, [
                   showCol('image') && (
-                  <th key="image" className="text-left px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="image" className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     이미지
-                    <div onMouseDown={(e) => startResize(e, 'image')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'image')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('styleNo') && (
-                  <th key="styleNo" className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none relative overflow-hidden whitespace-nowrap" onClick={() => handleSort('styleNo')}>
+                  <th key="styleNo" className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground cursor-pointer hover:text-foreground select-none relative overflow-hidden whitespace-nowrap" onClick={() => handleSort('styleNo')}>
                     스타일번호<SortIcon field="styleNo" />
-                    <div onMouseDown={(e) => startResize(e, 'styleNo')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'styleNo')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('season') && (
-                  <th key="season" className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none relative overflow-hidden whitespace-nowrap" onClick={() => handleSort('season')}>
+                  <th key="season" className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground cursor-pointer hover:text-foreground select-none relative overflow-hidden whitespace-nowrap" onClick={() => handleSort('season')}>
                     시즌<SortIcon field="season" />
-                    <div onMouseDown={(e) => startResize(e, 'season')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'season')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('buyer') && (
-                  <th key="buyer" className="text-left px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="buyer" className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     바이어
-                    <div onMouseDown={(e) => startResize(e, 'buyer')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'buyer')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('name') && (
-                  <th key="name" className="text-left px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none relative overflow-hidden whitespace-nowrap" onClick={() => handleSort('name')}>
+                  <th key="name" className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground cursor-pointer hover:text-foreground select-none relative overflow-hidden whitespace-nowrap" onClick={() => handleSort('name')}>
                     품명<SortIcon field="name" />
-                    <div onMouseDown={(e) => startResize(e, 'name')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'name')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('category') && (
-                  <th key="category" className="text-left px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="category" className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     카테고리
-                    <div onMouseDown={(e) => startResize(e, 'category')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'category')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('color') && (
-                  <th key="color" className="text-left px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="color" className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     컬러
-                    <div onMouseDown={(e) => startResize(e, 'color')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'color')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('delivery') && (
-                  <th key="delivery" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="delivery" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     납품가(KRW)
-                    <div onMouseDown={(e) => startResize(e, 'delivery')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'delivery')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('bomCost') && (
-                  <th key="bomCost" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="bomCost" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     총원가액
-                    <div onMouseDown={(e) => startResize(e, 'bomCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'bomCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('factoryCost') && (
-                  <th key="factoryCost" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="factoryCost" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     공장단가
-                    <div onMouseDown={(e) => startResize(e, 'factoryCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'factoryCost')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('processing') && (
-                  <th key="processing" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="processing" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     임가공비
-                    <div onMouseDown={(e) => startResize(e, 'processing')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'processing')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('logistics') && (
-                  <th key="logistics" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="logistics" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     물류비
-                    <div onMouseDown={(e) => startResize(e, 'logistics')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'logistics')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('packaging') && (
-                  <th key="packaging" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="packaging" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     포장/검사비
-                    <div onMouseDown={(e) => startResize(e, 'packaging')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'packaging')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('packing') && (
-                  <th key="packing" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="packing" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     패킹재
-                    <div onMouseDown={(e) => startResize(e, 'packing')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'packing')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('prodMargin') && (
-                  <th key="prodMargin" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="prodMargin" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     생산마진
-                    <div onMouseDown={(e) => startResize(e, 'prodMargin')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'prodMargin')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('salePrice') && (
-                  <th key="salePrice" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="salePrice" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     KMSRP
-                    <div onMouseDown={(e) => startResize(e, 'salePrice')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'salePrice')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('multiple') && (
-                  <th key="multiple" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="multiple" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     실현배수
-                    <div onMouseDown={(e) => startResize(e, 'multiple')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'multiple')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('margin') && (
-                  <th key="margin" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="margin" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     마진율
-                    <div onMouseDown={(e) => startResize(e, 'margin')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'margin')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('orderCount') && (
-                  <th key="orderCount" className="text-center px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="orderCount" className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     발주차수
-                    <div onMouseDown={(e) => startResize(e, 'orderCount')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'orderCount')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('cumQty') && (
-                  <th key="cumQty" className="text-right px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="cumQty" className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     누적생산량
-                    <div onMouseDown={(e) => startResize(e, 'cumQty')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'cumQty')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('noOrder') && (
-                  <th key="noOrder" className="text-center px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="noOrder" className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     미발주기간
-                    <div onMouseDown={(e) => startResize(e, 'noOrder')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'noOrder')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('createdAt') && (
-                  <th key="createdAt" className="text-center px-4 py-3 text-xs font-medium text-stone-500 cursor-pointer hover:text-stone-700 select-none relative overflow-hidden whitespace-nowrap" onClick={() => handleSort('createdAt')}>
+                  <th key="createdAt" className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground cursor-pointer hover:text-foreground select-none relative overflow-hidden whitespace-nowrap" onClick={() => handleSort('createdAt')}>
                     등록일<SortIcon field="createdAt" />
-                    <div onMouseDown={(e) => startResize(e, 'createdAt')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'createdAt')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                   showCol('bom') && (
-                  <th key="bom" className="text-center px-4 py-3 text-xs font-medium text-stone-500 relative overflow-hidden whitespace-nowrap">
+                  <th key="bom" className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
                     BOM
-                    <div onMouseDown={(e) => startResize(e, 'bom')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-amber-400 select-none z-10" />
+                    <div onMouseDown={(e) => startResize(e, 'bom')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
                 ])}
-                <th className="text-center px-4 py-3 text-xs font-medium text-stone-500 whitespace-nowrap">작업</th>
+                <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">작업</th>
               </tr>
             </thead>
             <tbody>
@@ -2375,13 +2379,13 @@ export default function ItemMaster() {
                 const months = monthsSinceLastOrder(item);
                 const isChecked = selectedIds.has(item.id);
                 return (
-                  <tr key={item.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${isChecked ? 'bg-amber-50/60' : ''}`}>
+                  <tr key={item.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${isChecked ? 'bg-primary/5' : ''}`}>
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => toggleSelect(item.id)}
-                        className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
+                        className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                       />
                     </td>
                     {orderNodes(colOrder, [
@@ -2391,24 +2395,24 @@ export default function ItemMaster() {
                           <HoverZoomImage
                             src={item.imageUrl}
                             alt={item.name}
-                            className="w-10 h-10 rounded-lg border border-stone-200 overflow-hidden cursor-zoom-in"
+                            className="w-10 h-10 rounded-lg border border-border overflow-hidden cursor-zoom-in"
                             imgClassName="w-10 h-10 object-cover"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center">
-                            <Package size={16} className="text-stone-300" />
+                          <div className="w-10 h-10 rounded-lg bg-[var(--fill-tertiary)] border border-border flex items-center justify-center">
+                            <Package size={16} className="text-muted-foreground" />
                           </div>
                         )}
                       </td>
                     ),
                     showCol('styleNo') && (
-                      <td key="styleNo" className="px-4 py-3 font-mono text-xs font-medium text-stone-700 whitespace-nowrap">{item.styleNo}</td>
+                      <td key="styleNo" className="px-4 py-3 font-mono text-xs font-medium text-foreground whitespace-nowrap">{item.styleNo}</td>
                     ),
                     showCol('season') && (
                       <td key="season" className="px-4 py-3">
                         {item.season ? (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 font-medium whitespace-nowrap">{item.season}</span>
-                        ) : <span className="text-stone-300 text-xs">-</span>}
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--fill-tertiary)] text-muted-foreground font-medium whitespace-nowrap">{item.season}</span>
+                        ) : <span className="text-muted-foreground text-xs">-</span>}
                       </td>
                     ),
                     showCol('buyer') && (
@@ -2417,13 +2421,13 @@ export default function ItemMaster() {
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
                             {vendorMap.get(item.buyerId)?.code || vendorMap.get(item.buyerId)?.name || '-'}
                           </span>
-                        ) : <span className="text-stone-300 text-xs">-</span>}
+                        ) : <span className="text-muted-foreground text-xs">-</span>}
                       </td>
                     ),
                     showCol('name') && (
                       <td key="name" className="px-4 py-3 overflow-hidden">
-                        <p className="font-medium text-stone-800 truncate" title={item.name}>{item.name}</p>
-                        {item.nameEn && <p className="text-xs text-stone-400 truncate" title={item.nameEn}>{item.nameEn}</p>}
+                        <p className="font-medium text-foreground truncate" title={item.name}>{item.name}</p>
+                        {item.nameEn && <p className="text-xs text-muted-foreground truncate" title={item.nameEn}>{item.nameEn}</p>}
                       </td>
                     ),
                     showCol('category') && (
@@ -2434,7 +2438,7 @@ export default function ItemMaster() {
                               {item.erpCategory}
                             </span>
                           )}
-                          <span className="text-xs text-stone-400 whitespace-nowrap">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
                             {item.customCategory || item.category}
                           </span>
                         </div>
@@ -2449,7 +2453,7 @@ export default function ItemMaster() {
                                 key={row.name}
                                 type="button"
                                 onClick={() => navigate(`/bom?styleNo=${encodeURIComponent(item.id)}&color=${encodeURIComponent(row.name)}`)}
-                                className="h-6 text-xs px-1.5 bg-stone-100 text-stone-600 rounded hover:bg-amber-100 hover:text-amber-700 hover:border hover:border-amber-300 border border-transparent transition-colors whitespace-nowrap leading-none"
+                                className="h-6 text-xs px-1.5 bg-[var(--fill-tertiary)] text-muted-foreground rounded hover:bg-primary/10 hover:text-primary hover:border hover:border-primary/30 border border-transparent transition-colors whitespace-nowrap leading-none"
                                 title={`${row.name} 컬러 BOM으로 이동`}
                               >
                                 {row.name}
@@ -2457,21 +2461,21 @@ export default function ItemMaster() {
                             ))}
                             {extraColorCount > 0 && (
                               <span
-                                className="h-6 text-xs px-1.5 text-stone-400 inline-flex items-center"
+                                className="h-6 text-xs px-1.5 text-muted-foreground inline-flex items-center"
                                 title={colorRows.slice(COLOR_CHIP_MAX).map(r => r.name).join(', ')}
                               >
                                 +{extraColorCount}
                               </span>
                             )}
                           </div>
-                        ) : <span className="text-stone-300 text-xs">—</span>}
+                        ) : <span className="text-muted-foreground text-xs">—</span>}
                       </td>
                     ),
                     showCol('delivery') && (
                       <td key="delivery" className="px-4 py-3 text-right whitespace-nowrap">
                         {delivery > 0 ? (
-                          <p className="font-mono text-xs text-stone-700">{formatKRW(delivery)}</p>
-                        ) : <span className="text-stone-300 text-xs">—</span>}
+                          <p className="font-mono text-xs text-foreground">{formatKRW(delivery)}</p>
+                        ) : <span className="text-muted-foreground text-xs">—</span>}
                       </td>
                     ),
                     showCol('bomCost') && (
@@ -2484,23 +2488,23 @@ export default function ItemMaster() {
                                 type="button"
                                 title={`${row.name} 원가 · BOM 이동`}
                                 onClick={() => navigate(`/bom?styleNo=${encodeURIComponent(item.id)}&color=${encodeURIComponent(row.name)}`)}
-                                className="h-6 px-1 hover:bg-amber-50 rounded transition-colors inline-flex items-center"
+                                className="h-6 px-1 hover:bg-primary/10 rounded transition-colors inline-flex items-center"
                               >
-                                <span className="text-amber-700 font-semibold leading-none">
+                                <span className="text-primary font-semibold leading-none">
                                   {row.displayCost > 0 ? formatKRW(row.displayCost) : '—'}
                                 </span>
                               </button>
                             ))}
                             {extraColorCount > 0 && (
-                              <span className="h-6 px-1 inline-flex items-center text-stone-300">+{extraColorCount}</span>
+                              <span className="h-6 px-1 inline-flex items-center text-muted-foreground">+{extraColorCount}</span>
                             )}
                           </div>
                         ) : bomCost > 0 ? (
-                          <span className="text-amber-700 font-semibold">{formatKRW(bomCost)}</span>
+                          <span className="text-primary font-semibold">{formatKRW(bomCost)}</span>
                         ) : itemBom ? (
-                          <span className="text-stone-300 text-xs">원가미입력</span>
+                          <span className="text-muted-foreground text-xs">원가미입력</span>
                         ) : (
-                          <span className="text-stone-300 text-xs">미등록</span>
+                          <span className="text-muted-foreground text-xs">미등록</span>
                         )}
                       </td>
                     ),
@@ -2516,13 +2520,13 @@ export default function ItemMaster() {
                               </div>
                             ))}
                             {extraColorCount > 0 && (
-                              <span className="h-6 px-1 inline-flex items-center text-stone-300">+{extraColorCount}</span>
+                              <span className="h-6 px-1 inline-flex items-center text-muted-foreground">+{extraColorCount}</span>
                             )}
                           </div>
                         ) : factoryUnitCostKrw > 0 ? (
                           <span className="text-blue-700">{formatKRW(factoryUnitCostKrw)}</span>
                         ) : (
-                          <span className="text-stone-300 text-xs">—</span>
+                          <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </td>
                     ),
@@ -2538,11 +2542,11 @@ export default function ItemMaster() {
                             <div className="flex flex-col items-end leading-tight">
                               <input inputMode="numeric" value={costEdits[item.id]?.processing ?? (processingKrw || '')}
                                 onChange={e => setCostEdit(item.id, 'processing', e.target.value)}
-                                className={`w-20 text-right font-mono text-xs rounded px-1 py-0.5 bg-transparent outline-none border ${costEdits[item.id]?.processing != null ? 'border-[#20E39B] bg-[#20E39B]/5' : 'border-transparent hover:border-stone-300 focus:border-[#20E39B]'}`} />
-                              <span className="text-[10px] text-stone-400 font-mono pr-1">{base > 0 ? `${sym}${cur === 'USD' ? base.toFixed(1) : Math.round(base).toLocaleString()}` : ''}</span>
+                                className={`w-20 text-right font-mono text-xs rounded px-1 py-0.5 bg-transparent outline-none border ${costEdits[item.id]?.processing != null ? 'border-primary bg-primary/5' : 'border-transparent hover:border-border focus:border-primary'}`} />
+                              <span className="text-[11px] text-muted-foreground font-mono pr-1">{base > 0 ? `${sym}${cur === 'USD' ? base.toFixed(1) : Math.round(base).toLocaleString()}` : ''}</span>
                             </div>
                           );
-                        })() : <span className="text-stone-300 font-mono text-xs">—</span>}
+                        })() : <span className="text-muted-foreground font-mono text-xs">—</span>}
                       </td>
                     ),
                     showCol('logistics') && (
@@ -2550,8 +2554,8 @@ export default function ItemMaster() {
                         {itemBom ? (
                           <input inputMode="numeric" value={costEdits[item.id]?.logistics ?? (logisticsKrw || '')}
                             onChange={e => setCostEdit(item.id, 'logistics', e.target.value)}
-                            className={`w-20 text-right font-mono text-xs rounded px-1 py-0.5 bg-transparent outline-none border ${costEdits[item.id]?.logistics != null ? 'border-[#20E39B] bg-[#20E39B]/5' : 'border-transparent hover:border-stone-300 focus:border-[#20E39B]'}`} />
-                        ) : <span className="text-stone-300 font-mono text-xs">—</span>}
+                            className={`w-20 text-right font-mono text-xs rounded px-1 py-0.5 bg-transparent outline-none border ${costEdits[item.id]?.logistics != null ? 'border-primary bg-primary/5' : 'border-transparent hover:border-border focus:border-primary'}`} />
+                        ) : <span className="text-muted-foreground font-mono text-xs">—</span>}
                       </td>
                     ),
                     showCol('packaging') && (
@@ -2559,8 +2563,8 @@ export default function ItemMaster() {
                         {itemBom ? (
                           <input inputMode="numeric" value={costEdits[item.id]?.packaging ?? (packagingKrw || '')}
                             onChange={e => setCostEdit(item.id, 'packaging', e.target.value)}
-                            className={`w-24 text-right font-mono text-xs rounded px-1 py-0.5 bg-transparent outline-none border ${costEdits[item.id]?.packaging != null ? 'border-[#20E39B] bg-[#20E39B]/5' : 'border-transparent hover:border-stone-300 focus:border-[#20E39B]'}`} />
-                        ) : <span className="text-stone-300 font-mono text-xs">—</span>}
+                            className={`w-24 text-right font-mono text-xs rounded px-1 py-0.5 bg-transparent outline-none border ${costEdits[item.id]?.packaging != null ? 'border-primary bg-primary/5' : 'border-transparent hover:border-border focus:border-primary'}`} />
+                        ) : <span className="text-muted-foreground font-mono text-xs">—</span>}
                       </td>
                     ),
                     showCol('packing') && (
@@ -2574,15 +2578,15 @@ export default function ItemMaster() {
                           return (
                             <div className="flex flex-col items-end leading-tight">
                               <select value={sel} onChange={e => setPackEdit(item.id, e.target.value, origId)}
-                                className={`w-28 text-xs rounded px-1 py-0.5 outline-none border bg-white ${dirty ? 'border-[#20E39B] bg-[#20E39B]/5' : 'border-transparent hover:border-stone-300 focus:border-[#20E39B]'}`}>
+                                className={`w-28 text-xs rounded px-1 py-0.5 outline-none border bg-card ${dirty ? 'border-primary bg-primary/5' : 'border-transparent hover:border-border focus:border-primary'}`}>
                                 <option value="">— 없음 —</option>
                                 {sel && !selItem && <option value={sel}>{itemBom.packingItemStyleNo || sel}</option>}
                                 {packItems.map(p => <option key={p.id} value={p.id}>{p.styleNo}</option>)}
                               </select>
-                              <span className="text-[10px] text-stone-400 font-mono pr-1">{cost > 0 ? formatKRW(cost) : ''}</span>
+                              <span className="text-[11px] text-muted-foreground font-mono pr-1">{cost > 0 ? formatKRW(cost) : ''}</span>
                             </div>
                           );
-                        })() : <span className="text-stone-300 font-mono text-xs">—</span>}
+                        })() : <span className="text-muted-foreground font-mono text-xs">—</span>}
                       </td>
                     ),
                     showCol('prodMargin') && (
@@ -2591,10 +2595,10 @@ export default function ItemMaster() {
                           <span className="inline-flex items-center gap-0.5">
                             <input inputMode="numeric" value={costEdits[item.id]?.prodMarginPct ?? (prodMarginRate ? Math.round(prodMarginRate * 100) : '')}
                               onChange={e => setCostEdit(item.id, 'prodMarginPct', e.target.value)}
-                              className={`w-12 text-right font-mono text-xs rounded px-1 py-0.5 bg-transparent outline-none border ${costEdits[item.id]?.prodMarginPct != null ? 'border-[#20E39B] bg-[#20E39B]/5' : 'border-transparent hover:border-stone-300 focus:border-[#20E39B]'}`} />
-                            <span className="text-stone-400 text-xs">%</span>
+                              className={`w-12 text-right font-mono text-xs rounded px-1 py-0.5 bg-transparent outline-none border ${costEdits[item.id]?.prodMarginPct != null ? 'border-primary bg-primary/5' : 'border-transparent hover:border-border focus:border-primary'}`} />
+                            <span className="text-muted-foreground text-xs">%</span>
                           </span>
-                        ) : <span className="text-stone-300 font-mono text-xs">—</span>}
+                        ) : <span className="text-muted-foreground font-mono text-xs">—</span>}
                       </td>
                     ),
                     showCol('salePrice') && (
@@ -2602,17 +2606,17 @@ export default function ItemMaster() {
                         <input inputMode="numeric"
                           value={msrpEdits[item.id] ?? (confirmedSalePrice || '')}
                           onChange={e => setMsrpEdit(item.id, e.target.value, confirmedSalePrice)}
-                          className={`w-24 text-right font-mono text-xs rounded px-1 py-0.5 bg-transparent outline-none border ${item.id in msrpEdits ? 'border-[#20E39B] bg-[#20E39B]/5' : 'border-transparent hover:border-stone-300 focus:border-[#20E39B]'}`} />
+                          className={`w-24 text-right font-mono text-xs rounded px-1 py-0.5 bg-transparent outline-none border ${item.id in msrpEdits ? 'border-primary bg-primary/5' : 'border-transparent hover:border-border focus:border-primary'}`} />
                       </td>
                     ),
                     showCol('multiple') && (
                       <td key="multiple" className="px-4 py-3 text-right font-mono text-xs whitespace-nowrap">
                         {actualMultiple > 0 ? (
-                          <span className={`font-semibold ${actualMultiple >= 3.5 ? 'text-green-600' : actualMultiple >= 3.0 ? 'text-amber-600' : 'text-red-500'}`}>
+                          <span className={`font-semibold ${actualMultiple >= 3.5 ? 'text-[var(--system-green)]' : actualMultiple >= 3.0 ? 'text-[var(--system-orange)]' : 'text-[var(--system-red)]'}`}>
                             {actualMultiple.toFixed(2)}x
                           </span>
                         ) : (
-                          <span className="text-stone-300">—</span>
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </td>
                     ),
@@ -2624,10 +2628,10 @@ export default function ItemMaster() {
                               {marginRate.toFixed(1)}%
                             </p>
                             {marginAmount !== null && (
-                              <p className="text-[10px] text-stone-400">{formatKRW(marginAmount)}</p>
+                              <p className="text-[11px] text-muted-foreground">{formatKRW(marginAmount)}</p>
                             )}
                           </div>
-                        ) : <span className="text-stone-300 text-xs">—</span>}
+                        ) : <span className="text-muted-foreground text-xs">—</span>}
                       </td>
                     ),
                     showCol('orderCount') && (() => {
@@ -2641,12 +2645,12 @@ export default function ItemMaster() {
                               title="발주 누적 횟수 (1차·2차·…N차) · 클릭 시 상세"
                               onClick={() => setListTab('production')}
                             >
-                              <span className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                              <span className="text-xs font-semibold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
                                 {st.orderCount}차
                               </span>
                             </button>
                           ) : (
-                            <span className="text-xs text-stone-300">—</span>
+                            <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </td>
                       );
@@ -2656,11 +2660,11 @@ export default function ItemMaster() {
                       return (
                         <td key="cumQty" className="px-4 py-3 text-right whitespace-nowrap">
                           {st.cumQty > 0 ? (
-                            <span className="text-xs font-mono font-medium text-stone-700">
+                            <span className="text-xs font-mono font-medium text-foreground">
                               {st.cumQty.toLocaleString()}
                             </span>
                           ) : (
-                            <span className="text-xs text-stone-300">—</span>
+                            <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </td>
                       );
@@ -2668,9 +2672,9 @@ export default function ItemMaster() {
                     showCol('noOrder') && (
                       <td key="noOrder" className="px-4 py-3 text-center whitespace-nowrap">
                         {months === null ? (
-                          <span className="text-xs text-stone-400 font-medium">미발주</span>
+                          <span className="text-xs text-muted-foreground font-medium">미발주</span>
                         ) : (
-                          <span className={`text-xs font-medium ${months >= 12 ? 'text-red-500' : months >= 6 ? 'text-amber-600' : 'text-stone-500'}`}>
+                          <span className={`text-xs font-medium ${months >= 12 ? 'text-[var(--system-red)]' : months >= 6 ? 'text-[var(--system-orange)]' : 'text-muted-foreground'}`}>
                             {months}개월
                           </span>
                         )}
@@ -2678,7 +2682,7 @@ export default function ItemMaster() {
                     ),
                     showCol('createdAt') && (
                       <td key="createdAt" className="px-4 py-3 text-center whitespace-nowrap">
-                        <span className="text-xs text-stone-500">{item.createdAt ? item.createdAt.split('T')[0] : '-'}</span>
+                        <span className="text-xs text-muted-foreground">{item.createdAt ? item.createdAt.split('T')[0] : '-'}</span>
                       </td>
                     ),
                     showCol('bom') && (
@@ -2691,13 +2695,13 @@ export default function ItemMaster() {
                             localStorage.setItem('ames_prefill_bom', item.id);
                             navigate('/bom');
                           }}
-                          className={`text-xs px-2 py-0.5 rounded border transition-colors font-medium whitespace-nowrap ${
+                          className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border transition-colors font-medium whitespace-nowrap ${
                             bomOk
-                              ? 'text-green-700 border-green-300 bg-green-50 hover:bg-green-100'
-                              : 'text-red-600 border-red-300 bg-red-50 hover:bg-red-100'
+                              ? 'text-success border-success/30 bg-success/10 hover:bg-success/15'
+                              : 'text-destructive border-destructive/30 bg-destructive/10 hover:bg-destructive/15'
                           }`}
                         >
-                          {bomOk ? 'BOM ✓' : 'BOM ⚠'}
+                          {bomOk ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}BOM
                         </button>
                           );
                         })()}
@@ -2706,10 +2710,10 @@ export default function ItemMaster() {
                     ])}
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => openEdit(item)} className="p-1.5 rounded hover:bg-stone-100 text-stone-500">
+                        <button onClick={() => openEdit(item)} className="p-1.5 rounded hover:bg-[var(--fill-tertiary)] text-muted-foreground">
                           <Pencil size={14} />
                         </button>
-                        <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded hover:bg-red-50 text-stone-400 hover:text-red-500">
+                        <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-[var(--system-red)]">
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -2718,7 +2722,7 @@ export default function ItemMaster() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={2 + visibleDataColCount} className="text-center py-12 text-stone-400">
+                <tr><td colSpan={2 + visibleDataColCount} className="text-center py-12 text-muted-foreground">
                   <Package size={32} className="mx-auto mb-2 opacity-30" />
                   등록된 품목이 없습니다
                 </td></tr>
@@ -2726,27 +2730,27 @@ export default function ItemMaster() {
             </tbody>
           </table>
           {displayItems.length > renderLimit && (
-            <div className="px-4 py-3 border-t border-stone-100 flex items-center justify-center gap-3">
-              <span className="text-xs text-stone-500">{renderLimit}/{displayItems.length}개 표시 중</span>
+            <div className="px-4 py-3 border-t border-border flex items-center justify-center gap-3">
+              <span className="text-xs text-muted-foreground">{renderLimit}/{displayItems.length}개 표시 중</span>
               <button type="button" onClick={() => setRenderLimit(n => n + 200)}
-                className="text-sm px-3 py-1.5 rounded border border-stone-300 hover:bg-stone-50">더 보기</button>
+                className="text-sm px-3 py-1.5 rounded border border-border hover:bg-[var(--fill-quaternary)]">더 보기</button>
               <button type="button" onClick={() => setRenderLimit(displayItems.length)}
-                className="text-xs text-stone-500 hover:text-stone-800">전체 표시</button>
+                className="text-xs text-muted-foreground hover:text-foreground">전체 표시</button>
             </div>
           )}
         </div>
       </div>
       ) : (
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
-        <div className="px-4 py-3 border-b border-stone-100 bg-stone-50 flex flex-wrap items-center gap-2">
-          <Factory size={16} className="text-amber-700" />
-          <span className="text-sm font-semibold text-stone-800">스타일별 누적생산량</span>
-          <span className="text-xs text-stone-400">발주차수 = 누적 발주 횟수 (5번 발주면 5차) · 컬러별 수량 · 행 클릭 시 발주 상세</span>
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="px-4 py-3 border-b border-border bg-[var(--fill-quaternary)] flex flex-wrap items-center gap-2">
+          <Factory size={16} className="text-muted-foreground" />
+          <span className="text-sm font-semibold text-foreground">스타일별 누적생산량</span>
+          <span className="text-xs text-muted-foreground">발주차수 = 누적 발주 횟수 (5번 발주면 5차) · 컬러별 수량 · 행 클릭 시 발주 상세</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[880px]">
             <thead>
-              <tr className="border-b border-stone-100 bg-white text-xs text-stone-500">
+              <tr className="border-b border-border bg-card text-xs text-muted-foreground">
                 <th className="w-8 px-2 py-2" />
                 <th className="text-left px-3 py-2">스타일번호</th>
                 <th className="text-left px-3 py-2">품명</th>
@@ -2767,18 +2771,18 @@ export default function ItemMaster() {
                 return (
                   <Fragment key={item.id}>
                     <tr
-                      className={`border-t border-stone-100 hover:bg-amber-50/40 cursor-pointer align-top ${st.orderCount === 0 ? 'opacity-50' : ''}`}
+                      className={`border-t border-border hover:bg-[var(--fill-quaternary)] cursor-pointer align-top ${st.orderCount === 0 ? 'opacity-50' : ''}`}
                       onClick={() => st.orderCount > 0 && toggleProdExpand(item.id)}
                     >
-                      <td className="px-2 py-3 text-stone-400">
+                      <td className="px-2 py-3 text-muted-foreground">
                         {st.orderCount > 0 ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}
                       </td>
-                      <td className="px-3 py-3 font-mono text-xs text-amber-800 whitespace-nowrap">{item.styleNo}</td>
+                      <td className="px-3 py-3 font-mono text-xs text-primary whitespace-nowrap">{item.styleNo}</td>
                       <td className="px-3 py-3">
-                        <p className="font-medium text-stone-800 truncate max-w-[200px]" title={item.name}>{item.name}</p>
-                        {item.nameEn && <p className="text-[10px] text-stone-400 truncate max-w-[200px]">{item.nameEn}</p>}
+                        <p className="font-medium text-foreground truncate max-w-[200px]" title={item.name}>{item.name}</p>
+                        {item.nameEn && <p className="text-[11px] text-muted-foreground truncate max-w-[200px]">{item.nameEn}</p>}
                       </td>
-                      <td className="px-3 py-3 text-xs text-stone-600">{item.season || '—'}</td>
+                      <td className="px-3 py-3 text-xs text-muted-foreground">{item.season || '—'}</td>
                       <td className="px-3 py-3 text-xs">
                         {item.buyerId
                           ? (vendorMap.get(item.buyerId)?.code || vendorMap.get(item.buyerId)?.name || '—')
@@ -2786,20 +2790,20 @@ export default function ItemMaster() {
                       </td>
                       <td className="px-3 py-3 text-center">
                         {st.orderCount > 0 ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-amber-50 border border-amber-200 text-base font-bold tabular-nums text-amber-900">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 text-base font-bold tabular-nums text-primary">
                             {st.orderCount}차
                           </span>
                         ) : (
-                          <span className="text-xs text-stone-300">미발주</span>
+                          <span className="text-xs text-muted-foreground">미발주</span>
                         )}
                       </td>
                       <td className="px-3 py-3 text-right">
                         {st.cumQty > 0 ? (
                           <div className="inline-flex flex-col items-end">
-                            <span className="text-base font-bold tabular-nums text-stone-900 leading-none">{st.cumQty.toLocaleString()}</span>
-                            <span className="text-[10px] text-stone-400 mt-0.5">pcs</span>
+                            <span className="text-base font-bold tabular-nums text-foreground leading-none">{st.cumQty.toLocaleString()}</span>
+                            <span className="text-[11px] text-muted-foreground mt-0.5">pcs</span>
                           </div>
-                        ) : <span className="text-xs text-stone-300">—</span>}
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
                       </td>
                       <td className="px-3 py-3">
                         {colorEntries.length > 0 ? (
@@ -2808,35 +2812,35 @@ export default function ItemMaster() {
                               const pct = Math.round((q / totalForBar) * 100);
                               return (
                                 <div key={c} className="grid grid-cols-[minmax(72px,1fr)_64px_minmax(80px,1.2fr)] gap-2 items-center">
-                                  <span className="text-xs font-medium text-stone-700 truncate" title={c}>{c}</span>
-                                  <span className="text-xs font-mono font-semibold text-stone-900 text-right tabular-nums">{q.toLocaleString()}</span>
+                                  <span className="text-xs font-medium text-foreground truncate" title={c}>{c}</span>
+                                  <span className="text-xs font-mono font-semibold text-foreground text-right tabular-nums">{q.toLocaleString()}</span>
                                   <div className="flex items-center gap-1.5">
-                                    <div className="flex-1 h-2 rounded-full bg-stone-100 overflow-hidden">
+                                    <div className="flex-1 h-2 rounded-full bg-[var(--fill-tertiary)] overflow-hidden">
                                       <div
-                                        className="h-full rounded-full bg-amber-500/80"
+                                        className="h-full rounded-full bg-primary/80"
                                         style={{ width: `${Math.max(pct, q > 0 ? 4 : 0)}%` }}
                                       />
                                     </div>
-                                    <span className="text-[10px] text-stone-400 w-7 text-right tabular-nums">{pct}%</span>
+                                    <span className="text-[11px] text-muted-foreground w-7 text-right tabular-nums">{pct}%</span>
                                   </div>
                                 </div>
                               );
                             })}
                           </div>
-                        ) : <span className="text-xs text-stone-300">—</span>}
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
                       </td>
-                      <td className="px-3 py-3 text-center text-xs text-stone-500 whitespace-nowrap">
+                      <td className="px-3 py-3 text-center text-xs text-muted-foreground whitespace-nowrap">
                         {st.lastOrderDate || '—'}
                       </td>
                     </tr>
                     {open && (
-                      <tr className="bg-amber-50/30 border-t border-amber-100/80">
+                      <tr className="bg-[var(--fill-quaternary)] border-t border-border">
                         <td colSpan={9} className="px-4 py-3">
-                          <p className="text-[11px] font-semibold text-stone-500 mb-2">발주 상세 (누적 {st.orderCount}차)</p>
-                          <div className="rounded-lg border border-stone-200 overflow-hidden bg-white">
+                          <p className="text-[11px] font-semibold text-muted-foreground mb-2">발주 상세 (누적 {st.orderCount}차)</p>
+                          <div className="rounded-lg border border-border overflow-hidden bg-card">
                             <table className="w-full text-xs">
                               <thead>
-                                <tr className="bg-stone-50 text-stone-500">
+                                <tr className="bg-[var(--fill-quaternary)] text-muted-foreground">
                                   <th className="text-left px-3 py-2">차수</th>
                                   <th className="text-left px-3 py-2">발주번호</th>
                                   <th className="text-left px-3 py-2">발주일</th>
@@ -2847,21 +2851,21 @@ export default function ItemMaster() {
                               </thead>
                               <tbody>
                                 {st.rounds.map((r, idx) => (
-                                  <tr key={`${item.id}-${r.orderId}`} className="border-t border-stone-100">
-                                    <td className="px-3 py-2 font-semibold text-stone-800">{idx + 1}차</td>
-                                    <td className="px-3 py-2 font-mono text-amber-800">{r.orderNo}</td>
-                                    <td className="px-3 py-2 text-stone-600">{r.orderDate || '—'}</td>
-                                    <td className="px-3 py-2 text-stone-500">{r.status || '—'}</td>
+                                  <tr key={`${item.id}-${r.orderId}`} className="border-t border-border">
+                                    <td className="px-3 py-2 font-semibold text-foreground">{idx + 1}차</td>
+                                    <td className="px-3 py-2 font-mono text-primary">{r.orderNo}</td>
+                                    <td className="px-3 py-2 text-muted-foreground">{r.orderDate || '—'}</td>
+                                    <td className="px-3 py-2 text-muted-foreground">{r.status || '—'}</td>
                                     <td className="px-3 py-2 text-right font-mono font-semibold">{r.qty.toLocaleString()}</td>
                                     <td className="px-3 py-2">
                                       <div className="flex flex-wrap gap-1.5">
                                         {(r.colorQtys || []).map(cq => (
                                           <span
                                             key={`${r.orderId}-${cq.color}`}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-stone-200 bg-stone-50"
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-border bg-[var(--fill-quaternary)]"
                                           >
-                                            <span className="text-stone-600">{cq.color}</span>
-                                            <span className="font-mono font-semibold text-stone-900">{cq.qty.toLocaleString()}</span>
+                                            <span className="text-muted-foreground">{cq.color}</span>
+                                            <span className="font-mono font-semibold text-foreground">{cq.qty.toLocaleString()}</span>
                                           </span>
                                         ))}
                                       </div>
@@ -2879,7 +2883,7 @@ export default function ItemMaster() {
               })}
               {prodDisplayItems.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center py-12 text-stone-400">
+                  <td colSpan={9} className="text-center py-12 text-muted-foreground">
                     {prodOrderedOnly ? '발주 이력이 있는 품목이 없습니다 · 「발주 있는 품목만」 해제해 보세요' : '필터에 해당하는 품목이 없습니다'}
                   </td>
                 </tr>
@@ -2898,30 +2902,30 @@ export default function ItemMaster() {
               <Columns3 size={18} />열 설정
             </DialogTitle>
           </DialogHeader>
-          <p className="text-xs text-stone-500 -mt-1">체크로 표시/숨김, ▲▼로 열 순서를 바꿉니다. 설정은 이 브라우저에 저장됩니다.</p>
+          <p className="text-xs text-muted-foreground -mt-1">체크로 표시/숨김, ▲▼로 열 순서를 바꿉니다. 설정은 이 브라우저에 저장됩니다.</p>
           <div className="space-y-0.5 max-h-[50vh] overflow-y-auto py-1">
             {colOrder.map((key, i) => {
               const col = ITEM_COLUMN_DEFS.find(c => c.key === key);
               if (!col) return null;
               return (
-                <div key={key} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-stone-50">
+                <div key={key} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-[var(--fill-quaternary)]">
                   <div className="flex items-center gap-0.5 min-w-0">
                     <button type="button" disabled={i === 0} onClick={() => moveCol(key, -1)}
-                      className="p-0.5 text-stone-400 hover:text-stone-700 disabled:opacity-20 disabled:cursor-default" title="위로">
+                      className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-default" title="위로">
                       <ChevronUp size={14} />
                     </button>
                     <button type="button" disabled={i === colOrder.length - 1} onClick={() => moveCol(key, 1)}
-                      className="p-0.5 text-stone-400 hover:text-stone-700 disabled:opacity-20 disabled:cursor-default" title="아래로">
+                      className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:cursor-default" title="아래로">
                       <ChevronDown size={14} />
                     </button>
-                    <span className="text-sm text-stone-700 truncate">
+                    <span className="text-sm text-foreground truncate">
                       {col.label}
-                      {!col.defaultVisible && <span className="ml-1.5 text-[10px] text-stone-400">기본숨김</span>}
+                      {!col.defaultVisible && <span className="ml-1.5 text-[11px] text-muted-foreground">기본숨김</span>}
                     </span>
                   </div>
                   <input
                     type="checkbox"
-                    className="accent-[#C9A96E] w-4 h-4 cursor-pointer shrink-0"
+                    className="accent-primary w-4 h-4 cursor-pointer shrink-0"
                     checked={showCol(key)}
                     onChange={() => toggleColVisible(key)}
                   />
@@ -2946,7 +2950,7 @@ export default function ItemMaster() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="flex items-center gap-2">
-              <Label className="text-xs text-stone-500">시즌 선택:</Label>
+              <Label className="text-xs text-muted-foreground">시즌 선택:</Label>
               <Select value={seasonStatsTarget} onValueChange={setSeasonStatsTarget}>
                 <SelectTrigger className="w-32 h-8 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -2955,34 +2959,34 @@ export default function ItemMaster() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="rounded-xl border border-stone-200 overflow-hidden">
+            <div className="rounded-xl border border-border overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-stone-50 border-b border-stone-200">
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-stone-500">시즌</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-stone-500">전체</th>
+                  <tr className="bg-[var(--fill-quaternary)] border-b border-border">
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">시즌</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-medium text-muted-foreground">전체</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-600">HB</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-purple-600">ACC</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-green-600">SHOES</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-medium text-[var(--system-green)]">SHOES</th>
                     <th className="text-center px-3 py-2.5 text-xs font-medium text-blue-600">BOM완료</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-red-500">BOM미작성</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-medium text-[var(--system-red)]">BOM미작성</th>
                   </tr>
                 </thead>
                 <tbody>
                   {seasonStats.map(row => (
-                    <tr key={row.season} className="border-b border-stone-50 hover:bg-stone-50">
-                      <td className="px-4 py-2.5 font-semibold text-stone-700">{row.season}</td>
-                      <td className="px-3 py-2.5 text-center font-bold text-stone-800">{row.total}</td>
+                    <tr key={row.season} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                      <td className="px-4 py-2.5 font-semibold text-foreground">{row.season}</td>
+                      <td className="px-3 py-2.5 text-center font-bold text-foreground">{row.total}</td>
                       <td className="px-3 py-2.5 text-center text-blue-700">{row.hb}</td>
                       <td className="px-3 py-2.5 text-center text-purple-700">{row.acc}</td>
-                      <td className="px-3 py-2.5 text-center text-green-700">{row.shoes}</td>
+                      <td className="px-3 py-2.5 text-center text-[var(--system-green)]">{row.shoes}</td>
                       <td className="px-3 py-2.5 text-center text-blue-600">{row.hasBom}</td>
                       <td className="px-3 py-2.5 text-center">
                         {row.noBom > 0 ? (
-                          <span className="inline-flex items-center gap-1 text-red-600 font-medium">
+                          <span className="inline-flex items-center gap-1 text-[var(--system-red)] font-medium">
                             <AlertCircle size={12} />{row.noBom}
                           </span>
-                        ) : <span className="text-stone-300">-</span>}
+                        ) : <span className="text-muted-foreground">-</span>}
                       </td>
                     </tr>
                   ))}
@@ -3013,62 +3017,62 @@ export default function ItemMaster() {
 
           <div className="space-y-5">
             {/* 스타일번호 자동생성 */}
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+            <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <Wand2 size={15} className="text-amber-600" />
-                  <span className="text-sm font-semibold text-amber-800">스타일번호 자동생성</span>
+                  <Wand2 size={15} className="text-primary" />
+                  <span className="text-sm font-semibold text-primary">스타일번호 자동생성</span>
                 </div>
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input type="checkbox" checked={manualStyleNo} onChange={e => {
                     setManualStyleNo(e.target.checked);
                     if (!e.target.checked) setEditItem(prev => ({ ...prev, styleNo: previewStyleNo }));
-                  }} className="w-3.5 h-3.5 accent-amber-600" />
-                  <span className="text-xs text-amber-700">직접 입력</span>
+                  }} className="w-3.5 h-3.5 accent-primary" />
+                  <span className="text-xs text-primary">직접 입력</span>
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-amber-700">거래처 (브랜드코드 보유)</Label>
+                  <Label className="text-xs text-primary">거래처 (브랜드코드 보유)</Label>
                   <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
-                    <SelectTrigger className="h-8 text-sm bg-white"><SelectValue placeholder="거래처 선택" /></SelectTrigger>
+                    <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder="거래처 선택" /></SelectTrigger>
                     <SelectContent>
                       {brandVendors.length === 0
-                        ? <div className="px-3 py-2 text-xs text-stone-400">브랜드코드 등록된 거래처 없음</div>
+                        ? <div className="px-3 py-2 text-xs text-muted-foreground">브랜드코드 등록된 거래처 없음</div>
                         : brandVendors.map(v => (
                           <SelectItem key={v.id} value={v.id}>
-                            <span className="font-mono font-bold text-amber-700 mr-2">[{v.code}]</span>{v.name}
+                            <span className="font-mono font-bold text-primary mr-2">[{v.code}]</span>{v.name}
                           </SelectItem>
                         ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-amber-700">등록일 (YYMM 기준)</Label>
-                  <Input type="date" value={registDate} onChange={e => setRegistDate(e.target.value)} className="h-8 text-sm bg-white" />
+                  <Label className="text-xs text-primary">등록일 (YYMM 기준)</Label>
+                  <Input type="date" value={registDate} onChange={e => setRegistDate(e.target.value)} className="h-8 text-sm bg-card" />
                 </div>
               </div>
               {!manualStyleNo ? (
-                <div className="flex items-center gap-2 p-2.5 bg-white border border-amber-200 rounded-lg">
+                <div className="flex items-center gap-2 p-2.5 bg-card border border-primary/20 rounded-lg">
                   {previewStyleNo ? (
                     <>
-                      <span className="text-xs text-amber-600">예상 품번:</span>
-                      <span className="font-mono font-bold text-amber-800 text-base tracking-widest">{previewStyleNo}</span>
+                      <span className="text-xs text-muted-foreground">예상 품번:</span>
+                      <span className="font-mono font-bold text-primary text-base tracking-widest">{previewStyleNo}</span>
                     </>
                   ) : (
-                    <div className="flex items-center gap-1.5 text-xs text-amber-500">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <AlertCircle size={13} />거래처와 카테고리를 선택하면 자동으로 생성됩니다
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <Label className="text-xs text-amber-700">스타일번호 (직접 입력)</Label>
+                  <Label className="text-xs text-primary">스타일번호 (직접 입력)</Label>
                   <Input
                     value={editItem.styleNo || ''}
                     onChange={e => setEditItem({ ...editItem, styleNo: e.target.value.toUpperCase() })}
                     placeholder="AT2603HB01"
-                    className="font-mono uppercase bg-white"
+                    className="font-mono uppercase bg-card"
                   />
                 </div>
               )}
@@ -3076,7 +3080,7 @@ export default function ItemMaster() {
 
             {/* 기본 정보 */}
             <div className="space-y-3">
-              <p className="text-xs font-medium text-stone-600">기본 정보</p>
+              <p className="text-xs font-medium text-muted-foreground">기본 정보</p>
 
               {/* 카테고리 */}
               <div className="grid grid-cols-2 gap-3">
@@ -3172,7 +3176,7 @@ export default function ItemMaster() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {editItem.erpCategory === 'PACK' ? (
-                  <div className="space-y-1.5 col-span-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+                  <div className="space-y-1.5 col-span-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
                     PACK는 자재마스터(포장재)에서 구성품을 선택하면 <b>전체원가가 자동 합산</b>됩니다. 사전/사후원가 없음.
                   </div>
                 ) : null}
@@ -3205,7 +3209,7 @@ export default function ItemMaster() {
 
             {/* 가격 정보 */}
             <div className="space-y-3">
-              <p className="text-xs font-medium text-stone-600">가격 정보</p>
+              <p className="text-xs font-medium text-muted-foreground">가격 정보</p>
 
               {/* BOM 원가 표시 영역 */}
               {(() => {
@@ -3218,23 +3222,23 @@ export default function ItemMaster() {
                   : (hasBom && styleNo ? store.getBomTotalCost(styleNo) : 0);
                 const showByColor = colorCosts.length > 0 && (colorCosts.length > 1 || !['기본', '전체'].includes(colorCosts[0].color));
                 return (
-                  <div className={`p-3 rounded-lg border ${hasBom && bomCostVal > 0 ? 'bg-amber-50 border-amber-200' : 'bg-stone-50 border-stone-200'}`}>
+                  <div className={`p-3 rounded-lg border ${hasBom && bomCostVal > 0 ? 'bg-primary/5 border-primary/20' : 'bg-[var(--fill-quaternary)] border-border'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <span className="text-xs font-medium text-stone-600">BOM 원가:</span>
+                        <span className="text-xs font-medium text-muted-foreground">BOM 원가:</span>
                         {showByColor ? (
                           <div className="mt-1.5 space-y-1">
                             {colorCosts.map(cc => (
                               <div key={cc.color} className="flex items-center justify-between gap-3 text-xs">
-                                <span className="text-stone-500 truncate">{cc.color}</span>
-                                <span className="font-bold text-amber-700 font-mono">{cc.displayCost > 0 ? formatKRW(cc.displayCost) : '—'}</span>
+                                <span className="text-muted-foreground truncate">{cc.color}</span>
+                                <span className="font-bold text-primary font-mono">{cc.displayCost > 0 ? formatKRW(cc.displayCost) : '—'}</span>
                               </div>
                             ))}
                           </div>
                         ) : hasBom && bomCostVal > 0 ? (
-                          <span className="ml-2 text-sm font-bold text-amber-700">{formatKRW(bomCostVal)}</span>
+                          <span className="ml-2 text-sm font-bold text-primary">{formatKRW(bomCostVal)}</span>
                         ) : (
-                          <span className="ml-2 text-xs text-stone-400">
+                          <span className="ml-2 text-xs text-muted-foreground">
                             {hasBom ? '원가 계산중' : 'BOM 미등록'}
                           </span>
                         )}
@@ -3247,7 +3251,7 @@ export default function ItemMaster() {
                             localStorage.setItem('ames_prefill_bom', editItem.id || styleNo);
                             navigate('/bom');
                           }}
-                          className="flex items-center gap-1 text-xs text-[#C9A96E] hover:text-amber-700 font-medium shrink-0"
+                          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium shrink-0"
                         >
                           <Link size={12} />BOM 등록하러 가기
                         </button>
@@ -3268,7 +3272,7 @@ export default function ItemMaster() {
                   }}
                   placeholder="바이어 납품가 입력 (예: 85000)"
                 />
-                <p className="text-[10px] text-stone-400">※ BOM이 등록된 경우 납품가 입력 시 마진이 자동 계산됩니다</p>
+                <p className="text-[11px] text-muted-foreground">※ BOM이 등록된 경우 납품가 입력 시 마진이 자동 계산됩니다</p>
               </div>
 
               {/* 마진 자동 계산 표시 (BOM 원가 연동) */}
@@ -3279,27 +3283,27 @@ export default function ItemMaster() {
                 const deliveryVal = editItem.deliveryPrice ?? editItem.targetSalePrice ?? 0;
                 const { rate, amount } = calcMargin(deliveryVal, bomCostVal);
                 if (rate === null) return null;
-                const bgClass = rate >= 30 ? 'bg-green-50 border-green-200' : rate >= 15 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
+                const bgClass = rate >= 30 ? 'bg-success/10 border-success/20' : rate >= 15 ? 'bg-warning/10 border-warning/20' : 'bg-destructive/10 border-destructive/20';
                 return (
                   <div className={`p-3 rounded-lg border ${bgClass}`}>
                     <div className="flex items-center gap-6">
                       <div>
-                        <p className="text-xs text-stone-500">마진금액</p>
+                        <p className="text-xs text-muted-foreground">마진금액</p>
                         <p className={`text-sm font-bold ${marginColorClass(rate)}`}>
                           {formatKRW(amount || 0)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-stone-500">마진율</p>
+                        <p className="text-xs text-muted-foreground">마진율</p>
                         <p className={`text-xl font-bold ${marginColorClass(rate)}`}>
                           {rate.toFixed(1)}%
                         </p>
                       </div>
                       <div className="ml-auto text-right">
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${rate >= 30 ? 'bg-green-100 text-green-700' : rate >= 15 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                          {rate >= 30 ? '✅ 양호' : rate >= 15 ? '🟡 주의' : '🔴 위험'}
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${rate >= 30 ? 'bg-success/15 text-success' : rate >= 15 ? 'bg-warning/15 text-warning' : 'bg-destructive/15 text-destructive'}`}>
+                          {rate >= 30 ? '양호' : rate >= 15 ? '주의' : '위험'}
                         </span>
-                        <p className="text-[10px] text-stone-400 mt-1">마진율 = (납품가 - BOM원가) / 납품가 × 100</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">마진율 = (납품가 - BOM원가) / 납품가 × 100</p>
                       </div>
                     </div>
                   </div>
@@ -3321,19 +3325,19 @@ export default function ItemMaster() {
                 <Button type="button" variant="outline" size="sm" onClick={addColor} className="h-9 px-3">추가</Button>
               </div>
               {normalizeColors(editItem.colors || []).length > 0 && (
-                <div className="space-y-2 p-2 bg-stone-50 rounded-lg border border-stone-100">
+                <div className="space-y-2 p-2 bg-[var(--fill-quaternary)] rounded-lg border border-border">
                   {normalizeColors(editItem.colors || []).map((c, idx) => (
-                    <div key={idx} className="bg-white border border-stone-200 rounded-lg overflow-hidden">
+                    <div key={idx} className="bg-card border border-border rounded-lg overflow-hidden">
                       {/* 컬러 헤더 */}
                       <div className="flex items-center justify-between px-3 py-2">
                         <button
                           type="button"
-                          className="flex items-center gap-2 text-sm font-medium text-stone-700 hover:text-stone-900 flex-1 text-left"
+                          className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground flex-1 text-left"
                           onClick={() => setColorDetailOpen(colorDetailOpen === idx ? null : idx)}
                         >
-                          <span className="w-2 h-2 rounded-full bg-stone-400 inline-block" />
+                          <span className="w-2 h-2 rounded-full bg-muted-foreground inline-block" />
                           {c.name}
-                          <span className="text-xs text-stone-400 font-normal">
+                          <span className="text-xs text-muted-foreground font-normal">
                             {[c.leatherColor, c.decorColor, c.threadColor, c.girimaeColor].filter(Boolean).length > 0
                               ? `— ${[
                                   c.leatherColor ? `가죽: ${c.leatherColor}` : null,
@@ -3343,7 +3347,7 @@ export default function ItemMaster() {
                                 ].filter(Boolean).join(', ')}`
                               : '— 세부정보 없음'}
                           </span>
-                          <span className="text-xs text-stone-300 ml-auto">{colorDetailOpen === idx ? '▲' : '▼'}</span>
+                          <span className="text-xs text-muted-foreground ml-auto">{colorDetailOpen === idx ? '▲' : '▼'}</span>
                         </button>
                         {/* BOM 바로가기 버튼 */}
                         {editItem.styleNo && (
@@ -3353,21 +3357,21 @@ export default function ItemMaster() {
                               setModalOpen(false);
                               navigate(`/bom?styleNo=${encodeURIComponent(editItem.styleNo || '')}&color=${encodeURIComponent(c.name)}`);
                             }}
-                            className="text-xs px-2 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium ml-1 shrink-0"
+                            className="text-xs px-2 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 font-medium ml-1 shrink-0"
                             title={`${c.name} 컬러 BOM으로 이동`}
                           >
                             BOM
                           </button>
                         )}
-                        <button type="button" onClick={() => removeColor(idx)} className="text-stone-400 hover:text-red-500 ml-1">
+                        <button type="button" onClick={() => removeColor(idx)} className="text-muted-foreground hover:text-[var(--system-red)] ml-1">
                           <X size={14} />
                         </button>
                       </div>
                       {/* 세부 정보 */}
                       {colorDetailOpen === idx && (
-                        <div className="px-3 pb-3 grid grid-cols-2 gap-2 border-t border-stone-100 pt-2">
+                        <div className="px-3 pb-3 grid grid-cols-2 gap-2 border-t border-border pt-2">
                           <div className="space-y-1">
-                            <Label className="text-xs text-stone-500">가죽/원단 컬러</Label>
+                            <Label className="text-xs text-muted-foreground">가죽/원단 컬러</Label>
                             <Input
                               value={c.leatherColor || ''}
                               onChange={e => updateColorDetail(idx, 'leatherColor', e.target.value)}
@@ -3376,7 +3380,7 @@ export default function ItemMaster() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs text-stone-500">장식 컬러</Label>
+                            <Label className="text-xs text-muted-foreground">장식 컬러</Label>
                             <Input
                               value={c.decorColor || ''}
                               onChange={e => updateColorDetail(idx, 'decorColor', e.target.value)}
@@ -3385,7 +3389,7 @@ export default function ItemMaster() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs text-stone-500">실 컬러</Label>
+                            <Label className="text-xs text-muted-foreground">실 컬러</Label>
                             <Input
                               value={c.threadColor || ''}
                               onChange={e => updateColorDetail(idx, 'threadColor', e.target.value)}
@@ -3394,7 +3398,7 @@ export default function ItemMaster() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs text-stone-500">기리매 컬러</Label>
+                            <Label className="text-xs text-muted-foreground">기리매 컬러</Label>
                             <Input
                               value={c.girimaeColor || ''}
                               onChange={e => updateColorDetail(idx, 'girimaeColor', e.target.value)}
@@ -3426,7 +3430,7 @@ export default function ItemMaster() {
               <Label>대표 이미지</Label>
               <div className="flex items-center gap-3">
                 <div
-                  className="w-20 h-20 rounded-xl border-2 border-dashed border-stone-200 flex items-center justify-center cursor-pointer hover:border-amber-400 transition-colors overflow-hidden"
+                  className="w-20 h-20 rounded-xl border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
                   onClick={() => imageFileRef.current?.click()}
                 >
                   {editItem.imageUrl ? (
@@ -3437,7 +3441,7 @@ export default function ItemMaster() {
                       imgClassName="w-full h-full object-cover"
                     />
                   ) : (
-                    <Package size={28} className="text-stone-300" />
+                    <Package size={28} className="text-muted-foreground" />
                   )}
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -3445,11 +3449,11 @@ export default function ItemMaster() {
                     이미지 선택
                   </Button>
                   {editItem.imageUrl && (
-                    <Button type="button" variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => setEditItem(prev => ({ ...prev, imageUrl: undefined }))}>
+                    <Button type="button" variant="ghost" size="sm" className="text-xs text-[var(--system-red)]" onClick={() => setEditItem(prev => ({ ...prev, imageUrl: undefined }))}>
                       삭제
                     </Button>
                   )}
-                  <p className="text-xs text-stone-400">최대 800px, JPEG 자동 변환</p>
+                  <p className="text-xs text-muted-foreground">최대 800px, JPEG 자동 변환</p>
                 </div>
               </div>
               <input ref={imageFileRef} type="file" accept="image/*" className="hidden" onChange={handleItemImageUpload} />
@@ -3458,7 +3462,7 @@ export default function ItemMaster() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalOpen(false)}>취소</Button>
-            <Button onClick={handleSave} className="bg-[#C9A96E] hover:bg-[#B8985D] text-white">{isEdit ? '수정' : '등록'}</Button>
+            <Button onClick={handleSave}>{isEdit ? '수정' : '등록'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3498,17 +3502,17 @@ export default function ItemMaster() {
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileSpreadsheet size={18} className="text-green-600" />
+              <FileSpreadsheet size={18} className="text-[var(--system-green)]" />
               엑셀 일괄 등록 미리보기
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex items-center gap-4 px-1 py-2 bg-stone-50 rounded-lg text-sm">
-            <span className="flex items-center gap-1.5 text-green-700">
+          <div className="flex items-center gap-4 px-1 py-2 bg-[var(--fill-quaternary)] rounded-lg text-sm">
+            <span className="flex items-center gap-1.5 text-[var(--system-green)]">
               <CheckCircle2 size={14} />
               신규 {excelPreviewItems.filter(p => !p.isDuplicate).length}개
             </span>
-            <span className="flex items-center gap-1.5 text-amber-600">
+            <span className="flex items-center gap-1.5 text-[var(--system-orange)]">
               <XCircle size={14} />
               중복 스킵 {excelPreviewItems.filter(p => p.isDuplicate).length}개
             </span>
@@ -3516,32 +3520,32 @@ export default function ItemMaster() {
 
           <div className="flex-1 overflow-y-auto">
             <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-stone-100">
+              <thead className="sticky top-0 bg-[var(--fill-tertiary)]">
                 <tr>
-                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">상태</th>
-                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">스타일번호</th>
-                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">품목명</th>
-                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">거래처</th>
-                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">시즌</th>
-                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">카테</th>
-                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">컬러</th>
-                  <th className="px-2 py-1.5 text-left font-medium text-stone-600">판매가</th>
+                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">상태</th>
+                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">스타일번호</th>
+                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">품목명</th>
+                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">거래처</th>
+                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">시즌</th>
+                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">카테</th>
+                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">컬러</th>
+                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">판매가</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-100">
+              <tbody className="divide-y divide-border">
                 {excelPreviewItems.map((p, idx) => (
-                  <tr key={idx} className={p.isDuplicate ? 'bg-amber-50 opacity-60' : 'bg-white'}>
+                  <tr key={idx} className={p.isDuplicate ? 'bg-[var(--fill-quaternary)] opacity-60' : 'bg-card'}>
                     <td className="px-2 py-1.5">
                       {p.isDuplicate
-                        ? <span className="text-amber-600 font-medium">중복</span>
-                        : <span className="text-green-600 font-medium">신규</span>}
+                        ? <span className="text-[var(--system-orange)] font-medium">중복</span>
+                        : <span className="text-[var(--system-green)] font-medium">신규</span>}
                     </td>
                     <td className="px-2 py-1.5 font-mono">{p.styleNo}</td>
                     <td className="px-2 py-1.5 max-w-[200px] truncate">{p.name}</td>
                     <td className="px-2 py-1.5">
                       {p.buyerName
-                        ? <span className={p.buyerId ? 'text-green-700 font-medium' : 'text-amber-600'}>{p.buyerName}{!p.buyerId && ' ⚠️미매칭'}</span>
-                        : <span className="text-stone-300">—</span>}
+                        ? <span className={p.buyerId ? 'text-[var(--system-green)] font-medium' : 'text-[var(--system-orange)]'}>{p.buyerName}{!p.buyerId && ' 미매칭'}</span>
+                        : <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="px-2 py-1.5">{p.season}</td>
                     <td className="px-2 py-1.5">{p.erpCategory}</td>
@@ -3553,14 +3557,13 @@ export default function ItemMaster() {
             </table>
           </div>
 
-          <DialogFooter className="pt-3 border-t border-stone-100">
+          <DialogFooter className="pt-3 border-t border-border">
             <Button variant="outline" onClick={() => { setExcelPreviewOpen(false); if (excelUploadRef.current) excelUploadRef.current.value = ''; }}>
               취소
             </Button>
             <Button
               onClick={handleExcelBulkRegister}
               disabled={excelPreviewItems.filter(p => !p.isDuplicate).length === 0}
-              className="bg-[#C9A96E] hover:bg-[#B8985D] text-white"
             >
               <FileSpreadsheet size={14} className="mr-1.5" />
               {excelPreviewItems.filter(p => !p.isDuplicate).length}개 일괄 등록
@@ -3582,13 +3585,13 @@ export default function ItemMaster() {
       <Dialog open={showBatchCostUpload} onOpenChange={open => { if (!open) setShowBatchCostUpload(false); }}>
         <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-stone-800">🏭 공장 원가표 일괄 업로드</DialogTitle>
-            <p className="text-xs text-stone-500 mt-0.5">각 스타일별로 공장 원가표 엑셀을 업로드하세요. KMSRP(확정판매가)는 변경되지 않습니다.</p>
+            <DialogTitle className="text-base font-bold text-foreground">공장 원가표 일괄 업로드</DialogTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">각 스타일별로 공장 원가표 엑셀을 업로드하세요. KMSRP(확정판매가)는 변경되지 않습니다.</p>
           </DialogHeader>
           <div className="overflow-y-auto flex-1 mt-2">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-stone-100 text-stone-600">
+                <tr className="bg-[var(--fill-tertiary)] text-muted-foreground">
                   <th className="px-3 py-2 text-left font-medium">스타일번호</th>
                   <th className="px-3 py-2 text-left font-medium">품명</th>
                   <th className="px-3 py-2 text-left font-medium">적용 탭</th>
@@ -3603,23 +3606,23 @@ export default function ItemMaster() {
                     ? (tabCount > 0 ? `전체 ${tabCount}개 탭 덮어쓰기` : '새 탭 생성')
                     : 'BOM 없음 (자동 생성)';
                   const statusEl = (() => {
-                    if (bi.status === 'pending') return <span className="text-stone-400">대기중</span>;
+                    if (bi.status === 'pending') return <span className="text-muted-foreground">대기중</span>;
                     if (bi.status === 'ready') return <span className="text-blue-600 font-medium">✓ {bi.parsedData!.materials.length}개 자재 · 환율 {bi.parsedData!.exchangeRateCny}</span>;
-                    if (bi.status === 'saving') return <span className="text-amber-500 animate-pulse">저장중…</span>;
-                    if (bi.status === 'done') return <span className="text-green-600 font-medium">✅ 적용 완료</span>;
-                    if (bi.status === 'error') return <span className="text-red-500">⚠ {bi.errorMsg}</span>;
+                    if (bi.status === 'saving') return <span className="text-[var(--system-orange)] animate-pulse">저장중…</span>;
+                    if (bi.status === 'done') return <span className="text-[var(--system-green)] font-medium">적용 완료</span>;
+                    if (bi.status === 'error') return <span className="text-[var(--system-red)]">{bi.errorMsg}</span>;
                   })();
                   return (
-                    <tr key={bi.item.id} className="border-b border-stone-100 hover:bg-stone-50">
-                      <td className="px-3 py-2 font-mono font-medium text-stone-700">{bi.item.styleNo}</td>
-                      <td className="px-3 py-2 text-stone-600 max-w-[180px] truncate">{bi.item.name}</td>
-                      <td className="px-3 py-2 text-stone-500">{tabLabel}</td>
-                      <td className="px-3 py-2">{bi.fileName ? <span className="text-stone-500 truncate max-w-[140px] block">{bi.fileName}</span> : null}<div className="mt-0.5">{statusEl}</div></td>
+                    <tr key={bi.item.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                      <td className="px-3 py-2 font-mono font-medium text-foreground">{bi.item.styleNo}</td>
+                      <td className="px-3 py-2 text-muted-foreground max-w-[180px] truncate">{bi.item.name}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{tabLabel}</td>
+                      <td className="px-3 py-2">{bi.fileName ? <span className="text-muted-foreground truncate max-w-[140px] block">{bi.fileName}</span> : null}<div className="mt-0.5">{statusEl}</div></td>
                       <td className="px-3 py-2 text-center">
                         {bi.status !== 'done' && bi.status !== 'saving' && (
                           <button
                             onClick={() => { setBatchCostActiveId(bi.item.id); setTimeout(() => batchCostFileRef.current?.click(), 0); }}
-                            className="px-2.5 py-1 bg-stone-700 hover:bg-stone-800 text-white rounded text-xs font-medium"
+                            className="px-2.5 py-1 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded text-xs font-medium"
                           >
                             파일 선택
                           </button>
@@ -3631,15 +3634,14 @@ export default function ItemMaster() {
               </tbody>
             </table>
           </div>
-          <DialogFooter className="mt-3 pt-3 border-t border-stone-100 flex gap-2 justify-end">
-            <Button variant="outline" size="sm" onClick={() => setShowBatchCostUpload(false)} className="border-stone-300 text-stone-600">
+          <DialogFooter className="mt-3 pt-3 border-t border-border flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={() => setShowBatchCostUpload(false)}>
               닫기
             </Button>
             <Button
               size="sm"
               onClick={applyBatchCostUpload}
               disabled={batchCostItems.filter(bi => bi.status === 'ready').length === 0}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Upload size={13} className="mr-1.5" />
               {batchCostItems.filter(bi => bi.status === 'ready').length}개 적용
@@ -4010,35 +4012,35 @@ function MultiBulkOrderModal({
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-green-700">
-              ✅ 발주 등록 완료
+            <DialogTitle className="flex items-center gap-2 text-[var(--system-green)]">
+              <CheckCircle2 className="w-5 h-5" />발주 등록 완료
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="p-3 bg-green-50 border border-green-200 rounded-xl">
-              <p className="text-sm font-medium text-green-800 mb-2">
+            <div className="p-3 bg-success/10 border border-success/20 rounded-xl">
+              <p className="text-sm font-medium text-success mb-2">
                 {postOrderState.orders.length}건 발주가 등록되었습니다
               </p>
               <ul className="space-y-1">
                 {postOrderState.orders.map(o => (
-                  <li key={o.id} className="text-xs text-green-700 flex items-center gap-2">
+                  <li key={o.id} className="text-xs text-foreground flex items-center gap-2">
                     <span className="font-mono font-semibold">{o.orderNo}</span>
-                    <span className="text-green-600">{o.styleName}</span>
+                    <span className="text-muted-foreground">{o.styleName}</span>
                     <span className="ml-auto font-medium">{o.qty.toLocaleString()}개</span>
                   </li>
                 ))}
               </ul>
             </div>
             {postOrderState.hqMaterialSummary.length > 0 && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <p className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-1.5">
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
+                <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
                   <ShoppingCart size={13} />본사제공 자재 장바구니 담김
                 </p>
                 <ul className="space-y-1">
                   {postOrderState.hqMaterialSummary.map((m, idx) => (
-                    <li key={idx} className="text-xs text-amber-700 flex items-center gap-2">
+                    <li key={idx} className="text-xs text-foreground flex items-center gap-2">
                       <span className="font-medium">{m.materialName}</span>
-                      {m.spec && <span className="text-amber-500">{m.spec}</span>}
+                      {m.spec && <span className="text-muted-foreground">{m.spec}</span>}
                       <span className="ml-auto font-mono">{m.totalQty.toLocaleString()} {m.unit}</span>
                     </li>
                   ))}
@@ -4049,13 +4051,13 @@ function MultiBulkOrderModal({
           <DialogFooter className="flex gap-2 sm:flex-row flex-col">
             <Button
               variant="outline"
-              className="flex items-center gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+              className="flex items-center gap-1.5"
               onClick={() => onComplete({ goToCart: true })}
             >
               <ShoppingCart size={14} />자재 장바구니 확인
             </Button>
             <Button
-              className="bg-[#C9A96E] hover:bg-[#B8985D] text-white flex items-center gap-1.5"
+              className="flex items-center gap-1.5"
               onClick={() => onComplete()}
             >
               <Printer size={14} />발주 목록으로 이동
@@ -4071,7 +4073,7 @@ function MultiBulkOrderModal({
       <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Package size={18} className="text-amber-600" />
+            <Package size={18} className="text-primary" />
             일괄 발주 등록
           </DialogTitle>
         </DialogHeader>
@@ -4087,7 +4089,7 @@ function MultiBulkOrderModal({
                 </SelectTrigger>
                 <SelectContent>
                   {factories.length === 0 ? (
-                    <div className="px-3 py-2 text-xs text-stone-400">등록된 공장 없음</div>
+                    <div className="px-3 py-2 text-xs text-muted-foreground">등록된 공장 없음</div>
                   ) : (
                     factories.map(f => (
                       <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
@@ -4108,8 +4110,8 @@ function MultiBulkOrderModal({
 
           {/* 품목별 설정 */}
           <div className="space-y-2">
-            <Label className="text-sm font-semibold text-stone-700">품목별 컬러 · 수량 설정</Label>
-            <div className="border border-stone-200 rounded-xl overflow-hidden divide-y divide-stone-100">
+            <Label className="text-sm font-semibold text-foreground">품목별 컬러 · 수량 설정</Label>
+            <div className="border border-border rounded-xl overflow-hidden divide-y divide-border">
               {itemStates.map(state => (
                 <BulkOrderItemRow
                   key={state.item.id}
@@ -4128,17 +4130,17 @@ function MultiBulkOrderModal({
           {/* 본사제공 자재 합산 */}
           {hqMaterialPreview.length > 0 && (
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-stone-700 flex items-center gap-1.5">
-                <ShoppingCart size={14} className="text-amber-600" />
+              <Label className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <ShoppingCart size={14} className="text-primary" />
                 본사제공 자재 통합 발주 (자동 합산)
               </Label>
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl space-y-1.5">
                 {hqMaterialPreview.map((m, idx) => (
                   <div key={idx} className="flex items-center gap-2 text-sm">
-                    <span className="text-amber-700 font-medium">{m.materialName}</span>
-                    {m.spec && <span className="text-amber-500 text-xs">{m.spec}</span>}
-                    <span className="text-xs text-stone-400 ml-1">({m.styleNos.join(' + ')})</span>
-                    <span className="ml-auto font-mono font-semibold text-amber-800">
+                    <span className="text-foreground font-medium">{m.materialName}</span>
+                    {m.spec && <span className="text-muted-foreground text-xs">{m.spec}</span>}
+                    <span className="text-xs text-muted-foreground ml-1">({m.styleNos.join(' + ')})</span>
+                    <span className="ml-auto font-mono font-semibold text-primary">
                       {m.totalQty.toLocaleString()} {m.unit}
                     </span>
                   </div>
@@ -4153,7 +4155,6 @@ function MultiBulkOrderModal({
           <Button
             onClick={handleSubmit}
             disabled={submitting}
-            className="bg-amber-500 hover:bg-amber-600 text-white"
           >
             {submitting ? '등록 중...' : '발주 등록'}
           </Button>
@@ -4205,34 +4206,34 @@ function BulkOrderItemRow({
   };
 
   return (
-    <div className={`p-3 transition-colors ${state.enabled ? 'bg-white' : 'bg-stone-50 opacity-60'}`}>
+    <div className={`p-3 transition-colors ${state.enabled ? 'bg-card' : 'bg-[var(--fill-quaternary)] opacity-60'}`}>
       {/* 헤더 */}
       <div className="flex items-center gap-3 mb-2.5">
         <input
           type="checkbox"
           checked={state.enabled}
           onChange={onToggle}
-          className="w-4 h-4 rounded border-stone-300 accent-amber-500 cursor-pointer"
+          className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
         />
         {state.item.imageUrl ? (
           <HoverZoomImage
             src={state.item.imageUrl}
             alt={state.item.name}
-            className="w-8 h-8 rounded-lg border border-stone-200 overflow-hidden cursor-zoom-in"
+            className="w-8 h-8 rounded-lg border border-border overflow-hidden cursor-zoom-in"
             imgClassName="w-8 h-8 object-cover"
             previewSize={280}
           />
         ) : (
-          <div className="w-8 h-8 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center">
-            <Package size={12} className="text-stone-300" />
+          <div className="w-8 h-8 rounded-lg bg-[var(--fill-tertiary)] border border-border flex items-center justify-center">
+            <Package size={12} className="text-muted-foreground" />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-stone-800 truncate">{state.item.name}</p>
-          <p className="text-xs font-mono text-stone-500">{state.item.styleNo}</p>
+          <p className="text-sm font-semibold text-foreground truncate">{state.item.name}</p>
+          <p className="text-xs font-mono text-muted-foreground">{state.item.styleNo}</p>
         </div>
         {totalQty > 0 && (
-          <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">
             합계 {totalQty.toLocaleString()}개
           </span>
         )}
@@ -4245,10 +4246,10 @@ function BulkOrderItemRow({
             {state.colorQtys.map(cq => {
               const isOpen = openDetails.has(cq.color);
               return (
-                <div key={cq.color} className="border border-stone-100 rounded-lg overflow-hidden">
+                <div key={cq.color} className="border border-border rounded-lg overflow-hidden">
                   {/* 컬러 메인 행 */}
-                  <div className="flex items-center gap-2 px-2 py-1.5 bg-stone-50">
-                    <span className="text-xs px-2 py-1 bg-white text-stone-700 rounded border border-stone-200 font-medium w-24 truncate">{cq.color}</span>
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-[var(--fill-quaternary)]">
+                    <span className="text-xs px-2 py-1 bg-card text-foreground rounded border border-border font-medium w-24 truncate">{cq.color}</span>
                     <Input
                       type="number"
                       min={0}
@@ -4257,11 +4258,11 @@ function BulkOrderItemRow({
                       placeholder="수량"
                       className="h-7 text-xs w-20"
                     />
-                    <span className="text-xs text-stone-400">개</span>
+                    <span className="text-xs text-muted-foreground">개</span>
                     <button
                       type="button"
                       onClick={() => onRemoveColor(cq.color)}
-                      className="text-stone-300 hover:text-red-400 transition-colors"
+                      className="text-muted-foreground hover:text-red-400 transition-colors"
                     >
                       <X size={12} />
                     </button>
@@ -4272,8 +4273,8 @@ function BulkOrderItemRow({
                       title="세부 컬러 정보 입력"
                       className={`ml-auto flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded transition-colors ${
                         isOpen
-                          ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                          : 'text-stone-400 hover:text-amber-600 hover:bg-amber-50 border border-transparent'
+                          ? 'bg-primary/10 text-primary border border-primary/20'
+                          : 'text-muted-foreground hover:text-primary hover:bg-primary/10 border border-transparent'
                       }`}
                     >
                       {isOpen ? '▲' : '▼'}
@@ -4281,10 +4282,10 @@ function BulkOrderItemRow({
                   </div>
                   {/* 세부 정보 패널 */}
                   {isOpen && (
-                    <div className="px-2 py-2 bg-white border-t border-stone-100">
+                    <div className="px-2 py-2 bg-card border-t border-border">
                       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-stone-400 w-16 shrink-0">가죽/원단</span>
+                          <span className="text-xs text-muted-foreground w-16 shrink-0">가죽/원단</span>
                           <Input
                             value={cq.leatherColor || ''}
                             onChange={e => { onUpdateColorDetail(cq.color, 'leatherColor', e.target.value); onSaveColorDetail(cq.color, 'leatherColor', e.target.value); }}
@@ -4293,7 +4294,7 @@ function BulkOrderItemRow({
                           />
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-stone-400 w-10 shrink-0">장식</span>
+                          <span className="text-xs text-muted-foreground w-10 shrink-0">장식</span>
                           <Input
                             value={cq.decorColor || ''}
                             onChange={e => { onUpdateColorDetail(cq.color, 'decorColor', e.target.value); onSaveColorDetail(cq.color, 'decorColor', e.target.value); }}
@@ -4302,7 +4303,7 @@ function BulkOrderItemRow({
                           />
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-stone-400 w-16 shrink-0">실</span>
+                          <span className="text-xs text-muted-foreground w-16 shrink-0">실</span>
                           <Input
                             value={cq.threadColor || ''}
                             onChange={e => { onUpdateColorDetail(cq.color, 'threadColor', e.target.value); onSaveColorDetail(cq.color, 'threadColor', e.target.value); }}
@@ -4311,7 +4312,7 @@ function BulkOrderItemRow({
                           />
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-stone-400 w-10 shrink-0">기리매</span>
+                          <span className="text-xs text-muted-foreground w-10 shrink-0">기리매</span>
                           <Input
                             value={cq.girimaeColor || ''}
                             onChange={e => { onUpdateColorDetail(cq.color, 'girimaeColor', e.target.value); onSaveColorDetail(cq.color, 'girimaeColor', e.target.value); }}

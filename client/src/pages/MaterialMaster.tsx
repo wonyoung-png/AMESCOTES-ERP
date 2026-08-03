@@ -16,22 +16,11 @@ import { Plus, Search, Pencil, Trash2, Package } from 'lucide-react';
 const MATERIAL_CATEGORIES: MaterialCategory[] = ['원자재', '지퍼', '장식', '보강재', '봉사·접착제', '포장재', '철형', '후가공'];
 const UNITS = ['SF', 'YD', 'M', 'EA', 'L', '콘', 'KG', 'SET', '장', '개', 'PC', 'CM'];
 
-const CATEGORY_ICON: Record<MaterialCategory, string> = {
-  '원자재': '🧴',
-  '지퍼': '🔗',
-  '장식': '✨',
-  '보강재': '🛡️',
-  '봉사·접착제': '🧵',
-  '포장재': '📦',
-  '철형': '🔩',
-  '후가공': '🎨',
-};
-
 const CATEGORY_COLOR: Record<MaterialCategory, string> = {
   '원자재': 'bg-amber-50 text-amber-700 border-amber-200',
   '지퍼': 'bg-blue-50 text-blue-700 border-blue-200',
   '장식': 'bg-purple-50 text-purple-700 border-purple-200',
-  '보강재': 'bg-stone-50 text-stone-600 border-stone-200',
+  '보강재': 'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
   '봉사·접착제': 'bg-green-50 text-green-700 border-green-200',
   '포장재': 'bg-orange-50 text-orange-700 border-orange-200',
   '철형': 'bg-slate-50 text-slate-700 border-slate-200',
@@ -176,13 +165,13 @@ export default function MaterialMaster() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">자재 마스터</h1>
-          <p className="text-sm text-stone-500 mt-0.5">원자재·부자재 단가 등록 · BOM 자동 연결</p>
-          {materialsLoading && <p className="text-xs text-blue-500">로딩 중...</p>}
-          {materialsError && <p className="text-xs text-red-500">오류: {String(materialsError)}</p>}
-          <p className="text-xs text-stone-400">총 {materials.length}건 (표시: {filtered.length}건)</p>
+          <h1 className="text-2xl font-bold text-foreground">자재 마스터</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">원자재·부자재 단가 등록 · BOM 자동 연결</p>
+          {materialsLoading && <p className="text-xs text-primary">로딩 중...</p>}
+          {materialsError && <p className="text-xs text-[var(--system-red)]">오류: {String(materialsError)}</p>}
+          <p className="text-xs text-muted-foreground">총 {materials.length}건 (표시: {filtered.length}건)</p>
         </div>
-        <Button onClick={openNew} className="bg-[#C9A96E] hover:bg-[#B8985D] text-white gap-2">
+        <Button onClick={openNew} className="gap-2">
           <Plus size={16} />자재 등록
         </Button>
       </div>
@@ -191,7 +180,7 @@ export default function MaterialMaster() {
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setFilterCat('all')}
-          className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${filterCat === 'all' ? 'bg-stone-800 text-white border-stone-800' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'}`}
+          className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${filterCat === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'}`}
         >
           전체 ({(materials as any[]).length})
         </button>
@@ -199,67 +188,67 @@ export default function MaterialMaster() {
           <button
             key={cat}
             onClick={() => setFilterCat(cat)}
-            className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${filterCat === cat ? 'bg-stone-800 text-white border-stone-800' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'}`}
+            className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${filterCat === cat ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'}`}
           >
-            {CATEGORY_ICON[cat]} {cat} ({catCounts[cat] || 0})
+            {cat} ({catCounts[cat] || 0})
           </button>
         ))}
       </div>
 
       {/* 검색 */}
       <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="자재명 / 영문명 / 스펙 검색" className="pl-9 h-9" />
       </div>
 
       {/* 다중 선택 액션 바 */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-stone-800 text-white rounded-xl">
-          <span className="text-sm font-medium">{selectedIds.size}개 선택됨</span>
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-xl">
+          <span className="text-sm font-medium text-foreground">{selectedIds.size}개 선택됨</span>
           <button
             onClick={handleBulkDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-lg text-xs font-medium transition-colors"
           >
-            🗑️ 선택 삭제
+            <Trash2 className="w-4 h-4" />선택 삭제
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
-            className="flex items-center gap-1 px-3 py-1.5 bg-stone-600 hover:bg-stone-500 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-lg text-xs font-medium transition-colors"
           >
-            ✕ 선택 해제
+            선택 해제
           </button>
         </div>
       )}
 
       {/* 테이블 */}
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50">
+            <tr className="border-b border-border bg-[var(--fill-quaternary)]">
               <th className="px-3 py-3 w-10">
                 <input
                   type="checkbox"
                   checked={isAllSelected}
                   ref={el => { if (el) el.indeterminate = isIndeterminate; }}
                   onChange={toggleSelectAll}
-                  className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
+                  className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                 />
               </th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">품번</th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">카테고리</th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">자재명</th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">스펙</th>
-              <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (CNY)</th>
-              <th className="text-right px-3 py-3 text-xs font-medium text-stone-500">단가 (KRW)</th>
-              <th className="text-left px-3 py-3 text-xs font-medium text-stone-500">단위</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">품번</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">카테고리</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">자재명</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">스펙</th>
+              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground">단가 (CNY)</th>
+              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground">단가 (KRW)</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">단위</th>
               
-              <th className="text-center px-3 py-3 text-xs font-medium text-stone-500">편집</th>
+              <th className="text-center px-3 py-3 text-[13px] font-semibold text-muted-foreground">편집</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center py-12 text-stone-400">
+                <td colSpan={10} className="text-center py-12 text-muted-foreground">
                   <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">등록된 자재가 없습니다</p>
                 </td>
@@ -267,42 +256,42 @@ export default function MaterialMaster() {
             ) : filtered.map((m: any) => {
               const isChecked = selectedIds.has(m.id);
               return (
-                <tr key={m.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${isChecked ? 'bg-amber-50/60' : ''}`}>
+                <tr key={m.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${isChecked ? 'bg-primary/5' : ''}`}>
                   <td className="px-3 py-2.5">
                     <input
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => toggleSelect(m.id)}
-                      className="w-4 h-4 rounded border-stone-300 accent-[#C9A96E] cursor-pointer"
+                      className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                     />
                   </td>
                   <td className="px-3 py-2.5 w-16">
-                    <span className="font-mono text-xs bg-stone-100 px-2 py-0.5 rounded text-stone-600">{m.itemCode || '—'}</span>
+                    <span className="font-mono text-xs bg-[var(--fill-tertiary)] px-2 py-0.5 rounded text-muted-foreground">{m.itemCode || '—'}</span>
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className={`text-xs px-2 py-0.5 rounded-full border ${CATEGORY_COLOR[m.category as MaterialCategory] || 'bg-stone-50 text-stone-600 border-stone-200'}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${CATEGORY_COLOR[m.category as MaterialCategory] || 'bg-[var(--fill-quaternary)] text-muted-foreground border-border'}`}>
                       {m.category}
                     </span>
                   </td>
                   <td className="px-3 py-2.5">
-                    <p className="font-medium text-stone-800">{m.name}</p>
-                    {m.nameEn && <p className="text-xs text-stone-400">{m.nameEn}</p>}
+                    <p className="font-medium text-foreground">{m.name}</p>
+                    {m.nameEn && <p className="text-xs text-muted-foreground">{m.nameEn}</p>}
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-stone-500">{m.spec || '—'}</td>
-                  <td className="px-3 py-2.5 text-right font-mono text-xs text-stone-700">
+                  <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.spec || '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-xs text-foreground">
                     {m.unitPriceCny != null ? `¥${Number(m.unitPriceCny).toFixed(2)}` : '—'}
                   </td>
-                  <td className="px-3 py-2.5 text-right font-mono text-xs text-stone-700">
+                  <td className="px-3 py-2.5 text-right font-mono text-xs text-foreground">
                     {m.unitPriceKrw != null ? `₩${Number(m.unitPriceKrw).toLocaleString()}` : '—'}
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-stone-600">{m.unit}</td>
+                  <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.unit}</td>
                   
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-stone-100 text-stone-500">
+                      <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-[var(--fill-tertiary)] text-muted-foreground">
                         <Pencil size={14} />
                       </button>
-                      <button onClick={() => handleDelete(m.id)} className="p-1.5 rounded hover:bg-red-50 text-stone-400 hover:text-red-500">
+                      <button onClick={() => handleDelete(m.id)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-[var(--system-red)]">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -327,13 +316,13 @@ export default function MaterialMaster() {
               <Label>이미지</Label>
               <div className="flex items-center gap-3">
                 <div
-                  className="w-20 h-20 rounded-xl border-2 border-dashed border-stone-200 flex items-center justify-center cursor-pointer hover:border-amber-400 transition-colors overflow-hidden"
+                  className="w-20 h-20 rounded-xl border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
                   onClick={() => fileRef.current?.click()}
                 >
                   {previewImage ? (
                     <img src={previewImage} alt="미리보기" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-3xl">{CATEGORY_ICON[form.category as MaterialCategory || '원자재']}</span>
+                    <Package className="w-8 h-8 text-muted-foreground" />
                   )}
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -341,11 +330,11 @@ export default function MaterialMaster() {
                     이미지 선택
                   </Button>
                   {previewImage && (
-                    <Button type="button" variant="ghost" size="sm" className="text-xs text-red-500" onClick={() => { setPreviewImage(null); setForm(prev => ({ ...prev, imageUrl: undefined })); }}>
+                    <Button type="button" variant="ghost" size="sm" className="text-xs text-[var(--system-red)]" onClick={() => { setPreviewImage(null); setForm(prev => ({ ...prev, imageUrl: undefined })); }}>
                       삭제
                     </Button>
                   )}
-                  <p className="text-xs text-stone-400">최대 800px, JPEG 자동 변환</p>
+                  <p className="text-xs text-muted-foreground">최대 800px, JPEG 자동 변환</p>
                 </div>
               </div>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -362,7 +351,7 @@ export default function MaterialMaster() {
                 <SelectContent>
                   {MATERIAL_CATEGORIES.map(c => (
                     <SelectItem key={c} value={c}>
-                      {CATEGORY_ICON[c]} {c}
+                      {c}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -375,7 +364,7 @@ export default function MaterialMaster() {
               <div className="flex gap-2">
                 <Input value={form.itemCode || ''} onChange={e => setForm(prev => ({ ...prev, itemCode: e.target.value }))} placeholder="M01" className="w-24 font-mono" />
                 <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setForm(prev => ({ ...prev, itemCode: store.getNextItemCode(prev.category as any || '원자재') }))}>자동생성</Button>
-                <span className="text-xs text-stone-400 self-center">카테고리별 자동: M01, Z01, H01...</span>
+                <span className="text-xs text-muted-foreground self-center">카테고리별 자동: M01, Z01, H01...</span>
               </div>
             </div>
             {/* 자재명 */}
@@ -430,7 +419,7 @@ export default function MaterialMaster() {
                 </SelectContent>
               </Select>
               {vendors.length === 0 && (
-                <p className="text-xs text-stone-400">자재거래처 타입의 거래처를 먼저 등록하세요</p>
+                <p className="text-xs text-muted-foreground">자재거래처 타입의 거래처를 먼저 등록하세요</p>
               )}
             </div>
 
@@ -443,7 +432,7 @@ export default function MaterialMaster() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
-            <Button onClick={handleSave} className="bg-[#C9A96E] hover:bg-[#B8985D] text-white">{editId ? '수정' : '등록'}</Button>
+            <Button onClick={handleSave}>{editId ? '수정' : '등록'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

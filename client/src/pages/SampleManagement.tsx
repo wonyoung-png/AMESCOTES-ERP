@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
   Plus, Search, Trash2, Camera, FileText,
-  ClipboardCheck, Eye, PackagePlus, FileSpreadsheet, File,
+  ClipboardCheck, Eye, PackagePlus, FileSpreadsheet, File, Paperclip,
 } from 'lucide-react';
 
 // 자재 업체 목록은 store의 자재거래처에서 동적으로 불러옴 (하드코딩 제거)
@@ -37,9 +37,9 @@ function getFileType(name: string): SampleDocument['fileType'] {
 
 // 문서 아이콘 렌더링
 function DocIcon({ fileType }: { fileType: SampleDocument['fileType'] }) {
-  if (fileType === 'pdf') return <File className="w-6 h-6 text-red-500" />;
-  if (fileType === 'excel') return <FileSpreadsheet className="w-6 h-6 text-green-600" />;
-  return <Camera className="w-6 h-6 text-stone-400" />;
+  if (fileType === 'pdf') return <File className="w-6 h-6 text-[var(--system-red)]" />;
+  if (fileType === 'excel') return <FileSpreadsheet className="w-6 h-6 text-[var(--system-green)]" />;
+  return <Camera className="w-6 h-6 text-muted-foreground" />;
 }
 
 const STAGES: SampleStage[] = ['1차', '2차', '3차', '4차', '최종승인', '반려'];
@@ -58,7 +58,7 @@ const STAGE_COLOR: Record<SampleStage, string> = {
 };
 
 const BILLING_COLOR: Record<SampleBillingStatus, string> = {
-  '미청구':   'bg-stone-50 text-stone-500 border-stone-200',
+  '미청구':   'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
   '청구완료': 'bg-amber-50 text-amber-700 border-amber-200',
   '수금완료': 'bg-green-50 text-green-700 border-green-200',
 };
@@ -712,14 +712,14 @@ export default function SampleManagement() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-stone-800">샘플 관리</h1>
-          <p className="text-xs md:text-sm text-stone-500 mt-0.5 hidden sm:block">샘플 접수 · 차수별 메모 · 자재 체크리스트 · TEMP 품목 자동생성</p>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">샘플 관리</h1>
+          <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">샘플 접수 · 차수별 메모 · 자재 체크리스트 · TEMP 품목 자동생성</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleBillAll} className="gap-1 md:gap-2 text-amber-700 border-amber-300 hover:bg-amber-50 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
+          <Button variant="outline" onClick={handleBillAll} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
             <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" /><span className="hidden sm:inline">명세표 발행</span><span className="sm:hidden">발행</span>
           </Button>
-          <Button onClick={openNew} className="bg-amber-700 hover:bg-amber-800 text-white gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
+          <Button onClick={openNew} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
             <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />샘플 접수
           </Button>
         </div>
@@ -728,19 +728,19 @@ export default function SampleManagement() {
       {/* KPI */}
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 md:gap-3">
         {[
-          { label: '전체',    value: stats.total,            color: 'text-stone-800' },
+          { label: '전체',    value: stats.total,            color: 'text-foreground' },
           { label: '진행중',  value: stats.inProgress,       color: 'text-blue-700' },
-          { label: '최종승인', value: stats.approved,         color: 'text-green-700' },
-          { label: '미청구',  value: stats.unclaimed,        color: 'text-amber-700' },
+          { label: '최종승인', value: stats.approved,         color: 'text-[var(--system-green)]' },
+          { label: '미청구',  value: stats.unclaimed,        color: 'text-[var(--system-orange)]' },
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-stone-200 p-4">
+          <div key={s.label} className="bg-card rounded-xl border border-border p-4">
             <p className={`text-xl font-bold ${s.color}`}>{s.value}건</p>
-            <p className="text-xs text-stone-500 mt-0.5">{s.label}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
         ))}
-        <div className="bg-white rounded-xl border border-stone-200 p-4">
-          <p className="text-xl font-bold text-red-600">{formatKRW(stats.totalUnclaimedKrw)}</p>
-          <p className="text-xs text-stone-500 mt-0.5">미청구 금액</p>
+        <div className="bg-card rounded-xl border border-border p-4">
+          <p className="text-xl font-bold text-[var(--system-red)]">{formatKRW(stats.totalUnclaimedKrw)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">미청구 금액</p>
         </div>
       </div>
 
@@ -752,28 +752,28 @@ export default function SampleManagement() {
         const thisMonthApproved = thisMonthSamples.filter(s => s.stage === '최종승인').length;
         const thisMonthReceived = thisMonthSamples.length;
         return (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-amber-800">📋 이번 달 샘플 현황</span>
-              <span className="text-xs text-amber-600">({thisMonth})</span>
+              <span className="text-sm font-semibold text-primary">이번 달 샘플 현황</span>
+              <span className="text-xs text-muted-foreground">({thisMonth})</span>
             </div>
             <div className="flex items-center gap-6 text-sm">
-              <div className="text-center">
-                <p className="font-bold text-stone-800">{thisMonthReceived}건</p>
-                <p className="text-xs text-stone-500">접수</p>
+              <div>
+                <p className="font-bold text-foreground">{thisMonthReceived}건</p>
+                <p className="text-xs text-muted-foreground">접수</p>
               </div>
-              <div className="text-center">
+              <div>
                 <p className="font-bold text-blue-700">{thisMonthInProgress}건</p>
-                <p className="text-xs text-stone-500">진행중</p>
+                <p className="text-xs text-muted-foreground">진행중</p>
               </div>
-              <div className="text-center">
-                <p className="font-bold text-green-700">{thisMonthApproved}건</p>
-                <p className="text-xs text-stone-500">완료</p>
+              <div>
+                <p className="font-bold text-[var(--system-green)]">{thisMonthApproved}건</p>
+                <p className="text-xs text-muted-foreground">완료</p>
               </div>
               {thisMonthReceived > 0 && (
-                <div className="text-center">
-                  <p className="font-bold text-amber-700">{Math.round(thisMonthApproved / thisMonthReceived * 100)}%</p>
-                  <p className="text-xs text-stone-500">완료율</p>
+                <div>
+                  <p className="font-bold text-primary">{Math.round(thisMonthApproved / thisMonthReceived * 100)}%</p>
+                  <p className="text-xs text-muted-foreground">완료율</p>
                 </div>
               )}
             </div>
@@ -782,9 +782,9 @@ export default function SampleManagement() {
       })()}
 
       {/* 월별 담당자별 처리량 통계 */}
-      <div className="bg-white rounded-xl border border-stone-200 p-4">
+      <div className="bg-card rounded-xl border border-border p-4">
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <p className="text-sm font-semibold text-stone-700 mr-1">월별 담당자별 처리량</p>
+          <p className="text-sm font-semibold text-foreground mr-1">월별 담당자별 처리량</p>
           {/* 월 선택 */}
           <Input
             type="month"
@@ -830,33 +830,33 @@ export default function SampleManagement() {
           {(statFilterSalesPerson !== 'all' || statFilterAssignee !== 'all' || statFilterBuyer !== 'all' || statFilterSeason !== 'all') && (
             <button
               onClick={() => { setStatFilterSalesPerson('all'); setStatFilterAssignee('all'); setStatFilterBuyer('all'); setStatFilterSeason('all'); }}
-              className="text-xs text-stone-400 hover:text-red-500 px-2 py-1 rounded border border-stone-200 hover:border-red-300"
+              className="text-xs text-muted-foreground hover:text-[var(--system-red)] px-2 py-1 rounded border border-border hover:border-red-300"
             >
               필터 초기화
             </button>
           )}
         </div>
         {monthlyStats.length === 0 ? (
-          <p className="text-xs text-stone-400 text-center py-2">해당 월 / 조건에 맞는 샘플 없음</p>
+          <p className="text-xs text-muted-foreground text-center py-2">해당 월 / 조건에 맞는 샘플 없음</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-100">
-                <th className="text-left py-1.5 text-xs text-stone-500">작업담당자</th>
-                <th className="text-center py-1.5 text-xs text-stone-500">전체 건수</th>
-                <th className="text-center py-1.5 text-xs text-stone-500">최종승인</th>
-                <th className="text-center py-1.5 text-xs text-stone-500">승인율</th>
+              <tr className="border-b border-border">
+                <th className="text-left py-1.5 text-[13px] font-semibold text-muted-foreground">작업담당자</th>
+                <th className="text-center py-1.5 text-[13px] font-semibold text-muted-foreground">전체 건수</th>
+                <th className="text-center py-1.5 text-[13px] font-semibold text-muted-foreground">최종승인</th>
+                <th className="text-center py-1.5 text-[13px] font-semibold text-muted-foreground">승인율</th>
               </tr>
             </thead>
             <tbody>
               {monthlyStats.map(row => (
-                <tr key={row.assignee} className="border-b border-stone-50">
-                  <td className="py-1.5 text-stone-700 font-medium">{row.assignee}</td>
-                  <td className="py-1.5 text-center text-stone-600">{row.total}건</td>
-                  <td className="py-1.5 text-center text-green-600 font-medium">{row.done}건</td>
+                <tr key={row.assignee} className="border-b border-border">
+                  <td className="py-1.5 text-foreground font-medium">{row.assignee}</td>
+                  <td className="py-1.5 text-center text-muted-foreground">{row.total}건</td>
+                  <td className="py-1.5 text-center text-[var(--system-green)] font-medium">{row.done}건</td>
                   <td className="py-1.5 text-center text-xs">
                     {row.total > 0 ? (
-                      <span className={row.done / row.total >= 0.5 ? 'text-green-600' : 'text-amber-600'}>
+                      <span className={row.done / row.total >= 0.5 ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]'}>
                         {Math.round(row.done / row.total * 100)}%
                       </span>
                     ) : '-'}
@@ -869,7 +869,7 @@ export default function SampleManagement() {
       </div>
 
       {/* 단계 탭 필터 */}
-      <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl w-fit flex-wrap">
+      <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-xl w-fit flex-wrap">
         {[
           { value: 'all', label: '전체' },
           { value: '진행중', label: '진행중' },
@@ -885,13 +885,13 @@ export default function SampleManagement() {
             onClick={() => setFilterStage(opt.value)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
               filterStage === opt.value
-                ? 'bg-white text-stone-800 shadow-sm'
-                : 'text-stone-500 hover:text-stone-700'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {opt.label}
             {opt.value === '진행중' && (
-              <span className="ml-1 text-[10px] text-blue-600 font-bold">
+              <span className="ml-1 text-[11px] text-blue-600 font-bold">
                 {samples.filter(s => ['1차','2차','3차','4차'].includes(s.stage)).length}
               </span>
             )}
@@ -902,7 +902,7 @@ export default function SampleManagement() {
       {/* 검색 + 필터 */}
       <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="스타일번호 / 품명 검색" className="pl-9 h-9" />
         </div>
         <Select value={filterSeason} onValueChange={setFilterSeason}>
@@ -953,53 +953,53 @@ export default function SampleManagement() {
 
       {/* 다중 선택 액션 바 */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-stone-800 text-white rounded-xl">
-          <span className="text-sm font-medium">{selectedIds.size}개 선택됨</span>
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-xl">
+          <span className="text-sm font-medium text-foreground">{selectedIds.size}개 선택됨</span>
           <button
             onClick={handleBulkDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-lg text-xs font-medium transition-colors"
           >
-            🗑️ 선택 삭제
+            <Trash2 className="w-4 h-4" />선택 삭제
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
-            className="flex items-center gap-1 px-3 py-1.5 bg-stone-600 hover:bg-stone-500 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-lg text-xs font-medium transition-colors"
           >
-            ✕ 선택 해제
+            선택 해제
           </button>
         </div>
       )}
 
       {/* 테이블 (데스크탑) */}
-      <div className="hidden md:block bg-white rounded-xl border border-stone-200 overflow-hidden">
+      <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-stone-100 bg-stone-50">
+            <tr className="border-b border-border bg-[var(--fill-quaternary)]">
               <th className="px-4 py-3 w-10">
                 <input
                   type="checkbox"
                   checked={isAllSelected}
                   ref={el => { if (el) el.indeterminate = isIndeterminate; }}
                   onChange={toggleSelectAll}
-                  className="w-4 h-4 rounded border-stone-300 accent-amber-700 cursor-pointer"
+                  className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                 />
               </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500 w-12">이미지</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">바이어</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">스타일</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">장소/차수</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">단계</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">의뢰일</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">목표완료</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">비고</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-stone-500">비용(KRW)</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-stone-500">청구</th>
-              <th className="text-center px-4 py-3 text-xs font-medium text-stone-500">작업</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground w-12">이미지</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">바이어</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">스타일</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">장소/차수</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">단계</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">의뢰일</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">목표완료</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">비고</th>
+              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">비용(KRW)</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">청구</th>
+              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={12} className="text-center py-12 text-stone-400">
+              <tr><td colSpan={12} className="text-center py-12 text-muted-foreground">
                 <Camera className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 샘플이 없습니다</p>
               </td></tr>
@@ -1008,20 +1008,20 @@ export default function SampleManagement() {
               const readyCount = (s.materialChecklist || []).filter(c => c.isReady).length;
               const isChecked = selectedIds.has(s.id);
               return (
-                <tr key={s.id} className={`border-b border-stone-50 hover:bg-stone-50/50 ${isChecked ? 'bg-amber-50/60' : ''}`}>
+                <tr key={s.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${isChecked ? 'bg-primary/5' : ''}`}>
                   <td className="px-4 py-3">
                     <input
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => toggleSelect(s.id)}
-                      className="w-4 h-4 rounded border-stone-300 accent-amber-700 cursor-pointer"
+                      className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                     />
                   </td>
                   <td className="px-3 py-2.5">
                     {(s.imageUrls || []).length > 0 ? (
-                      <img src={s.imageUrls[0]} alt={s.styleNo} className="w-14 h-14 object-cover rounded-lg border border-stone-200" />
+                      <img src={s.imageUrls[0]} alt={s.styleNo} className="w-14 h-14 object-cover rounded-lg border border-border" />
                     ) : (
-                      <div className="w-14 h-14 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center text-stone-400">
+                      <div className="w-14 h-14 rounded-lg bg-[var(--fill-tertiary)] border border-border flex items-center justify-center text-muted-foreground">
                         <Camera className="w-5 h-5" />
                       </div>
                     )}
@@ -1031,25 +1031,25 @@ export default function SampleManagement() {
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
                         {vendors.find(v => v.id === s.buyerId)?.name || '-'}
                       </span>
-                    ) : <span className="text-stone-300 text-xs">-</span>}
+                    ) : <span className="text-muted-foreground text-xs">-</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-stone-700">{s.styleNo}</p>
-                    <p className="text-xs text-stone-400">{s.styleName}</p>
-                    <Badge variant="outline" className="text-[10px] mt-0.5">{s.season}</Badge>
+                    <p className="font-medium text-foreground">{s.styleNo}</p>
+                    <p className="text-xs text-muted-foreground">{s.styleName}</p>
+                    <Badge variant="outline" className="text-[11px] mt-0.5">{s.season}</Badge>
                   </td>
                   <td className="px-4 py-3">
-                    {s.location && <p className="text-xs text-stone-600">{s.location}</p>}
+                    {s.location && <p className="text-xs text-muted-foreground">{s.location}</p>}
                     {s.round && (
                       <p className="text-xs text-blue-600 font-medium">
                         {s.round}차{s.roundName ? ` (${s.roundName})` : ''}
                       </p>
                     )}
-                    {s.assignee && <p className="text-[11px] text-stone-400">{s.assignee}</p>}
+                    {s.assignee && <p className="text-[11px] text-muted-foreground">{s.assignee}</p>}
                   </td>
                   <td className="px-4 py-3">
                     <Select value={s.stage} onValueChange={v => handleStageChange(s.id, v as SampleStage)}>
-                      <SelectTrigger className={`h-7 text-xs w-28 border ${STAGE_COLOR[s.stage] || 'bg-stone-50 text-stone-600 border-stone-200'}`}>
+                      <SelectTrigger className={`h-7 text-xs w-28 border ${STAGE_COLOR[s.stage] || 'bg-[var(--fill-quaternary)] text-muted-foreground border-border'}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1057,18 +1057,18 @@ export default function SampleManagement() {
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-4 py-3 text-stone-600 text-xs">{s.requestDate}</td>
-                  <td className="px-4 py-3 text-stone-500 text-xs">{s.expectedDate || '-'}</td>
-                  <td className="px-4 py-3 text-xs text-stone-500 max-w-[120px]">
+                  <td className="px-4 py-3 text-muted-foreground text-xs">{s.requestDate}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">{s.expectedDate || '-'}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground max-w-[120px]">
                     {s.memo && <p className="truncate">{s.memo}</p>}
                     {checkCount > 0 && (
-                      <span className={`inline-flex items-center gap-1 text-xs ${readyCount === checkCount ? 'text-green-600' : 'text-amber-600'}`}>
+                      <span className={`inline-flex items-center gap-1 text-xs ${readyCount === checkCount ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]'}`}>
                         <ClipboardCheck className="w-3 h-3" />{readyCount}/{checkCount}
                       </span>
                     )}
-                    {!s.memo && checkCount === 0 && <span className="text-stone-300">—</span>}
+                    {!s.memo && checkCount === 0 && <span className="text-muted-foreground">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono text-stone-700 text-xs">{formatKRW(s.costKrw || Math.round((s.costCny || 0) * settings.cnyKrw))}</td>
+                  <td className="px-4 py-3 text-right font-mono text-foreground text-xs">{formatKRW(s.costKrw || Math.round((s.costCny || 0) * settings.cnyKrw))}</td>
                   <td className="px-4 py-3">
                     {s.billingStatus === '미청구' ? (
                       <button
@@ -1078,7 +1078,7 @@ export default function SampleManagement() {
                           setLinkStatementId('');
                           setBillingModal(true);
                         }}
-                        className="inline-flex text-xs px-2 py-0.5 rounded-full border bg-stone-50 text-stone-500 border-stone-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 transition-colors whitespace-nowrap"
+                        className="inline-flex text-xs px-2 py-0.5 rounded-full border bg-[var(--fill-quaternary)] text-muted-foreground border-border hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors whitespace-nowrap"
                         title="거래명세표 생성 또는 기존 전표 연결"
                       >
                         청구하기
@@ -1095,7 +1095,7 @@ export default function SampleManagement() {
                                 upsertSampleSB({ ...s, billingStatus: '미청구', billingDate: undefined }).then(() => refresh()).catch(() => {});
                               }
                             }}
-                            className="text-[10px] text-stone-400 hover:text-red-500"
+                            className="text-[11px] text-muted-foreground hover:text-[var(--system-red)]"
                             title="미청구로 되돌리기"
                           >↩</button>
                         )}
@@ -1109,7 +1109,7 @@ export default function SampleManagement() {
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(s)}>수정</Button>
                       {s.stage !== '최종승인' && (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-green-700 hover:text-green-800"
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-[var(--system-green)] hover:text-[var(--system-green)]"
                           onClick={() => handleApprove(s)}>승인</Button>
                       )}
                       {s.stage === '최종승인' && (() => {
@@ -1125,16 +1125,16 @@ export default function SampleManagement() {
                         const needsRegistration = isTempStyleNo || !registeredItem;
                         return needsRegistration ? (
                           /* TEMP 스타일번호 or 품목 미등록 → 품목등록 버튼 (주황색) */
-                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-orange-700 hover:text-orange-900 bg-orange-50 hover:bg-orange-100 border border-orange-300"
+                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-warning hover:text-warning bg-warning/10 hover:bg-warning/20 border border-warning/30"
                             onClick={() => handleRegisterItem(s)}>
                             <PackagePlus className="w-3 h-3 mr-1" />품목등록
                           </Button>
                         ) : (
                           /* 품목 등록 완료(ACTIVE) → 버튼 없음, 텍스트만 표시 */
-                          <span className="text-xs text-green-600 font-medium px-1">✓ 품목등록완료</span>
+                          <span className="text-xs text-[var(--system-green)] font-medium px-1">✓ 품목등록완료</span>
                         );
                       })()}
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(s.id)}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -1149,7 +1149,7 @@ export default function SampleManagement() {
       {/* 카드 리스트 (모바일) */}
       <div className="md:hidden space-y-3">
         {filtered.length === 0 ? (
-          <div className="text-center py-12 text-stone-400 bg-white rounded-xl border border-stone-200">
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
             <Camera className="w-10 h-10 mx-auto mb-2 opacity-30" />
             <p className="text-sm">등록된 샘플이 없습니다</p>
           </div>
@@ -1158,14 +1158,14 @@ export default function SampleManagement() {
           const readyCount = (s.materialChecklist || []).filter(c => c.isReady).length;
           const isChecked = selectedIds.has(s.id);
           return (
-            <div key={s.id} className={`bg-white rounded-xl border p-4 ${isChecked ? 'border-amber-400 bg-amber-50/50' : 'border-stone-200'}`}>
+            <div key={s.id} className={`bg-card rounded-xl border p-4 ${isChecked ? 'border-primary/40 bg-primary/5' : 'border-border'}`}>
               <div className="flex gap-3">
                 {/* 썸네일 */}
                 <div className="shrink-0">
                   {(s.imageUrls || []).length > 0 ? (
-                    <img src={s.imageUrls[0]} alt={s.styleNo} className="w-16 h-16 object-cover rounded-lg border border-stone-200" />
+                    <img src={s.imageUrls[0]} alt={s.styleNo} className="w-16 h-16 object-cover rounded-lg border border-border" />
                   ) : (
-                    <div className="w-16 h-16 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center text-stone-400">
+                    <div className="w-16 h-16 rounded-lg bg-[var(--fill-tertiary)] border border-border flex items-center justify-center text-muted-foreground">
                       <Camera className="w-5 h-5" />
                     </div>
                   )}
@@ -1174,17 +1174,17 @@ export default function SampleManagement() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-semibold text-stone-800 text-sm">{s.styleNo}</p>
-                      <p className="text-xs text-stone-500 truncate">{s.styleName}</p>
+                      <p className="font-semibold text-foreground text-sm">{s.styleNo}</p>
+                      <p className="text-xs text-muted-foreground truncate">{s.styleName}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <input
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => toggleSelect(s.id)}
-                        className="w-4 h-4 rounded border-stone-300 accent-amber-700 cursor-pointer"
+                        className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                       />
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${STAGE_COLOR[s.stage] || 'bg-stone-50 text-stone-600 border-stone-200'}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${STAGE_COLOR[s.stage] || 'bg-[var(--fill-quaternary)] text-muted-foreground border-border'}`}>
                         {s.stage}
                       </span>
                     </div>
@@ -1195,23 +1195,23 @@ export default function SampleManagement() {
                         {vendors.find(v => v.id === s.buyerId)?.name || '-'}
                       </span>
                     )}
-                    <Badge variant="outline" className="text-[10px]">{s.season}</Badge>
-                    <span className="text-[11px] text-stone-400">{s.requestDate}</span>
+                    <Badge variant="outline" className="text-[11px]">{s.season}</Badge>
+                    <span className="text-[11px] text-muted-foreground">{s.requestDate}</span>
                   </div>
                   {checkCount > 0 && (
-                    <span className={`inline-flex items-center gap-1 text-xs mt-1 ${readyCount === checkCount ? 'text-green-600' : 'text-amber-600'}`}>
+                    <span className={`inline-flex items-center gap-1 text-xs mt-1 ${readyCount === checkCount ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]'}`}>
                       <ClipboardCheck className="w-3 h-3" />{readyCount}/{checkCount}
                     </span>
                   )}
                 </div>
               </div>
               {/* 하단 액션 */}
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-stone-100">
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
                 <div>
                   {s.billingStatus === '미청구' ? (
                     <button
                       onClick={() => { setBillingTarget(s); setBillingMode('new'); setLinkStatementId(''); setBillingModal(true); }}
-                      className="text-xs px-2.5 py-1 rounded-full border bg-stone-50 text-stone-500 border-stone-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 transition-colors"
+                      className="text-xs px-2.5 py-1 rounded-full border bg-[var(--fill-quaternary)] text-muted-foreground border-border hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
                     >
                       청구하기
                     </button>
@@ -1225,7 +1225,7 @@ export default function SampleManagement() {
                   </Button>
                   <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openEdit(s)}>수정</Button>
                   {s.stage !== '최종승인' && (
-                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-green-700" onClick={() => handleApprove(s)}>승인</Button>
+                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-[var(--system-green)]" onClick={() => handleApprove(s)}>승인</Button>
                   )}
                   {s.stage === '최종승인' && (() => {
                     // 모바일 뷰: TEMP 스타일번호 여부 + 정식 ACTIVE 품목 등록 여부 확인
@@ -1238,16 +1238,16 @@ export default function SampleManagement() {
                     const needsRegistration = isTempStyleNo || !registeredItem;
                     return needsRegistration ? (
                       /* TEMP 스타일번호 or 품목 미등록 → 품목등록 버튼 */
-                      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-orange-700 bg-orange-50 border border-orange-300"
+                      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-warning bg-warning/10 border border-warning/30"
                         onClick={() => handleRegisterItem(s)}>
                         <PackagePlus className="w-3 h-3 mr-1" />품목
                       </Button>
                     ) : (
                       /* 품목 등록 완료(ACTIVE) → 텍스트만 표시, 버튼 없음 */
-                      <span className="text-xs text-green-600 font-medium px-1">✓ 완료</span>
+                      <span className="text-xs text-[var(--system-green)] font-medium px-1">✓ 완료</span>
                     );
                   })()}
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-stone-400 hover:text-red-500" onClick={() => handleDelete(s.id)}>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -1273,26 +1273,26 @@ export default function SampleManagement() {
 
             {/* TEMP 품목 자동생성 토글 */}
             {!editId && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox" checked={createTempMode}
                     onChange={e => setCreateTempMode(e.target.checked)}
-                    className="accent-amber-600"
+                    className="accent-primary"
                   />
-                  <span className="text-sm font-medium text-amber-800">TEMP 품목 자동생성</span>
-                  <span className="text-xs text-amber-600">(아직 품목이 없는 신규 샘플)</span>
+                  <span className="text-sm font-medium text-primary">TEMP 품목 자동생성</span>
+                  <span className="text-xs text-muted-foreground">(아직 품목이 없는 신규 샘플)</span>
                 </label>
                 {createTempMode && (
                   <div className="mt-2 space-y-1.5">
-                    <Label className="text-xs text-amber-700">품명 *</Label>
+                    <Label className="text-xs text-primary">품명 *</Label>
                     <Input
                       value={tempStyleName}
                       onChange={e => setTempStyleName(e.target.value)}
                       placeholder="예: 파니에 쁘띠 백"
-                      className="bg-white"
+                      className="bg-card"
                     />
-                    <p className="text-[11px] text-amber-600">TEMP 상태로 품목 자동생성 후 샘플 연결됩니다</p>
+                    <p className="text-[11px] text-muted-foreground">TEMP 상태로 품목 자동생성 후 샘플 연결됩니다</p>
                   </div>
                 )}
               </div>
@@ -1314,7 +1314,7 @@ export default function SampleManagement() {
               {/* 스타일 선택 (TEMP 자동생성이 아닐 때) */}
               {!createTempMode && (
                 <div className="col-span-2 space-y-2">
-                  <Label>기존 스타일에서 이미지 불러오기 <span className="text-stone-400 font-normal text-xs">(선택사항 — 컬러 추가 등)</span></Label>
+                  <Label>기존 스타일에서 이미지 불러오기 <span className="text-muted-foreground font-normal text-xs">(선택사항 — 컬러 추가 등)</span></Label>
                   <Select value={form.styleId || 'none'} onValueChange={v => {
                     if (v === 'none') { setForm(f => ({ ...f, styleId: undefined })); return; }
                     const item = items.find(i => i.id === v);
@@ -1351,7 +1351,7 @@ export default function SampleManagement() {
                   </Select>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
-                      <Label className="text-xs text-stone-500">새 스타일번호 *</Label>
+                      <Label className="text-xs text-muted-foreground">새 스타일번호 *</Label>
                       <Input value={form.styleNo || ''} onChange={e => setForm(f => ({ ...f, styleNo: e.target.value }))} placeholder="예: AT2603HB01" className="h-8 text-xs" />
                       {/* 스타일번호 중복 체크 */}
                       {form.styleNo && !editId && (() => {
@@ -1359,8 +1359,8 @@ export default function SampleManagement() {
                         const dupItem = (items as Item[]).find(i => i.styleNo === form.styleNo);
                         if (dupSample || dupItem) {
                           return (
-                            <p className="text-xs text-amber-600 flex items-center gap-1 mt-0.5">
-                              ⚠️ 중복: {dupSample ? `샘플에 이미 존재 (${dupSample.stage})` : `품목 마스터에 존재 (${dupItem?.itemStatus})`}
+                            <p className="text-xs text-[var(--system-orange)] flex items-center gap-1 mt-0.5">
+                              중복: {dupSample ? `샘플에 이미 존재 (${dupSample.stage})` : `품목 마스터에 존재 (${dupItem?.itemStatus})`}
                             </p>
                           );
                         }
@@ -1368,7 +1368,7 @@ export default function SampleManagement() {
                       })()}
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs text-stone-500">품명 *</Label>
+                      <Label className="text-xs text-muted-foreground">품명 *</Label>
                       <Input value={form.styleName || ''} onChange={e => setForm(f => ({ ...f, styleName: e.target.value }))} placeholder="품명 입력" className="h-8 text-xs" />
                     </div>
                   </div>
@@ -1377,7 +1377,7 @@ export default function SampleManagement() {
 
               {/* 컬러 */}
               <div className="col-span-2 space-y-1.5">
-                <Label>컬러 <span className="text-stone-400 text-xs">(선택)</span></Label>
+                <Label>컬러 <span className="text-muted-foreground text-xs">(선택)</span></Label>
                 <Input value={form.color || ''} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} placeholder="예: 블랙, 카멜, RED" className="h-9" />
               </div>
 
@@ -1397,7 +1397,7 @@ export default function SampleManagement() {
               </div>
               {/* 작업방식 (단계 바로 다음) */}
               <div className="space-y-1.5">
-                <Label>작업방식 <span className="text-stone-400 text-xs">(선택)</span></Label>
+                <Label>작업방식 <span className="text-muted-foreground text-xs">(선택)</span></Label>
                 <Input
                   value={form.roundName || ''}
                   onChange={e => setForm(f => ({ ...f, roundName: e.target.value }))}
@@ -1452,11 +1452,11 @@ export default function SampleManagement() {
                 </Button>
               </div>
               {(form.materialRequests || []).length === 0 ? (
-                <p className="text-xs text-stone-400 text-center py-2">자재 요청 없음 (행 추가 버튼으로 추가)</p>
+                <p className="text-xs text-muted-foreground text-center py-2">자재 요청 없음 (행 추가 버튼으로 추가)</p>
               ) : (
                 <div className="space-y-2">
                   {/* 헤더 */}
-                  <div className="grid grid-cols-12 gap-1 text-xs text-stone-500 px-1">
+                  <div className="grid grid-cols-12 gap-1 text-xs text-muted-foreground px-1">
                     <span className="col-span-3">자재명</span>
                     <span className="col-span-3">업체</span>
                     <span className="col-span-2">컬러</span>
@@ -1560,7 +1560,7 @@ export default function SampleManagement() {
                               <img
                                 src={req.imageUrl}
                                 alt="자재 이미지"
-                                className="w-8 h-8 object-cover rounded border border-stone-200 cursor-pointer hover:opacity-80"
+                                className="w-8 h-8 object-cover rounded border border-border cursor-pointer hover:opacity-80"
                                 onClick={() => window.open(req.imageUrl, '_blank')}
                                 title="클릭하면 새 탭에서 열림"
                               />
@@ -1569,17 +1569,17 @@ export default function SampleManagement() {
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0 text-stone-400 hover:text-amber-600"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-primary"
                                 onClick={() => materialImageRefs.current[idx]?.click()}
                                 title="이미지 첨부"
                               >
-                                📎
+                                <Paperclip className="w-4 h-4" />
                               </Button>
                             )}
                           </div>
                           {/* 삭제 */}
                           <Button
-                            type="button" variant="ghost" size="sm" className="col-span-1 h-8 w-8 p-0 text-red-400 hover:text-red-600"
+                            type="button" variant="ghost" size="sm" className="col-span-1 h-8 w-8 p-0 text-destructive/70 hover:text-destructive"
                             onClick={() => setForm(f => ({
                               ...f,
                               materialRequests: (f.materialRequests || []).filter((_, i) => i !== idx),
@@ -1612,7 +1612,7 @@ export default function SampleManagement() {
             {/* 파일/이미지 업로드 */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>파일/이미지 첨부 <span className="text-xs text-stone-400 font-normal">(이미지 최대 5장 + 문서 최대 5개)</span></Label>
+                <Label>파일/이미지 첨부 <span className="text-xs text-muted-foreground font-normal">(이미지 최대 5장 + 문서 최대 5개)</span></Label>
                 <Button
                   type="button" variant="outline" size="sm" className="h-7 text-xs gap-1"
                   onClick={() => docFileRef.current?.click()}
@@ -1633,20 +1633,20 @@ export default function SampleManagement() {
               {/* 이미지 미리보기 */}
               {(form.imageUrls || []).length > 0 && (
                 <div>
-                  <p className="text-xs text-stone-500 mb-1">이미지 ({(form.imageUrls || []).length}/5)</p>
-                  <div className="flex flex-wrap gap-2 p-2 bg-stone-50 rounded-lg border border-stone-100">
+                  <p className="text-xs text-muted-foreground mb-1">이미지 ({(form.imageUrls || []).length}/5)</p>
+                  <div className="flex flex-wrap gap-2 p-2 bg-[var(--fill-quaternary)] rounded-lg border border-border">
                     {(form.imageUrls || []).map((url, idx) => (
                       <div key={idx} className="relative group">
                         <img
                           src={url}
                           alt={`샘플 이미지 ${idx + 1}`}
-                          className="w-16 h-16 object-cover rounded-lg border border-stone-200 cursor-pointer"
+                          className="w-16 h-16 object-cover rounded-lg border border-border cursor-pointer"
                           onClick={() => window.open(url, '_blank')}
                         />
                         <button
                           type="button"
                           onClick={() => setForm(f => ({ ...f, imageUrls: (f.imageUrls || []).filter((_, i) => i !== idx) }))}
-                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         >×</button>
                       </div>
                     ))}
@@ -1656,14 +1656,14 @@ export default function SampleManagement() {
               {/* 문서 목록 */}
               {(form.documents || []).length > 0 && (
                 <div>
-                  <p className="text-xs text-stone-500 mb-1">첨부 문서 ({(form.documents || []).length}/5)</p>
+                  <p className="text-xs text-muted-foreground mb-1">첨부 문서 ({(form.documents || []).length}/5)</p>
                   <div className="space-y-1">
                     {(form.documents || []).map((doc, idx) => (
-                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-stone-50 rounded-lg border border-stone-100 group">
+                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-[var(--fill-quaternary)] rounded-lg border border-border group">
                         <DocIcon fileType={doc.fileType} />
                         <button
                           type="button"
-                          className="flex-1 text-xs text-stone-700 text-left hover:text-blue-600 truncate"
+                          className="flex-1 text-xs text-foreground text-left hover:text-blue-600 truncate"
                           onClick={() => openFile(doc.url, doc.fileType, doc.name)}
                           title={doc.fileType === 'excel' ? '클릭하면 다운로드' : '클릭하면 새 탭에서 열림'}
                         >
@@ -1672,7 +1672,7 @@ export default function SampleManagement() {
                         <button
                           type="button"
                           onClick={() => setForm(f => ({ ...f, documents: (f.documents || []).filter((_, i) => i !== idx) }))}
-                          className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                          className="text-muted-foreground hover:text-[var(--system-red)] opacity-0 group-hover:opacity-100 transition-opacity text-xs"
                         >×</button>
                       </div>
                     ))}
@@ -1680,7 +1680,7 @@ export default function SampleManagement() {
                 </div>
               )}
               {(form.imageUrls || []).length === 0 && (form.documents || []).length === 0 && (
-                <p className="text-xs text-stone-400 text-center py-3 border border-dashed border-stone-200 rounded-lg">
+                <p className="text-xs text-muted-foreground text-center py-3 border border-dashed border-border rounded-lg">
                   파일 없음 — 위 버튼으로 이미지·PDF·엑셀을 추가하세요
                 </p>
               )}
@@ -1688,7 +1688,7 @@ export default function SampleManagement() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => handleModalClose(true)}>취소</Button>
-            <Button onClick={handleSave} className="bg-amber-700 hover:bg-amber-800 text-white">{editId ? '수정' : '접수'}</Button>
+            <Button onClick={handleSave}>{editId ? '수정' : '접수'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1711,19 +1711,19 @@ export default function SampleManagement() {
                 {/* 자재 요청 목록 */}
                 {(detailSample.materialRequests || []).length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold text-stone-600 uppercase tracking-wider flex items-center gap-1">
-                      🧵 자재 요청 목록
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                      자재 요청 목록
                     </p>
-                    <div className="rounded-lg border border-stone-200 overflow-hidden">
+                    <div className="rounded-lg border border-border overflow-hidden">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="bg-stone-50 border-b border-stone-100">
-                            <th className="text-left px-3 py-1.5 text-stone-500 font-medium">자재명</th>
-                            <th className="text-left px-3 py-1.5 text-stone-500 font-medium">업체</th>
-                            <th className="text-left px-3 py-1.5 text-stone-500 font-medium">컬러</th>
-                            <th className="text-right px-3 py-1.5 text-stone-500 font-medium">수량</th>
-                            <th className="text-left px-3 py-1.5 text-stone-500 font-medium">단위</th>
-                            <th className="text-center px-3 py-1.5 text-stone-500 font-medium">이미지</th>
+                          <tr className="bg-[var(--fill-quaternary)] border-b border-border">
+                            <th className="text-left px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">자재명</th>
+                            <th className="text-left px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">업체</th>
+                            <th className="text-left px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">컬러</th>
+                            <th className="text-right px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">수량</th>
+                            <th className="text-left px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">단위</th>
+                            <th className="text-center px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">이미지</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1733,21 +1733,21 @@ export default function SampleManagement() {
                               ? (req.customVendor || '—')
                               : (req.vendor || '—');
                             return (
-                            <tr key={i} className="border-b border-stone-50 last:border-0">
-                              <td className="px-3 py-2 text-stone-700 font-medium">{req.itemName}</td>
-                              <td className="px-3 py-2 text-stone-600">{vendorDisplay === '—' ? <span className="text-stone-300">—</span> : vendorDisplay}</td>
-                              <td className="px-3 py-2 text-stone-600">{req.color || <span className="text-stone-300">—</span>}</td>
-                              <td className="px-3 py-2 text-right text-stone-700">{req.qty}</td>
-                              <td className="px-3 py-2 text-stone-500">{req.unit}</td>
+                            <tr key={i} className="border-b border-border last:border-0">
+                              <td className="px-3 py-2 text-foreground font-medium">{req.itemName}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{vendorDisplay === '—' ? <span className="text-muted-foreground">—</span> : vendorDisplay}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{req.color || <span className="text-muted-foreground">—</span>}</td>
+                              <td className="px-3 py-2 text-right text-foreground">{req.qty}</td>
+                              <td className="px-3 py-2 text-muted-foreground">{req.unit}</td>
                               <td className="px-3 py-2 text-center">
                                 {req.imageUrl ? (
                                   <img
                                     src={req.imageUrl}
                                     alt="자재"
-                                    className="w-8 h-8 object-cover rounded border border-stone-200 cursor-pointer hover:opacity-80 inline-block"
+                                    className="w-8 h-8 object-cover rounded border border-border cursor-pointer hover:opacity-80 inline-block"
                                     onClick={() => window.open(req.imageUrl, '_blank')}
                                   />
-                                ) : <span className="text-stone-300">—</span>}
+                                ) : <span className="text-muted-foreground">—</span>}
                               </td>
                             </tr>
                             );
@@ -1761,7 +1761,7 @@ export default function SampleManagement() {
                 {/* 첨부 파일/이미지 */}
                 {((detailSample.imageUrls || []).length > 0 || (detailSample.documents || []).length > 0) && (
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold text-stone-600 uppercase tracking-wider">📎 첨부 파일</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">첨부 파일</p>
                     {(detailSample.imageUrls || []).length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {(detailSample.imageUrls || []).map((url, idx) => (
@@ -1769,7 +1769,7 @@ export default function SampleManagement() {
                             key={idx}
                             src={url}
                             alt={`이미지 ${idx + 1}`}
-                            className="w-16 h-16 object-cover rounded-lg border border-stone-200 cursor-pointer hover:opacity-80"
+                            className="w-16 h-16 object-cover rounded-lg border border-border cursor-pointer hover:opacity-80"
                             onClick={() => window.open(url, '_blank')}
                           />
                         ))}
@@ -1780,12 +1780,12 @@ export default function SampleManagement() {
                         {(detailSample.documents || []).map((doc, idx) => (
                           <button
                             key={idx}
-                            className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg border border-stone-100 hover:bg-stone-50"
+                            className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg border border-border hover:bg-[var(--fill-quaternary)]"
                             onClick={() => openFile(doc.url, doc.fileType, doc.name)}
                             title={doc.fileType === 'excel' ? '클릭하면 다운로드' : '클릭하면 새 탭에서 열림'}
                           >
                             <DocIcon fileType={doc.fileType} />
-                            <span className="text-xs text-stone-700 truncate">{doc.name}</span>
+                            <span className="text-xs text-foreground truncate">{doc.name}</span>
                           </button>
                         ))}
                       </div>
@@ -1795,17 +1795,17 @@ export default function SampleManagement() {
 
                 {/* 차수별 수정 요청 메모 */}
                 <div className="space-y-3">
-                  <p className="text-xs font-semibold text-stone-600 uppercase tracking-wider">차수별 수정 요청 히스토리</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">차수별 수정 요청 히스토리</p>
                   {(detailSample.revisionHistory || []).length === 0 ? (
-                    <p className="text-xs text-stone-400 py-2 text-center">등록된 메모가 없습니다</p>
+                    <p className="text-xs text-muted-foreground py-2 text-center">등록된 메모가 없습니다</p>
                   ) : (
                     <div className="space-y-2">
                       {(detailSample.revisionHistory || []).map((r, i) => (
-                        <div key={i} className="flex gap-3 text-sm p-2 bg-stone-50 rounded-lg border border-stone-100">
+                        <div key={i} className="flex gap-3 text-sm p-2 bg-[var(--fill-quaternary)] rounded-lg border border-border">
                           <span className="text-xs font-bold text-blue-600 shrink-0 mt-0.5">{r.round}차</span>
                           <div className="flex-1">
-                            <p className="text-stone-700">{r.note}</p>
-                            <p className="text-[11px] text-stone-400 mt-0.5">{r.date}</p>
+                            <p className="text-foreground">{r.note}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">{r.date}</p>
                           </div>
                         </div>
                       ))}
@@ -1827,53 +1827,53 @@ export default function SampleManagement() {
                       onChange={e => setNewRevNote(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') handleAddRevNote(); }}
                     />
-                    <Button size="sm" className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleAddRevNote}>추가</Button>
+                    <Button size="sm" variant="secondary" className="h-8 px-3" onClick={handleAddRevNote}>추가</Button>
                   </div>
                 </div>
 
                 {/* 자재 준비 체크리스트 */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-stone-600 uppercase tracking-wider flex items-center gap-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                       <ClipboardCheck className="w-3.5 h-3.5" />자재 준비 체크리스트
                     </p>
                     {(detailSample.materialChecklist || []).length > 0 && (
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 text-xs gap-1 border-yellow-400 text-yellow-700 hover:bg-yellow-50"
+                        className="h-7 text-xs gap-1"
                         onClick={() => {
                           const items = (detailSample.materialChecklist || []).map((c, i) =>
                             `${i + 1}. ${c.isReady ? '✅' : '⬜'} ${c.itemName}`
                           ).join('\n');
                           const text = `[${detailSample.styleNo}] ${detailSample.styleName} 자재 준비 현황\n\n${items}\n\n완료: ${(detailSample.materialChecklist||[]).filter(c=>c.isReady).length}/${(detailSample.materialChecklist||[]).length}`;
                           navigator.clipboard.writeText(text).then(() => {
-                            toast.success('카카오톡 전달용 텍스트가 복사되었습니다 📋');
+                            toast.success('카카오톡 전달용 텍스트가 복사되었습니다');
                           });
                         }}
                       >
-                        📋 카톡 복사
+                        카톡 복사
                       </Button>
                     )}
                   </div>
                   {(detailSample.materialChecklist || []).length === 0 ? (
-                    <p className="text-xs text-stone-400 py-2 text-center">체크리스트가 없습니다</p>
+                    <p className="text-xs text-muted-foreground py-2 text-center">체크리스트가 없습니다</p>
                   ) : (
                     <div className="space-y-1.5">
                       {(detailSample.materialChecklist || []).map(c => (
-                        <label key={c.id} className="flex items-center gap-3 p-2 rounded-lg border border-stone-100 hover:bg-stone-50 cursor-pointer">
+                        <label key={c.id} className="flex items-center gap-3 p-2 rounded-lg border border-border hover:bg-[var(--fill-quaternary)] cursor-pointer">
                           <input
                             type="checkbox" checked={c.isReady}
                             onChange={() => handleToggleCheck(c.id)}
-                            className="accent-green-600 w-4 h-4"
+                            className="accent-primary w-4 h-4"
                           />
-                          <span className={`text-sm flex-1 ${c.isReady ? 'line-through text-stone-400' : 'text-stone-700'}`}>
+                          <span className={`text-sm flex-1 ${c.isReady ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                             {c.itemName}
                           </span>
-                          {c.isReady && <span className="text-xs text-green-600">확보</span>}
+                          {c.isReady && <span className="text-xs text-[var(--system-green)]">확보</span>}
                         </label>
                       ))}
-                      <p className="text-xs text-right text-stone-500 mt-1">
+                      <p className="text-xs text-right text-muted-foreground mt-1">
                         {(detailSample.materialChecklist || []).filter(c => c.isReady).length} /
                         {(detailSample.materialChecklist || []).length} 확보 완료
                       </p>
@@ -1888,7 +1888,7 @@ export default function SampleManagement() {
                       onChange={e => setNewCheckItem(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') handleAddCheckItem(); }}
                     />
-                    <Button size="sm" className="h-8 px-3 bg-stone-700 hover:bg-stone-800 text-white" onClick={handleAddCheckItem}>추가</Button>
+                    <Button size="sm" variant="secondary" className="h-8 px-3" onClick={handleAddCheckItem}>추가</Button>
                   </div>
                 </div>
               </div>
@@ -1907,7 +1907,7 @@ export default function SampleManagement() {
           <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>청구하기 — {billingTarget.styleNo}</DialogTitle>
-              <DialogDescription className="text-xs text-stone-500">
+              <DialogDescription className="text-xs text-muted-foreground">
                 거래명세표를 새로 생성하거나 기존 전표에 연결하세요
               </DialogDescription>
             </DialogHeader>
@@ -1916,15 +1916,15 @@ export default function SampleManagement() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   onClick={() => setBillingMode('new')}
-                  className={`p-3 rounded-lg border text-sm font-medium transition-colors ${billingMode === 'new' ? 'bg-amber-50 border-amber-400 text-amber-800' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
+                  className={`p-3 rounded-lg border text-sm font-medium transition-colors ${billingMode === 'new' ? 'bg-primary/5 border-primary/40 text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
                 >
-                  📄 거래명세표 신규 생성
+                  거래명세표 신규 생성
                 </button>
                 <button
                   onClick={() => setBillingMode('link')}
-                  className={`p-3 rounded-lg border text-sm font-medium transition-colors ${billingMode === 'link' ? 'bg-blue-50 border-blue-400 text-blue-800' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
+                  className={`p-3 rounded-lg border text-sm font-medium transition-colors ${billingMode === 'link' ? 'bg-primary/5 border-primary/40 text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
                 >
-                  🔗 기존 전표에 연결
+                  기존 전표에 연결
                 </button>
               </div>
 
@@ -1938,20 +1938,20 @@ export default function SampleManagement() {
                   });
                 return (
                   <div className="space-y-2">
-                    <p className="text-xs text-stone-500">이번 달 전표 ({thisMonth}) — 바이어: {vendors.find(v => v.id === billingTarget.buyerId)?.name || '미지정'}</p>
+                    <p className="text-xs text-muted-foreground">이번 달 전표 ({thisMonth}) — 바이어: {vendors.find(v => v.id === billingTarget.buyerId)?.name || '미지정'}</p>
                     {buyerStatements.length === 0 ? (
-                      <p className="text-xs text-stone-400 py-3 text-center">해당 조건의 전표가 없습니다. 신규 생성을 선택하세요.</p>
+                      <p className="text-xs text-muted-foreground py-3 text-center">해당 조건의 전표가 없습니다. 신규 생성을 선택하세요.</p>
                     ) : (
                       <div className="space-y-1 max-h-48 overflow-y-auto">
                         {buyerStatements.map(t => (
                           <button key={t.id}
                             onClick={() => setLinkStatementId(t.id)}
-                            className={`w-full text-left px-3 py-2 rounded border text-xs transition-colors ${linkStatementId === t.id ? 'bg-blue-50 border-blue-400' : 'border-stone-200 hover:bg-stone-50'}`}
+                            className={`w-full text-left px-3 py-2 rounded border text-xs transition-colors ${linkStatementId === t.id ? 'bg-primary/5 border-primary/40' : 'border-border hover:bg-[var(--fill-quaternary)]'}`}
                           >
                             <span className="font-mono font-medium">{t.statementNo}</span>
-                            <span className="ml-2 text-stone-500">{t.vendorName}</span>
-                            <span className="ml-2 text-stone-400">{t.issueDate}</span>
-                            <span className="ml-2 text-stone-400">{t.lines?.length || 0}건</span>
+                            <span className="ml-2 text-muted-foreground">{t.vendorName}</span>
+                            <span className="ml-2 text-muted-foreground">{t.issueDate}</span>
+                            <span className="ml-2 text-muted-foreground">{t.lines?.length || 0}건</span>
                           </button>
                         ))}
                       </div>
@@ -1961,8 +1961,8 @@ export default function SampleManagement() {
               })()}
 
               {billingMode === 'new' && (
-                <div className="p-3 bg-amber-50 rounded-lg text-xs text-amber-700">
-                  <p className="font-medium mb-1">생성될 거래명세표</p>
+                <div className="p-3 bg-primary/5 rounded-lg text-xs text-muted-foreground">
+                  <p className="font-medium mb-1 text-foreground">생성될 거래명세표</p>
                   <p>바이어: {vendors.find(v => v.id === billingTarget.buyerId)?.name || '미지정'}</p>
                   <p>품목: {billingTarget.styleNo} — {billingTarget.styleName}</p>
                   <p>금액: {(billingTarget.costKrw || Math.round((billingTarget.costCny || 0) * settings.cnyKrw)).toLocaleString()}원</p>
@@ -1972,7 +1972,6 @@ export default function SampleManagement() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setBillingModal(false)}>취소</Button>
               <Button
-                className="bg-amber-700 hover:bg-amber-800 text-white"
                 disabled={billingMode === 'link' && !linkStatementId}
                 onClick={() => {
                   const today = new Date().toISOString().split('T')[0];

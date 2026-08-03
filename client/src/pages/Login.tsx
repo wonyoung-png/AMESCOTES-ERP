@@ -46,21 +46,21 @@ export default function Login({ onLogin }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F4EF] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* 로고 */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-[#1C1C1E] flex items-center justify-center mb-4 shadow-lg">
-            <span className="text-[#C9A96E] font-bold text-xl tracking-wider">AM</span>
+          <div className="w-14 h-14 rounded-2xl bg-sidebar flex items-center justify-center mb-4">
+            <span className="text-sidebar-primary font-bold text-xl tracking-wider">AM</span>
           </div>
-          <h1 className="text-2xl font-bold text-stone-800 tracking-wide">AMESCOTES</h1>
-          <p className="text-sm text-stone-400 mt-1">ERP System</p>
+          <h1 className="text-2xl font-bold text-foreground tracking-wide">AMESCOTES</h1>
+          <p className="text-sm text-muted-foreground mt-1">ERP System</p>
         </div>
 
         {/* 로그인 카드 */}
-        <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-8">
-          <h2 className="text-lg font-semibold text-stone-800 mb-6 flex items-center gap-2">
-            <Lock className="w-4 h-4 text-[#C9A96E]" />
+        <div className="bg-card rounded-2xl border border-border p-8">
+          <h2 className="text-lg font-semibold text-foreground mb-6 flex items-center gap-2">
+            <Lock className="w-4 h-4 text-primary" />
             로그인
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -91,7 +91,7 @@ export default function Login({ onLogin }: LoginProps) {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -100,7 +100,7 @@ export default function Login({ onLogin }: LoginProps) {
             </div>
             <Button
               type="submit"
-              className="w-full h-10 bg-[#1C1C1E] hover:bg-stone-700 text-white font-medium"
+              className="w-full h-10 font-medium"
               disabled={loading}
             >
               {loading ? '로그인 중...' : '로그인'}
@@ -108,12 +108,12 @@ export default function Login({ onLogin }: LoginProps) {
           </form>
 
           {/* 안내 문구 (데모 블록 제거 — 대신 간단 안내) */}
-          <p className="mt-6 text-center text-[11px] text-stone-400">
+          <p className="mt-6 text-center text-[11px] text-muted-foreground">
             계정 관련 문의는 대표님께 요청해 주십시오.
           </p>
         </div>
 
-        <p className="text-center text-xs text-stone-400 mt-6">
+        <p className="text-center text-xs text-muted-foreground mt-6">
           © 2026 (주)아메스코테스 · B2B OEM/ODM ERP
         </p>
       </div>
