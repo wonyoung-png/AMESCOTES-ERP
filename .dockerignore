@@ -1,0 +1,39 @@
+# 빌드 산출물·의존성 (컨테이너 안에서 새로 생성)
+node_modules
+dist
+
+# 시크릿 — 이미지에 절대 포함 금지
+.env
+.env.*
+!.env.example
+
+# VCS / 에디터
+.git
+.gitignore
+.claude
+.DS_Store
+
+# 로컬 전용 파일 (빌드에 불필요)
+*.log
+*.xlsx
+*.bat
+*.lnk
+docs
+design
+modules
+ideas.md
+md-dashboard.html
+AGENT.md
+CLAUDE.md
+DESIGN.md
+DESIGN_BRAND_OPS.md
+HANDOVER.md
+HARNESS_CHECKLIST.md
+README.md
+개발_가이드.md
+기획서.md
+
+# 배포 관련 자기 자신
+Dockerfile
+docker-compose.yml
+Caddyfile

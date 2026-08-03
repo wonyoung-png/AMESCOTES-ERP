@@ -18,6 +18,11 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
+  // 배포용 헬스체크 — Basic Auth 게이트보다 먼저 등록해야 SHARE_PASS 활성 시에도 200 응답
+  app.get("/healthz", (_req, res) => {
+    res.status(200).json({ ok: true, uptime: process.uptime() });
+  });
+
   // ─── 공개 배포 접근 보호 (SHARE_PASS 설정 시에만 활성) ───
   // 외부 URL로 열 때 원가·거래처·재무 데이터 노출 방지용 1차 관문.
   // 로컬/사내 LAN에서는 SHARE_PASS 미설정 → 게이트 없음(그대로 접속).

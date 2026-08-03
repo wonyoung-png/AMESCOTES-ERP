@@ -1,0 +1,14 @@
+# SITE_ADDRESS 예시:
+#   erp.atlm.kr        → Let's Encrypt 인증서 자동 발급 (DNS A레코드가 EIP를 가리켜야 함)
+#   :80                → 도메인 연결 전 임시 (HTTP만)
+{$SITE_ADDRESS} {
+	encode gzip
+	log {
+		output stdout
+		format json
+	}
+	reverse_proxy app:4000 {
+		# AI 에이전트 패널이 SSE 스트리밍 사용 — 버퍼링 없이 즉시 전달
+		flush_interval -1
+	}
+}

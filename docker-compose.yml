@@ -1,0 +1,49 @@
+# AMESCOTES ERP — 로컬/EC2 공용 Docker Compose
+#
+# ※ DB 컨테이너가 없는 이유: DB는 Supabase(외부 관리형)이며 앱이 HTTPS로 직접 접속.
+#   로컬 전체 스택 = 앱 컨테이너 + (실제) Supabase. 별도 로컬 DB 재현 대상이 없음.
+#
+# 로컬 검증:  docker compose up -d --build   → http://localhost:4000
+# EC2 운영:   docker compose --profile edge up -d   (Caddy가 80/443 + 자동 HTTPS)
+#
+# 필요 파일: .env (git 제외) — VITE_*는 빌드 인자, 나머지는 런타임 주입
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    image: amescotes-erp:local
+    restart: unless-stopped
+    environment:
+      PORT: "4000"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SHARE_USER: ${SHARE_USER:-}
+      SHARE_PASS: ${SHARE_PASS:-}
+    ports:
+      - "4000:4000"
+
+  # 리버스 프록시 (EC2 전용 — 로컬에서는 생략됨)
+  caddy:
+    profiles: ["edge"]
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
