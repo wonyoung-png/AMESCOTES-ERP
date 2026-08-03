@@ -76,7 +76,7 @@ export default function ProjectPL() {
             />
           </div>
 
-          <div className="bg-card rounded-xl border overflow-hidden">
+          <div className="bg-card rounded-lg border overflow-hidden">
             <div className="px-4 py-3 border-b font-semibold text-sm">연결 발주 ({projOrders.length}건)</div>
             <table className="w-full text-sm">
               <thead className="text-[13px] font-semibold text-muted-foreground">
@@ -102,7 +102,7 @@ export default function ProjectPL() {
             </table>
           </div>
 
-          <div className="bg-card rounded-xl border overflow-hidden">
+          <div className="bg-card rounded-lg border overflow-hidden">
             <div className="px-4 py-3 border-b font-semibold text-sm">
               품목 · 컬러별 실제원가
               <span className="ml-2 font-normal text-muted-foreground text-xs">
@@ -169,7 +169,7 @@ export default function ProjectPL() {
             </div>
           </div>
 
-          <div className="bg-muted rounded-xl border p-4 text-sm">
+          <div className="bg-muted rounded-lg border p-4 text-sm">
             <p className="font-semibold text-foreground">손익 요약</p>
             <p className="mt-2 text-muted-foreground">
               매출 {formatKRW(pl.revenue)} − 생산비 {formatKRW(pl.actualCost)} − 자재 {formatKRW(pl.purchaseCost)}
@@ -184,7 +184,7 @@ export default function ProjectPL() {
 
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="bg-card rounded-xl border p-4">
+    <div className="bg-card rounded-lg border p-4">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-lg font-bold text-foreground mt-1">{value}</p>
       {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}

@@ -143,7 +143,7 @@ function ExpenseDetailModal({
 
         {/* 헤더 정보 */}
         <div className="space-y-3 py-2">
-          <div className="grid grid-cols-2 gap-3 text-sm bg-muted rounded-lg p-3">
+          <div className="grid grid-cols-2 gap-3 text-sm bg-muted rounded-md p-3">
             <div>
               <span className="text-muted-foreground text-xs">전표번호</span>
               <p className="font-mono font-bold text-primary">{expenseNo}</p>
@@ -171,7 +171,7 @@ function ExpenseDetailModal({
           </div>
 
           {/* 품목 테이블 - 편집 가능 */}
-          <div className="border border-border rounded-lg overflow-hidden">
+          <div className="border border-border rounded-md overflow-hidden">
             <div className="bg-muted px-4 py-2 flex items-center justify-between border-b border-border">
               <p className="text-xs font-medium text-muted-foreground">품목/내역</p>
               <Button size="sm" variant="outline" onClick={addDetailLine} className="h-7 text-xs gap-1">
@@ -284,7 +284,7 @@ function ExpenseDetailModal({
           </div>
 
           {/* 합계 */}
-          <div className="bg-muted rounded-lg p-3 space-y-1.5 text-sm">
+          <div className="bg-muted rounded-md p-3 space-y-1.5 text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>공급가액</span>
               <span className="font-mono">{formatKRW(supplyAmount)}</span>
@@ -522,13 +522,13 @@ export default function ExpenseEntry() {
       </div>
 
       <div className="grid grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl border border-border p-4">
+        <div className="bg-card rounded-lg border border-border p-4">
           <p className="text-xs text-muted-foreground mb-1">총 지출</p>
           <p className="text-lg font-bold text-foreground">{formatKRW(totalAmount)}</p>
           <p className="text-xs text-muted-foreground mt-1">{expenses.length}건</p>
         </div>
         {EXPENSE_TYPES.map(t => (
-          <div key={t} className="bg-card rounded-xl border border-border p-4">
+          <div key={t} className="bg-card rounded-lg border border-border p-4">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-muted-foreground">{TYPE_ICON[t]}</span>
               <p className="text-xs text-muted-foreground">{t}</p>
@@ -538,7 +538,7 @@ export default function ExpenseEntry() {
         ))}
       </div>
 
-      <div className="bg-card rounded-xl border border-border">
+      <div className="bg-card rounded-lg border border-border">
         <div className="flex items-center gap-3 p-4 border-b border-border">
           <Select value={filterType} onValueChange={setFilterType}>
             <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="결제 방법" /></SelectTrigger>
@@ -676,7 +676,7 @@ export default function ExpenseEntry() {
             </div>
 
             {/* 항목 테이블 */}
-            <div className="border border-border rounded-lg overflow-hidden">
+            <div className="border border-border rounded-md overflow-hidden">
               <div className="bg-muted px-4 py-2 flex items-center justify-between border-b border-border">
                 <p className="text-xs font-medium text-muted-foreground">항목 명세</p>
                 <Button size="sm" variant="outline" onClick={addLine} className="h-7 text-xs gap-1">
@@ -758,7 +758,7 @@ export default function ExpenseEntry() {
             </div>
 
             {/* 세금계산서 */}
-            <div className="border border-border rounded-lg p-3 space-y-3">
+            <div className="border border-border rounded-md p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">세금계산서</Label>
                 <Switch checked={header.hasTaxInvoice} onCheckedChange={v => setHeader(f => ({ ...f, hasTaxInvoice: v }))} />

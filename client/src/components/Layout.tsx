@@ -146,13 +146,13 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         `}
       >
         <div className={`flex items-center gap-3 px-4 py-5 border-b border-sidebar-border ${collapsed ? 'justify-center px-2' : ''}`}>
-          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center shrink-0">
             <span className="text-sidebar-primary-foreground font-bold text-xs leading-none">AT</span>
           </div>
           {!collapsed && (
             <div className="overflow-hidden flex-1">
-              <h1 className="text-sm font-bold text-foreground tracking-wide leading-tight">ATLM ERP</h1>
-              <p className="text-[11px] text-muted-foreground tracking-wider leading-tight">제조 · Phase 1</p>
+              <h1 className="text-sm font-bold text-foreground leading-tight">ATLM ERP</h1>
+              <p className="text-[11px] text-muted-foreground leading-tight">제조 · Phase 1</p>
             </div>
           )}
           {!collapsed && (
@@ -168,7 +168,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         {/* 워크스페이스 — Phase 1: OEM만 활성 */}
         {!collapsed && (
           <div className="px-3 py-3 border-b border-sidebar-border">
-            <div className="flex gap-1 bg-[var(--fill-tertiary)] rounded-lg p-1">
+            <div className="flex gap-1 bg-[var(--fill-tertiary)] rounded-md p-1">
               {(['OEM', 'LUMEN', 'AETALOOP'] as WorkspaceId[]).map((ws) => {
                 const active = workspace === ws;
                 return (
@@ -200,7 +200,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             <div key={gi} className="mb-1">
               {group.label && !collapsed && (
                 <div className="px-3 pt-4 pb-1.5">
-                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.15em]">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase">
                     {group.label}
                   </span>
                 </div>
@@ -215,7 +215,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     href={item.path}
                     onClick={() => setSidebarOpen(false)}
                     className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 mb-0.5
+                      flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 mb-0.5
                       ${active
                         ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium border border-sidebar-primary/20'
                         : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'
@@ -256,14 +256,14 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           )}
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-muted-foreground hover:text-[var(--system-red)] hover:bg-[var(--fill-quaternary)] transition-colors text-xs ${collapsed ? 'justify-center' : ''}`}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-muted-foreground hover:text-[var(--system-red)] hover:bg-[var(--fill-quaternary)] transition-colors text-xs ${collapsed ? 'justify-center' : ''}`}
           >
             <LogOut size={14} />
             {!collapsed && <span>로그아웃</span>}
           </button>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className={`w-full hidden md:flex items-center gap-2 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)] transition-colors text-xs ${collapsed ? 'justify-center' : ''}`}
+            className={`w-full hidden md:flex items-center gap-2 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)] transition-colors text-xs ${collapsed ? 'justify-center' : ''}`}
           >
             {collapsed ? <ChevronRight size={14} /> : <><ChevronLeft size={14} /><span>접기</span></>}
           </button>
@@ -275,7 +275,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="md:hidden p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+              className="md:hidden p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
             >
               <Menu size={20} />
             </button>

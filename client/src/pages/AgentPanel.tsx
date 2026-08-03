@@ -288,14 +288,14 @@ export default function AgentPanel() {
                         key={i}
                         src={src}
                         alt="첨부 이미지"
-                        className="max-w-[200px] max-h-[200px] rounded-xl object-cover border"
+                        className="max-w-[200px] max-h-[200px] rounded-lg object-cover border"
                       />
                     ))}
                   </div>
                 )}
                 {/* 텍스트 말풍선 */}
                 {(message.text || message.isStreaming) && (
-                  <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                  <div className={`rounded-lg px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words ${
                     message.role === 'user'
                       ? 'bg-muted text-foreground rounded-tr-sm'
                       : message.error
@@ -331,7 +331,7 @@ export default function AgentPanel() {
           <div className="flex flex-wrap gap-2 mb-3">
             {pendingImages.map((img, i) => (
               <div key={i} className="relative group">
-                <img src={img.preview} alt="첨부" className="w-16 h-16 rounded-lg object-cover border" />
+                <img src={img.preview} alt="첨부" className="w-16 h-16 rounded-md object-cover border" />
                 <button
                   onClick={() => setPendingImages(prev => prev.filter((_, idx) => idx !== i))}
                   className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--system-red)] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -370,7 +370,7 @@ export default function AgentPanel() {
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={pendingImages.length > 0 ? '이미지에 대해 질문하거나 Enter로 바로 분석...' : '질문을 입력하거나 이미지를 붙여넣기(Ctrl+V)...'}
-              className="w-full min-h-[44px] max-h-32 resize-none rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full min-h-[44px] max-h-32 resize-none rounded-md border px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
               disabled={isLoading}
               rows={1}
             />

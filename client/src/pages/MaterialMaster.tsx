@@ -180,7 +180,7 @@ export default function MaterialMaster() {
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setFilterCat('all')}
-          className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${filterCat === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'}`}
+          className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${filterCat === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'}`}
         >
           전체 ({(materials as any[]).length})
         </button>
@@ -188,7 +188,7 @@ export default function MaterialMaster() {
           <button
             key={cat}
             onClick={() => setFilterCat(cat)}
-            className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${filterCat === cat ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'}`}
+            className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${filterCat === cat ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'}`}
           >
             {cat} ({catCounts[cat] || 0})
           </button>
@@ -203,17 +203,17 @@ export default function MaterialMaster() {
 
       {/* 다중 선택 액션 바 */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-xl">
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-lg">
           <span className="text-sm font-medium text-foreground">{selectedIds.size}개 선택됨</span>
           <button
             onClick={handleBulkDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-md text-xs font-medium transition-colors"
           >
             <Trash2 className="w-4 h-4" />선택 삭제
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
-            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-md text-xs font-medium transition-colors"
           >
             선택 해제
           </button>
@@ -221,7 +221,7 @@ export default function MaterialMaster() {
       )}
 
       {/* 테이블 */}
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
@@ -316,7 +316,7 @@ export default function MaterialMaster() {
               <Label>이미지</Label>
               <div className="flex items-center gap-3">
                 <div
-                  className="w-20 h-20 rounded-xl border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
+                  className="w-20 h-20 rounded-lg border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
                   onClick={() => fileRef.current?.click()}
                 >
                   {previewImage ? (

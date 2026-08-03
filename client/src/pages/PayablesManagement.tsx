@@ -53,17 +53,17 @@ export default function PayablesManagement() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-card rounded-xl border p-4">
+        <div className="bg-card rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">미지급 잔액</p>
           <p className="text-2xl font-bold text-[var(--system-red)]">{formatKRW(stats.pending)}</p>
         </div>
-        <div className="bg-card rounded-xl border p-4">
+        <div className="bg-card rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">불량 차감 대기</p>
           <p className="text-2xl font-bold text-[var(--system-orange)]">{formatKRW(stats.defectPending)}</p>
         </div>
       </div>
 
-      <div className="bg-card rounded-xl border overflow-hidden">
+      <div className="bg-card rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">미지급 목록</div>
         <table className="w-full text-sm">
           <thead className="text-[13px] font-semibold text-muted-foreground">
@@ -121,7 +121,7 @@ export default function PayablesManagement() {
         </table>
       </div>
 
-      <div className="bg-card rounded-xl border overflow-hidden">
+      <div className="bg-card rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">불량 차감 이월</div>
         <table className="w-full text-sm">
           <thead className="text-[13px] font-semibold text-muted-foreground">

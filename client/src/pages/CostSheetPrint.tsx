@@ -178,7 +178,7 @@ export default function CostSheetPrint() {
       <div id="cost-sheet-print-content" className="p-6 space-y-6">
 
         {/* ── 섹션 1: 제품 기본정보 ── */}
-        <div className="border border-stone-200 rounded-xl overflow-hidden">
+        <div className="border border-stone-200 rounded-lg overflow-hidden">
           <div className="bg-stone-800 text-white px-5 py-3 flex items-center justify-between">
             <h3 className="text-sm font-bold">제품 기본정보</h3>
             <span className="text-xs text-stone-400">작성일: {today}</span>
@@ -187,7 +187,7 @@ export default function CostSheetPrint() {
             <div className="flex gap-5">
               {/* 제품 사진 (Puppeteer가 base64 주입) */}
               <div className="flex-shrink-0">
-                <div className="w-32 h-32 border-2 border-dashed border-stone-300 rounded-xl flex flex-col items-center justify-center overflow-hidden">
+                <div className="w-32 h-32 border-2 border-dashed border-stone-300 rounded-lg flex flex-col items-center justify-center overflow-hidden">
                   <img
                     id="cost-sheet-product-img"
                     alt="제품사진"
@@ -227,7 +227,7 @@ export default function CostSheetPrint() {
         </div>
 
         {/* ── 섹션 2: 사후원가 요약 테이블 ── */}
-        <div className="border border-stone-200 rounded-xl overflow-hidden">
+        <div className="border border-stone-200 rounded-lg overflow-hidden">
           <div className="bg-stone-800 text-white px-5 py-3">
             <h3 className="text-sm font-bold">사후원가 요약</h3>
           </div>
@@ -301,14 +301,14 @@ export default function CostSheetPrint() {
 
         {/* ── 섹션 3: P&L 분석 ── */}
         {bom.pnl && postPnlResultSheet && (
-          <div className="border border-stone-200 rounded-xl overflow-hidden">
+          <div className="border border-stone-200 rounded-lg overflow-hidden">
             <div className="bg-stone-800 text-white px-5 py-3">
               <h3 className="text-sm font-bold">P&L 분석</h3>
             </div>
             <div className="p-5 space-y-4">
 
               {/* 가정 */}
-              <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
+              <div className="bg-stone-50 rounded-md p-4 border border-stone-200">
                 <h4 className="text-xs font-semibold text-stone-600 mb-3">가정 (Assumptions)</h4>
                 <div className="grid grid-cols-3 gap-4 text-xs">
                   <div>
@@ -327,7 +327,7 @@ export default function CostSheetPrint() {
               </div>
 
               {/* 배수 분석 */}
-              <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
+              <div className="bg-stone-50 rounded-md p-4 border border-stone-200">
                 <h4 className="text-xs font-semibold text-stone-600 mb-3">배수 분석</h4>
                 <div className="space-y-2 text-xs">
                   {[
@@ -351,7 +351,7 @@ export default function CostSheetPrint() {
 
               {/* 영업이익 분석 */}
               {bom.pnl.confirmedSalePrice ? (
-                <div className="bg-stone-50 rounded-lg p-4 border border-stone-200">
+                <div className="bg-stone-50 rounded-md p-4 border border-stone-200">
                   <h4 className="text-xs font-semibold text-stone-600 mb-3">영업이익 분석 (P&L)</h4>
                   <div className="space-y-1">
                     {[
@@ -397,7 +397,7 @@ export default function CostSheetPrint() {
                   </div>
                 </div>
               ) : (
-                <div className="text-center text-stone-400 text-xs py-4 bg-stone-50 rounded-lg border border-stone-200 border-dashed">
+                <div className="text-center text-stone-400 text-xs py-4 bg-stone-50 rounded-md border border-stone-200 border-dashed">
                   KMSRP(확정판매가)를 입력하면 영업이익 P&L 분석이 표시됩니다
                 </div>
               )}

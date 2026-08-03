@@ -346,7 +346,7 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
           </div>
 
           {detail.status === 'draft' && (
-            <div className="bg-muted border border-border rounded-lg p-3 text-sm">
+            <div className="bg-muted border border-border rounded-md p-3 text-sm">
               <p className="text-foreground">미온보딩 상태입니다. 온보딩 후 팀별로 업무를 직접 등록하세요.</p>
               <Button size="sm" className="mt-2" onClick={onboard}>캘린더 온보딩</Button>
             </div>
@@ -384,7 +384,7 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
                   )}
 
                   {tasksForTeam.map(task => (
-                    <div key={task.id} className={`border rounded-lg p-3 space-y-2 ${task.done ? 'bg-muted opacity-90' : 'bg-card'}`}>
+                    <div key={task.id} className={`border rounded-md p-3 space-y-2 ${task.done ? 'bg-muted opacity-90' : 'bg-card'}`}>
                       <div className="flex items-start gap-2">
                         <button
                           type="button"
@@ -460,7 +460,7 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
                   ))}
 
                   {/* 팀별 업무 직접 추가 */}
-                  <div className="border border-dashed border-border rounded-lg p-3 bg-muted space-y-2">
+                  <div className="border border-dashed border-border rounded-md p-3 bg-muted space-y-2">
                     <p className="text-xs font-semibold text-foreground">{team} 업무 추가</p>
                     <Input
                       className="h-8 text-sm bg-card"

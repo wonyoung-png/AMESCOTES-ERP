@@ -234,7 +234,7 @@ export default function ExchangeSettings() {
 
       {/* 현재 환율 + 시스템 설정 */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-card rounded-xl border border-border p-5">
+        <div className="bg-card rounded-lg border border-border p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-muted-foreground" />
@@ -267,7 +267,7 @@ export default function ExchangeSettings() {
             </div>
           </div>
         </div>
-        <div className="bg-card rounded-xl border border-border p-5">
+        <div className="bg-card rounded-lg border border-border p-5">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-5 h-5 text-muted-foreground" />
             <span className="font-semibold text-foreground">시스템 설정</span>
@@ -294,7 +294,7 @@ export default function ExchangeSettings() {
       </div>
 
       {/* 환율 업데이트 */}
-      <div className="bg-card rounded-xl border border-border p-5">
+      <div className="bg-card rounded-lg border border-border p-5">
         <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
           <RefreshCw className="w-4 h-4 text-muted-foreground" />
           환율 업데이트
@@ -318,7 +318,7 @@ export default function ExchangeSettings() {
 
       {/* 환율 추이 차트 */}
       {chartData.length > 1 && (
-        <div className="bg-card rounded-xl border border-border p-5">
+        <div className="bg-card rounded-lg border border-border p-5">
           <h2 className="font-semibold text-foreground mb-4">환율 추이</h2>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
@@ -337,7 +337,7 @@ export default function ExchangeSettings() {
       )}
 
       {/* 환율 이력 */}
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
           <History className="w-4 h-4 text-muted-foreground" />
           <h2 className="font-semibold text-foreground">환율 변경 이력</h2>
@@ -376,7 +376,7 @@ export default function ExchangeSettings() {
       </div>
 
       {/* 데이터 관리 */}
-      <div className="bg-card rounded-xl border border-border p-5">
+      <div className="bg-card rounded-lg border border-border p-5">
         <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2">
           <Save className="w-4 h-4 text-muted-foreground" />
           데이터 관리
@@ -422,7 +422,7 @@ export default function ExchangeSettings() {
           </p>
         )}
         {packKits.length > 0 && (
-          <div className="mt-4 border border-border rounded-lg overflow-hidden">
+          <div className="mt-4 border border-border rounded-md overflow-hidden">
             <div className="bg-[var(--fill-quaternary)] px-3 py-2 text-xs font-semibold text-muted-foreground">PACKAGE 키트 원가 (자재마스터 BOM 합산)</div>
             <table className="w-full text-sm">
               <thead className="bg-card text-xs text-muted-foreground">
@@ -447,7 +447,7 @@ export default function ExchangeSettings() {
       </div>
 
       {/* 위험 구역 */}
-      <div className="bg-destructive/5 rounded-xl border border-destructive/20 p-5">
+      <div className="bg-destructive/5 rounded-lg border border-destructive/20 p-5">
         <h2 className="font-semibold text-destructive mb-2">위험 구역</h2>
         <p className="text-sm text-destructive mb-3">모든 ERP 데이터를 초기화합니다. 이 작업은 되돌릴 수 없습니다.</p>
         <Button variant="outline" className="text-destructive" onClick={handleClearAll}>

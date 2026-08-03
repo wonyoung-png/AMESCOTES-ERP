@@ -772,7 +772,7 @@ function SimpleCostModal({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
-          <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2.5 text-xs text-primary">
+          <div className="bg-primary/5 border border-primary/20 rounded-md px-3 py-2.5 text-xs text-primary">
             자재 세부 내역 없이 사전원가(코스트)를 직접 입력합니다.
             사후원가는 선택사항입니다.
           </div>
@@ -847,7 +847,7 @@ function SimpleCostModal({
             const diff = ((post - pre) / pre) * 100;
             const cls = diff > 0 ? 'text-[var(--system-red)] bg-[var(--system-red)]/10 border-[var(--system-red)]/20' : diff < 0 ? 'text-[var(--system-green)] bg-[var(--system-green)]/10 border-[var(--system-green)]/20' : 'text-muted-foreground bg-[var(--fill-quaternary)] border-border';
             return (
-              <div className={`rounded-lg border px-3 py-2 text-xs font-semibold ${cls}`}>
+              <div className={`rounded-md border px-3 py-2 text-xs font-semibold ${cls}`}>
                 사후원가 차이: {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
                 {' '}({post - pre > 0 ? '+' : ''}₩{(post - pre).toLocaleString('ko-KR')})
               </div>
@@ -974,7 +974,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
           </div>
 
           {/* ── 마진율 조정 패널 ── */}
-          <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 space-y-3">
+          <div className="bg-primary/5 border border-primary/20 rounded-md px-4 py-3 space-y-3">
             <div className="flex items-center gap-4 flex-wrap">
               <span className="text-xs font-semibold text-primary">마진율 설정</span>
               <div className="flex items-center gap-1.5">
@@ -1036,7 +1036,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
             )}
           </div>
 
-          <div className="bg-[var(--fill-quaternary)] border border-border rounded-lg px-4 py-3 space-y-1.5">
+          <div className="bg-[var(--fill-quaternary)] border border-border rounded-md px-4 py-3 space-y-1.5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>소계 (업체제공·마진 제외)</span>
               <span className="tabular-nums">{fmtKrw(baseSupply)}</span>
@@ -1058,7 +1058,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
               <span className="text-xl font-bold text-[#C9A96E] tabular-nums">{fmtKrw(grandTotal)}</span>
             </div>
           </div>
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div className="overflow-x-auto rounded-md border border-border">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border text-[13px] font-semibold text-muted-foreground">
@@ -1416,7 +1416,7 @@ function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void 
             <a
               href={src}
               download="material-image.jpg"
-              className="bg-card/80 hover:bg-card text-foreground text-xs px-3 py-1.5 rounded-lg border border-border flex items-center gap-1 shadow-sm"
+              className="bg-card/80 hover:bg-card text-foreground text-xs px-3 py-1.5 rounded-md border border-border flex items-center gap-1 shadow-sm"
             >
               <Download className="w-3.5 h-3.5" /> 다운로드
             </a>
@@ -1497,7 +1497,7 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-card rounded-xl shadow-2xl w-[640px] max-w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="bg-card rounded-lg shadow-2xl w-[640px] max-w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className={`px-4 py-3 border-b border-border flex items-center justify-between bg-${accent}-50`}>
           <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5"><Ruler className="w-4 h-4" />소요량 계산 — {itemName || '자재'}</h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
@@ -1549,7 +1549,7 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
             </label>
           </div>
           {/* 행 테이블 */}
-          <div className="overflow-hidden rounded-lg border border-border">
+          <div className="overflow-hidden rounded-md border border-border">
             <table className="w-full">
               <thead className={`bg-${accent}-50 border-b border-border`}>
                 <tr>
@@ -1920,7 +1920,7 @@ function PostCostSummary({
   const fmtCny = (n: number) => `${currSymbol}${n.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}`;
 
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
       <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground flex items-center justify-between">
         <h2 className="text-sm font-semibold">사후 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— 공장 실제 원가 기준</span></h2>
         {ps.totalMaterialCny > 0 && (
@@ -1929,7 +1929,7 @@ function PostCostSummary({
       </div>
       <div className="p-5 space-y-3">
         {/* 자재비 상세 */}
-        <div className="bg-[var(--fill-quaternary)] rounded-lg border border-border overflow-hidden">
+        <div className="bg-[var(--fill-quaternary)] rounded-md border border-border overflow-hidden">
           <div className="px-4 py-2 bg-[var(--fill-tertiary)] border-b border-border">
             <span className="text-xs font-semibold text-muted-foreground">자재비 합계</span>
             <span className="float-right text-xs font-bold text-foreground">
@@ -1953,7 +1953,7 @@ function PostCostSummary({
         </div>
 
         {/* 임가공비 */}
-        <div className="flex justify-between items-center px-4 py-2 bg-[var(--fill-quaternary)] rounded-lg border border-border text-xs">
+        <div className="flex justify-between items-center px-4 py-2 bg-[var(--fill-quaternary)] rounded-md border border-border text-xs">
           <span className="text-muted-foreground font-medium">임가공비</span>
           <span className="text-foreground font-medium">
             {fmtCny(ps.processingCny)} {showKrw && <span className="text-muted-foreground">→ {fmtKrw(ps.processingKrw)}</span>}
@@ -1962,7 +1962,7 @@ function PostCostSummary({
 
         {/* 관세 */}
         {ps.customsRate > 0 && (
-          <div className="flex justify-between items-center px-4 py-2 bg-[var(--fill-quaternary)] rounded-lg border border-border text-xs">
+          <div className="flex justify-between items-center px-4 py-2 bg-[var(--fill-quaternary)] rounded-md border border-border text-xs">
             <span className="text-muted-foreground font-medium">관세 ({ps.customsRate}%)</span>
             <span className="text-foreground font-medium">{fmtKrw(ps.customsKrw)}</span>
           </div>
@@ -1972,7 +1972,7 @@ function PostCostSummary({
         <div className="border-t border-border my-1" />
 
         {/* 공장단가 (강조) */}
-        <div className="bg-primary/5 rounded-xl border border-primary/30 px-4 py-3">
+        <div className="bg-primary/5 rounded-lg border border-primary/30 px-4 py-3">
           <div className="flex justify-between items-center">
             <div>
               <span className="text-sm font-bold text-foreground flex items-center gap-1.5"><Factory className="w-4 h-4 text-primary" />공장단가</span>
@@ -1987,14 +1987,14 @@ function PostCostSummary({
 
         {/* 물류비 */}
         {ps.logisticsKrw > 0 && (
-          <div className="flex justify-between items-center px-4 py-2 bg-[var(--fill-quaternary)] rounded-lg border border-border text-xs">
+          <div className="flex justify-between items-center px-4 py-2 bg-[var(--fill-quaternary)] rounded-md border border-border text-xs">
             <span className="text-muted-foreground font-medium">물류비</span>
             <span className="text-foreground font-medium">{fmtKrw(ps.logisticsKrw)}</span>
           </div>
         )}
 
         {/* 제품원가 */}
-        <div className="bg-primary rounded-xl px-4 py-3">
+        <div className="bg-primary rounded-lg px-4 py-3">
           <div className="flex justify-between items-center">
             <div>
               <span className="text-sm font-bold text-primary-foreground flex items-center gap-1.5"><Package className="w-4 h-4" />제품원가</span>
@@ -2027,7 +2027,7 @@ function PostCostSummary({
 
         {/* 마진 */}
         {deliveryPrice > 0 && (
-          <div className={`rounded-xl border px-4 py-3 ${marginBgClass}`}>
+          <div className={`rounded-lg border px-4 py-3 ${marginBgClass}`}>
             <div className="flex justify-between items-center">
               <div>
                 <div className="text-xs text-muted-foreground">마진율</div>
@@ -3292,7 +3292,7 @@ export default function BomManagement() {
       </div>
 
       {/* 스타일 선택 */}
-      <div className="bg-card rounded-xl border border-border p-5">
+      <div className="bg-card rounded-lg border border-border p-5">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <div className="col-span-1">
             <label className="text-xs text-muted-foreground mb-1 block font-medium">바이어 필터</label>
@@ -3364,7 +3364,7 @@ export default function BomManagement() {
                     return (
                   <>
                   <div
-                    className="w-20 h-20 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/10 transition-colors overflow-hidden flex-shrink-0"
+                    className="w-20 h-20 border-2 border-dashed border-border rounded-md flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/10 transition-colors overflow-hidden flex-shrink-0"
                     onClick={() => document.getElementById('bom-product-img-input')?.click()}
                     onPaste={e => { const pasteItems = Array.from(e.clipboardData?.items || []); const img = pasteItems.find(i => i.type.startsWith('image/')); if (img) { const blob = img.getAsFile(); if (blob) { const reader = new FileReader(); reader.onload = ev => updateField('productImage', ev.target?.result as string); reader.readAsDataURL(blob); } } }}
                     tabIndex={0}
@@ -3403,7 +3403,7 @@ export default function BomManagement() {
 
 
       {!editBom && (
-        <div className="bg-[var(--fill-quaternary)] border border-dashed border-border rounded-xl p-12 text-center">
+        <div className="bg-[var(--fill-quaternary)] border border-dashed border-border rounded-lg p-12 text-center">
           <Calculator className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
           <p className="text-muted-foreground text-sm font-medium">스타일을 선택하거나 엑셀을 업로드하세요</p>
           <p className="text-muted-foreground text-xs mt-1">중국원가표(.xlsm) 업로드 시 자동으로 BOM이 생성됩니다</p>
@@ -3550,19 +3550,19 @@ export default function BomManagement() {
                 <div className="space-y-4 py-2">
                   {/* 마이그레이션 안내 */}
                   {addColorForTab === 'pre' && (editBom.colorBoms || []).length === 0 && editBom.lines.some(l => l.itemName) && (
-                    <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2.5 text-xs text-primary">
+                    <div className="bg-primary/5 border border-primary/20 rounded-md px-3 py-2.5 text-xs text-primary">
                       <span className="font-semibold">기존 BOM 데이터 감지</span>
                       <p className="mt-1 text-primary">첫 번째 컬러 탭이 생성되면 기존 BOM 데이터가 자동으로 복사됩니다.</p>
                     </div>
                   )}
                   {addColorForTab === 'pre' && (editBom.colorBoms || []).length > 0 && (
-                    <div className="bg-[var(--system-green)]/10 border border-[var(--system-green)]/20 rounded-lg px-3 py-2.5 text-xs text-[var(--system-green)]">
+                    <div className="bg-[var(--system-green)]/10 border border-[var(--system-green)]/20 rounded-md px-3 py-2.5 text-xs text-[var(--system-green)]">
                       <span className="font-semibold">자동 복사</span>
                       <p className="mt-1 text-[var(--system-green)]">[{editBom.colorBoms?.[0]?.color}] 탭의 전체 BOM이 복사됩니다.</p>
                     </div>
                   )}
                   {addColorForTab === 'post' && (editBom.postColorBoms || []).length > 0 && (
-                    <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2.5 text-xs text-primary">
+                    <div className="bg-primary/5 border border-primary/20 rounded-md px-3 py-2.5 text-xs text-primary">
                       <span className="font-semibold">자동 복사</span>
                       <p className="mt-1 text-primary">[{editBom.postColorBoms?.[0]?.color}] 탭의 전체 BOM이 복사됩니다.</p>
                     </div>
@@ -3640,7 +3640,7 @@ export default function BomManagement() {
 
           {/* 사전원가 - 컬러 탭 없는 경우 안내 */}
           {mainTab === 'pre' && !activeColorBom && (editBom.colorBoms || []).length === 0 && (
-            <div className="bg-[var(--fill-quaternary)] border border-dashed border-[var(--system-green)]/30 rounded-xl p-10 text-center">
+            <div className="bg-[var(--fill-quaternary)] border border-dashed border-[var(--system-green)]/30 rounded-lg p-10 text-center">
               <Calculator className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-foreground text-sm font-semibold mb-1">사전원가 컬러 탭이 없습니다</p>
               <p className="text-muted-foreground text-xs mb-4">BOM을 관리하려면 먼저 컬러를 추가하세요. 기존 엑셀 데이터가 있으면 첫 컬러 탭에 자동 복사됩니다.</p>
@@ -3674,7 +3674,7 @@ export default function BomManagement() {
             return (
               <div className="space-y-4">
                 {/* 컬러 BOM 컨트롤 바 */}
-                <div className="bg-card rounded-xl border border-border p-4">
+                <div className="bg-card rounded-lg border border-border p-4">
                   <div className="flex flex-wrap items-end gap-4">
                     {/* 제조국 선택 */}
                     <div>
@@ -3688,7 +3688,7 @@ export default function BomManagement() {
                               if (country === '중국') updateField('preCurrency', 'CNY');
                               else if (country === '한국') updateField('preCurrency', 'KRW');
                             }}
-                            className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
+                            className={`px-3 py-1.5 text-xs rounded-md border font-medium transition-colors ${
                               editBom.preManufacturingCountry === country
                                 ? 'bg-primary text-primary-foreground border-primary'
                                 : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
@@ -3707,7 +3707,7 @@ export default function BomManagement() {
                           <button
                             key={cur}
                             onClick={() => updateField('preCurrency', cur)}
-                            className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
+                            className={`px-3 py-1.5 text-xs rounded-md border font-medium transition-colors ${
                               (editBom.preCurrency || 'CNY') === cur
                                 ? 'bg-primary text-primary-foreground border-primary'
                                 : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
@@ -3770,7 +3770,7 @@ export default function BomManagement() {
                 </div>
 
                 {/* BOM 테이블 (전체 섹션) */}
-                <div className="bg-card rounded-xl border border-border overflow-hidden">
+                <div className="bg-card rounded-lg border border-border overflow-hidden">
                   <div className="px-5 py-3 border-b border-border flex items-center justify-between bg-[var(--system-green)]/10">
                     <div className="flex items-center gap-3">
                       <h2 className="text-sm font-semibold text-[var(--system-green)]">BOM 자재 명세 — [{colorBom.color}]</h2>
@@ -3947,7 +3947,7 @@ export default function BomManagement() {
 
                 {/* 사전원가 요약 */}
                 {summary && (
-                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                  <div className="bg-card rounded-lg border border-border overflow-hidden">
                     <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
                       <h2 className="text-sm font-semibold">사전 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— [{colorBom.color}] 기준</span></h2>
                     </div>
@@ -4044,7 +4044,7 @@ export default function BomManagement() {
                               </tr>
                               <tr>
                                 <td colSpan={4} className="px-4 py-2">
-                                  <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border ${marginBg}`}>
+                                  <div className={`flex items-center justify-between px-4 py-2.5 rounded-lg border ${marginBg}`}>
                                     <div className="flex items-center gap-4">
                                       <span className="text-xs text-muted-foreground">마진금액</span>
                                       <span className={`font-mono font-bold text-sm ${marginClass}`}>{fmtKrw(marginAmt)}</span>
@@ -4077,7 +4077,7 @@ export default function BomManagement() {
                   return (
                     <>
                       {hqLines.length > 0 && (
-                        <div className="bg-card rounded-xl border border-primary/20 overflow-hidden">
+                        <div className="bg-card rounded-lg border border-primary/20 overflow-hidden">
                           <div className="px-5 py-3 border-b border-primary/10 bg-primary/5">
                             <h4 className="font-semibold text-sm text-primary">본사제공 자재 목록</h4>
                           </div>
@@ -4112,7 +4112,7 @@ export default function BomManagement() {
                         </div>
                       )}
                       {vendorLines.length > 0 && (
-                        <div className="bg-card rounded-xl border border-border overflow-hidden">
+                        <div className="bg-card rounded-lg border border-border overflow-hidden">
                           <div className="px-5 py-3 border-b border-border bg-[var(--fill-tertiary)]">
                             <h4 className="font-semibold text-sm text-muted-foreground">업체제공 자재 목록</h4>
                           </div>
@@ -4152,12 +4152,12 @@ export default function BomManagement() {
 
                 {/* P&L 분석 */}
                 {summary && editBom.pnl && pnlResult && (
-                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                  <div className="bg-card rounded-lg border border-border overflow-hidden">
                     <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
                       <h2 className="text-sm font-semibold">P&L 분석 <span className="text-muted-foreground text-xs font-normal ml-2">— [{colorBom.color}] 기준</span></h2>
                     </div>
                     <div className="p-5 space-y-5">
-                      <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                      <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                         <h3 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h3>
                         <div className="grid grid-cols-3 gap-4">
                           {([
@@ -4175,7 +4175,7 @@ export default function BomManagement() {
                           ))}
                         </div>
                       </div>
-                      <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                      <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                         <h3 className="text-xs font-semibold text-muted-foreground mb-3">배수 가이드 (국내 B2C)</h3>
                         <div className="space-y-2">
                           {[
@@ -4196,7 +4196,7 @@ export default function BomManagement() {
                         onPatch={patchPnl}
                       />
                       {editBom.pnl.confirmedSalePrice ? (
-                        <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                        <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                           <h3 className="text-xs font-semibold text-muted-foreground mb-3">영업이익 분석 (P&L) — 국내 B2C</h3>
                           <div className="space-y-1">
                             {[
@@ -4222,7 +4222,7 @@ export default function BomManagement() {
                           </div>
                         </div>
                       ) : (
-                        <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-dashed border-border text-center text-xs text-muted-foreground">
+                        <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-dashed border-border text-center text-xs text-muted-foreground">
                           <TrendingUp className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
                           {SALES_PRICE_LABELS.kmsrpFull}을 입력하면 국내 B2C 영업이익 P&L이 표시됩니다
                         </div>
@@ -4236,7 +4236,7 @@ export default function BomManagement() {
 
           {/* 사후원가 - 컬러 탭 없는 경우 안내 */}
           {mainTab === 'post' && !activePostColorBom && (editBom.postColorBoms || []).length === 0 && (
-            <div className="bg-[var(--fill-quaternary)] border border-dashed border-border rounded-xl p-10 text-center">
+            <div className="bg-[var(--fill-quaternary)] border border-dashed border-border rounded-lg p-10 text-center">
               <Factory className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-foreground text-sm font-semibold mb-1">사후원가 컬러 탭이 없습니다</p>
               <p className="text-muted-foreground text-xs mb-4">공장 원가표를 관리하려면 컬러를 추가하세요.</p>
@@ -4262,7 +4262,7 @@ export default function BomManagement() {
           {mainTab === 'post' && activePostColorBom && (
             <>
               {/* 사후원가 컨트롤 바 */}
-              <div className="bg-card rounded-xl border border-border p-4">
+              <div className="bg-card rounded-lg border border-border p-4">
                 <div className="flex flex-wrap items-end gap-4">
                   {/* 제조국 선택 */}
                   <div>
@@ -4276,7 +4276,7 @@ export default function BomManagement() {
                             if (country === '중국') updateField('currency', 'CNY');
                             else if (country === '한국') updateField('currency', 'KRW');
                           }}
-                          className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
+                          className={`px-3 py-1.5 text-xs rounded-md border font-medium transition-colors ${
                             editBom.manufacturingCountry === country
                               ? 'bg-primary text-primary-foreground border-primary'
                               : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
@@ -4295,7 +4295,7 @@ export default function BomManagement() {
                         <button
                           key={cur}
                           onClick={() => updateField('currency', cur)}
-                          className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
+                          className={`px-3 py-1.5 text-xs rounded-md border font-medium transition-colors ${
                             (editBom.currency || 'CNY') === cur
                               ? 'bg-primary text-primary-foreground border-primary'
                               : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
@@ -4370,7 +4370,7 @@ export default function BomManagement() {
                 const curSymbol = postCur === 'CNY' ? '¥' : postCur === 'USD' ? '$' : '₩';
                 const otherPostColors = (editBom.postColorBoms || []).filter(cb => cb.color !== postColorBom.color);
                 return (
-                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                  <div className="bg-card rounded-lg border border-border overflow-hidden">
                     <div className="px-5 py-3 border-b border-border flex items-center justify-between bg-primary/5">
                       <div className="flex items-center gap-3">
                         <h2 className="text-sm font-semibold text-primary">사후원가 자재 명세 — [{postColorBom.color}]</h2>
@@ -4579,7 +4579,7 @@ export default function BomManagement() {
                 const marginClass = marginPct < 15 ? 'text-[var(--system-red)]' : marginPct < 20 ? 'text-[var(--system-orange)]' : marginPct <= 30 ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]';
                 const marginBg = marginPct < 15 ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20' : marginPct < 30 ? 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20';
                 return (
-                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                  <div className="bg-card rounded-lg border border-border overflow-hidden">
                     <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
                       <h2 className="text-sm font-semibold">사후 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— [{activePostColorBom?.color}] 기준</span></h2>
                     </div>
@@ -4721,7 +4721,7 @@ export default function BomManagement() {
                             </tr>
                             <tr>
                               <td colSpan={4} className="px-4 py-2">
-                                <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border ${marginBg}`}>
+                                <div className={`flex items-center justify-between px-4 py-2.5 rounded-lg border ${marginBg}`}>
                                   <div className="flex items-center gap-4">
                                     <span className="text-xs text-muted-foreground">마진금액</span>
                                     <span className={`font-mono font-bold text-sm ${marginClass}`}>{fmtKrw(marginAmt)}</span>
@@ -4772,12 +4772,12 @@ export default function BomManagement() {
                 const postPnlResult = editBom?.pnl ? calcPnl(finalCost, editBom.pnl) : null;
                 if (!editBom?.pnl || !postPnlResult) return null;
                 return (
-                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                  <div className="bg-card rounded-lg border border-border overflow-hidden">
                     <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
                       <h2 className="text-sm font-semibold">P&L 분석 <span className="text-muted-foreground text-xs font-normal ml-2">— 사후원가 [{activePostColorBom?.color}] 기준</span></h2>
                     </div>
                     <div className="p-5 space-y-5">
-                      <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                      <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                         <h3 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h3>
                         <div className="grid grid-cols-3 gap-4">
                           {([
@@ -4795,7 +4795,7 @@ export default function BomManagement() {
                           ))}
                         </div>
                       </div>
-                      <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                      <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                         <h3 className="text-xs font-semibold text-muted-foreground mb-3">배수 가이드 (국내 B2C)</h3>
                         <div className="space-y-2">
                           {[
@@ -4816,7 +4816,7 @@ export default function BomManagement() {
                         onPatch={patchPnl}
                       />
                       {editBom.pnl.confirmedSalePrice ? (
-                        <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                        <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                           <h3 className="text-xs font-semibold text-muted-foreground mb-3">영업이익 분석 (P&L) — 국내 B2C</h3>
                           <div className="space-y-1">
                             {[
@@ -4842,7 +4842,7 @@ export default function BomManagement() {
                           </div>
                         </div>
                       ) : (
-                        <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-dashed border-border text-center text-xs text-muted-foreground">
+                        <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-dashed border-border text-center text-xs text-muted-foreground">
                           <TrendingUp className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
                           {SALES_PRICE_LABELS.kmsrpFull}을 입력하면 국내 B2C 영업이익 P&L이 표시됩니다
                         </div>
@@ -4996,7 +4996,7 @@ export default function BomManagement() {
 
                 {/* 가죽 탭 */}
                 {yardageTab === 'leather' && (
-                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                  <div className="bg-card rounded-lg border border-border overflow-hidden">
                     {/* 로스율 헤더 */}
                     <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border-b border-border">
                       <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">로스율 (%)</span>
@@ -5062,7 +5062,7 @@ export default function BomManagement() {
 
                 {/* 원단 탭 */}
                 {yardageTab === 'fabric' && (
-                  <div className="bg-card rounded-xl border border-border overflow-hidden">
+                  <div className="bg-card rounded-lg border border-border overflow-hidden">
                     <div className="flex items-center gap-4 px-4 py-2.5 bg-[var(--fill-quaternary)] border-b border-border flex-wrap">
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">원단 폭 (cm)</span>
@@ -5178,9 +5178,9 @@ export default function BomManagement() {
                   #cost-sheet-print, #cost-sheet-print * { visibility: visible; }
                   #cost-sheet-print { position: absolute; top: 0; left: 0; width: 100%; }
                 }`}</style>
-                <div id="cost-sheet-print" className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
+                <div id="cost-sheet-print" className="bg-card rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
                   {/* 헤더 */}
-                  <div className="sticky top-0 z-10 bg-card border-b border-border text-foreground px-6 py-4 flex items-center justify-between rounded-t-2xl print:hidden">
+                  <div className="sticky top-0 z-10 bg-card border-b border-border text-foreground px-6 py-4 flex items-center justify-between rounded-t-lg print:hidden">
                     <h2 className="text-base font-bold">원가계산서</h2>
                     <div className="flex items-center gap-2">
                       <button
@@ -5210,7 +5210,7 @@ export default function BomManagement() {
                             window.print();
                           }
                         }}
-                        className="px-4 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-lg flex items-center gap-1.5"
+                        className="px-4 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold rounded-md flex items-center gap-1.5"
                       >
                         <Printer className="w-3.5 h-3.5" /> PDF 다운로드
                       </button>
@@ -5223,7 +5223,7 @@ export default function BomManagement() {
 
                   <div id="cost-sheet-print-content" className="p-6 space-y-6">
                     {/* 섹션 1: 제품 기본정보 */}
-                    <div className="border border-border rounded-xl overflow-hidden">
+                    <div className="border border-border rounded-lg overflow-hidden">
                       <div className="bg-stone-800 text-white px-5 py-3 flex items-center justify-between">
                         <h3 className="text-sm font-bold">제품 기본정보</h3>
                         <span className="text-xs text-muted-foreground">작성일: {today}</span>
@@ -5233,7 +5233,7 @@ export default function BomManagement() {
                           {/* 제품 사진 */}
                           <div className="flex-shrink-0">
                             <div
-                              className="w-32 h-32 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-border0 hover:bg-[var(--fill-quaternary)] transition-colors overflow-hidden"
+                              className="w-32 h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-border0 hover:bg-[var(--fill-quaternary)] transition-colors overflow-hidden"
                               onClick={() => document.getElementById('cost-sheet-img-input')?.click()}
                               onPaste={e => {
                                 const items = Array.from(e.clipboardData?.items || []);
@@ -5299,7 +5299,7 @@ export default function BomManagement() {
                     </div>
 
                     {/* 섹션 2: 사후원가 요약 테이블 */}
-                    <div className="border border-border rounded-xl overflow-hidden">
+                    <div className="border border-border rounded-lg overflow-hidden">
                       <div className="bg-stone-800 text-white px-5 py-3">
                         <h3 className="text-sm font-bold">사후원가 요약</h3>
                       </div>
@@ -5366,13 +5366,13 @@ export default function BomManagement() {
 
                     {/* 섹션 3: P&L 분석 */}
                     {editBom.pnl && postPnlResultSheet && (
-                      <div className="border border-border rounded-xl overflow-hidden">
+                      <div className="border border-border rounded-lg overflow-hidden">
                         <div className="bg-stone-800 text-white px-5 py-3">
                           <h3 className="text-sm font-bold">P&L 분석</h3>
                         </div>
                         <div className="p-5 space-y-4">
                           {/* 기가정 */}
-                          <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                          <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                             <h4 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h4>
                             <div className="grid grid-cols-3 gap-4 text-xs">
                               <div><span className="text-muted-foreground text-[11px] block">할인율</span><span className="font-semibold text-foreground">{Math.round(editBom.pnl.discountRate * 100)}%</span></div>
@@ -5381,7 +5381,7 @@ export default function BomManagement() {
                             </div>
                           </div>
                           {/* 배수 분석 */}
-                          <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                          <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                             <h4 className="text-xs font-semibold text-muted-foreground mb-3">배수 분석</h4>
                             <div className="space-y-2 text-xs">
                               {[
@@ -5421,7 +5421,7 @@ export default function BomManagement() {
                           </div>
                           {/* 영업이익 분석 */}
                           {editBom.pnl.confirmedSalePrice && (
-                            <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border">
+                            <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                               <h4 className="text-xs font-semibold text-muted-foreground mb-3">영업이익 분석 (P&L)</h4>
                               <div className="space-y-1">
                                 {[

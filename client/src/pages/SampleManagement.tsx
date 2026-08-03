@@ -733,12 +733,12 @@ export default function SampleManagement() {
           { label: '최종승인', value: stats.approved,         color: 'text-[var(--system-green)]' },
           { label: '미청구',  value: stats.unclaimed,        color: 'text-[var(--system-orange)]' },
         ].map(s => (
-          <div key={s.label} className="bg-card rounded-xl border border-border p-4">
+          <div key={s.label} className="bg-card rounded-lg border border-border p-4">
             <p className={`text-xl font-bold ${s.color}`}>{s.value}건</p>
             <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
         ))}
-        <div className="bg-card rounded-xl border border-border p-4">
+        <div className="bg-card rounded-lg border border-border p-4">
           <p className="text-xl font-bold text-[var(--system-red)]">{formatKRW(stats.totalUnclaimedKrw)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">미청구 금액</p>
         </div>
@@ -752,7 +752,7 @@ export default function SampleManagement() {
         const thisMonthApproved = thisMonthSamples.filter(s => s.stage === '최종승인').length;
         const thisMonthReceived = thisMonthSamples.length;
         return (
-          <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-primary">이번 달 샘플 현황</span>
               <span className="text-xs text-muted-foreground">({thisMonth})</span>
@@ -782,7 +782,7 @@ export default function SampleManagement() {
       })()}
 
       {/* 월별 담당자별 처리량 통계 */}
-      <div className="bg-card rounded-xl border border-border p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <p className="text-sm font-semibold text-foreground mr-1">월별 담당자별 처리량</p>
           {/* 월 선택 */}
@@ -869,7 +869,7 @@ export default function SampleManagement() {
       </div>
 
       {/* 단계 탭 필터 */}
-      <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-xl w-fit flex-wrap">
+      <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-lg w-fit flex-wrap">
         {[
           { value: 'all', label: '전체' },
           { value: '진행중', label: '진행중' },
@@ -883,7 +883,7 @@ export default function SampleManagement() {
           <button
             key={opt.value}
             onClick={() => setFilterStage(opt.value)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
               filterStage === opt.value
                 ? 'bg-card text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
@@ -953,17 +953,17 @@ export default function SampleManagement() {
 
       {/* 다중 선택 액션 바 */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-xl">
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-lg">
           <span className="text-sm font-medium text-foreground">{selectedIds.size}개 선택됨</span>
           <button
             onClick={handleBulkDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-md text-xs font-medium transition-colors"
           >
             <Trash2 className="w-4 h-4" />선택 삭제
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
-            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-md text-xs font-medium transition-colors"
           >
             선택 해제
           </button>
@@ -971,7 +971,7 @@ export default function SampleManagement() {
       )}
 
       {/* 테이블 (데스크탑) */}
-      <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
+      <div className="hidden md:block bg-card rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
@@ -1019,9 +1019,9 @@ export default function SampleManagement() {
                   </td>
                   <td className="px-3 py-2.5">
                     {(s.imageUrls || []).length > 0 ? (
-                      <img src={s.imageUrls[0]} alt={s.styleNo} className="w-14 h-14 object-cover rounded-lg border border-border" />
+                      <img src={s.imageUrls[0]} alt={s.styleNo} className="w-14 h-14 object-cover rounded-md border border-border" />
                     ) : (
-                      <div className="w-14 h-14 rounded-lg bg-[var(--fill-tertiary)] border border-border flex items-center justify-center text-muted-foreground">
+                      <div className="w-14 h-14 rounded-md bg-[var(--fill-tertiary)] border border-border flex items-center justify-center text-muted-foreground">
                         <Camera className="w-5 h-5" />
                       </div>
                     )}
@@ -1149,7 +1149,7 @@ export default function SampleManagement() {
       {/* 카드 리스트 (모바일) */}
       <div className="md:hidden space-y-3">
         {filtered.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-lg border border-border">
             <Camera className="w-10 h-10 mx-auto mb-2 opacity-30" />
             <p className="text-sm">등록된 샘플이 없습니다</p>
           </div>
@@ -1158,14 +1158,14 @@ export default function SampleManagement() {
           const readyCount = (s.materialChecklist || []).filter(c => c.isReady).length;
           const isChecked = selectedIds.has(s.id);
           return (
-            <div key={s.id} className={`bg-card rounded-xl border p-4 ${isChecked ? 'border-primary/40 bg-primary/5' : 'border-border'}`}>
+            <div key={s.id} className={`bg-card rounded-lg border p-4 ${isChecked ? 'border-primary/40 bg-primary/5' : 'border-border'}`}>
               <div className="flex gap-3">
                 {/* 썸네일 */}
                 <div className="shrink-0">
                   {(s.imageUrls || []).length > 0 ? (
-                    <img src={s.imageUrls[0]} alt={s.styleNo} className="w-16 h-16 object-cover rounded-lg border border-border" />
+                    <img src={s.imageUrls[0]} alt={s.styleNo} className="w-16 h-16 object-cover rounded-md border border-border" />
                   ) : (
-                    <div className="w-16 h-16 rounded-lg bg-[var(--fill-tertiary)] border border-border flex items-center justify-center text-muted-foreground">
+                    <div className="w-16 h-16 rounded-md bg-[var(--fill-tertiary)] border border-border flex items-center justify-center text-muted-foreground">
                       <Camera className="w-5 h-5" />
                     </div>
                   )}
@@ -1267,13 +1267,13 @@ export default function SampleManagement() {
 
       {/* ── 등록/수정 모달 ── */}
       <Dialog open={showModal} onOpenChange={(open) => { if (!open) handleModalClose(true); }}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editId ? '샘플 수정' : '샘플 접수'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
 
             {/* TEMP 품목 자동생성 토글 */}
             {!editId && (
-              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-md">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox" checked={createTempMode}
@@ -1634,13 +1634,13 @@ export default function SampleManagement() {
               {(form.imageUrls || []).length > 0 && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">이미지 ({(form.imageUrls || []).length}/5)</p>
-                  <div className="flex flex-wrap gap-2 p-2 bg-[var(--fill-quaternary)] rounded-lg border border-border">
+                  <div className="flex flex-wrap gap-2 p-2 bg-[var(--fill-quaternary)] rounded-md border border-border">
                     {(form.imageUrls || []).map((url, idx) => (
                       <div key={idx} className="relative group">
                         <img
                           src={url}
                           alt={`샘플 이미지 ${idx + 1}`}
-                          className="w-16 h-16 object-cover rounded-lg border border-border cursor-pointer"
+                          className="w-16 h-16 object-cover rounded-md border border-border cursor-pointer"
                           onClick={() => window.open(url, '_blank')}
                         />
                         <button
@@ -1659,7 +1659,7 @@ export default function SampleManagement() {
                   <p className="text-xs text-muted-foreground mb-1">첨부 문서 ({(form.documents || []).length}/5)</p>
                   <div className="space-y-1">
                     {(form.documents || []).map((doc, idx) => (
-                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-[var(--fill-quaternary)] rounded-lg border border-border group">
+                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-[var(--fill-quaternary)] rounded-md border border-border group">
                         <DocIcon fileType={doc.fileType} />
                         <button
                           type="button"
@@ -1680,7 +1680,7 @@ export default function SampleManagement() {
                 </div>
               )}
               {(form.imageUrls || []).length === 0 && (form.documents || []).length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-3 border border-dashed border-border rounded-lg">
+                <p className="text-xs text-muted-foreground text-center py-3 border border-dashed border-border rounded-md">
                   파일 없음 — 위 버튼으로 이미지·PDF·엑셀을 추가하세요
                 </p>
               )}
@@ -1695,7 +1695,7 @@ export default function SampleManagement() {
 
       {/* ── 상세 모달 (차수별 메모 + 자재 체크리스트) ── */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           {detailSample && (
             <>
               <DialogHeader>
@@ -1711,10 +1711,10 @@ export default function SampleManagement() {
                 {/* 자재 요청 목록 */}
                 {(detailSample.materialRequests || []).length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1">
                       자재 요청 목록
                     </p>
-                    <div className="rounded-lg border border-border overflow-hidden">
+                    <div className="rounded-md border border-border overflow-hidden">
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="bg-[var(--fill-quaternary)] border-b border-border">
@@ -1761,7 +1761,7 @@ export default function SampleManagement() {
                 {/* 첨부 파일/이미지 */}
                 {((detailSample.imageUrls || []).length > 0 || (detailSample.documents || []).length > 0) && (
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">첨부 파일</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase">첨부 파일</p>
                     {(detailSample.imageUrls || []).length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {(detailSample.imageUrls || []).map((url, idx) => (
@@ -1769,7 +1769,7 @@ export default function SampleManagement() {
                             key={idx}
                             src={url}
                             alt={`이미지 ${idx + 1}`}
-                            className="w-16 h-16 object-cover rounded-lg border border-border cursor-pointer hover:opacity-80"
+                            className="w-16 h-16 object-cover rounded-md border border-border cursor-pointer hover:opacity-80"
                             onClick={() => window.open(url, '_blank')}
                           />
                         ))}
@@ -1780,7 +1780,7 @@ export default function SampleManagement() {
                         {(detailSample.documents || []).map((doc, idx) => (
                           <button
                             key={idx}
-                            className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg border border-border hover:bg-[var(--fill-quaternary)]"
+                            className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-md border border-border hover:bg-[var(--fill-quaternary)]"
                             onClick={() => openFile(doc.url, doc.fileType, doc.name)}
                             title={doc.fileType === 'excel' ? '클릭하면 다운로드' : '클릭하면 새 탭에서 열림'}
                           >
@@ -1795,13 +1795,13 @@ export default function SampleManagement() {
 
                 {/* 차수별 수정 요청 메모 */}
                 <div className="space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">차수별 수정 요청 히스토리</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase">차수별 수정 요청 히스토리</p>
                   {(detailSample.revisionHistory || []).length === 0 ? (
                     <p className="text-xs text-muted-foreground py-2 text-center">등록된 메모가 없습니다</p>
                   ) : (
                     <div className="space-y-2">
                       {(detailSample.revisionHistory || []).map((r, i) => (
-                        <div key={i} className="flex gap-3 text-sm p-2 bg-[var(--fill-quaternary)] rounded-lg border border-border">
+                        <div key={i} className="flex gap-3 text-sm p-2 bg-[var(--fill-quaternary)] rounded-md border border-border">
                           <span className="text-xs font-bold text-foreground shrink-0 mt-0.5">{r.round}차</span>
                           <div className="flex-1">
                             <p className="text-foreground">{r.note}</p>
@@ -1834,7 +1834,7 @@ export default function SampleManagement() {
                 {/* 자재 준비 체크리스트 */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1">
                       <ClipboardCheck className="w-3.5 h-3.5" />자재 준비 체크리스트
                     </p>
                     {(detailSample.materialChecklist || []).length > 0 && (
@@ -1861,7 +1861,7 @@ export default function SampleManagement() {
                   ) : (
                     <div className="space-y-1.5">
                       {(detailSample.materialChecklist || []).map(c => (
-                        <label key={c.id} className="flex items-center gap-3 p-2 rounded-lg border border-border hover:bg-[var(--fill-quaternary)] cursor-pointer">
+                        <label key={c.id} className="flex items-center gap-3 p-2 rounded-md border border-border hover:bg-[var(--fill-quaternary)] cursor-pointer">
                           <input
                             type="checkbox" checked={c.isReady}
                             onChange={() => handleToggleCheck(c.id)}
@@ -1904,7 +1904,7 @@ export default function SampleManagement() {
       {/* ── 청구하기 모달 ── */}
       {billingTarget && (
         <Dialog open={billingModal} onOpenChange={setBillingModal}>
-          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>청구하기 — {billingTarget.styleNo}</DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
@@ -1916,13 +1916,13 @@ export default function SampleManagement() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   onClick={() => setBillingMode('new')}
-                  className={`p-3 rounded-lg border text-sm font-medium transition-colors ${billingMode === 'new' ? 'bg-primary/5 border-primary/40 text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
+                  className={`p-3 rounded-md border text-sm font-medium transition-colors ${billingMode === 'new' ? 'bg-primary/5 border-primary/40 text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
                 >
                   거래명세표 신규 생성
                 </button>
                 <button
                   onClick={() => setBillingMode('link')}
-                  className={`p-3 rounded-lg border text-sm font-medium transition-colors ${billingMode === 'link' ? 'bg-primary/5 border-primary/40 text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
+                  className={`p-3 rounded-md border text-sm font-medium transition-colors ${billingMode === 'link' ? 'bg-primary/5 border-primary/40 text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
                 >
                   기존 전표에 연결
                 </button>
@@ -1961,7 +1961,7 @@ export default function SampleManagement() {
               })()}
 
               {billingMode === 'new' && (
-                <div className="p-3 bg-primary/5 rounded-lg text-xs text-muted-foreground">
+                <div className="p-3 bg-primary/5 rounded-md text-xs text-muted-foreground">
                   <p className="font-medium mb-1 text-foreground">생성될 거래명세표</p>
                   <p>바이어: {vendors.find(v => v.id === billingTarget.buyerId)?.name || '미지정'}</p>
                   <p>품목: {billingTarget.styleNo} — {billingTarget.styleName}</p>

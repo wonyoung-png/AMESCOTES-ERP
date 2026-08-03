@@ -1093,7 +1093,7 @@ export default function ProductionOrders() {
         <div className="flex gap-2">
           <button
             onClick={() => setShowFactoryView(v => !v)}
-            className={`hidden sm:block px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${showFactoryView ? 'bg-primary/10 border-primary/30 text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
+            className={`hidden sm:block px-3 py-2 rounded-md border text-xs font-medium transition-colors ${showFactoryView ? 'bg-primary/10 border-primary/30 text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
           >
             공장별 현황
           </button>
@@ -1111,7 +1111,7 @@ export default function ProductionOrders() {
           { label: '리오더', value: stats.reorders, color: 'text-primary' },
           { label: '긴급 (D-7 이내)', value: stats.urgent, color: 'text-[var(--system-red)]' },
         ].map(s => (
-          <div key={s.label} className="bg-card rounded-xl border border-border p-4">
+          <div key={s.label} className="bg-card rounded-lg border border-border p-4">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
@@ -1120,7 +1120,7 @@ export default function ProductionOrders() {
 
       {/* 공장별 발주 현황 */}
       {showFactoryView && (
-        <div className="bg-card rounded-xl border border-border p-4">
+        <div className="bg-card rounded-lg border border-border p-4">
           <p className="text-sm font-semibold text-foreground mb-3">공장별 발주 현황</p>
           {factoryStats.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-4">등록된 발주가 없습니다</p>
@@ -1184,7 +1184,7 @@ export default function ProductionOrders() {
         </Select>
         <button
           onClick={() => setFilterUrgent(v => !v)}
-          className={`h-9 px-3 rounded-lg border text-xs font-medium transition-colors ${filterUrgent ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/30 text-[var(--system-red)]' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
+          className={`h-9 px-3 rounded-md border text-xs font-medium transition-colors ${filterUrgent ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/30 text-[var(--system-red)]' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
         >
           납기임박
         </button>
@@ -1240,7 +1240,7 @@ export default function ProductionOrders() {
       </div>
 
       {/* 테이블 (데스크탑) */}
-      <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
+      <div className="hidden md:block bg-card rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
@@ -1443,14 +1443,14 @@ export default function ProductionOrders() {
       {/* 카드 리스트 (모바일) */}
       <div className="md:hidden space-y-3">
         {filtered.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-lg border border-border">
             <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
             <p className="text-sm">등록된 발주가 없습니다</p>
           </div>
         ) : filtered.map(o => {
           const totalAmtKrw = (o.factoryUnitPriceKrw || 0) * o.qty;
           return (
-            <div key={o.id} className="bg-card rounded-xl border border-border p-4">
+            <div key={o.id} className="bg-card rounded-lg border border-border p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1495,7 +1495,7 @@ export default function ProductionOrders() {
 
       {/* ─── 발주 등록 모달 (BOM 연동) ─── */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{isEditMode ? '발주 수정' : '발주 등록 — BOM 연동'}</DialogTitle></DialogHeader>
           <div className="space-y-5 py-2">
 
@@ -1516,13 +1516,13 @@ export default function ProductionOrders() {
                 const existingOrdersForStyle = (orders as ProductionOrder[]).filter(o => o.styleNo === form.styleNo && (!isEditMode || o.id !== editOrderId));
                 const existingCount = existingOrdersForStyle.length;
                 return existingCount > 0 ? (
-                  <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 text-xs text-primary flex items-center gap-1.5">
+                  <div className="p-2 rounded-md bg-primary/10 border border-primary/20 text-xs text-primary flex items-center gap-1.5">
                     <span>이 스타일 기존 발주 <strong>{existingCount}건</strong> 있음 (리오더)</span>
                   </div>
                 ) : null;
               })()}
               {form.orderNo && (
-                <div className={`p-3 rounded-lg border ${bomCalc.hasBomWarning ? 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20'}`}>
+                <div className={`p-3 rounded-md border ${bomCalc.hasBomWarning ? 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20'}`}>
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-foreground">
                       발주번호: <span className="font-mono font-bold">{form.orderNo}</span>
@@ -1598,7 +1598,7 @@ export default function ProductionOrders() {
                       const usedColors = colorQtys.map(c => c.color);
                       const availableColors = registeredColors.filter(c => !usedColors.includes(c));
                       return (
-                        <div className="absolute right-0 top-8 z-50 w-48 bg-card border border-border rounded-lg shadow-lg py-1">
+                        <div className="absolute right-0 top-8 z-50 w-48 bg-card border border-border rounded-md shadow-lg py-1">
                           {availableColors.length === 0 && !showCustomColorInput && (
                             <p className="text-xs text-muted-foreground px-3 py-2">등록된 컬러 없음</p>
                           )}
@@ -1756,7 +1756,7 @@ export default function ProductionOrders() {
                 </div>
 
                 {/* ── 공장 발주 섹션 ── */}
-                <div className="rounded-lg border border-border overflow-hidden">
+                <div className="rounded-md border border-border overflow-hidden">
                   <div className="bg-[var(--fill-quaternary)] border-b border-border px-4 py-2 flex items-center gap-2">
                     <Factory className="w-4 h-4 text-primary" />
                     <span className="text-sm font-semibold text-foreground">공장 발주</span>
@@ -1868,7 +1868,7 @@ export default function ProductionOrders() {
                     </div>
                     {/* 총 발주금액 */}
                     {displayTotalAmountKrw > 0 && (
-                      <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+                      <div className="p-3 bg-primary/5 rounded-md border border-primary/20">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-foreground">총 공장 발주금액</span>
                           <span className="text-lg font-bold text-primary font-mono">{formatKRW(displayTotalAmountKrw)}</span>
@@ -1877,7 +1877,7 @@ export default function ProductionOrders() {
                       </div>
                     )}
                     {bomCalc.hasBomWarning && (
-                      <div className="p-3 bg-[var(--system-orange)]/10 rounded-lg border border-[var(--system-orange)]/20 flex items-start gap-2">
+                      <div className="p-3 bg-[var(--system-orange)]/10 rounded-md border border-[var(--system-orange)]/20 flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 text-[var(--system-orange)] shrink-0 mt-0.5" />
                         <div>
                           <p className="text-xs font-semibold text-[var(--system-orange)]">BOM 미등록 — 공장단가 수동 입력 필요</p>
@@ -1987,7 +1987,7 @@ export default function ProductionOrders() {
                   };
 
                   return (
-                    <div className="rounded-lg border border-border overflow-hidden">
+                    <div className="rounded-md border border-border overflow-hidden">
                       <div className="bg-[var(--fill-quaternary)] border-b border-border px-4 py-2 flex items-center gap-2">
                         <span className="text-sm font-semibold text-foreground">리오더 네고</span>
                         <span className="text-xs text-muted-foreground">단가 협상 내역 기록</span>
@@ -2057,7 +2057,7 @@ export default function ProductionOrders() {
 
                         {/* 절감 계산 결과 */}
                         {savedTotal !== 0 && (
-                          <div className={`p-3 rounded-lg border ${savedTotal > 0 ? 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20' : 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20'}`}>
+                          <div className={`p-3 rounded-md border ${savedTotal > 0 ? 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20' : 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20'}`}>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               <div>
                                 <p className="text-muted-foreground">절감 금액 (총)</p>
@@ -2142,7 +2142,7 @@ export default function ProductionOrders() {
 
                 {/* ── 자재 발주 섹션 (본사제공) ── */}
                 {(bomCalc.hqProvided.length > 0 || hqItems.length > 0) && (
-                  <div className="rounded-lg border border-border overflow-hidden">
+                  <div className="rounded-md border border-border overflow-hidden">
                     <div className="bg-[var(--fill-quaternary)] border-b border-border px-4 py-2 flex items-center gap-2">
                       <ShoppingCart className="w-4 h-4 text-primary" />
                       <span className="text-sm font-semibold text-foreground">자재 발주 (본사제공)</span>
@@ -2165,7 +2165,7 @@ export default function ProductionOrders() {
                                 <a
                                   href={materialImagePreview}
                                   download="material-image.jpg"
-                                  className="bg-card/80 hover:bg-card text-foreground text-xs px-3 py-1.5 rounded-lg border border-border flex items-center gap-1 shadow-sm"
+                                  className="bg-card/80 hover:bg-card text-foreground text-xs px-3 py-1.5 rounded-md border border-border flex items-center gap-1 shadow-sm"
                                 >
                                   <Download className="w-3.5 h-3.5" /> 다운로드
                                 </a>
@@ -2297,7 +2297,7 @@ export default function ProductionOrders() {
                   }
                   const sortedCats = CATEGORY_ORDER.filter(c => grouped[c]);
                   return (
-                    <div className="rounded-lg border border-border bg-[var(--fill-quaternary)] overflow-hidden">
+                    <div className="rounded-md border border-border bg-[var(--fill-quaternary)] overflow-hidden">
                       <p className="text-xs font-medium text-muted-foreground px-3 py-2 flex items-center gap-1 border-b border-border bg-[var(--fill-tertiary)]">
                         <CheckCircle2 className="w-3.5 h-3.5 text-muted-foreground" />
                         공장 구매 자재 ({bomCalc.factoryProvided.length}종) — 공장이 직접 구매
@@ -2410,7 +2410,7 @@ export default function ProductionOrders() {
 
       {/* 입고 처리 팝업 */}
       <Dialog open={showReceiveModal} onOpenChange={setShowReceiveModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-md sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-md sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>입고 처리</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">입고 수량과 불량 수량을 입력해주세요.</p>
@@ -2446,7 +2446,7 @@ export default function ProductionOrders() {
       {/* 발주 상세 모달 */}
       {showDetail && (
         <Dialog open={!!showDetail} onOpenChange={() => setShowDetail(null)}>
-          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-lg sm:max-h-[85vh] overflow-y-auto">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-md sm:max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <span className="font-mono">{showDetail.orderNo}</span>
@@ -2522,7 +2522,7 @@ export default function ProductionOrders() {
                       requestedPrice: number; currency: string; savedAmount: number;
                       savedRate: number; memo: string; date: string;
                     }>).map((n, i) => (
-                      <div key={i} className={`p-2.5 rounded-lg border text-xs ${n.savedAmount > 0 ? 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20' : 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20'}`}>
+                      <div key={i} className={`p-2.5 rounded-md border text-xs ${n.savedAmount > 0 ? 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20' : 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20'}`}>
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground font-medium">{n.date}</span>
                           <span className={`font-mono font-bold ${n.savedAmount > 0 ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]'}`}>
@@ -2556,7 +2556,7 @@ export default function ProductionOrders() {
       {/* ── 명세표 발행 모달 ── */}
       {billingTarget && (
         <Dialog open={billingModal} onOpenChange={setBillingModal}>
-          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>명세표 발행 — {billingTarget.orderNo}</DialogTitle>
               <div className="text-xs text-muted-foreground mt-1">
@@ -2568,13 +2568,13 @@ export default function ProductionOrders() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   onClick={() => setBillingMode('new')}
-                  className={`p-3 rounded-lg border text-sm font-medium transition-colors ${billingMode === 'new' ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
+                  className={`p-3 rounded-md border text-sm font-medium transition-colors ${billingMode === 'new' ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
                 >
                   거래명세표 신규 생성
                 </button>
                 <button
                   onClick={() => setBillingMode('link')}
-                  className={`p-3 rounded-lg border text-sm font-medium transition-colors ${billingMode === 'link' ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
+                  className={`p-3 rounded-md border text-sm font-medium transition-colors ${billingMode === 'link' ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
                 >
                   기존 전표에 연결
                 </button>
@@ -2623,7 +2623,7 @@ export default function ProductionOrders() {
                   : [{ color: '기본', qty: billingTarget.qty }];
                 const totalAmt = colorQtyList.reduce((sum, cq) => sum + cq.qty * unitPrice, 0);
                 return (
-                  <div className="p-3 bg-[var(--fill-quaternary)] rounded-lg text-xs text-muted-foreground space-y-1">
+                  <div className="p-3 bg-[var(--fill-quaternary)] rounded-md text-xs text-muted-foreground space-y-1">
                     <p className="font-medium mb-1">생성될 거래명세표</p>
                     <p>발주번호: {billingTarget.orderNo}</p>
                     <p>스타일: {billingTarget.styleNo} — {billingTarget.styleName}</p>
@@ -2651,7 +2651,7 @@ export default function ProductionOrders() {
       {/* ── 작업지시서 모달 (가로 A4 실제 양식) ── */}
       {workOrderTarget && (
         <Dialog open={workOrderModal} onOpenChange={setWorkOrderModal}>
-          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[98vw] sm:h-auto sm:max-w-6xl sm:rounded-lg sm:max-h-[95vh] overflow-y-auto p-4">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[98vw] sm:h-auto sm:max-w-6xl sm:rounded-md sm:max-h-[95vh] overflow-y-auto p-4">
             {/* 인쇄 전용 스타일 */}
             <style>{`
               @media print {
@@ -3019,7 +3019,7 @@ export default function ProductionOrders() {
       {/* ── 발주 완료 후 액션 팝업 ── */}
       {postOrderInfo && (
         <Dialog open={postOrderModal} onOpenChange={setPostOrderModal}>
-          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-lg">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-[var(--system-green)]">
                 <CheckCircle2 className="w-5 h-5" />
@@ -3028,7 +3028,7 @@ export default function ProductionOrders() {
             </DialogHeader>
             <div className="py-3 space-y-3">
               {/* 발주 정보 요약 */}
-              <div className="p-3 bg-[var(--system-green)]/10 border border-[var(--system-green)]/20 rounded-lg">
+              <div className="p-3 bg-[var(--system-green)]/10 border border-[var(--system-green)]/20 rounded-md">
                 <div className="flex items-center gap-2 flex-wrap text-sm">
                   <span className="font-mono font-bold text-foreground">{postOrderInfo.order.styleNo}</span>
                   <span className="text-muted-foreground">{postOrderInfo.order.styleName}</span>
@@ -3040,7 +3040,7 @@ export default function ProductionOrders() {
               <div className="space-y-2">
                 {/* 작업지시서 출력 */}
                 <button
-                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-[var(--fill-quaternary)] text-left transition-colors"
+                  className="w-full flex items-center gap-3 p-3 rounded-md border border-border hover:bg-[var(--fill-quaternary)] text-left transition-colors"
                   onClick={() => {
                     setPostOrderModal(false);
                     openWorkOrderModal(postOrderInfo.order);
@@ -3054,7 +3054,7 @@ export default function ProductionOrders() {
                 </button>
                 {/* 자재 장바구니 자동 저장 안내 */}
                 {postOrderInfo.bomMaterials.length > 0 ? (
-                  <div className="w-full flex items-center gap-3 p-3 rounded-lg border border-primary/20 bg-primary/10 text-left">
+                  <div className="w-full flex items-center gap-3 p-3 rounded-md border border-primary/20 bg-primary/10 text-left">
                     <CheckCircle2 className="w-5 h-5 text-primary" />
                     <div>
                       <p className="text-sm font-semibold text-primary">자재 장바구니 자동 저장 완료</p>
@@ -3062,7 +3062,7 @@ export default function ProductionOrders() {
                     </div>
                   </div>
                 ) : (
-                  <div className="w-full flex items-center gap-3 p-3 rounded-lg border border-border bg-[var(--fill-quaternary)] text-left opacity-60">
+                  <div className="w-full flex items-center gap-3 p-3 rounded-md border border-border bg-[var(--fill-quaternary)] text-left opacity-60">
                     <Package className="w-5 h-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-semibold text-muted-foreground">자재 없음</p>
@@ -3081,7 +3081,7 @@ export default function ProductionOrders() {
 
       {/* ── 자재 통합 발주 장바구니 모달 ── */}
       <Dialog open={cartModal} onOpenChange={setCartModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4 text-primary" />
@@ -3222,7 +3222,7 @@ export default function ProductionOrders() {
 
       {/* ── 거래처별 발주서 출력 모달 ── */}
       <Dialog open={vendorOrderModal} onOpenChange={setVendorOrderModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Printer className="w-4 h-4" />
@@ -3247,7 +3247,7 @@ export default function ProductionOrders() {
                 return <p className="text-center text-muted-foreground py-8">발주가 필요한 자재가 없습니다 (보유재고로 충당 가능)</p>;
               }
               return Array.from(grouped.entries()).map(([vendor, items]) => (
-                <div key={vendor} className="border border-border rounded-lg overflow-hidden">
+                <div key={vendor} className="border border-border rounded-md overflow-hidden">
                   {/* 업체 헤더 */}
                   <div className="bg-[var(--fill-quaternary)] border-b border-border px-4 py-3 flex items-center justify-between">
                     <div>
@@ -3442,7 +3442,7 @@ export default function ProductionOrders() {
                 .map(p => (
                   <div
                     key={p.id}
-                    className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-[var(--fill-quaternary)] cursor-pointer"
+                    className="flex items-center justify-between p-3 border border-border rounded-md hover:bg-[var(--fill-quaternary)] cursor-pointer"
                     onClick={() => handleLinkExpenseToOrder(p.id)}
                   >
                     <div className="space-y-0.5 flex-1 min-w-0">
@@ -3472,7 +3472,7 @@ export default function ProductionOrders() {
 
       {/* ── 입고완료 지출결의 모달 ── */}
       <Dialog open={expenseModal} onOpenChange={setExpenseModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-primary" />
@@ -3560,7 +3560,7 @@ export default function ProductionOrders() {
                 />
               </div>
             </div>
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
+            <div className="bg-primary/5 border border-primary/20 rounded-md p-3 space-y-1">
               <p className="text-xs font-medium text-primary">전표 미리보기</p>
               <p className="text-xs text-muted-foreground">{expenseForm.description}</p>
               <p className="text-sm font-bold text-foreground">{formatKRW(expenseForm.amountKrw)}</p>
@@ -3578,7 +3578,7 @@ export default function ProductionOrders() {
 
       {/* ── 이메일 입력 모달 ── */}
       <Dialog open={emailInputModal} onOpenChange={setEmailInputModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-sm sm:rounded-lg">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-sm sm:rounded-md">
           <DialogHeader>
             <DialogTitle>이메일 주소 입력</DialogTitle>
           </DialogHeader>

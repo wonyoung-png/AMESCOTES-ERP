@@ -113,7 +113,7 @@ export default function ReceivingShipping() {
         ))}
       </div>
 
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
@@ -165,7 +165,7 @@ export default function ReceivingShipping() {
             </SelectContent>
           </Select>
         </div>
-        <div className="bg-card rounded-xl border border-border divide-y divide-border">
+        <div className="bg-card rounded-lg border border-border divide-y divide-border">
           {allLogs.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground text-center">이력 없음</p>
           ) : allLogs.slice(0, 30).map(l => (

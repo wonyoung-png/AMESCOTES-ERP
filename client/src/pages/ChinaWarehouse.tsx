@@ -143,15 +143,15 @@ export default function ChinaWarehouse() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <div className="bg-card rounded-xl border p-4">
+        <div className="bg-card rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">현재고 합계</p>
           <p className="text-2xl font-bold text-foreground">{formatNumber(totalOnHand)}</p>
         </div>
-        <div className="bg-card rounded-xl border p-4">
+        <div className="bg-card rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">SKU·컬러 (재고 보유)</p>
           <p className="text-2xl font-bold text-foreground">{skuCount}</p>
         </div>
-        <div className="bg-card rounded-xl border p-4 col-span-2 md:col-span-1">
+        <div className="bg-card rounded-lg border p-4 col-span-2 md:col-span-1">
           <p className="text-xs text-muted-foreground">입고 경로</p>
           <p className="text-sm text-foreground mt-1">오더관리 → <strong>중국입고</strong> 시 자동 반영</p>
         </div>
@@ -166,7 +166,7 @@ export default function ChinaWarehouse() {
         />
       </div>
 
-      <div className="bg-card rounded-xl border overflow-hidden">
+      <div className="bg-card rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">현재고 (품목 · 컬러)</div>
         <table className="w-full text-sm">
           <thead className="text-[13px] font-semibold text-muted-foreground">
@@ -210,7 +210,7 @@ export default function ChinaWarehouse() {
         </table>
       </div>
 
-      <div className="bg-card rounded-xl border overflow-hidden">
+      <div className="bg-card rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">입출고 이력</div>
         <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
           {moves.length === 0 ? (

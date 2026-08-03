@@ -249,7 +249,7 @@ export function PackBomEditor({ lines, materials, onChange, compact }: PackBomEd
   const total = packLinesTotal(lines);
 
   return (
-    <div className={`space-y-3 ${compact ? '' : 'rounded-xl border border-border bg-card p-4'}`}>
+    <div className={`space-y-3 ${compact ? '' : 'rounded-lg border border-border bg-card p-4'}`}>
       {!compact && (
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground">
           <span>
@@ -261,7 +261,7 @@ export function PackBomEditor({ lines, materials, onChange, compact }: PackBomEd
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="overflow-x-auto rounded-md border border-border bg-card">
         <table className="w-full text-xs">
           <thead className="text-[13px] font-semibold text-muted-foreground border-b border-border">
             <tr>

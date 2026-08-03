@@ -129,7 +129,7 @@ export default function DocumentOutput() {
               className={`border-border cursor-pointer transition-all ${selectedDoc === doc.id ? 'ring-2 ring-primary border-primary' : 'hover:border-primary/50'}`}
               onClick={() => setSelectedDoc(doc.id)}>
               <CardContent className="p-4 flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedDoc === doc.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                <div className={`w-10 h-10 rounded-md flex items-center justify-center ${selectedDoc === doc.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                   <FileText size={18} />
                 </div>
                 <div>

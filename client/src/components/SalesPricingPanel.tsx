@@ -24,7 +24,7 @@ export function SalesPricingPanel({ costKrw, pnl, onPatch }: Props) {
   const discountPct = Math.round((pnl.wholesaleDiscountRate ?? sp.wholesaleDiscountRate) * 1000) / 10;
 
   return (
-    <div className="bg-[var(--fill-quaternary)] rounded-lg p-4 border border-border space-y-4">
+    <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border space-y-4">
       <div>
         <h3 className="text-xs font-semibold text-muted-foreground">세일즈 가격 확정</h3>
         <p className="text-[11px] text-muted-foreground mt-0.5">

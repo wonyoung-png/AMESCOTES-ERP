@@ -1925,7 +1925,7 @@ export default function ItemMaster() {
     <div className="p-6 space-y-5">
       {/* 원가 일괄수정 저장 바 — 변경된 품목이 있을 때만 노출 */}
       {dirtyCostIds.size > 0 && (
-        <div className="fixed bottom-6 right-8 z-50 flex items-center gap-3 bg-card border border-border shadow-xl rounded-lg px-4 py-3">
+        <div className="fixed bottom-6 right-8 z-50 flex items-center gap-3 bg-card border border-border shadow-xl rounded-md px-4 py-3">
           <span className="text-sm text-foreground">{dirtyCostIds.size}개 품목 원가 변경됨</span>
           <button onClick={() => { setCostEdits({}); setPackEdits({}); }} disabled={savingCosts}
             className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 disabled:opacity-40">취소</button>
@@ -2014,7 +2014,7 @@ export default function ItemMaster() {
                 // PACK 탭: 시즌 필터 때문에 목록이 비지 않도록
                 if (tab.key === 'PACK') setFilterSeason('전체');
               }}
-              className={`rounded-xl border p-3 text-center transition-all cursor-pointer ${selected ? tab.active : tab.idle}`}
+              className={`rounded-lg border p-3 text-center transition-all cursor-pointer ${selected ? tab.active : tab.idle}`}
             >
               <p className={`text-xl font-bold ${tab.num}`}>{tab.count}</p>
               <p className={`text-xs mt-0.5 ${tab.sub}`}>{tab.label}</p>
@@ -2030,7 +2030,7 @@ export default function ItemMaster() {
 
       {/* 품목목록 / 누적생산량 */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
+        <div className="inline-flex rounded-md border border-border bg-card p-0.5">
           <button
             type="button"
             onClick={() => setListTab('items')}
@@ -2091,7 +2091,7 @@ export default function ItemMaster() {
             </Select>
             <button
               onClick={resetFilters}
-              className="h-9 px-3 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-[var(--fill-quaternary)] flex items-center gap-1.5 whitespace-nowrap"
+              className="h-9 px-3 rounded-md border border-border text-xs font-medium text-muted-foreground hover:bg-[var(--fill-quaternary)] flex items-center gap-1.5 whitespace-nowrap"
             >
               <X size={13} />필터 초기화
               {activeFilterCount > 0 && (
@@ -2131,7 +2131,7 @@ export default function ItemMaster() {
             </Select>
             <button
               onClick={() => setFilterNoBom(v => !v)}
-              className={`h-9 px-3 rounded-lg border text-xs font-medium transition-colors ${filterNoBom ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
+              className={`h-9 px-3 rounded-md border text-xs font-medium transition-colors ${filterNoBom ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
             >
               BOM 미작성 {filterNoBom && `(${items.filter(i => !i.hasBom).length}건)`}
             </button>
@@ -2141,41 +2141,41 @@ export default function ItemMaster() {
 
       {/* 다중 선택 액션 바 */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-xl">
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-lg">
           <span className="text-sm font-medium text-foreground">{selectedIds.size}개 선택됨</span>
           <button
             onClick={handleBulkOrder}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md text-xs font-medium transition-colors"
           >
             <Package className="w-4 h-4" />선택 발주
           </button>
           <button
             onClick={openBatchCostUpload}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/15 hover:bg-primary/20 text-primary rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/15 hover:bg-primary/20 text-primary rounded-md text-xs font-medium transition-colors"
           >
             <Factory className="w-4 h-4" />공장 원가표 업로드
           </button>
           <button
             onClick={downloadSelectedItemsExcel}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-md text-xs font-medium transition-colors"
           >
             <Download size={13} />엑셀 다운로드
           </button>
           <button
             onClick={handleBulkDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-md text-xs font-medium transition-colors"
           >
             <Trash2 className="w-4 h-4" />선택 삭제
           </button>
           <button
             onClick={() => setShowSelectedOnly(v => !v)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${showSelectedOnly ? 'bg-primary/15 text-primary hover:bg-primary/20' : 'bg-[var(--fill-tertiary)] text-foreground hover:bg-[var(--fill-secondary)]'}`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${showSelectedOnly ? 'bg-primary/15 text-primary hover:bg-primary/20' : 'bg-[var(--fill-tertiary)] text-foreground hover:bg-[var(--fill-secondary)]'}`}
           >
             {showSelectedOnly ? '선택만 보기 ON' : '선택만 보기'}
           </button>
           <button
             onClick={() => { setSelectedIds(new Set()); setShowSelectedOnly(false); }}
-            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-md text-xs font-medium transition-colors"
           >
             선택 해제
           </button>
@@ -2184,7 +2184,7 @@ export default function ItemMaster() {
 
       {/* 테이블 */}
       {listTab === 'items' ? (
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="text-sm table-fixed w-full" style={{ minWidth: 40 + 70 + ITEM_COLUMN_DEFS.filter(c => showCol(c.key)).reduce((s, c) => s + (colWidths[c.key] || 80), 0) }}>
             <colgroup>
@@ -2395,11 +2395,11 @@ export default function ItemMaster() {
                           <HoverZoomImage
                             src={item.imageUrl}
                             alt={item.name}
-                            className="w-10 h-10 rounded-lg border border-border overflow-hidden cursor-zoom-in"
+                            className="w-10 h-10 rounded-md border border-border overflow-hidden cursor-zoom-in"
                             imgClassName="w-10 h-10 object-cover"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-lg bg-[var(--fill-tertiary)] border border-border flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-md bg-[var(--fill-tertiary)] border border-border flex items-center justify-center">
                             <Package size={16} className="text-muted-foreground" />
                           </div>
                         )}
@@ -2741,7 +2741,7 @@ export default function ItemMaster() {
         </div>
       </div>
       ) : (
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <div className="px-4 py-3 border-b border-border bg-[var(--fill-quaternary)] flex flex-wrap items-center gap-2">
           <Factory size={16} className="text-muted-foreground" />
           <span className="text-sm font-semibold text-foreground">스타일별 누적생산량</span>
@@ -2837,7 +2837,7 @@ export default function ItemMaster() {
                       <tr className="bg-[var(--fill-quaternary)] border-t border-border">
                         <td colSpan={9} className="px-4 py-3">
                           <p className="text-[11px] font-semibold text-muted-foreground mb-2">발주 상세 (누적 {st.orderCount}차)</p>
-                          <div className="rounded-lg border border-border overflow-hidden bg-card">
+                          <div className="rounded-md border border-border overflow-hidden bg-card">
                             <table className="w-full text-xs">
                               <thead>
                                 <tr className="bg-[var(--fill-quaternary)] text-muted-foreground">
@@ -2959,7 +2959,7 @@ export default function ItemMaster() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="rounded-xl border border-border overflow-hidden">
+            <div className="rounded-lg border border-border overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[var(--fill-quaternary)] border-b border-border">
@@ -3017,7 +3017,7 @@ export default function ItemMaster() {
 
           <div className="space-y-5">
             {/* 스타일번호 자동생성 */}
-            <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-3">
+            <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Wand2 size={15} className="text-primary" />
@@ -3053,11 +3053,11 @@ export default function ItemMaster() {
                 </div>
               </div>
               {!manualStyleNo ? (
-                <div className="flex items-center gap-2 p-2.5 bg-card border border-primary/20 rounded-lg">
+                <div className="flex items-center gap-2 p-2.5 bg-card border border-primary/20 rounded-md">
                   {previewStyleNo ? (
                     <>
                       <span className="text-xs text-muted-foreground">예상 품번:</span>
-                      <span className="font-mono font-bold text-primary text-base tracking-widest">{previewStyleNo}</span>
+                      <span className="font-mono font-bold text-primary text-base">{previewStyleNo}</span>
                     </>
                   ) : (
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -3176,7 +3176,7 @@ export default function ItemMaster() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {editItem.erpCategory === 'PACK' ? (
-                  <div className="space-y-1.5 col-span-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
+                  <div className="space-y-1.5 col-span-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
                     PACK는 자재마스터(포장재)에서 구성품을 선택하면 <b>전체원가가 자동 합산</b>됩니다. 사전/사후원가 없음.
                   </div>
                 ) : null}
@@ -3222,7 +3222,7 @@ export default function ItemMaster() {
                   : (hasBom && styleNo ? store.getBomTotalCost(styleNo) : 0);
                 const showByColor = colorCosts.length > 0 && (colorCosts.length > 1 || !['기본', '전체'].includes(colorCosts[0].color));
                 return (
-                  <div className={`p-3 rounded-lg border ${hasBom && bomCostVal > 0 ? 'bg-primary/5 border-primary/20' : 'bg-[var(--fill-quaternary)] border-border'}`}>
+                  <div className={`p-3 rounded-md border ${hasBom && bomCostVal > 0 ? 'bg-primary/5 border-primary/20' : 'bg-[var(--fill-quaternary)] border-border'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <span className="text-xs font-medium text-muted-foreground">BOM 원가:</span>
@@ -3285,7 +3285,7 @@ export default function ItemMaster() {
                 if (rate === null) return null;
                 const bgClass = rate >= 30 ? 'bg-success/10 border-success/20' : rate >= 15 ? 'bg-warning/10 border-warning/20' : 'bg-destructive/10 border-destructive/20';
                 return (
-                  <div className={`p-3 rounded-lg border ${bgClass}`}>
+                  <div className={`p-3 rounded-md border ${bgClass}`}>
                     <div className="flex items-center gap-6">
                       <div>
                         <p className="text-xs text-muted-foreground">마진금액</p>
@@ -3325,9 +3325,9 @@ export default function ItemMaster() {
                 <Button type="button" variant="outline" size="sm" onClick={addColor} className="h-9 px-3">추가</Button>
               </div>
               {normalizeColors(editItem.colors || []).length > 0 && (
-                <div className="space-y-2 p-2 bg-[var(--fill-quaternary)] rounded-lg border border-border">
+                <div className="space-y-2 p-2 bg-[var(--fill-quaternary)] rounded-md border border-border">
                   {normalizeColors(editItem.colors || []).map((c, idx) => (
-                    <div key={idx} className="bg-card border border-border rounded-lg overflow-hidden">
+                    <div key={idx} className="bg-card border border-border rounded-md overflow-hidden">
                       {/* 컬러 헤더 */}
                       <div className="flex items-center justify-between px-3 py-2">
                         <button
@@ -3430,7 +3430,7 @@ export default function ItemMaster() {
               <Label>대표 이미지</Label>
               <div className="flex items-center gap-3">
                 <div
-                  className="w-20 h-20 rounded-xl border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
+                  className="w-20 h-20 rounded-lg border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
                   onClick={() => imageFileRef.current?.click()}
                 >
                   {editItem.imageUrl ? (
@@ -3507,7 +3507,7 @@ export default function ItemMaster() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex items-center gap-4 px-1 py-2 bg-[var(--fill-quaternary)] rounded-lg text-sm">
+          <div className="flex items-center gap-4 px-1 py-2 bg-[var(--fill-quaternary)] rounded-md text-sm">
             <span className="flex items-center gap-1.5 text-[var(--system-green)]">
               <CheckCircle2 size={14} />
               신규 {excelPreviewItems.filter(p => !p.isDuplicate).length}개
@@ -4017,7 +4017,7 @@ function MultiBulkOrderModal({
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="p-3 bg-success/10 border border-success/20 rounded-xl">
+            <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
               <p className="text-sm font-medium text-success mb-2">
                 {postOrderState.orders.length}건 발주가 등록되었습니다
               </p>
@@ -4032,7 +4032,7 @@ function MultiBulkOrderModal({
               </ul>
             </div>
             {postOrderState.hqMaterialSummary.length > 0 && (
-              <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
                 <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
                   <ShoppingCart size={13} />본사제공 자재 장바구니 담김
                 </p>
@@ -4111,7 +4111,7 @@ function MultiBulkOrderModal({
           {/* 품목별 설정 */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold text-foreground">품목별 컬러 · 수량 설정</Label>
-            <div className="border border-border rounded-xl overflow-hidden divide-y divide-border">
+            <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
               {itemStates.map(state => (
                 <BulkOrderItemRow
                   key={state.item.id}
@@ -4134,7 +4134,7 @@ function MultiBulkOrderModal({
                 <ShoppingCart size={14} className="text-primary" />
                 본사제공 자재 통합 발주 (자동 합산)
               </Label>
-              <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl space-y-1.5">
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-1.5">
                 {hqMaterialPreview.map((m, idx) => (
                   <div key={idx} className="flex items-center gap-2 text-sm">
                     <span className="text-foreground font-medium">{m.materialName}</span>
@@ -4219,12 +4219,12 @@ function BulkOrderItemRow({
           <HoverZoomImage
             src={state.item.imageUrl}
             alt={state.item.name}
-            className="w-8 h-8 rounded-lg border border-border overflow-hidden cursor-zoom-in"
+            className="w-8 h-8 rounded-md border border-border overflow-hidden cursor-zoom-in"
             imgClassName="w-8 h-8 object-cover"
             previewSize={280}
           />
         ) : (
-          <div className="w-8 h-8 rounded-lg bg-[var(--fill-tertiary)] border border-border flex items-center justify-center">
+          <div className="w-8 h-8 rounded-md bg-[var(--fill-tertiary)] border border-border flex items-center justify-center">
             <Package size={12} className="text-muted-foreground" />
           </div>
         )}
@@ -4246,7 +4246,7 @@ function BulkOrderItemRow({
             {state.colorQtys.map(cq => {
               const isOpen = openDetails.has(cq.color);
               return (
-                <div key={cq.color} className="border border-border rounded-lg overflow-hidden">
+                <div key={cq.color} className="border border-border rounded-md overflow-hidden">
                   {/* 컬러 메인 행 */}
                   <div className="flex items-center gap-2 px-2 py-1.5 bg-[var(--fill-quaternary)]">
                     <span className="text-xs px-2 py-1 bg-card text-foreground rounded border border-border font-medium w-24 truncate">{cq.color}</span>

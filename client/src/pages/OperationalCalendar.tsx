@@ -214,7 +214,7 @@ export default function OperationalCalendar() {
 
       {/* 뷰 전환: 연간 · 반기 · 분기 · 월 · 주 · 일 */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex bg-muted rounded-lg p-1 gap-0.5">
+        <div className="flex bg-muted rounded-md p-1 gap-0.5">
           {VIEW_MODES.map(v => (
             <Button
               key={v}
@@ -227,7 +227,7 @@ export default function OperationalCalendar() {
             </Button>
           ))}
         </div>
-        <div className="flex items-center gap-1 border rounded-lg p-1">
+        <div className="flex items-center gap-1 border rounded-md p-1">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => shift(-1)}><ChevronLeft className="w-4 h-4" /></Button>
           <span className="text-sm font-semibold min-w-[140px] text-center">{period}</span>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => shift(1)}><ChevronRight className="w-4 h-4" /></Button>
@@ -243,7 +243,7 @@ export default function OperationalCalendar() {
       <p className="text-xs text-muted-foreground">{hint}</p>
 
       {/* 타임라인 */}
-      <div className="bg-card rounded-xl border border-border overflow-x-auto">
+      <div className="bg-card rounded-lg border border-border overflow-x-auto">
         <div style={{ minWidth: 120 + (bands[0]?.cols.length || 1) * colWidth }}>
           {bands.map((band, i) => renderBand(band, i))}
         </div>
@@ -256,7 +256,7 @@ export default function OperationalCalendar() {
             key={c.id}
             type="button"
             onClick={() => setSelected(c)}
-            className="text-left bg-card border border-border rounded-xl p-4 hover:border-primary transition-colors"
+            className="text-left bg-card border border-border rounded-lg p-4 hover:border-primary transition-colors"
           >
             <div className="flex justify-between items-start gap-2">
               <span className="font-medium text-sm">{c.title}</span>

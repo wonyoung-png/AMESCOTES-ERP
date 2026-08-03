@@ -534,7 +534,7 @@ export default function PurchaseMatching() {
           {/* 자재 장바구니 버튼 */}
           <button
             onClick={() => { refreshCart(); setCartModal(true); }}
-            className="relative px-3 py-2 rounded-lg border border-transparent text-xs font-medium text-primary bg-primary/15 hover:bg-primary/20 transition-colors flex items-center gap-1.5"
+            className="relative px-3 py-2 rounded-md border border-transparent text-xs font-medium text-primary bg-primary/15 hover:bg-primary/20 transition-colors flex items-center gap-1.5"
           >
             <ShoppingCart className="w-3.5 h-3.5" />
             자재 장바구니
@@ -557,7 +557,7 @@ export default function PurchaseMatching() {
           { label: '총 구매금액', value: formatKRW(stats.totalKrw), color: 'text-foreground' },
           { label: '전표 연결됨', value: `${stats.linked}건`, color: 'text-[var(--system-green)]' },
         ].map(s => (
-          <div key={s.label} className="bg-card rounded-xl border border-border p-4">
+          <div key={s.label} className="bg-card rounded-lg border border-border p-4">
             <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
@@ -579,7 +579,7 @@ export default function PurchaseMatching() {
         )}
       </div>
 
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
@@ -899,7 +899,7 @@ export default function PurchaseMatching() {
 
       {/* ── 자재 장바구니 모달 ── */}
       <Dialog open={cartModal} onOpenChange={setCartModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4 text-primary" />
@@ -1049,7 +1049,7 @@ export default function PurchaseMatching() {
 
       {/* ── 거래처별 발주서 모달 ── */}
       <Dialog open={vendorOrderModal} onOpenChange={setVendorOrderModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Printer className="w-4 h-4" />
@@ -1072,7 +1072,7 @@ export default function PurchaseMatching() {
                 return <p className="text-center text-muted-foreground py-8">발주가 필요한 자재가 없습니다 (보유재고로 충당 가능)</p>;
               }
               return Array.from(grouped.entries()).map(([vendor, items]) => (
-                <div key={vendor} className="border border-border rounded-lg overflow-hidden">
+                <div key={vendor} className="border border-border rounded-md overflow-hidden">
                   <div className="bg-[var(--fill-quaternary)] border-b border-border px-4 py-3 flex items-center justify-between">
                     <div>
                       <p className="font-bold text-base text-foreground">{vendor === '미지정' ? '구매처 미지정' : vendor}</p>
@@ -1256,7 +1256,7 @@ export default function PurchaseMatching() {
 
       {/* ── 이메일 입력 모달 ── */}
       <Dialog open={emailInputModal} onOpenChange={setEmailInputModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-sm sm:rounded-lg">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-sm sm:rounded-md">
           <DialogHeader>
             <DialogTitle>이메일 주소 입력</DialogTitle>
           </DialogHeader>
@@ -1385,7 +1385,7 @@ export default function PurchaseMatching() {
             </div>
 
             {/* 미리보기 */}
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
+            <div className="bg-primary/5 border border-primary/20 rounded-md p-3 space-y-1">
               <p className="text-xs font-medium text-primary">전표 미리보기</p>
               <p className="text-xs text-muted-foreground">{expenseForm.description}</p>
               <p className="text-sm font-bold text-foreground">{formatKRW(expenseForm.amountKrw)}</p>
@@ -1431,7 +1431,7 @@ export default function PurchaseMatching() {
                 .map(p => (
                   <div
                     key={p.id}
-                    className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-[var(--fill-quaternary)] cursor-pointer"
+                    className="flex items-center justify-between p-3 border border-border rounded-md hover:bg-[var(--fill-quaternary)] cursor-pointer"
                     onClick={() => handleLinkExpense(p.id)}
                   >
                     <div className="space-y-0.5 flex-1 min-w-0">
@@ -1524,7 +1524,7 @@ export default function PurchaseMatching() {
                 </tbody>
               </table>
             </div>
-            <div className="p-2 bg-primary/10 rounded-lg text-xs text-primary">
+            <div className="p-2 bg-primary/10 rounded-md text-xs text-primary">
               총 {bulkEditItems.length}종 · 합계 {formatKRW(bulkEditItems.reduce((s, i) => s + i.amountKrw, 0))}
             </div>
           </div>
@@ -1550,7 +1550,7 @@ export default function PurchaseMatching() {
           </DialogHeader>
           {justCreatedPayable && (
             <div className="space-y-3 py-2">
-              <div className="bg-[var(--fill-quaternary)] rounded-lg p-3 text-sm space-y-1">
+              <div className="bg-[var(--fill-quaternary)] rounded-md p-3 text-sm space-y-1">
                 <p><span className="text-muted-foreground text-xs">내용</span></p>
                 <p className="font-medium text-foreground">{justCreatedPayable.memo}</p>
                 <p className="text-muted-foreground">{justCreatedPayable.dueDate} · {justCreatedPayable.status}</p>
@@ -1677,7 +1677,7 @@ function ExpenseDetailInlineModal({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 py-2">
-          <div className="grid grid-cols-2 gap-3 text-sm bg-[var(--fill-quaternary)] rounded-lg p-3">
+          <div className="grid grid-cols-2 gap-3 text-sm bg-[var(--fill-quaternary)] rounded-md p-3">
             <div>
               <span className="text-muted-foreground text-xs">전표번호</span>
               <p className="font-mono font-bold text-primary">{expenseNo}</p>
@@ -1704,7 +1704,7 @@ function ExpenseDetailInlineModal({
             </div>
           </div>
 
-          <div className="border border-border rounded-lg overflow-hidden">
+          <div className="border border-border rounded-md overflow-hidden">
             <div className="bg-[var(--fill-quaternary)] px-4 py-2 flex items-center justify-between border-b border-border">
               <p className="text-xs font-medium text-muted-foreground">품목/내역</p>
               <Button size="sm" variant="outline" onClick={addDetailLine} className="h-7 text-xs gap-1">
@@ -1776,7 +1776,7 @@ function ExpenseDetailInlineModal({
             </table>
           </div>
 
-          <div className="bg-[var(--fill-quaternary)] rounded-lg p-3 space-y-1.5 text-sm">
+          <div className="bg-[var(--fill-quaternary)] rounded-md p-3 space-y-1.5 text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>공급가액</span>
               <span className="font-mono">{formatKRW(supplyAmount)}</span>

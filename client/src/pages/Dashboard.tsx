@@ -223,7 +223,7 @@ export default function Dashboard() {
       {/* ── 메인 2단 레이아웃 ── */}
       <div className="grid grid-cols-5 gap-4">
         {/* 좌측 60% — 납기 위험 현황 */}
-        <div className="col-span-3 bg-card rounded-xl border border-border p-5">
+        <div className="col-span-3 bg-card rounded-lg border border-border p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-[var(--system-red)]" />
@@ -236,15 +236,15 @@ export default function Dashboard() {
 
           {/* 요약 배지 */}
           <div className="flex gap-2 mb-4">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--system-red)]/10 border border-[var(--system-red)]/20">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--system-red)]/10 border border-[var(--system-red)]/20">
               <span className="text-[var(--system-red)] text-xs font-bold">D-1 이하</span>
               <span className="text-[var(--system-red)] font-bold text-sm">{deadlineRisk.critical.length}</span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--system-orange)]/10 border border-[var(--system-orange)]/20">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--system-orange)]/10 border border-[var(--system-orange)]/20">
               <span className="text-[var(--system-orange)] text-xs font-bold">D-7 이내</span>
               <span className="text-[var(--system-orange)] font-bold text-sm">{deadlineRisk.warning.length}</span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--system-green)]/10 border border-[var(--system-green)]/20">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--system-green)]/10 border border-[var(--system-green)]/20">
               <span className="text-[var(--system-green)] text-xs font-bold">정상</span>
               <span className="text-[var(--system-green)] font-bold text-sm">{deadlineRisk.normal.length}</span>
             </div>
@@ -255,7 +255,7 @@ export default function Dashboard() {
             {deadlineRisk.all.length === 0 ? (
               <p className="text-xs text-muted-foreground py-6 text-center">납기 위험 발주가 없습니다</p>
             ) : deadlineRisk.all.slice(0, 8).map(o => (
-              <div key={o.id} className={`flex items-center justify-between py-2 px-3 rounded-lg border ${
+              <div key={o.id} className={`flex items-center justify-between py-2 px-3 rounded-md border ${
                 o.dday! <= 1 ? 'bg-[var(--fill-quaternary)] border-[var(--system-red)]/30' :
                 o.dday! <= 7 ? 'bg-[var(--fill-quaternary)] border-[var(--system-orange)]/30' :
                 'bg-[var(--fill-quaternary)] border-border'
@@ -278,7 +278,7 @@ export default function Dashboard() {
         {/* 우측 40% */}
         <div className="col-span-2 space-y-4">
           {/* 자재 입고 대기 */}
-          <div className="bg-card rounded-xl border border-border p-4">
+          <div className="bg-card rounded-lg border border-border p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <ShoppingCart className="w-3.5 h-3.5 text-muted-foreground" />자재 입고 대기
@@ -303,7 +303,7 @@ export default function Dashboard() {
           </div>
 
           {/* 미청구 샘플 */}
-          <div className="bg-card rounded-xl border border-border p-4">
+          <div className="bg-card rounded-lg border border-border p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <FlaskConical className="w-3.5 h-3.5 text-primary" />미청구 샘플
@@ -332,7 +332,7 @@ export default function Dashboard() {
       {/* ── 하단 2단 ── */}
       <div className="grid grid-cols-2 gap-4">
         {/* 오더 파이프라인 */}
-        <div className="bg-card rounded-xl border border-border p-5">
+        <div className="bg-card rounded-lg border border-border p-5">
           <h3 className="text-sm font-semibold text-foreground mb-4">전체 오더 파이프라인</h3>
           <div className="space-y-2.5">
             {pipeline.map(stage => (
@@ -351,7 +351,7 @@ export default function Dashboard() {
         </div>
 
         {/* 이달 청구 / 연체 미수금 */}
-        <div className="bg-card rounded-xl border border-border p-5">
+        <div className="bg-card rounded-lg border border-border p-5">
           <h3 className="text-sm font-semibold text-foreground mb-3">월별 OEM 청구 추이</h3>
           {monthlyBillingData.length === 0 ? (
             <div className="h-[140px] flex items-center justify-center text-muted-foreground text-sm">
@@ -393,7 +393,7 @@ export default function Dashboard() {
         </div>
       </div>
       {/* ── 샘플자재구매 ── */}
-      <div className="bg-card rounded-xl border border-border p-5">
+      <div className="bg-card rounded-lg border border-border p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <PackageSearch className="w-4 h-4 text-primary" />
@@ -416,14 +416,14 @@ export default function Dashboard() {
               <button
                 key={s.id}
                 onClick={() => setSelectedSample(s)}
-                className="w-full text-left flex items-center justify-between py-2 px-3 rounded-lg border border-border hover:bg-muted transition-colors group"
+                className="w-full text-left flex items-center justify-between py-2 px-3 rounded-md border border-border hover:bg-muted transition-colors group"
               >
                 <div className="flex items-center gap-3">
                   {/* 썸네일 */}
                   {(s.imageUrls || []).length > 0 ? (
-                    <img src={s.imageUrls[0]} alt={s.styleNo} className="w-10 h-10 object-cover rounded-lg border border-border shrink-0" />
+                    <img src={s.imageUrls[0]} alt={s.styleNo} className="w-10 h-10 object-cover rounded-md border border-border shrink-0" />
                   ) : (
-                    <div className="w-10 h-10 rounded-lg bg-muted border border-border flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-md bg-muted border border-border flex items-center justify-center shrink-0">
                       <Camera className="w-4 h-4 text-muted-foreground" />
                     </div>
                   )}
@@ -455,7 +455,7 @@ export default function Dashboard() {
       {/* 샘플 접수 상세 모달 */}
       {selectedSample && (
         <Dialog open={!!selectedSample} onOpenChange={() => setSelectedSample(null)}>
-          <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 flex-wrap">
                 <span>{selectedSample.styleNo}</span>
@@ -469,7 +469,7 @@ export default function Dashboard() {
 
             <div className="space-y-4 py-2 text-sm">
               {/* 기본 정보 */}
-              <div className="grid grid-cols-2 gap-2 p-3 bg-muted rounded-lg text-xs">
+              <div className="grid grid-cols-2 gap-2 p-3 bg-muted rounded-md text-xs">
                 <div><span className="text-muted-foreground">의뢰일:</span> <span className="text-foreground font-medium">{selectedSample.requestDate}</span></div>
                 <div><span className="text-muted-foreground">목표완료:</span> <span className="text-foreground font-medium">{selectedSample.expectedDate || '—'}</span></div>
                 <div><span className="text-muted-foreground">장소:</span> <span className="text-foreground font-medium">{selectedSample.location || '—'}</span></div>
@@ -492,7 +492,7 @@ export default function Dashboard() {
                         key={idx}
                         src={url}
                         alt={`이미지 ${idx + 1}`}
-                        className="w-16 h-16 object-cover rounded-lg border border-border cursor-pointer hover:opacity-80"
+                        className="w-16 h-16 object-cover rounded-md border border-border cursor-pointer hover:opacity-80"
                         onClick={() => {
                           try {
                             window.open(url, '_blank', 'noopener,noreferrer');
@@ -513,7 +513,7 @@ export default function Dashboard() {
               {/* 자재 요청 목록 */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-2">자재 요청 목록</p>
-                <div className="rounded-lg border border-border overflow-hidden">
+                <div className="rounded-md border border-border overflow-hidden">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="bg-muted border-b border-border">
@@ -547,7 +547,7 @@ export default function Dashboard() {
                     {(selectedSample.documents || []).map((doc, idx) => (
                       <button
                         key={idx}
-                        className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg border border-border hover:bg-muted"
+                        className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-md border border-border hover:bg-muted"
                         onClick={() => window.open(doc.url, '_blank')}
                       >
                         <DocIconSmall fileType={doc.fileType} />
@@ -600,11 +600,11 @@ export default function Dashboard() {
 
         if (feedItems.length === 0) return null;
         return (
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className="bg-card rounded-lg border border-border p-5">
             <h3 className="text-sm font-semibold text-foreground mb-3">최근 활동</h3>
             <div className="space-y-2">
               {feedItems.map((item, i) => (
-                <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${item.color}`}>
+                <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-md border ${item.color}`}>
                   <div>
                     <p className="text-xs font-medium text-foreground">{item.label}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">{item.sub}</p>
@@ -624,9 +624,9 @@ function KpiCard({ icon, bg, label, value, sub }: {
   icon: React.ReactNode; bg: string; label: string; value: string; sub: React.ReactNode;
 }) {
   return (
-    <div className="bg-card rounded-xl border border-border p-4">
+    <div className="bg-card rounded-lg border border-border p-4">
       <div className="flex items-start justify-between mb-3">
-        <div className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center`}>{icon}</div>
+        <div className={`w-8 h-8 rounded-md ${bg} flex items-center justify-center`}>{icon}</div>
       </div>
       <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
       <p className="text-lg font-bold text-foreground leading-tight">{value}</p>

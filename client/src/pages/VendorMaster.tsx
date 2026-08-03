@@ -637,7 +637,7 @@ export default function VendorMaster() {
       {/* 유형별 통계 */}
       <div className="grid grid-cols-6 gap-3">
         {VENDOR_TYPES.map(t => (
-          <div key={t} className="bg-card rounded-xl border border-border p-3">
+          <div key={t} className="bg-card rounded-lg border border-border p-3">
             <p className="text-xl font-bold text-foreground">{typeCounts[t] || 0}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{t}</p>
           </div>
@@ -645,12 +645,12 @@ export default function VendorMaster() {
       </div>
 
       {/* 유형 탭 필터 */}
-      <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-xl w-fit">
+      <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-lg w-fit">
         {(['all', ...VENDOR_TYPES] as const).map(t => (
           <button
             key={t}
             onClick={() => { setFilterType(t); setFilterMaterialType('all'); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
               filterType === t
                 ? 'bg-card text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
@@ -668,12 +668,12 @@ export default function VendorMaster() {
       {filterType === '자재거래처' && (
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">자재 유형:</span>
-          <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-xl w-fit">
+          <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-lg w-fit">
             {(['all', ...MATERIAL_TYPE_OPTIONS] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setFilterMaterialType(t)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
                   filterMaterialType === t
                     ? 'bg-card text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
@@ -694,17 +694,17 @@ export default function VendorMaster() {
 
       {/* 다중 선택 액션 바 */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-xl">
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-card border border-border rounded-lg">
           <span className="text-sm font-medium text-foreground">{selectedIds.size}개 선택됨</span>
           <button
             onClick={handleBulkDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-md text-xs font-medium transition-colors"
           >
             <Trash2 className="w-4 h-4" />선택 삭제
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
-            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--fill-tertiary)] hover:bg-[var(--fill-secondary)] text-foreground rounded-md text-xs font-medium transition-colors"
           >
             선택 해제
           </button>
@@ -712,7 +712,7 @@ export default function VendorMaster() {
       )}
 
       {/* 테이블 */}
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
@@ -862,7 +862,7 @@ export default function VendorMaster() {
           <div className="space-y-5 py-2">
 
             {/* 사업자등록증 / 거래처정보 업로드 */}
-            <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+            <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-md">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -889,7 +889,7 @@ export default function VendorMaster() {
             </div>
 
             {/* 코드 + 회사명 섹션 */}
-            <div className="p-3 bg-[var(--fill-quaternary)] border border-border rounded-lg">
+            <div className="p-3 bg-[var(--fill-quaternary)] border border-border rounded-md">
               <p className="text-xs font-medium text-muted-foreground mb-3">식별 정보</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -899,7 +899,7 @@ export default function VendorMaster() {
                     onChange={e => updateCode('code', e.target.value, 2)}
                     placeholder="AT"
                     maxLength={2}
-                    className="w-28 font-mono uppercase text-center font-bold tracking-widest"
+                    className="w-28 font-mono uppercase text-center font-bold"
                   />
                   <p className="text-[11px] text-muted-foreground">예: 202603-LLL-001 / AT2603HB01</p>
                 </div>
@@ -977,7 +977,7 @@ export default function VendorMaster() {
                             : [...current, mt];
                           update('materialTypes', next);
                         }}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
                           isSelected
                             ? 'bg-primary text-primary-foreground border-primary'
                             : 'bg-card text-muted-foreground border-border hover:border-primary/40'
@@ -1042,7 +1042,7 @@ export default function VendorMaster() {
             </div>
 
             {/* 계산서 발행 이메일 */}
-            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-md space-y-2">
               <p className="text-xs font-medium text-primary">계산서 / 세금계산서 발행 정보</p>
               <div className="space-y-1.5">
                 <Label className="text-xs">세금계산서 수신 이메일 <span className="text-muted-foreground font-normal">(담당자 이메일과 다를 경우 별도 입력)</span></Label>
@@ -1060,7 +1060,7 @@ export default function VendorMaster() {
 
             {/* 해외공장 계좌정보 섹션 (해외공장 유형일 때만 표시) */}
             {editVendor.type === '해외공장' && (
-              <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
+              <div className="p-4 bg-primary/5 border border-primary/20 rounded-md space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-medium text-primary">해외 송금 계좌정보 (해외공장 전용)</p>
                   {/* 파일 업로드 버튼 */}
@@ -1160,7 +1160,7 @@ export default function VendorMaster() {
                       value={editVendor.bankInfo?.swiftCode || ''}
                       onChange={e => update('bankInfo', { ...(editVendor.bankInfo || {}), swiftCode: e.target.value.toUpperCase() })}
                       placeholder="WIHBHKHHXXX"
-                      className="bg-card text-sm font-mono uppercase font-bold tracking-widest"
+                      className="bg-card text-sm font-mono uppercase font-bold"
                     />
                   </div>
                 </div>
@@ -1257,7 +1257,7 @@ export default function VendorMaster() {
                 <textarea
                   value={aiNotes}
                   onChange={e => setAiNotes(e.target.value)}
-                  className="w-full min-h-[100px] text-sm border border-border rounded-lg p-3 resize-y"
+                  className="w-full min-h-[100px] text-sm border border-border rounded-md p-3 resize-y"
                   placeholder={"예)\n계산서 이메일: tax@example.com\n담당자: 김○○ / 010-1234-5678\n위챗: wechat_id"}
                 />
               </div>
@@ -1277,7 +1277,7 @@ export default function VendorMaster() {
 
           {aiStep === 'type' && (
             <div className="space-y-4 py-2">
-              <div className="bg-primary/5 border border-primary/10 rounded-lg p-3 text-sm">
+              <div className="bg-primary/5 border border-primary/10 rounded-md p-3 text-sm">
                 <p className="font-medium text-foreground">이 거래처는 무엇인가요?</p>
                 {aiDraft.typeHint && (
                   <p className="text-xs text-primary mt-1">AI 힌트: {aiDraft.typeHint}</p>
@@ -1295,7 +1295,7 @@ export default function VendorMaster() {
                       key={c.type}
                       type="button"
                       onClick={() => setAiType(c.type)}
-                      className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-colors ${
+                      className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-colors ${
                         selected
                           ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
                           : 'border-border hover:border-primary/30 hover:bg-[var(--fill-quaternary)]'

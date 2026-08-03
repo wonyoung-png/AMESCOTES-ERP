@@ -121,7 +121,7 @@ export default function DeadlineManagement() {
             return (
               <Card key={order.id} className="border-border">
                 <CardContent className="p-4 flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-lg flex flex-col items-center justify-center text-xs font-medium shrink-0 ${d !== null ? dDayColor(d) : 'bg-muted text-muted-foreground'}`}>
+                  <div className={`w-14 h-14 rounded-md flex flex-col items-center justify-center text-xs font-medium shrink-0 ${d !== null ? dDayColor(d) : 'bg-muted text-muted-foreground'}`}>
                     {d !== null ? (
                       <>
                         <span className="text-lg font-number font-bold">{d < 0 ? `+${Math.abs(d)}` : d}</span>

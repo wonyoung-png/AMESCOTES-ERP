@@ -416,7 +416,7 @@ export default function CostComparison() {
             color: stats.avgDiff === null ? 'text-muted-foreground' : stats.avgDiff > 0 ? 'text-[var(--system-red)]' : 'text-[var(--system-green)]',
           },
         ].map(card => (
-          <div key={card.label} className="bg-card rounded-xl border border-border p-4">
+          <div key={card.label} className="bg-card rounded-lg border border-border p-4">
             <div className={`text-2xl font-bold ${card.color}`}>{card.value}</div>
             <div className="text-xs text-muted-foreground mt-0.5">{card.label}</div>
           </div>
@@ -424,7 +424,7 @@ export default function CostComparison() {
       </div>
 
       {/* 검색 & 필터 */}
-      <div className="bg-card rounded-xl border border-border p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -462,11 +462,11 @@ export default function CostComparison() {
 
       {/* 테이블 */}
       {isLoading ? (
-        <div className="bg-card rounded-xl border border-border p-12 text-center text-muted-foreground text-sm">
+        <div className="bg-card rounded-lg border border-border p-12 text-center text-muted-foreground text-sm">
           데이터 로딩 중...
         </div>
       ) : (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>

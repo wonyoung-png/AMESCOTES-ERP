@@ -273,7 +273,7 @@ export default function LineSheet() {
           <div className="flex items-center gap-2 text-foreground">
             <FileSpreadsheet size={20} className="text-primary" />
             <h1 className="text-xl font-bold tracking-tight">라인시트</h1>
-            <span className="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-primary/20 bg-primary/10 text-primary">LUMEN</span>
+            <span className="text-[11px] uppercase px-2 py-0.5 rounded-full border border-primary/20 bg-primary/10 text-primary">LUMEN</span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             Wholesale Line Sheet · 품목 마스터 기반 · 국가별 현지통화
@@ -287,7 +287,7 @@ export default function LineSheet() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4 items-start">
         {/* 품목 지정 */}
-        <aside className="bg-card rounded-xl border border-border overflow-hidden">
+        <aside className="bg-card rounded-lg border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-muted">
             <h2 className="text-sm font-semibold text-foreground">품목 지정</h2>
             <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
@@ -336,7 +336,7 @@ export default function LineSheet() {
               <ChipBtn onClick={() => selectIds(filtered.filter(i => !!i.imageUrl).map(i => i.id), 'add')}>이미지 있는 것만</ChipBtn>
             </div>
 
-            <div className="max-h-[420px] overflow-y-auto border border-border rounded-lg">
+            <div className="max-h-[420px] overflow-y-auto border border-border rounded-md">
               {filtered.length === 0 ? (
                 <div className="p-6 text-center text-xs text-muted-foreground">조건에 맞는 품목 없음</div>
               ) : filtered.map(i => (
@@ -377,10 +377,10 @@ export default function LineSheet() {
 
         {/* 시트 */}
         <section className="space-y-3">
-          <div className="bg-card rounded-xl border border-border p-3">
+          <div className="bg-card rounded-lg border border-border p-3">
             <div className="flex flex-wrap gap-3 items-end">
               <div>
-                <label className="text-[11px] uppercase tracking-wide text-muted-foreground block mb-1">Market</label>
+                <label className="text-[11px] uppercase text-muted-foreground block mb-1">Market</label>
                 <Select value={marketCode} onValueChange={applyMarket}>
                   <SelectTrigger className="h-8 text-xs w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -391,7 +391,7 @@ export default function LineSheet() {
                 </Select>
               </div>
               <div>
-                <label className="text-[11px] uppercase tracking-wide text-muted-foreground block mb-1">환율 (1 KRW→Local)</label>
+                <label className="text-[11px] uppercase text-muted-foreground block mb-1">환율 (1 KRW→Local)</label>
                 <Input
                   type="number"
                   step="any"
@@ -401,7 +401,7 @@ export default function LineSheet() {
                 />
               </div>
               <div>
-                <label className="text-[11px] uppercase tracking-wide text-muted-foreground block mb-1">Discount %</label>
+                <label className="text-[11px] uppercase text-muted-foreground block mb-1">Discount %</label>
                 <Input
                   type="number"
                   min={0}
@@ -412,7 +412,7 @@ export default function LineSheet() {
                 />
               </div>
               <div>
-                <label className="text-[11px] uppercase tracking-wide text-muted-foreground block mb-1">반올림</label>
+                <label className="text-[11px] uppercase text-muted-foreground block mb-1">반올림</label>
                 <Select value={roundMode} onValueChange={v => setRoundMode(v as RoundMode)}>
                   <SelectTrigger className="h-8 text-xs w-36"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -437,7 +437,7 @@ export default function LineSheet() {
             </div>
           </div>
 
-          <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="bg-card rounded-lg border border-border overflow-hidden">
             <div className="px-4 py-2.5 border-b border-border bg-[#1c1c1e] text-white text-sm font-semibold">
               Line Sheet
             </div>

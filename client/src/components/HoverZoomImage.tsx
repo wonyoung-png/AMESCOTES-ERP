@@ -69,7 +69,7 @@ export function HoverZoomImage({
         createPortal(
           <div
             style={style}
-            className="pointer-events-none rounded-xl border border-border bg-card shadow-lg overflow-hidden"
+            className="pointer-events-none rounded-lg border border-border bg-card shadow-lg overflow-hidden"
           >
             <img src={src} alt={alt} className="w-full h-full object-contain bg-muted" />
           </div>,

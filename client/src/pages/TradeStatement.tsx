@@ -386,7 +386,7 @@ export default function TradeStatement() {
           { label: '미청구 금액', value: formatKRW(stats.unclaimedAmount), color: 'text-[var(--system-orange)]' },
           { label: '청구 완료',  value: formatKRW(stats.billedAmount),   color: 'text-primary' },
         ].map(s => (
-          <div key={s.label} className="bg-card rounded-xl border border-border p-4">
+          <div key={s.label} className="bg-card rounded-lg border border-border p-4">
             <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
@@ -394,7 +394,7 @@ export default function TradeStatement() {
       </div>
 
       {/* 상태 탭 필터 */}
-      <div className="flex items-center gap-1 bg-muted p-1 rounded-xl w-fit">
+      <div className="flex items-center gap-1 bg-muted p-1 rounded-lg w-fit">
         {[
           { value: 'all', label: '전체', count: stats.total },
           { value: '미청구', label: '미청구', count: stats.unclaimed },
@@ -404,7 +404,7 @@ export default function TradeStatement() {
           <button
             key={opt.value}
             onClick={() => setFilterStatus(opt.value)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
               filterStatus === opt.value
                 ? 'bg-card text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
@@ -434,7 +434,7 @@ export default function TradeStatement() {
       </div>
 
       {/* 테이블 (데스크탑) */}
-      <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
+      <div className="hidden md:block bg-card rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
@@ -567,14 +567,14 @@ export default function TradeStatement() {
       {/* 카드 리스트 (모바일) */}
       <div className="md:hidden space-y-3">
         {filtered.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-lg border border-border">
             <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
             <p className="text-sm">발행된 명세표가 없습니다</p>
           </div>
         ) : filtered.map(s => {
           const calc = calcStatement(s.lines);
           return (
-            <div key={s.id} className="bg-card rounded-xl border border-border p-4">
+            <div key={s.id} className="bg-card rounded-lg border border-border p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-mono font-bold text-primary text-sm">{s.statementNo}</p>
@@ -623,8 +623,8 @@ export default function TradeStatement() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             {/* 공급자 (고정) */}
-            <div className="rounded-lg border border-border bg-muted p-3 space-y-1.5">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">공급자</p>
+            <div className="rounded-md border border-border bg-muted p-3 space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase">공급자</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <div><span className="text-muted-foreground">상호</span><span className="ml-2 font-medium text-foreground">{SUPPLIER.companyName}</span></div>
                 <div><span className="text-muted-foreground">대표자</span><span className="ml-2 font-medium text-foreground">{SUPPLIER.ceo}</span></div>
@@ -634,8 +634,8 @@ export default function TradeStatement() {
             </div>
 
             {/* 공급받는자 */}
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-3">
-              <p className="text-xs font-semibold text-primary uppercase tracking-wider">공급받는자</p>
+            <div className="rounded-md border border-primary/20 bg-primary/5 p-3 space-y-3">
+              <p className="text-xs font-semibold text-primary uppercase">공급받는자</p>
               <div className="space-y-2">
                 <div className="space-y-1">
                   <Label className="text-xs">상호 *</Label>
@@ -678,8 +678,8 @@ export default function TradeStatement() {
             </div>
 
             {/* 금액 */}
-            <div className="rounded-lg border border-border p-3 space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">금액</p>
+            <div className="rounded-md border border-border p-3 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase">금액</p>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <Label className="text-xs w-24 shrink-0">공급가액</Label>
@@ -764,14 +764,14 @@ export default function TradeStatement() {
                 </p>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-lg border border-border p-3 space-y-1">
+                <div className="rounded-md border border-border p-3 space-y-1">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">공급자</p>
                   <p className="text-sm font-bold text-foreground">{SUPPLIER.companyName}</p>
                   <p className="text-xs text-muted-foreground">사업자번호: {SUPPLIER.bizRegNo}</p>
                   <p className="text-xs text-muted-foreground">대표자: {SUPPLIER.ceo}</p>
                   <p className="text-xs text-muted-foreground">{SUPPLIER.address}</p>
                 </div>
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-1">
+                <div className="rounded-md border border-primary/20 bg-primary/5 p-3 space-y-1">
                   <p className="text-xs font-semibold text-primary mb-2">공급받는자</p>
                   <p className="text-sm font-bold text-foreground">{taxPreviewData.invoice.buyerCompanyName}</p>
                   <p className="text-xs text-muted-foreground">사업자번호: {taxPreviewData.invoice.buyerBizRegNo}</p>
@@ -783,7 +783,7 @@ export default function TradeStatement() {
                   )}
                 </div>
               </div>
-              <div className="rounded-lg border border-border overflow-hidden">
+              <div className="rounded-md border border-border overflow-hidden">
                 <table className="w-full text-sm">
                   <tbody>
                     <tr className="border-b border-border">
@@ -808,7 +808,7 @@ export default function TradeStatement() {
                 </table>
               </div>
               {taxPreviewData.invoice.memo && (
-                <div className="rounded-lg border border-border bg-muted px-4 py-2.5">
+                <div className="rounded-md border border-border bg-muted px-4 py-2.5">
                   <span className="text-xs text-muted-foreground">비고: </span>
                   <span className="text-sm text-foreground">{taxPreviewData.invoice.memo}</span>
                 </div>
@@ -826,7 +826,7 @@ export default function TradeStatement() {
 
       {/* 발주에서 불러오기 모달 */}
       <Dialog open={showOrderModal} onOpenChange={setShowOrderModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-lg sm:max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-md sm:max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="w-4 h-4 text-primary" />
@@ -847,7 +847,7 @@ export default function TradeStatement() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="border border-border rounded-lg overflow-hidden">
+            <div className="border border-border rounded-md overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
@@ -913,7 +913,7 @@ export default function TradeStatement() {
 
       {/* 발행/수정 모달 */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEdit ? '거래명세표 수정' : '거래명세표 발행'}</DialogTitle>
           </DialogHeader>
@@ -977,7 +977,7 @@ export default function TradeStatement() {
                   <Plus className="w-3 h-3" />항목 추가
                 </Button>
               </div>
-              <div className="rounded-lg border border-border overflow-hidden">
+              <div className="rounded-md border border-border overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border">
@@ -1024,7 +1024,7 @@ export default function TradeStatement() {
                 </table>
               </div>
               {/* 합계 */}
-              <div className="p-3 bg-muted rounded-lg border border-border text-sm space-y-1">
+              <div className="p-3 bg-muted rounded-md border border-border text-sm space-y-1">
                 <div className="flex justify-between text-muted-foreground">
                   <span>과세 공급가액</span>
                   <span className="font-mono">{formatKRW(currentTotal.taxableSupply)}</span>
@@ -1145,7 +1145,7 @@ function TradeStatementDetailModal({
 
         <div className="space-y-3 py-2">
           {/* 헤더 정보 */}
-          <div className="grid grid-cols-2 gap-3 text-sm bg-muted rounded-lg p-3">
+          <div className="grid grid-cols-2 gap-3 text-sm bg-muted rounded-md p-3">
             <div>
               <span className="text-muted-foreground text-xs">전표번호</span>
               <p className="font-mono font-bold text-primary">{statement.statementNo}</p>
@@ -1166,7 +1166,7 @@ function TradeStatementDetailModal({
           </div>
 
           {/* 품목 테이블 */}
-          <div className="border border-border rounded-lg overflow-hidden">
+          <div className="border border-border rounded-md overflow-hidden">
             <div className="bg-muted px-4 py-2 flex items-center justify-between border-b border-border">
               <p className="text-xs font-medium text-muted-foreground">품목 명세</p>
               <div className="flex items-center gap-2">
@@ -1264,7 +1264,7 @@ function TradeStatementDetailModal({
           </div>
 
           {/* 합계 */}
-          <div className="bg-muted rounded-lg p-3 space-y-1.5 text-sm">
+          <div className="bg-muted rounded-md p-3 space-y-1.5 text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>과세 공급가액</span>
               <span className="font-mono">{formatKRW(calc.taxableSupply)}</span>

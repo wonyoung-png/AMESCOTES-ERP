@@ -416,11 +416,11 @@ export default function BrandOrders() {
           </div>
 
           {board.length === 0 ? (
-            <div className="bg-card rounded-xl border p-10 text-center text-sm text-muted-foreground">
+            <div className="bg-card rounded-lg border p-10 text-center text-sm text-muted-foreground">
               표시할 오더가 없습니다. 승인 탭에서 묶음 발주 → 생산발주 분할 후, 또는 리오더 생산발주를 등록하세요.
             </div>
           ) : board.map(group => (
-            <div key={group.styleNo} className="bg-card rounded-xl border overflow-hidden">
+            <div key={group.styleNo} className="bg-card rounded-lg border overflow-hidden">
               <div className="px-4 py-3 border-b bg-muted flex items-center gap-2">
                 <span className="font-semibold text-sm">{group.styleName}</span>
                 <span className="font-mono text-xs text-primary">{group.styleNo}</span>
@@ -503,7 +503,7 @@ export default function BrandOrders() {
           </div>
 
           <div className="grid grid-cols-5 gap-4">
-            <div className="col-span-2 bg-card rounded-xl border divide-y divide-border max-h-[70vh] overflow-y-auto">
+            <div className="col-span-2 bg-card rounded-lg border divide-y divide-border max-h-[70vh] overflow-y-auto">
               {batches.length === 0 ? (
                 <p className="p-6 text-sm text-muted-foreground text-center">발주 없음</p>
               ) : batches.map(b => (
@@ -517,7 +517,7 @@ export default function BrandOrders() {
               ))}
             </div>
 
-            <div className="col-span-3 bg-card rounded-xl border p-5 space-y-4">
+            <div className="col-span-3 bg-card rounded-lg border p-5 space-y-4">
               {!detail ? (
                 <p className="text-muted-foreground text-sm">왼쪽에서 발주 선택</p>
               ) : (
@@ -561,7 +561,7 @@ export default function BrandOrders() {
                   )}
 
                   {detail.status === 'in_approval' && detail.approvalStep === 2 && (
-                    <div className="flex flex-wrap items-end gap-2 border rounded-lg p-3 bg-muted">
+                    <div className="flex flex-wrap items-end gap-2 border rounded-md p-3 bg-muted">
                       <div className="space-y-1">
                         <label className="text-[11px] text-muted-foreground">생산납기 · 예상입고일</label>
                         <Input
@@ -611,7 +611,7 @@ export default function BrandOrders() {
                     <Button size="sm" onClick={splitToOrders}><Split className="w-3 h-3 mr-1" />생산발주 분할</Button>
                   )}
 
-                  <table className="w-full text-sm border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm border rounded-md overflow-hidden">
                     <thead className="text-[13px] font-semibold text-muted-foreground">
                       <tr>
                         <th className="text-left px-3 py-2">SKU</th>

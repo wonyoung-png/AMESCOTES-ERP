@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 // APPLE_DESIGN.md §7 Button 4종: default=Filled · secondary=Tinted · outline=Gray · ghost=Plain
 // §6 탭 피드백 active:scale-[0.97], §3 기본 터치 타깃 44px(h-11)
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-[15px] font-semibold transition-all duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 aria-invalid:outline-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[8px] text-[15px] font-semibold transition-all duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 aria-invalid:outline-destructive",
   {
     variants: {
       variant: {
@@ -21,10 +21,10 @@ const buttonVariants = cva(
       },
       size: {
         default: "h-11 px-5 has-[>svg]:px-4",
-        sm: "h-9 rounded-[8px] gap-1.5 px-3.5 text-[13px] has-[>svg]:px-3",
+        sm: "h-9 rounded-[6px] gap-1.5 px-3.5 text-[13px] has-[>svg]:px-3",
         lg: "h-12 px-6 has-[>svg]:px-5",
         icon: "size-11",
-        "icon-sm": "size-9 rounded-[8px]",
+        "icon-sm": "size-9 rounded-[6px]",
         "icon-lg": "size-12",
       },
     },

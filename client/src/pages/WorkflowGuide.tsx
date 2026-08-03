@@ -65,7 +65,7 @@ function FlowCard({
       type="button"
       disabled={external && !node.path}
       onClick={() => node.path && onGo(node.path, node.label)}
-      className={`group relative w-full sm:w-auto min-w-[140px] max-w-[200px] text-left rounded-xl border px-3 py-2.5 transition
+      className={`group relative w-full sm:w-auto min-w-[140px] max-w-[200px] text-left rounded-lg border px-3 py-2.5 transition
         ${TONE[tone]}
         ${external && !node.path ? 'cursor-default opacity-80' : 'cursor-pointer'}
         focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40`}
@@ -98,7 +98,7 @@ function BranchSplit({
       <div className="flex justify-center">
         <div className="w-px h-3 bg-border" />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border border-border rounded-2xl p-3 bg-muted/50">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border border-border rounded-lg p-3 bg-muted/50">
         <div className="flex flex-col items-center gap-1">
           <Badge variant="outline" className="text-[11px] mb-1">본사 사입</Badge>
           <FlowCard node={left} onGo={onGo} />
@@ -194,7 +194,7 @@ export default function WorkflowGuide() {
             박스를 누르면 해당 메뉴로 이동합니다 · 현재 워크스페이스: <span className="font-medium text-foreground">{workspace}</span>
           </p>
         </div>
-        <div className="flex rounded-lg border border-border overflow-hidden">
+        <div className="flex rounded-md border border-border overflow-hidden">
           <Button
             size="sm"
             variant={flow === 'oem' ? 'default' : 'ghost'}
@@ -215,7 +215,7 @@ export default function WorkflowGuide() {
       </div>
 
       {hint && (
-        <p className="text-xs text-primary bg-primary/10 border border-primary/20 rounded-lg px-3 py-1.5">
+        <p className="text-xs text-primary bg-primary/10 border border-primary/20 rounded-md px-3 py-1.5">
           {hint}
         </p>
       )}
@@ -230,7 +230,7 @@ export default function WorkflowGuide() {
       </div>
 
       {flow === 'oem' ? (
-        <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
+        <section className="rounded-lg border border-border bg-card p-4 sm:p-6">
           <h2 className="text-sm font-semibold text-foreground mb-4">OEM 생산 파이프라인</h2>
 
           {/* 사전 가로 스크롤 */}
@@ -273,7 +273,7 @@ export default function WorkflowGuide() {
           </div>
         </section>
       ) : (
-        <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
+        <section className="rounded-lg border border-border bg-card p-4 sm:p-6">
           <h2 className="text-sm font-semibold text-foreground mb-1">브랜드 MD → 생산팀</h2>
           <p className="text-xs text-muted-foreground mb-4">승인 후 생산발주 · 작업지시서/공장발주서 → 사입·완사입 (OEM과 동일)</p>
 
@@ -306,7 +306,7 @@ export default function WorkflowGuide() {
 
       {/* 바로가기 */}
       <div>
-        <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">관련 메뉴</h3>
+        <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase">관련 메뉴</h3>
         <div className="flex flex-wrap gap-2">
           {QUICK_LINKS.map(n => (
             <button

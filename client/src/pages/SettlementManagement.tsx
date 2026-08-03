@@ -204,7 +204,7 @@ export default function SettlementManagement() {
 
       {/* 연체 알림 배너 */}
       {overdueList.length > 0 && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex items-center gap-3">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
           <div>
             <p className="text-sm font-semibold text-destructive">
@@ -218,7 +218,7 @@ export default function SettlementManagement() {
       )}
 
       {/* 미수금 총액 대시보드 */}
-      <div className="bg-[#1c1c1e] rounded-xl p-5 flex items-center justify-between">
+      <div className="bg-[#1c1c1e] rounded-lg p-5 flex items-center justify-between">
         <div>
           <p className="text-white/60 text-xs mb-1">총 미수금</p>
           <p className="text-3xl font-bold text-white">{formatKRW(stats.totalReceivable)}</p>
@@ -237,7 +237,7 @@ export default function SettlementManagement() {
           { label: '연체 금액', value: formatKRW(stats.overdueAmount), sub: '기한 초과 미수금', color: 'text-[var(--system-red)]' },
           { label: '90일 초과', value: formatKRW(stats.over90Amount), sub: '장기 미수금', color: 'text-[var(--system-red)]' },
         ].map(s => (
-          <div key={s.label} className="bg-card rounded-xl border border-border p-4">
+          <div key={s.label} className="bg-card rounded-lg border border-border p-4">
             <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
             <p className="text-[11px] text-muted-foreground">{s.sub}</p>
@@ -245,7 +245,7 @@ export default function SettlementManagement() {
         ))}
       </div>
 
-      <div className="bg-card rounded-xl border border-border p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex items-center gap-2 mb-3">
           <AlertTriangle className="w-4 h-4 text-[var(--system-orange)]" />
           <p className="text-sm font-semibold text-foreground">미수금 에이징 분석</p>
@@ -265,7 +265,7 @@ export default function SettlementManagement() {
       </div>
 
       {/* 바이어별 누적 거래금액 */}
-      <div className="bg-card rounded-xl border border-border p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-foreground">바이어별 누적 거래금액</p>
           <button
@@ -331,7 +331,7 @@ export default function SettlementManagement() {
         </Select>
       </div>
 
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <table className="hidden md:table w-full text-sm">
           <thead>
             <tr className="border-b border-border">
@@ -452,7 +452,7 @@ export default function SettlementManagement() {
       </div>
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-lg sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editId ? '정산 수정' : '정산 등록'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

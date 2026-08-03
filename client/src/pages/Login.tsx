@@ -50,15 +50,15 @@ export default function Login({ onLogin }: LoginProps) {
       <div className="w-full max-w-sm">
         {/* 로고 */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-sidebar flex items-center justify-center mb-4">
-            <span className="text-sidebar-primary font-bold text-xl tracking-wider">AM</span>
+          <div className="w-14 h-14 rounded-lg bg-sidebar flex items-center justify-center mb-4">
+            <span className="text-sidebar-primary font-bold text-xl">AM</span>
           </div>
-          <h1 className="text-2xl font-bold text-foreground tracking-wide">AMESCOTES</h1>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">AMESCOTES</h1>
           <p className="text-sm text-muted-foreground mt-1">ERP System</p>
         </div>
 
         {/* 로그인 카드 */}
-        <div className="bg-card rounded-2xl border border-border p-8">
+        <div className="bg-card rounded-lg border border-border p-8">
           <h2 className="text-lg font-semibold text-foreground mb-6 flex items-center gap-2">
             <Lock className="w-4 h-4 text-primary" />
             로그인

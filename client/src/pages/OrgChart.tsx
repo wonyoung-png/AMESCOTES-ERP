@@ -23,7 +23,7 @@ function UnitCard({ unit, depth }: { unit: OrgUnit; depth: number }) {
 
   return (
     <div className={`${depth > 0 ? 'ml-3 border-l border-border pl-3' : ''}`}>
-      <div className="rounded-xl border border-border bg-card overflow-hidden mb-3">
+      <div className="rounded-lg border border-border bg-card overflow-hidden mb-3">
         <div className={`px-3 py-2 border-b border-border flex items-center gap-2 ${
           depth === 0 ? 'bg-[var(--fill-tertiary)]' :
           depth === 1 ? 'bg-muted' : 'bg-muted/50'
@@ -43,7 +43,7 @@ function UnitCard({ unit, depth }: { unit: OrgUnit; depth: number }) {
             {members.map(m => (
               <div
                 key={m.id}
-                className={`rounded-lg border px-2.5 py-2 ${
+                className={`rounded-md border px-2.5 py-2 ${
                   m.isVacant ? 'border-dashed border-border bg-muted text-muted-foreground' : 'border-border bg-card'
                 }`}
               >
@@ -68,7 +68,7 @@ function UnitCard({ unit, depth }: { unit: OrgUnit; depth: number }) {
               </div>
             ))}
             {concurrent.map(m => (
-              <div key={m.id} className="rounded-lg border border-dashed border-border px-2.5 py-2 bg-muted/80">
+              <div key={m.id} className="rounded-md border border-dashed border-border px-2.5 py-2 bg-muted/80">
                 <p className="text-sm font-medium text-muted-foreground">{m.name}</p>
                 <p className="text-[11px] text-muted-foreground">{m.title}</p>
               </div>
@@ -118,7 +118,7 @@ export default function OrgChartPage() {
       </div>
 
       {/* R3 역할 매핑 */}
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <div className="px-4 py-3 border-b border-border bg-[var(--fill-quaternary)] flex items-center gap-2">
           <Users size={16} className="text-muted-foreground" />
           <span className="text-sm font-semibold text-foreground">R3 승인 담당 (임시)</span>
@@ -182,7 +182,7 @@ export default function OrgChartPage() {
 
       {/* 조직 트리 */}
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">AMESCOTES, INC. 조직</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase">AMESCOTES, INC. 조직</p>
         {roots.map(u => <UnitCard key={u.id} unit={u} depth={0} />)}
       </div>
     </div>
