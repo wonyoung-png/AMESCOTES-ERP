@@ -215,7 +215,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     href={item.path}
                     onClick={() => setSidebarOpen(false)}
                     className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 mb-0.5
+                      flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 mb-0.5 outline-none focus-visible:outline-none
                       ${active
                         ? 'bg-[var(--fill-quaternary)] text-foreground font-medium'
                         : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'
@@ -235,9 +235,6 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                           </span>
                         )}
                       </span>
-                    )}
-                    {active && !collapsed && (
-                      <span className="ml-auto w-1 h-4 rounded-full bg-sidebar-primary shrink-0" />
                     )}
                   </Link>
                 );
