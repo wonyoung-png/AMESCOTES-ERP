@@ -100,7 +100,7 @@ function Router() {
   if (!bootReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">
-        데이터 준비 중...
+        Data Loading by AMESCOTES
       </div>
     );
   }
@@ -149,7 +149,7 @@ function App() {
           <Toaster />
           <Suspense fallback={
             <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">
-              불러오는 중...
+              Data Loading by AMESCOTES
             </div>
           }>
             <Router />

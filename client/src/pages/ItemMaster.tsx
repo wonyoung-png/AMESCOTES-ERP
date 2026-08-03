@@ -1946,6 +1946,7 @@ export default function ItemMaster() {
         <div className="flex gap-2 flex-wrap">
           <Button
             variant="outline"
+            size="sm"
             onClick={() => runLumen27Seed(false)}
             disabled={isLumen27Loading}
             className="gap-2"
@@ -1955,6 +1956,7 @@ export default function ItemMaster() {
           </Button>
           <Button
             variant="outline"
+            size="sm"
             onClick={loadLumenPacking}
             disabled={isPackLoading}
             className="gap-2"
@@ -1962,16 +1964,16 @@ export default function ItemMaster() {
             <Package size={16} />
             {isPackLoading ? '불러오는 중...' : '핸드백 패키지 등록'}
           </Button>
-          <Button variant="outline" onClick={() => setColSettingsOpen(true)} className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => setColSettingsOpen(true)} className="gap-2">
             <Columns3 size={16} />열 설정
           </Button>
-          <Button variant="outline" onClick={() => setShowSeasonStats(true)} className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowSeasonStats(true)} className="gap-2">
             <BarChart2 size={16} />시즌별 현황
           </Button>
-          <Button variant="outline" onClick={downloadTemplate} className="gap-2">
+          <Button variant="outline" size="sm" onClick={downloadTemplate} className="gap-2">
             <Download size={16} />양식 다운로드
           </Button>
-          <Button variant="outline" onClick={() => excelUploadRef.current?.click()} className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => excelUploadRef.current?.click()} className="gap-2">
             <Upload size={16} />엑셀 일괄 등록
           </Button>
           <input
@@ -1983,13 +1985,14 @@ export default function ItemMaster() {
           />
           <Button
             variant="outline"
+            size="sm"
             onClick={syncPostCost}
             disabled={isSyncing}
             className="gap-2"
           >
             {isSyncing ? '동기화 중...' : '원가 동기화'}
           </Button>
-          <Button onClick={() => openAdd()} className="gap-2">
+          <Button size="sm" onClick={() => openAdd()} className="gap-2">
             <Plus size={16} />품목 등록
           </Button>
         </div>
