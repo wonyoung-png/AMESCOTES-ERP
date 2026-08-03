@@ -217,7 +217,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     className={`
                       flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 mb-0.5
                       ${active
-                        ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium border border-sidebar-primary/20'
+                        ? 'bg-[var(--fill-quaternary)] text-foreground font-medium'
                         : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'
                       }
                       ${collapsed ? 'justify-center px-2' : ''}
@@ -230,7 +230,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                       <span className="flex-1 min-w-0">
                         <span className="block truncate">{item.label}</span>
                         {item.table && (
-                          <span className="block text-[11px] font-mono opacity-30 truncate leading-tight">
+                          <span className="block text-[11px] font-mono opacity-60 truncate leading-tight">
                             {item.table}
                           </span>
                         )}
