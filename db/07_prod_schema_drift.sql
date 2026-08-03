@@ -1,0 +1,21 @@
+-- 운영 Supabase에서 대시보드로 수동 추가된 컬럼 보정 (JSON 백업 키 기준 자동 생성, 2026-08-03)
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS color_boms jsonb;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS customs_rate numeric;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS pnl_data text;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS post_color_boms jsonb;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS post_currency text;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS post_delivery_price numeric;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS post_exchange_rate_cny numeric;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS post_process_lines jsonb;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS post_subtotal_krw numeric;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS post_total_cost_krw numeric;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS pre_currency text;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS pre_exchange_rate_cny numeric;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS product_image text;
+ALTER TABLE boms ADD COLUMN IF NOT EXISTS style_id text;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS colors jsonb;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS item_code text;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS order_date text;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS order_qty numeric;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS order_status text;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS order_vendor_name text;

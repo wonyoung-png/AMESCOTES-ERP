@@ -1,14 +1,29 @@
 # SITE_ADDRESS 예시:
-#   erp.atlm.kr        → Let's Encrypt 인증서 자동 발급 (DNS A레코드가 EIP를 가리켜야 함)
-#   :80                → 도메인 연결 전 임시 (HTTP만)
+#   erp.atlm.kr → Let's Encrypt 자동 HTTPS (DNS A레코드가 EIP를 가리켜야 함)
+#   :80         → 도메인 연결 전 임시 (HTTP만)
 {$SITE_ADDRESS} {
 	encode gzip
 	log {
 		output stdout
 		format json
 	}
-	reverse_proxy app:4000 {
-		# AI 에이전트 패널이 SSE 스트리밍 사용 — 버퍼링 없이 즉시 전달
-		flush_interval -1
+
+	# Supabase REST 프로토콜 → 셀프호스팅 PostgREST
+	handle_path /rest/v1/* {
+		reverse_proxy postgrest:3000
+	}
+
+	# Supabase Auth 미사용 — 즉시 JSON 400 응답해 클라이언트가 재시도 없이
+	# 레거시 로그인으로 폴백하게 함 (404/HTML이면 supabase-js가 백오프 재시도로 수십 초 지연)
+	handle /auth/v1/* {
+		header Content-Type application/json
+		respond `{"error":"invalid_grant","error_description":"Supabase Auth disabled (self-hosted)"}` 400
+	}
+
+	handle {
+		reverse_proxy app:4000 {
+			# AI 에이전트 패널이 SSE 스트리밍 사용 — 버퍼링 없이 즉시 전달
+			flush_interval -1
+		}
 	}
 }

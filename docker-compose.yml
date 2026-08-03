@@ -1,35 +1,73 @@
-# AMESCOTES ERP — 로컬/EC2 공용 Docker Compose
+# AMESCOTES ERP — 자체 호스팅 전체 스택 (앱 + Caddy + Postgres + PostgREST)
 #
-# ※ DB 컨테이너가 없는 이유: DB는 Supabase(외부 관리형)이며 앱이 HTTPS로 직접 접속.
-#   로컬 전체 스택 = 앱 컨테이너 + (실제) Supabase. 별도 로컬 DB 재현 대상이 없음.
+# 아키텍처: 브라우저 → Caddy(:80/:443)
+#   /rest/v1/*  → PostgREST → Postgres  (기존 Supabase REST 프로토콜 그대로)
+#   그 외       → Express 앱(:4000)
 #
-# 로컬 검증:  docker compose up -d --build   → http://localhost:4000
-# EC2 운영:   docker compose --profile edge up -d   (Caddy가 80/443 + 자동 HTTPS)
+# 로컬 검증:  docker compose up -d --build  →  http://localhost
+# EC2 운영:   동일 (SITE_ADDRESS만 도메인으로)
 #
-# 필요 파일: .env (git 제외) — VITE_*는 빌드 인자, 나머지는 런타임 주입
+# 필요 .env: POSTGRES_PASSWORD, PGRST_AUTHENTICATOR_PASSWORD, PGRST_JWT_SECRET,
+#            VITE_SUPABASE_ANON_KEY(자체 발급 anon JWT), SITE_ADDRESS
 
 services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: erp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      PGRST_AUTHENTICATOR_PASSWORD: ${PGRST_AUTHENTICATOR_PASSWORD:?}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # 초기화(빈 볼륨 최초 1회, 이름순 실행): 롤 → 스키마 → 마이그레이션 → 권한
+      - ./db/00_roles.sh:/docker-entrypoint-initdb.d/00_roles.sh:ro
+      - ./supabase/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./supabase/migration_phase1_manufacturing.sql:/docker-entrypoint-initdb.d/02_phase1.sql:ro
+      - ./supabase/migration_add_missing_columns.sql:/docker-entrypoint-initdb.d/03_add_missing.sql:ro
+      - ./supabase/migration_add_packing_columns.sql:/docker-entrypoint-initdb.d/04_packing.sql:ro
+      - ./supabase/migration_add_post_cost_to_items.sql:/docker-entrypoint-initdb.d/05_post_cost.sql:ro
+      - ./db/06_unique_keys_partial.sql:/docker-entrypoint-initdb.d/06_unique_keys.sql:ro
+      - ./db/07_prod_schema_drift.sql:/docker-entrypoint-initdb.d/07_prod_schema_drift.sql:ro
+      - ./db/99_grants.sh:/docker-entrypoint-initdb.d/99_grants.sh:ro
+      # 미포함: migration_rls_step1.sql (Supabase Auth 전제 — 레거시 인증 유지로 의도적 스킵)
+      #         migration_at_*/set_* (데이터 보정 스크립트 — 백업 데이터에 이미 반영됨)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d erp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.12
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${PGRST_AUTHENTICATOR_PASSWORD:?}@db:5432/erp
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?}
+
   app:
     build:
       context: .
       args:
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     image: amescotes-erp:local
     restart: unless-stopped
+    depends_on:
+      - postgrest
     environment:
       PORT: "4000"
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      SUPABASE_URL: ${SUPABASE_URL:-}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       SHARE_USER: ${SHARE_USER:-}
       SHARE_PASS: ${SHARE_PASS:-}
-    ports:
-      - "4000:4000"
 
-  # 리버스 프록시 (EC2 전용 — 로컬에서는 생략됨)
   caddy:
-    profiles: ["edge"]
     image: caddy:2
     restart: unless-stopped
     depends_on:
@@ -45,5 +83,6 @@ services:
       - caddy_config:/config
 
 volumes:
+  db_data:
   caddy_data:
   caddy_config:

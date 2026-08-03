@@ -22,7 +22,14 @@ export async function ensureErpBootstrap(): Promise<{ seeded: boolean; message: 
 
   const seedCurrent = !!localStorage.getItem(DEMO_SEED_FLAG);
 
-  if (!hasData || !seedCurrent) {
+  // DB에 데이터가 있는데 이 브라우저에 플래그만 없는 경우 = 새 기기/새 도메인 접속.
+  // 플래그 기준으로 재시드하면 접속 기기마다 데모가 중복 생성되므로(운영 27SS 2세트 원인),
+  // 시드 완료로 간주하고 플래그만 채운다.
+  if (hasData && !seedCurrent) {
+    localStorage.setItem(DEMO_SEED_FLAG, new Date().toISOString());
+  }
+
+  if (!hasData) {
     const result = await seedDemoIntegrationData();
     try {
       await syncFromSupabase();
@@ -63,6 +70,10 @@ export async function ensureErpBootstrap(): Promise<{ seeded: boolean; message: 
   }
 
   // LUMEN 27SS RRP (+ 이미지 누락 시 재적용)
+  // 데이터가 온전하면(이미지 누락 없음) 새 브라우저에서도 재시드하지 않음 — 플래그만 채움
+  if (!localStorage.getItem(LUMEN_27SS_SEED_FLAG) && !lumen27ssMissingImages(store.getItems())) {
+    localStorage.setItem(LUMEN_27SS_SEED_FLAG, new Date().toISOString());
+  }
   if (!localStorage.getItem(LUMEN_27SS_SEED_FLAG) || lumen27ssMissingImages(store.getItems())) {
     const r = await seedLumen27ssRrp(false);
     if (r.total > 0 || r.created > 0 || r.updated > 0) {

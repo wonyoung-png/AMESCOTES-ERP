@@ -15,7 +15,8 @@ ARG VITE_SUPABASE_ANON_KEY
 ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL} \
     VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
 COPY . .
-RUN test -n "$VITE_SUPABASE_URL" || (echo "ERROR: VITE_SUPABASE_URL build arg 누락" && exit 1)
+# URL은 빈값 허용(빈값 → 런타임에 same-origin 사용). anon 키는 필수.
+RUN test -n "$VITE_SUPABASE_ANON_KEY" || (echo "ERROR: VITE_SUPABASE_ANON_KEY build arg 누락" && exit 1)
 RUN npm run build
 
 # ─── 3) 프로덕션 의존성만 별도 설치 ───
