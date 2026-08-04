@@ -28,7 +28,12 @@
 	import erp
 }
 
-# IP 직접 접속(HTTP) 병행 허용 — 전환기용
+# IP/HTTP 접속 → 정식 https 주소로 자동 이동 (헬스체크는 직접 응답)
 http://:80 {
-	import erp
+	handle /healthz {
+		reverse_proxy app:4000
+	}
+	handle {
+		redir https://54-116-241-64.sslip.io{uri} 308
+	}
 }
