@@ -5,4 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || window.location.origin
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// accessToken: 서버(/api/login)가 발급한 세션 토큰만 사용 — 토큰 없으면 REST 접근 불가
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  accessToken: async () => localStorage.getItem('erp_token'),
+})

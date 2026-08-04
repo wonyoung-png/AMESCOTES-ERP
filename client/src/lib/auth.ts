@@ -13,7 +13,6 @@
 // 버전: 2026-04-16-team (데모 계정 → 팀원 실계정 마이그레이션)
 
 import { store, genId, type AppUser, type UserRole } from './store';
-import { supabase } from './supabase';
 
 /** 사용자 초대 기능에서만 초대 가능한 관리자 */
 export const ADMIN_EMAIL = 'wonyoung@atlm.kr';
@@ -34,24 +33,7 @@ export function hashPassword(plain: string): string {
   return simpleHash(plain);
 }
 
-/** DB(app_users) 사용자 조회 — 실패 시 null (레거시 폴백) */
-async function fetchDbUsers(): Promise<AppUser[] | null> {
-  try {
-    const { data, error } = await supabase.from('app_users').select('*');
-    if (error || !data) return null;
-    return data.map((r: Record<string, unknown>) => ({
-      id: String(r.id),
-      email: String(r.email),
-      passwordHash: String(r.password_hash),
-      name: String(r.name),
-      role: r.role as AppUser['role'],
-      isActive: Boolean(r.is_active),
-      createdAt: String(r.created_at),
-    }));
-  } catch {
-    return null;
-  }
-}
+
 
 // ─────────────────────────────────────────────────────────────
 //  자동 마이그레이션 — 기기별 최초 1회 기존 데모 계정 삭제
@@ -102,29 +84,32 @@ export function initDefaultUsers(): void {
 }
 
 export async function login(email: string, password: string): Promise<AppUser | null> {
-  const normEmail = email.toLowerCase();
-  const hash = simpleHash(password);
+  const normEmail = email.trim().toLowerCase();
 
-  // 1) DB(app_users) 우선 — 초대된 계정이 모든 기기에서 동작
-  const dbUsers = await fetchDbUsers();
-  if (dbUsers) {
-    const user = dbUsers.find(
-      u => u.email.toLowerCase() === normEmail && u.passwordHash === hash && u.isActive,
-    );
-    if (!user) return null; // DB 응답이 정답 — 레거시 폴백 안 함
-    // 로컬 캐시 동기화 (기존 화면들의 store.getUsers() 호환)
-    const local = store.getUsers().find(u => u.email.toLowerCase() === normEmail);
-    if (!local) store.addUser(user);
-    else if (local.passwordHash !== user.passwordHash || local.role !== user.role) {
-      store.updateUser(local.id, { passwordHash: user.passwordHash, role: user.role });
+  // 1) 서버 검증 로그인 — 성공 시 12시간 세션 토큰 발급 (REST 접근에 필수)
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normEmail, password }),
+    });
+    if (res.status === 401) return null;
+    if (res.ok) {
+      const { token, user } = (await res.json()) as { token: string; user: AppUser };
+      localStorage.setItem('erp_token', token);
+      // 로컬 캐시 동기화 (기존 화면들의 store.getUsers() 호환)
+      const local = store.getUsers().find(u => u.email.toLowerCase() === normEmail);
+      if (!local) store.addUser(user);
+      store.setCurrentUser(user);
+      return user;
     }
-    store.setCurrentUser(user);
-    return user;
-  }
+  } catch { /* 서버 불가 → 레거시 폴백 */ }
 
-  // 2) DB 접속 불가 시에만 레거시 localStorage 폴백
-  const users = store.getUsers();
-  const user = users.find(u => u.email.toLowerCase() === normEmail && u.passwordHash === hash && u.isActive);
+  // 2) 서버 접속 불가 시에만 레거시 localStorage 폴백 (캐시된 데이터로 조회만 가능)
+  const hash = simpleHash(password);
+  const user = store.getUsers().find(
+    u => u.email.toLowerCase() === normEmail && u.passwordHash === hash && u.isActive,
+  );
   if (!user) return null;
   store.setCurrentUser(user);
   return user;
@@ -132,7 +117,7 @@ export async function login(email: string, password: string): Promise<AppUser | 
 
 export function logout(): void {
   store.setCurrentUser(null);
-  supabase.auth.signOut().catch(() => { /* 세션 없으면 무시 */ });
+  localStorage.removeItem('erp_token');
 }
 
 export function getCurrentUser(): AppUser | null {
@@ -140,7 +125,14 @@ export function getCurrentUser(): AppUser | null {
 }
 
 export function isAuthenticated(): boolean {
-  return store.getCurrentUser() !== null;
+  if (store.getCurrentUser() === null) return false;
+  const token = localStorage.getItem('erp_token');
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1])) as { exp?: number };
+    if (!payload.exp || payload.exp * 1000 < Date.now()) return false;
+  } catch { return false; }
+  return true;
 }
 
 // ─────────────────────────────────────────────────────────────

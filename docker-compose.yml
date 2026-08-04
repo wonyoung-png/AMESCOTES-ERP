@@ -49,7 +49,7 @@ services:
     environment:
       PGRST_DB_URI: postgres://authenticator:${PGRST_AUTHENTICATOR_PASSWORD:?}@db:5432/erp
       PGRST_DB_SCHEMAS: public
-      PGRST_DB_ANON_ROLE: anon
+      # PGRST_DB_ANON_ROLE 미설정 = 무토큰 요청 401 (로그인 토큰 필수)
       PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?}
 
   app:
@@ -67,6 +67,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       SHARE_USER: ${SHARE_USER:-}
       SHARE_PASS: ${SHARE_PASS:-}
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?}
 
   caddy:
     image: caddy:2

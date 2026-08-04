@@ -9,6 +9,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import yardageOcrRouter from "./yardage-ocr.js";
+import sessionRouter from "./session.js";
 import vendorOcrRouter from "./vendor-ocr.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -54,6 +55,10 @@ async function startServer() {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
   });
+
+  // 서버 검증 로그인 (게이트 제거 후 보안 경계)
+  app.use(sessionRouter);
+  console.log("✓ Session router mounted (/api/login)");
 
   // OCR 전용 라우터 (항상 활성) — ANTHROPIC_API_KEY만 필요, agent-team 의존성 없음
   // agent-routes보다 먼저 마운트해서 /api/yardage/ocr 를 우선 처리
