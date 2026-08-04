@@ -15,7 +15,10 @@
 import { store, genId, type AppUser, type UserRole } from './store';
 import { supabase } from './supabase';
 
-// 간단한 해시 (Phase 1 임시용 — Phase 2 에서 Supabase Auth로 교체)
+/** 사용자 초대 기능에서만 초대 가능한 관리자 */
+export const ADMIN_EMAIL = 'wonyoung@atlm.kr';
+
+// 간단한 해시 (Phase 1 임시용)
 function simpleHash(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -24,6 +27,30 @@ function simpleHash(str: string): string {
     hash |= 0;
   }
   return Math.abs(hash).toString(36);
+}
+
+/** 사용자 관리 화면에서 비밀번호 해시 생성용 */
+export function hashPassword(plain: string): string {
+  return simpleHash(plain);
+}
+
+/** DB(app_users) 사용자 조회 — 실패 시 null (레거시 폴백) */
+async function fetchDbUsers(): Promise<AppUser[] | null> {
+  try {
+    const { data, error } = await supabase.from('app_users').select('*');
+    if (error || !data) return null;
+    return data.map((r: Record<string, unknown>) => ({
+      id: String(r.id),
+      email: String(r.email),
+      passwordHash: String(r.password_hash),
+      name: String(r.name),
+      role: r.role as AppUser['role'],
+      isActive: Boolean(r.is_active),
+      createdAt: String(r.created_at),
+    }));
+  } catch {
+    return null;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -75,28 +102,28 @@ export function initDefaultUsers(): void {
 }
 
 export async function login(email: string, password: string): Promise<AppUser | null> {
-  const users = store.getUsers();
   const normEmail = email.toLowerCase();
-
-  // 1) Supabase Auth 우선 — RLS(DB 잠금) 전환 후에도 유효한 정식 세션 확보
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (!error && data.session) {
-      const user = users.find(u => u.email.toLowerCase() === normEmail && u.isActive);
-      if (user) { store.setCurrentUser(user); return user; }
-      // 로컬 레코드 없는 신규 직원 → 기본 '사원'으로 생성 (권한 상향은 대표가 조정)
-      const fresh: AppUser = {
-        id: genId(), email, name: email.split('@')[0], role: '사원',
-        passwordHash: '', isActive: true, createdAt: new Date().toISOString(),
-      };
-      store.addUser(fresh);
-      store.setCurrentUser(fresh);
-      return fresh;
-    }
-  } catch { /* 네트워크 오류 등 → 레거시 폴백 */ }
-
-  // 2) 레거시 폴백 — Auth 계정 미생성 과도기 동안만 유효 (RLS 켜면 DB 접근 불가)
   const hash = simpleHash(password);
+
+  // 1) DB(app_users) 우선 — 초대된 계정이 모든 기기에서 동작
+  const dbUsers = await fetchDbUsers();
+  if (dbUsers) {
+    const user = dbUsers.find(
+      u => u.email.toLowerCase() === normEmail && u.passwordHash === hash && u.isActive,
+    );
+    if (!user) return null; // DB 응답이 정답 — 레거시 폴백 안 함
+    // 로컬 캐시 동기화 (기존 화면들의 store.getUsers() 호환)
+    const local = store.getUsers().find(u => u.email.toLowerCase() === normEmail);
+    if (!local) store.addUser(user);
+    else if (local.passwordHash !== user.passwordHash || local.role !== user.role) {
+      store.updateUser(local.id, { passwordHash: user.passwordHash, role: user.role });
+    }
+    store.setCurrentUser(user);
+    return user;
+  }
+
+  // 2) DB 접속 불가 시에만 레거시 localStorage 폴백
+  const users = store.getUsers();
   const user = users.find(u => u.email.toLowerCase() === normEmail && u.passwordHash === hash && u.isActive);
   if (!user) return null;
   store.setCurrentUser(user);

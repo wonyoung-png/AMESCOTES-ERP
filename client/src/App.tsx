@@ -37,6 +37,7 @@ const OrgChartPage = lazy(() => import("./pages/OrgChart"));
 const WorkflowGuide = lazy(() => import("./pages/WorkflowGuide"));
 const LineSheet = lazy(() => import("./pages/LineSheet"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const UserManagement = lazy(() => import("./pages/UserManagement"));
 
 import { ensureErpBootstrap } from "@/lib/ensureErpBootstrap";
 import { setSbWriteFailureHandler } from "@/lib/store";
@@ -112,6 +113,7 @@ function Router() {
         <Route path="/login"><Redirect to="/" /></Route>
         <Route path="/" component={Dashboard} />
         <Route path="/workflow" component={WorkflowGuide} />
+        <Route path="/users" component={UserManagement} />
         <Route path="/items" component={ItemMaster} />
         <Route path="/bom" component={BomManagement} />
         <Route path="/samples" component={SampleManagement} />

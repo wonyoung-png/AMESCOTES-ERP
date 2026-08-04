@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useLocation, Link } from 'wouter';
 import { store } from '@/lib/store';
-import { getCurrentUser, logout } from '@/lib/auth';
+import { getCurrentUser, logout, ADMIN_EMAIL } from '@/lib/auth';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import type { Workspace } from '@/lib/phase1';
 import {
@@ -12,7 +12,7 @@ import {
   ShoppingCart, Building2, FileText, Receipt, Settings,
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Warehouse, Network,
-  GitBranch, FileSpreadsheet,
+  GitBranch, FileSpreadsheet, UserRound,
 } from 'lucide-react';
 
 interface NavItem {
@@ -22,6 +22,8 @@ interface NavItem {
   table?: string;
   /** LUMEN 워크스페이스에서만 표시 */
   lumenOnly?: boolean;
+  /** 관리자(ADMIN_EMAIL)에게만 표시 */
+  adminOnly?: boolean;
 }
 
 interface NavGroup {
@@ -88,6 +90,7 @@ const navGroups: NavGroup[] = [
     label: '설정',
     items: [
       { path: '/settings', label: '환율 / 설정', icon: <Settings size={17} />, table: 'exchange_rates' },
+      { path: '/users', label: '사용자 관리', icon: <UserRound size={17} />, table: 'app_users', adminOnly: true },
       { path: '/org', label: '조직도 · R3담당', icon: <Network size={17} />, table: 'org_chart' },
     ],
   },
@@ -208,6 +211,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
               {group.label && collapsed && <div className="my-2 mx-2 h-px bg-border" />}
               {group.items.map((item) => {
                 if (item.lumenOnly && workspace !== 'LUMEN') return null;
+                if (item.adminOnly && currentUser?.email.toLowerCase() !== ADMIN_EMAIL) return null;
                 const active = isActive(item.path);
                 return (
                   <Link
