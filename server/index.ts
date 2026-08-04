@@ -50,31 +50,19 @@ async function startServer() {
   app.use(compression());
   app.use(express.json({ limit: "10mb" }));
 
-  // 요청 로깅 미들웨어
-  app.use((req, _res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    next();
-  });
-
-  // 서버 검증 로그인 (게이트 제거 후 보안 경계)
+  // 서버 검증 로그인
   app.use(sessionRouter);
-  console.log("✓ Session router mounted (/api/login)");
 
-  // OCR 전용 라우터 (항상 활성) — ANTHROPIC_API_KEY만 필요, agent-team 의존성 없음
-  // agent-routes보다 먼저 마운트해서 /api/yardage/ocr 를 우선 처리
+  // OCR 라우터
   app.use(yardageOcrRouter);
-  console.log("✓ Yardage OCR router mounted (/api/yardage/ocr)");
   app.use(vendorOcrRouter);
-  console.log("✓ Vendor OCR router mounted (/api/vendor/ocr)");
 
-  // AI 에이전트 API 라우터 (AI 에이전트 팀, SSE) — Supabase service key 없으면 스킵
+  // AI 에이전트 API 라우터 — Supabase service key 없으면 스킵
   try {
     const { default: agentRoutes } = await import("./agent-routes.js");
     app.use(agentRoutes);
-    console.log("✓ Agent routes mounted (AI agent team)");
   } catch (err) {
-    console.warn("⚠ Agent routes 비활성화 — 원인:", String(err).split("\n")[0]);
-    console.warn("  → AI 에이전트 팀 기능을 쓰려면 .env에 SUPABASE_SERVICE_ROLE_KEY 설정");
+    console.warn("[server] Agent routes 비활성화:", String(err).split("\n")[0]);
   }
 
   // Serve static files from dist/public
@@ -82,8 +70,7 @@ async function startServer() {
   const staticPath = path.resolve(__dirname, "public");
   const indexHtml = path.join(staticPath, "index.html");
   if (!fs.existsSync(indexHtml)) {
-    console.error(`✗ UI 빌드 없음: ${indexHtml}`);
-    console.error("  → npm run build 후 다시 시작하세요 (ERP_시작.bat)");
+    console.error(`[server] UI 빌드 없음: ${indexHtml} — npm run build 후 재시작 필요`);
   }
 
   app.use(express.static(staticPath));
@@ -106,8 +93,7 @@ async function startServer() {
   const port = process.env.PORT || 4000;
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-    console.log(`Anthropic API key loaded: ${!!process.env.ANTHROPIC_API_KEY}`);
+    console.log(`[server] AMESCOTES ERP 서버 시작 — port ${port}`);
   });
 }
 

@@ -1,20 +1,8 @@
-// AMESCOTES ERP — Data Store v2
-// 핵심 철학: "이미 만드는 파일을 올리면 자동으로 연결된다"
-// localStorage + Supabase 동시 저장 (쓰기 시 둘 다, 읽기 시 localStorage 우선)
+// AMESCOTES ERP — Data Store
+// localStorage(캐시) + Supabase DB 동시 저장 구조
 
 import { supabase } from './supabase';
 import { filterForTable, toSnakeCase } from './tableColumns';
-
-// 마이그레이션 전까지 Supabase에 없는 컬럼 목록 (PGRST204 에러 방지용 제외 컬럼)
-// migration_add_missing_columns.sql 실행 후 이 목록에서 제거하세요
-const PENDING_MIGRATION_COLUMNS: Record<string, string[]> = {
-  items: ['has_bom', 'base_cost_krw', 'colors'],
-  production_orders: ['order_no', 'style_name', 'style_id', 'season', 'vendor_name',
-                      'delivery_date', 'factory_unit_price_cny', 'factory_unit_price_krw',
-                      'factory_currency', 'bom_id', 'bom_type', 'color_qtys',
-                      'hq_supply_items', 'received_qty', 'defect_qty', 'defect_note',
-                      'received_date', 'revision'],
-};
 
 // ─────────────────────────────────────────────
 // Supabase 쓰기 실패 알림
@@ -44,17 +32,7 @@ async function sbUpsert(table: string, data: Record<string, any>): Promise<void>
   try {
     const row = filterForTable(table, toSnakeCase(data));
     const { error } = await supabase.from(table).upsert(row);
-    if (!error) return;
-    if (error.code === 'PGRST204' && PENDING_MIGRATION_COLUMNS[table]) {
-      // 마이그레이션 미실행 컬럼 제외 후 재시도
-      const pending = PENDING_MIGRATION_COLUMNS[table];
-      const fallbackRow = Object.fromEntries(Object.entries(row).filter(([k]) => !pending.includes(k)));
-      const { error: err2 } = await supabase.from(table).upsert(fallbackRow);
-      if (err2) reportSbFailure(table, 'upsert 재시도', err2.message);
-      else console.warn(`[store] ${table}: 마이그레이션 미실행 컬럼 제외하고 저장됨`);
-    } else {
-      reportSbFailure(table, 'upsert', error.message);
-    }
+    if (error) reportSbFailure(table, 'upsert', error.message);
   } catch (e) {
     reportSbFailure(table, 'upsert', String(e));
   }
@@ -64,25 +42,11 @@ async function sbUpdate(table: string, id: string, patch: Record<string, any>): 
   try {
     const row = filterForTable(table, toSnakeCase(patch));
     if (Object.keys(row).length === 0) {
-      // 넘어온 필드가 전부 화이트리스트 밖 — 조용히 버리면 안 된다
       reportSbFailure(table, 'update', `저장 가능한 컬럼이 없습니다 (${Object.keys(toSnakeCase(patch)).join(', ')})`);
       return;
     }
     const { error } = await supabase.from(table).update(row).eq('id', id);
-    if (!error) return;
-    if (error.code === 'PGRST204' && PENDING_MIGRATION_COLUMNS[table]) {
-      const pending = PENDING_MIGRATION_COLUMNS[table];
-      const fallbackRow = Object.fromEntries(Object.entries(row).filter(([k]) => !pending.includes(k)));
-      if (Object.keys(fallbackRow).length > 0) {
-        const { error: err2 } = await supabase.from(table).update(fallbackRow).eq('id', id);
-        if (err2) reportSbFailure(table, 'update 재시도', err2.message);
-        else console.warn(`[store] ${table}: 마이그레이션 미실행 컬럼 제외하고 저장됨`);
-      } else {
-        reportSbFailure(table, 'update', '마이그레이션 미실행 컬럼만 남아 저장 불가');
-      }
-    } else {
-      reportSbFailure(table, 'update', error.message);
-    }
+    if (error) reportSbFailure(table, 'update', error.message);
   } catch (e) {
     reportSbFailure(table, 'update', String(e));
   }
@@ -104,9 +68,11 @@ export type Category =
   | '파우치' | '키링' | '지갑'
   | '스니커즈' | '힐' | '로퍼' | '부츠' | '샌들'
   | '택배박스' | '내부박스' | '더스트백' | '쇼핑백' | '노루지' | '소모품' | '기타';
+/** BOM 섹션 / 자재 카테고리 공통 타입 */
 export type BomCategory = '원자재' | '지퍼' | '장식' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
-export type BomSectionKey = '원자재' | '지퍼' | '장식' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
-export type MaterialCategory = '원자재' | '지퍼' | '장식' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
+/** @deprecated BomCategory 로 대체됨 */
+export type BomSectionKey = BomCategory;
+export type MaterialCategory = BomCategory;
 export type VendorType = '바이어' | '자재거래처' | '공장' | '해외공장' | '물류업체' | '기타';
 export type BillingType = '월별합산' | '건별즉시';
 export type ItemStatus = 'TEMP' | 'ACTIVE' | 'INACTIVE';
