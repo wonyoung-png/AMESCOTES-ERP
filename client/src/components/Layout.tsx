@@ -231,14 +231,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                       {item.icon}
                     </span>
                     {!collapsed && (
-                      <span className="flex-1 min-w-0">
-                        <span className="block truncate">{item.label}</span>
-                        {item.table && (
-                          <span className="block text-[11px] font-mono opacity-60 truncate leading-tight">
-                            {item.table}
-                          </span>
-                        )}
-                      </span>
+                      <span className="flex-1 min-w-0 truncate">{item.label}</span>
                     )}
                   </Link>
                 );
