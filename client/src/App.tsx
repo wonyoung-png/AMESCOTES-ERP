@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense, type ComponentType } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAutoExchangeRate } from '@/hooks/useAutoExchangeRate';
 import { Toaster } from "@/components/ui/sonner";
@@ -10,34 +10,50 @@ import { WorkspaceProvider } from "./contexts/WorkspaceContext";
 import Layout from "./components/Layout";
 import { isAuthenticated } from "@/lib/auth";
 
+
+// 배포 직후 열려 있던 탭이 사라진 청크를 요청하면 로드 실패 → 세션당 1회 자동 새로고침
+// (ErrorBoundary "unexpected error" 대신 최신 번들로 복구)
+function lazyWithReload<T extends ComponentType<unknown>>(factory: () => Promise<{ default: T }>) {
+  return lazy(() =>
+    factory().catch((err) => {
+      if (!sessionStorage.getItem('chunk_reload_once')) {
+        sessionStorage.setItem('chunk_reload_once', '1');
+        window.location.reload();
+        return new Promise<{ default: T }>(() => {});
+      }
+      throw err;
+    })
+  );
+}
+
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-const ItemMaster = lazy(() => import("./pages/ItemMaster"));
-const BomManagement = lazy(() => import("./pages/BomManagement"));
-const SampleManagement = lazy(() => import("./pages/SampleManagement"));
-const ProductionOrders = lazy(() => import("./pages/ProductionOrders"));
-const PurchaseMatching = lazy(() => import("./pages/PurchaseMatching"));
-const VendorMaster = lazy(() => import("./pages/VendorMaster"));
-const TradeStatement = lazy(() => import("./pages/TradeStatement"));
-const SettlementManagement = lazy(() => import("./pages/SettlementManagement"));
-const ExpenseEntry = lazy(() => import("./pages/ExpenseEntry"));
-const DocumentOutput = lazy(() => import("./pages/DocumentOutput"));
-const ExchangeSettings = lazy(() => import("./pages/ExchangeSettings"));
-const MaterialMaster = lazy(() => import("./pages/MaterialMaster"));
-const CostComparison = lazy(() => import("./pages/CostComparison"));
-const CostSheetPrint = lazy(() => import("./pages/CostSheetPrint"));
-const ReceivingShipping = lazy(() => import("./pages/ReceivingShipping"));
-const PayablesManagement = lazy(() => import("./pages/PayablesManagement"));
-const BrandOrders = lazy(() => import("./pages/BrandOrders"));
-const ChinaWarehouse = lazy(() => import("./pages/ChinaWarehouse"));
-const ProjectPL = lazy(() => import("./pages/ProjectPL"));
-const DeadlineManagement = lazy(() => import("./pages/DeadlineManagement"));
-const OperationalCalendar = lazy(() => import("./pages/OperationalCalendar"));
-const OrgChartPage = lazy(() => import("./pages/OrgChart"));
-const WorkflowGuide = lazy(() => import("./pages/WorkflowGuide"));
-const LineSheet = lazy(() => import("./pages/LineSheet"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const UserManagement = lazy(() => import("./pages/UserManagement"));
+const ItemMaster = lazyWithReload(() => import("./pages/ItemMaster"));
+const BomManagement = lazyWithReload(() => import("./pages/BomManagement"));
+const SampleManagement = lazyWithReload(() => import("./pages/SampleManagement"));
+const ProductionOrders = lazyWithReload(() => import("./pages/ProductionOrders"));
+const PurchaseMatching = lazyWithReload(() => import("./pages/PurchaseMatching"));
+const VendorMaster = lazyWithReload(() => import("./pages/VendorMaster"));
+const TradeStatement = lazyWithReload(() => import("./pages/TradeStatement"));
+const SettlementManagement = lazyWithReload(() => import("./pages/SettlementManagement"));
+const ExpenseEntry = lazyWithReload(() => import("./pages/ExpenseEntry"));
+const DocumentOutput = lazyWithReload(() => import("./pages/DocumentOutput"));
+const ExchangeSettings = lazyWithReload(() => import("./pages/ExchangeSettings"));
+const MaterialMaster = lazyWithReload(() => import("./pages/MaterialMaster"));
+const CostComparison = lazyWithReload(() => import("./pages/CostComparison"));
+const CostSheetPrint = lazyWithReload(() => import("./pages/CostSheetPrint"));
+const ReceivingShipping = lazyWithReload(() => import("./pages/ReceivingShipping"));
+const PayablesManagement = lazyWithReload(() => import("./pages/PayablesManagement"));
+const BrandOrders = lazyWithReload(() => import("./pages/BrandOrders"));
+const ChinaWarehouse = lazyWithReload(() => import("./pages/ChinaWarehouse"));
+const ProjectPL = lazyWithReload(() => import("./pages/ProjectPL"));
+const DeadlineManagement = lazyWithReload(() => import("./pages/DeadlineManagement"));
+const OperationalCalendar = lazyWithReload(() => import("./pages/OperationalCalendar"));
+const OrgChartPage = lazyWithReload(() => import("./pages/OrgChart"));
+const WorkflowGuide = lazyWithReload(() => import("./pages/WorkflowGuide"));
+const LineSheet = lazyWithReload(() => import("./pages/LineSheet"));
+const NotFound = lazyWithReload(() => import("./pages/NotFound"));
+const UserManagement = lazyWithReload(() => import("./pages/UserManagement"));
 
 import { ensureErpBootstrap } from "@/lib/ensureErpBootstrap";
 import { setSbWriteFailureHandler } from "@/lib/store";
