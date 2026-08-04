@@ -1,0 +1,34 @@
+# ERP 라우팅 공통 (스니펫)
+(erp) {
+	encode gzip
+	log {
+		output stdout
+		format json
+	}
+
+	handle_path /rest/v1/* {
+		reverse_proxy postgrest:3000
+	}
+
+	handle /auth/v1/* {
+		header Content-Type application/json
+		respond `{"error":"invalid_grant","error_description":"Supabase Auth disabled (self-hosted)"}` 400
+	}
+
+	handle {
+		reverse_proxy app:4000 {
+			flush_interval -1
+		}
+	}
+}
+
+# 무료 HTTPS — sslip.io 공개 DNS (54-116-241-64.sslip.io → EIP)
+# 실제 도메인(erp.atlm.kr 등) 연결 시 이 호스트만 교체하면 됨
+54-116-241-64.sslip.io {
+	import erp
+}
+
+# IP 직접 접속(HTTP) 병행 허용 — 전환기용
+http://:80 {
+	import erp
+}
