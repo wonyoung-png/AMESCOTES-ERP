@@ -10,6 +10,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import yardageOcrRouter from "./yardage-ocr.js";
 import sessionRouter from "./session.js";
+import dailyBridgeRouter from "./daily-bridge.js";
 import vendorOcrRouter from "./vendor-ocr.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -52,6 +53,9 @@ async function startServer() {
 
   // 서버 검증 로그인
   app.use(sessionRouter);
+
+  // Daily 데이터 브리지 (플랫폼 간 연계)
+  app.use(dailyBridgeRouter);
 
   // OCR 라우터
   app.use(yardageOcrRouter);

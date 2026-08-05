@@ -13,7 +13,7 @@ import {
   ShoppingCart, Building2, FileText, Receipt, Settings,
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Warehouse, Network,
-  GitBranch, FileSpreadsheet, UserRound, Moon, Sun,
+  GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight,
 } from 'lucide-react';
 
 interface NavItem {
@@ -151,9 +151,10 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         `}
       >
         <div className={`flex items-center gap-3 px-4 py-5 border-b border-sidebar-border ${collapsed ? 'justify-center px-2' : ''}`}>
-          <div className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center shrink-0">
+          <a href="https://os.54-116-241-64.sslip.io/" aria-label="OS 홈"
+            className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center shrink-0">
             <span className="text-sidebar-primary-foreground font-bold text-xs leading-none">AT</span>
-          </div>
+          </a>
           {!collapsed && (
             <div className="overflow-hidden flex-1">
               <h1 className="text-sm font-bold text-foreground leading-tight">AMESCOTES OS</h1>
@@ -290,6 +291,12 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             </div>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <a
+              href="https://os.54-116-241-64.sslip.io/"
+              className="hidden sm:inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground"
+            >
+              OS 홈 <ArrowUpRight size={12} />
+            </a>
             <button
               type="button"
               onClick={toggleTheme}

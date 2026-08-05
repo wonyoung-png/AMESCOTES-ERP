@@ -68,6 +68,7 @@ services:
       SHARE_USER: ${SHARE_USER:-}
       SHARE_PASS: ${SHARE_PASS:-}
       PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?}
+      DAILY_URL: ${DAILY_URL:-http://daily:8000}
 
   caddy:
     image: caddy:2
