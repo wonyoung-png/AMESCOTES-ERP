@@ -142,8 +142,9 @@ export default function UserManagement() {
         </Button>
       </div>
 
-      <div className="bg-card border border-border rounded-lg overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm">
+      {/* 데스크탑 — 표 */}
+      <div className="hidden md:block bg-card border border-border rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
           <thead>
             <tr className="text-[13px] font-semibold text-muted-foreground text-left">
               <th className="px-4 py-3">이름</th>
@@ -190,6 +191,45 @@ export default function UserManagement() {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* 모바일 — 카드 리스트 */}
+      <div className="md:hidden space-y-2">
+        {isLoading && (
+          <p className="py-8 text-center text-muted-foreground text-[13px]">Data Loading by AMESCOTES</p>
+        )}
+        {users.map(u => {
+          const isAdminRow = isAdminEmail(u.email);
+          return (
+            <div key={u.id} className="bg-card border border-border rounded-lg p-4 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground text-sm truncate">
+                    {u.name}
+                    {isAdminRow && (
+                      <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded-[6px] bg-primary text-primary-foreground">관리자</span>
+                    )}
+                  </p>
+                  <p className="text-[12px] text-muted-foreground truncate">{u.email}</p>
+                </div>
+                <Switch
+                  checked={u.is_active}
+                  disabled={isAdminRow}
+                  onCheckedChange={() => handleToggleActive(u)}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[12px] px-2 py-0.5 rounded-[6px] bg-[var(--fill-tertiary)] text-foreground">{u.role}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground">{u.created_at?.slice(0, 10)}</span>
+                  <Button variant="outline" size="sm" className="gap-1" onClick={() => setResetTarget(u)}>
+                    <KeyRound className="w-3.5 h-3.5" />재설정
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <p className="text-[13px] text-muted-foreground">
