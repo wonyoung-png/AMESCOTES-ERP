@@ -118,6 +118,7 @@ export async function login(email: string, password: string): Promise<AppUser | 
 export function logout(): void {
   store.setCurrentUser(null);
   localStorage.removeItem('erp_token');
+  fetch('/api/logout', { method: 'POST' }).catch(() => { /* 쿠키 제거 실패는 무시 */ });
 }
 
 export function getCurrentUser(): AppUser | null {

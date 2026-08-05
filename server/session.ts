@@ -8,6 +8,8 @@ const router = Router();
 const SECRET = process.env.PGRST_JWT_SECRET || '';
 const POSTGREST_URL = process.env.POSTGREST_URL || 'http://postgrest:3000';
 const SESSION_HOURS = 12;
+// PMS SSO — 서브도메인 모듈(daily 등)이 같은 세션을 쓰도록 상위 도메인 쿠키 발급
+const COOKIE_DOMAIN = process.env.PMS_COOKIE_DOMAIN || '';
 
 function b64url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -54,6 +56,13 @@ router.post('/api/login', async (req: Request, res: Response) => {
 
     const exp = now + SESSION_HOURS * 3600;
     const token = signJwt({ role: 'anon', iss: 'erp-server', email: u.email, name: u.name, exp });
+    res.cookie('erp_token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: SESSION_HOURS * 3600 * 1000,
+      ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
+    });
     res.json({
       token,
       user: {
@@ -65,6 +74,11 @@ router.post('/api/login', async (req: Request, res: Response) => {
     console.error('POST /api/login 실패:', e);
     res.status(500).json({ error: 'internal' });
   }
+});
+
+router.post('/api/logout', (_req: Request, res: Response) => {
+  res.clearCookie('erp_token', { ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}) });
+  res.json({ ok: true });
 });
 
 export default router;

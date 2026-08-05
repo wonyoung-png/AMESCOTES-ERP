@@ -28,6 +28,23 @@
 	import erp
 }
 
+# BGROW OS 셸 (런처 — 정적, 컨테이너 불필요)
+os.54-116-241-64.sslip.io {
+	encode gzip
+	root * /srv/shell
+	file_server
+}
+
+# Daily Check (PMS 모듈)
+daily.54-116-241-64.sslip.io {
+	encode gzip
+	log {
+		output stdout
+		format json
+	}
+	reverse_proxy daily:8000
+}
+
 # IP/HTTP 접속 → 정식 https 주소로 자동 이동 (헬스체크는 직접 응답)
 http://:80 {
 	handle /healthz {

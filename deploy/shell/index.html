@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko" translate="no">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="google" content="notranslate" />
+<title>BGROW OS</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet" />
+<style>
+  :root{
+    --bg-canvas:#0B0B0C; --bg-surface:#141416; --bg-surface-2:#1A1A1D; --bg-subtle:#1F1F23;
+    --border:rgba(255,255,255,0.08); --border-strong:rgba(255,255,255,0.14);
+    --text-primary:#EDEDEF; --text-secondary:rgba(255,255,255,0.62); --text-tertiary:rgba(255,255,255,0.42);
+    --accent:#3DFFA2; --accent-weak:rgba(61,255,162,0.14);
+    --highlight-top:inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;
+    background:var(--bg-canvas); color:var(--text-primary);
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{width:100%;max-width:560px;padding:24px}
+  .logo{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+  h1{font-size:28px;font-weight:600;letter-spacing:-0.02em}
+  .sub{font-size:13px;color:var(--text-tertiary);margin:6px 0 28px}
+  .apps{display:flex;flex-direction:column;gap:12px}
+  a.app{
+    display:flex;align-items:center;gap:14px;text-decoration:none;color:inherit;
+    background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;
+    padding:18px 20px;box-shadow:var(--highlight-top);
+    transition:background .15s ease,border-color .15s ease;
+  }
+  a.app:hover{background:var(--bg-surface-2);border-color:var(--border-strong)}
+  .tile{width:32px;height:32px;border-radius:8px;background:var(--bg-subtle);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .tile svg{width:16px;height:16px;stroke:var(--text-secondary);stroke-width:1.5;fill:none}
+  .meta{flex:1;min-width:0}
+  .name{font-size:14px;font-weight:600}
+  .desc{font-size:12px;color:var(--text-secondary);margin-top:3px;line-height:1.5}
+  .go{font-size:12px;color:var(--text-tertiary)}
+  .foot{margin-top:28px;padding-top:16px;border-top:1px solid var(--border);
+    display:flex;justify-content:space-between;font-size:11px;color:var(--text-tertiary)}
+  .foot a{color:var(--text-tertiary)}
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="logo"><span class="logo-dot"></span><h1>BGROW OS</h1></div>
+    <p class="sub">전사 업무 플랫폼 — 로그인 한 번으로 모든 모듈 사용</p>
+
+    <nav class="apps">
+      <a class="app" href="https://54-116-241-64.sslip.io/">
+        <span class="tile"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></span>
+        <span class="meta">
+          <span class="name">AMESCOTES ERP</span>
+          <span class="desc">생산 · 발주 · BOM · 정산 · 거래처 — 제조 운영 전반</span>
+        </span>
+        <span class="go">열기 ↗</span>
+      </a>
+
+      <a class="app" href="https://daily.54-116-241-64.sslip.io/app/">
+        <span class="tile"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg></span>
+        <span class="meta">
+          <span class="name">Daily Check</span>
+          <span class="desc">일일 매출 · 캠페인 · 재고 · 물류 · AI 콘텐츠 — 판매 운영</span>
+        </span>
+        <span class="go">열기 ↗</span>
+      </a>
+
+      <a class="app" href="https://54-116-241-64.sslip.io/users">
+        <span class="tile"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M15 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0M22 21v-2a4 4 0 0 0-3-3.87"/></svg></span>
+        <span class="meta">
+          <span class="name">사용자 관리</span>
+          <span class="desc">계정 초대 · 권한 · 비밀번호 — 관리자 전용</span>
+        </span>
+        <span class="go">열기 ↗</span>
+      </a>
+    </nav>
+
+    <div class="foot">
+      <span>BGROW · 내부 시스템</span>
+      <span>문의: 관리자</span>
+    </div>
+  </main>
+</body>
+</html>
