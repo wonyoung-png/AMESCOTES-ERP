@@ -115,7 +115,7 @@ export default function DocumentOutput() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
       <div>
         <h1 className="text-2xl font-semibold">서류 출력</h1>
         <p className="text-sm text-muted-foreground mt-0.5">ATLM 브랜드 헤더 포함 PDF 문서 생성</p>
@@ -126,7 +126,7 @@ export default function DocumentOutput() {
         <div className="lg:col-span-2 space-y-3">
           {DOC_TYPES.map(doc => (
             <Card key={doc.id}
-              className={`border-border cursor-pointer transition-all ${selectedDoc === doc.id ? 'ring-2 ring-primary border-primary' : 'hover:border-primary/50'}`}
+              className={`py-0 border-border cursor-pointer transition-all ${selectedDoc === doc.id ? 'ring-2 ring-primary border-primary' : 'hover:border-primary/50'}`}
               onClick={() => setSelectedDoc(doc.id)}>
               <CardContent className="p-4 flex items-center gap-4">
                 <div className={`w-10 h-10 rounded-md flex items-center justify-center ${selectedDoc === doc.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
