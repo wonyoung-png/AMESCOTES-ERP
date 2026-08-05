@@ -10,6 +10,43 @@ const POSTGREST_URL = process.env.POSTGREST_URL || 'http://postgrest:3000';
 const SESSION_HOURS = 12;
 // PMS SSO — 서브도메인 모듈(daily 등)이 같은 세션을 쓰도록 상위 도메인 쿠키 발급
 const COOKIE_DOMAIN = process.env.PMS_COOKIE_DOMAIN || '';
+// OS 셸 등 서브도메인 오리진에서의 로그인/세션 호출 허용 (쿠키 포함)
+const ALLOWED_ORIGINS = (process.env.PMS_SHELL_ORIGINS ||
+  'https://os.54-116-241-64.sslip.io,https://daily.54-116-241-64.sslip.io')
+  .split(',').map(s => s.trim()).filter(Boolean);
+
+router.use((req: Request, res: Response, next) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.set('Access-Control-Allow-Origin', origin);
+    res.set('Access-Control-Allow-Credentials', 'true');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.set('Vary', 'Origin');
+  }
+  if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
+  next();
+});
+
+function verifyJwt(token: string): Record<string, unknown> | null {
+  if (!SECRET || !token || token.split('.').length !== 3) return null;
+  try {
+    const [h, b, s] = token.split('.');
+    const expected = b64url(crypto.createHmac('sha256', SECRET).update(`${h}.${b}`).digest());
+    if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(s))) return null;
+    const payload = JSON.parse(Buffer.from(b, 'base64url').toString()) as Record<string, unknown>;
+    if (Number(payload.exp || 0) * 1000 < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function parseCookie(header: string | undefined, name: string): string {
+  if (!header) return '';
+  const m = header.split(/;\s*/).find(c => c.startsWith(name + '='));
+  return m ? decodeURIComponent(m.slice(name.length + 1)) : '';
+}
 
 function b64url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -72,6 +109,35 @@ router.post('/api/login', async (req: Request, res: Response) => {
     });
   } catch (e) {
     console.error('POST /api/login 실패:', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 쿠키 세션 복원 — 셸에서 로그인한 뒤 각 툴이 재로그인 없이 세션을 이어받는다
+router.get('/api/session', async (req: Request, res: Response) => {
+  try {
+    const token = parseCookie(req.headers.cookie, 'erp_token');
+    const payload = verifyJwt(token);
+    if (!payload || !payload.email) { res.status(401).json({ error: 'no_session' }); return; }
+    const now = Math.floor(Date.now() / 1000);
+    const svcToken = signJwt({ role: 'anon', iss: 'erp-server', exp: now + 60 });
+    const r = await fetch(
+      `${POSTGREST_URL}/app_users?email=eq.${encodeURIComponent(String(payload.email).toLowerCase())}&select=*`,
+      { headers: { Authorization: `Bearer ${svcToken}` } },
+    );
+    if (!r.ok) { res.status(502).json({ error: 'db_unavailable' }); return; }
+    const rows = (await r.json()) as Array<Record<string, unknown>>;
+    const u = rows[0];
+    if (!u || !u.is_active) { res.status(401).json({ error: 'no_session' }); return; }
+    res.json({
+      token,
+      user: {
+        id: u.id, email: u.email, name: u.name, role: u.role,
+        passwordHash: '', isActive: u.is_active, createdAt: u.created_at,
+      },
+    });
+  } catch (e) {
+    console.error('GET /api/session 실패:', e);
     res.status(500).json({ error: 'internal' });
   }
 });

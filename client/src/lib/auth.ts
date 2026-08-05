@@ -119,6 +119,22 @@ export async function login(email: string, password: string): Promise<AppUser | 
   return user;
 }
 
+/** 셸(OS)에서 로그인한 쿠키 세션을 이어받아 localStorage에 복원 */
+export async function restoreSession(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/session');
+    if (!res.ok) return false;
+    const { token, user } = (await res.json()) as { token: string; user: AppUser };
+    localStorage.setItem('erp_token', token);
+    const local = store.getUsers().find(u => u.email.toLowerCase() === user.email.toLowerCase());
+    if (!local) store.addUser(user);
+    store.setCurrentUser(user);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function logout(): void {
   store.setCurrentUser(null);
   localStorage.removeItem('erp_token');

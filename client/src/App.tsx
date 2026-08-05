@@ -8,7 +8,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { WorkspaceProvider } from "./contexts/WorkspaceContext";
 import Layout from "./components/Layout";
-import { isAuthenticated } from "@/lib/auth";
+import { isAuthenticated , restoreSession } from '@/lib/auth';
 
 
 // 배포 직후 열려 있던 탭이 사라진 청크를 요청하면 로드 실패 → 세션당 1회 자동 새로고침
@@ -77,6 +77,15 @@ setSbWriteFailureHandler(({ table, op, message }) => {
 function Router() {
   const [, forceUpdate] = useState(0);
   const [bootReady, setBootReady] = useState(!isAuthenticated());
+  // OS 셸에서 로그인한 쿠키 세션 이어받기 — 성공 시 리로드로 정상 부트 경로 진입
+  const [restoring, setRestoring] = useState(!isAuthenticated());
+  useEffect(() => {
+    if (isAuthenticated()) { setRestoring(false); return; }
+    restoreSession().then(ok => {
+      if (ok) window.location.reload();
+      else setRestoring(false);
+    });
+  }, []);
   const queryClient = useQueryClient();
   useAutoExchangeRate();
 
@@ -108,6 +117,14 @@ function Router() {
   if (window.location.pathname === '/md-mockup' || window.location.pathname === '/agent' || window.location.pathname === '/sales') {
     if (!isAuthenticated()) return <Login onLogin={handleLogin} />;
     return <Redirect to="/" />;
+  }
+
+  if (restoring) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">
+        Data Loading by AMESCOTES
+      </div>
+    );
   }
 
   if (!isAuthenticated()) {
