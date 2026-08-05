@@ -247,7 +247,7 @@ export default function DeadlineManagement() {
                           const pos = ((new Date(date).getTime() - minDate) / range) * 100;
                           return (
                             <div key={i}
-                              className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white ${m.actualDate ? 'bg-[var(--system-green)]' : 'bg-primary'}`}
+                              className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-background ${m.actualDate ? 'bg-[var(--system-green)]' : 'bg-primary'}`}
                               style={{ left: `${Math.min(pos, 98)}%` }}
                               title={`${MILESTONE_LABELS[m.stage] || m.stage}: ${date}`}
                             />

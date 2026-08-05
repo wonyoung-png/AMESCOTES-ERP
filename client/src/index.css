@@ -55,36 +55,45 @@
 }
 
 :root {
-  /* APPLE_DESIGN.md §4 — 카드/그룹 12px */
-  --radius: 0.5rem;
+  /* BGROW OS 디자인 시스템 — 다크 퍼스트 (기본 테마는 ThemeProvider가 .dark 클래스로 적용)
+     이 블록(라이트)은 동일 시스템의 토큰 스왑 결과물 — 레이아웃·간격·radius 동일 */
+  --radius: 0.75rem; /* 카드·팝오버 12px (BGROW §4 — 12 초과 금지) */
 
-  /* ── Apple 시맨틱 토큰 (§2) ── */
-  --label-primary: rgba(0, 0, 0, 1);
-  --label-secondary: rgba(60, 60, 67, 0.6);
-  --label-tertiary: rgba(60, 60, 67, 0.3);
-  --label-quaternary: rgba(60, 60, 67, 0.18);
-  --fill-primary: rgba(120, 120, 128, 0.2);
-  --fill-secondary: rgba(120, 120, 128, 0.16);
-  --fill-tertiary: rgba(118, 118, 128, 0.12);
-  --fill-quaternary: rgba(116, 116, 128, 0.08);
-  --separator: rgba(60, 60, 67, 0.14);
-  --separator-opaque: #c6c6c8;
+  --bg-canvas: #f4f1ec;
+  --bg-surface: #ffffff;
+  --bg-surface-2: #faf9f7;
+  --bg-subtle: #f1efea;
+  --separator: #e8e5e0;
+  --separator-strong: #d6d2cb;
+  --label-primary: #111111;
+  --label-secondary: #6b6b6b;
+  --label-tertiary: #9a9a9a;
+  --fill-primary: rgba(0, 0, 0, 0.1);
+  --fill-secondary: rgba(0, 0, 0, 0.07);
+  --fill-tertiary: rgba(0, 0, 0, 0.05);
+  --fill-quaternary: rgba(0, 0, 0, 0.03);
+
+  --accent-mint: #3dffa2;
+  --accent-mint-weak: rgba(61, 255, 162, 0.18);
+  --highlight-top: none;
+
+  --status-high-bg: #ffe9eb; --status-high-fg: #c4303f;
+  --status-medium-bg: #fff1de; --status-medium-fg: #9a6212;
+  --status-low-bg: #f1eaff; --status-low-fg: #6b3fbf;
 
   --system-blue: #007aff;
-  --system-green: #34c759;
-  --system-red: #ff3b30;
-  --system-orange: #ff9500;
+  --system-green: #2e9e5b;
+  --system-red: #c4303f;
+  --system-orange: #9a6212;
   --system-yellow: #ffcc00;
   --system-indigo: #5856d6;
   --system-teal: #30b0c7;
   --system-gray: #8e8e93;
 
-  /* ── §5 그림자 3단계 ── */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
 
-  /* ── §6 모션 ── */
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
@@ -93,15 +102,15 @@
   --duration-slow: 350ms;
 
   /* ── shadcn 매핑 ── */
-  --background: #f2f2f7;
+  --background: var(--bg-canvas);
   --foreground: var(--label-primary);
-  --card: #ffffff;
+  --card: var(--bg-surface);
   --card-foreground: var(--label-primary);
-  --popover: #ffffff;
+  --popover: var(--bg-surface);
   --popover-foreground: var(--label-primary);
-  --primary: #1c1c1e; /* 모노톤 액센트 — 블랙 */
+  --primary: #111111;
   --primary-foreground: #ffffff;
-  --secondary: var(--fill-secondary);
+  --secondary: var(--bg-subtle);
   --secondary-foreground: var(--label-primary);
   --muted: var(--fill-quaternary);
   --muted-foreground: var(--label-secondary);
@@ -111,74 +120,102 @@
   --destructive-foreground: #ffffff;
   --border: var(--separator);
   --input: var(--separator);
-  --ring: #1c1c1e;
-  /* 차트 — 그레이스케일 (모노톤 원칙) */
-  --chart-1: #1c1c1e;
-  --chart-2: #6e6e73;
-  --chart-3: #aeaeb2;
-  --chart-4: #d1d1d6;
+  --ring: #111111;
+  --chart-1: #111111;
+  --chart-2: #6b6b6b;
+  --chart-3: #9a9a9a;
+  --chart-4: #c9c5be;
   --chart-5: #8e8e93;
-  /* 사이드바 — 라이트 (clobe.ai 레퍼런스) */
-  --sidebar: #ffffff;
-  --sidebar-foreground: rgba(60, 60, 67, 0.7);
-  --sidebar-primary: #1c1c1e;
+  --sidebar: var(--bg-surface);
+  --sidebar-foreground: var(--label-secondary);
+  --sidebar-primary: #111111;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(118, 118, 128, 0.08);
-  --sidebar-accent-foreground: rgba(0, 0, 0, 1);
-  --sidebar-border: rgba(60, 60, 67, 0.14);
-  --sidebar-ring: #1c1c1e;
+  --sidebar-accent: var(--fill-quaternary);
+  --sidebar-accent-foreground: var(--label-primary);
+  --sidebar-border: var(--separator);
+  --sidebar-ring: #111111;
 }
 
 .dark {
-  --label-primary: rgba(255, 255, 255, 1);
-  --label-secondary: rgba(235, 235, 245, 0.6);
-  --label-tertiary: rgba(235, 235, 245, 0.3);
-  --label-quaternary: rgba(235, 235, 245, 0.18);
-  --fill-primary: rgba(120, 120, 128, 0.36);
-  --fill-secondary: rgba(120, 120, 128, 0.32);
-  --fill-tertiary: rgba(118, 118, 128, 0.24);
-  --fill-quaternary: rgba(118, 118, 128, 0.18);
-  --separator: rgba(84, 84, 88, 0.38);
-  --separator-opaque: #38383a;
+  /* BGROW 다크 — 기본 테마. elevation = 배경 밝기 단계 (섀도우 미사용) */
+  --bg-canvas: #0b0b0c;
+  --bg-surface: #141416;
+  --bg-surface-2: #1a1a1d;
+  --bg-subtle: #1f1f23;
+  --separator: rgba(255, 255, 255, 0.08);
+  --separator-strong: rgba(255, 255, 255, 0.14);
+  --label-primary: #ededef;
+  --label-secondary: rgba(255, 255, 255, 0.62);
+  --label-tertiary: rgba(255, 255, 255, 0.42);
+  --fill-primary: rgba(255, 255, 255, 0.14);
+  --fill-secondary: rgba(255, 255, 255, 0.1);
+  --fill-tertiary: rgba(255, 255, 255, 0.07);
+  --fill-quaternary: rgba(255, 255, 255, 0.04);
+
+  --accent-mint: #3dffa2;
+  --accent-mint-weak: rgba(61, 255, 162, 0.14);
+  --highlight-top: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  --status-high-bg: rgba(255, 90, 105, 0.14); --status-high-fg: #ff8a94;
+  --status-medium-bg: rgba(255, 168, 60, 0.14); --status-medium-fg: #ffb863;
+  --status-low-bg: rgba(167, 120, 255, 0.14); --status-low-fg: #b996ff;
 
   --system-blue: #0a84ff;
-  --system-green: #30d158;
-  --system-red: #ff453a;
-  --system-orange: #ff9f0a;
+  --system-green: #4ade80;
+  --system-red: #ff8a94;
+  --system-orange: #ffb863;
   --system-yellow: #ffd60a;
   --system-indigo: #5e5ce6;
   --system-teal: #40c8e0;
 
-  --background: #000000;
+  /* 다크에서는 그림자 대신 highlight-top — 오버레이만 예외 */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+  --background: var(--bg-canvas);
   --foreground: var(--label-primary);
-  --card: #1c1c1e;
+  --card: var(--bg-surface);
   --card-foreground: var(--label-primary);
-  --popover: #1c1c1e;
+  --popover: var(--bg-surface);
   --popover-foreground: var(--label-primary);
-  --secondary: var(--fill-secondary);
+  --primary: var(--label-primary);
+  --primary-foreground: #0b0b0c;
+  --secondary: var(--bg-subtle);
   --secondary-foreground: var(--label-primary);
   --muted: var(--fill-quaternary);
   --muted-foreground: var(--label-secondary);
   --accent: var(--fill-tertiary);
   --accent-foreground: var(--label-primary);
+  --destructive: #ff5a69;
+  --destructive-foreground: #ffffff;
   --border: var(--separator);
   --input: var(--separator);
-  --primary: #ffffff;
-  --primary-foreground: #1c1c1e;
-  --ring: #ffffff;
-  --chart-1: #ffffff;
-  --chart-2: #aeaeb2;
-  --chart-3: #6e6e73;
-  --chart-4: #48484a;
+  --ring: var(--label-primary);
+  --chart-1: #ededef;
+  --chart-2: rgba(255, 255, 255, 0.62);
+  --chart-3: rgba(255, 255, 255, 0.42);
+  --chart-4: rgba(255, 255, 255, 0.28);
   --chart-5: #8e8e93;
-  --sidebar: #1c1c1e;
-  --sidebar-foreground: rgba(235, 235, 245, 0.6);
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #1c1c1e;
-  --sidebar-accent: rgba(118, 118, 128, 0.18);
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgba(84, 84, 88, 0.38);
-  --sidebar-ring: #ffffff;
+  --sidebar: var(--bg-surface);
+  --sidebar-foreground: var(--label-secondary);
+  --sidebar-primary: var(--label-primary);
+  --sidebar-primary-foreground: #0b0b0c;
+  --sidebar-accent: var(--bg-surface-2);
+  --sidebar-accent-foreground: var(--label-primary);
+  --sidebar-border: var(--separator);
+  --sidebar-ring: var(--label-primary);
+}
+
+/* 인쇄물(원가계산서·작업지시서 등)은 항상 라이트 — 서류는 흰 종이 기준 */
+@media print {
+  .dark {
+    --background: #ffffff; --foreground: #111111;
+    --card: #ffffff; --card-foreground: #111111;
+    --border: #d6d2cb; --muted-foreground: #6b6b6b;
+    --primary: #111111; --primary-foreground: #ffffff;
+    --highlight-top: none;
+  }
 }
 
 @layer base {
@@ -193,6 +230,10 @@
   }
   h1, h2, h3 {
     letter-spacing: -0.02em;
+  }
+  /* 다크 elevation — 카드 상단 미세 하이라이트 (BGROW §1-A) */
+  .bg-card {
+    box-shadow: var(--highlight-top);
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),

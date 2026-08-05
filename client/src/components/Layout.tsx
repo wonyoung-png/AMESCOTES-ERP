@@ -6,13 +6,14 @@ import { useLocation, Link } from 'wouter';
 import { store } from '@/lib/store';
 import { getCurrentUser, logout, ADMIN_EMAIL } from '@/lib/auth';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import type { Workspace } from '@/lib/phase1';
 import {
   BarChart3, Package, ClipboardList, FlaskConical, Factory,
   ShoppingCart, Building2, FileText, Receipt, Settings,
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Warehouse, Network,
-  GitBranch, FileSpreadsheet, UserRound,
+  GitBranch, FileSpreadsheet, UserRound, Moon, Sun,
 } from 'lucide-react';
 
 interface NavItem {
@@ -116,6 +117,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { workspace, setWorkspace } = useWorkspace();
+  const { theme, toggleTheme } = useTheme();
   const settings = store.getSettings();
   const currentUser = getCurrentUser();
 
@@ -219,7 +221,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     href={item.path}
                     onClick={() => setSidebarOpen(false)}
                     className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 mb-0.5 outline-none focus-visible:outline-none
+                      relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 mb-0.5 outline-none focus-visible:outline-none
                       ${active
                         ? 'bg-[var(--fill-quaternary)] text-foreground font-medium'
                         : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'
@@ -227,6 +229,9 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                       ${collapsed ? 'justify-center px-2' : ''}
                     `}
                   >
+                    {active && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-[var(--accent-mint)]" />
+                    )}
                     <span className={`shrink-0 ${active ? 'text-sidebar-primary' : ''}`}>
                       {item.icon}
                     </span>
@@ -280,6 +285,14 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             </div>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label="테마 전환"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]"
+            >
+              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
             <span className="hidden sm:flex items-center gap-1">
               <DollarSign className="w-3 h-3" />
               USD {settings.usdKrw.toLocaleString()}

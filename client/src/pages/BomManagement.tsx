@@ -1498,7 +1498,7 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-card rounded-lg shadow-2xl w-[640px] max-w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className={`px-4 py-3 border-b border-border flex items-center justify-between bg-${accent}-50`}>
+        <div className={`px-4 py-3 border-b border-border flex items-center justify-between bg-muted`}>
           <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5"><Ruler className="w-4 h-4" />소요량 계산 — {itemName || '자재'}</h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
         </div>
@@ -1551,7 +1551,7 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
           {/* 행 테이블 */}
           <div className="overflow-hidden rounded-md border border-border">
             <table className="w-full">
-              <thead className={`bg-${accent}-50 border-b border-border`}>
+              <thead className={`bg-muted border-b border-border`}>
                 <tr>
                   <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">부위</th>
                   {calcType === 'SF' ? (

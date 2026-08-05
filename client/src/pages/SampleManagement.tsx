@@ -957,7 +957,7 @@ export default function SampleManagement() {
           <span className="text-sm font-medium text-foreground">{selectedIds.size}개 선택됨</span>
           <button
             onClick={handleBulkDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-white rounded-md text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-md text-xs font-medium transition-colors"
           >
             <Trash2 className="w-4 h-4" />선택 삭제
           </button>
@@ -1646,7 +1646,7 @@ export default function SampleManagement() {
                         <button
                           type="button"
                           onClick={() => setForm(f => ({ ...f, imageUrls: (f.imageUrls || []).filter((_, i) => i !== idx) }))}
-                          className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         >×</button>
                       </div>
                     ))}

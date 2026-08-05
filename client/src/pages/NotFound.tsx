@@ -18,7 +18,7 @@ export default function NotFound() {
             <AlertCircle className="h-16 w-16 text-muted-foreground" />
           </div>
 
-          <h1 className="text-4xl font-bold text-foreground mb-2">404</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">404</h1>
 
           <h2 className="text-xl font-semibold text-foreground mb-4">
             Page Not Found

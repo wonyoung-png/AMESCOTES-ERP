@@ -218,11 +218,11 @@ export default function SettlementManagement() {
       )}
 
       {/* 미수금 총액 대시보드 */}
-      <div className="bg-[#1c1c1e] rounded-lg p-5 flex items-center justify-between">
+      <div className="bg-foreground rounded-lg p-5 flex items-center justify-between">
         <div>
-          <p className="text-white/60 text-xs mb-1">총 미수금</p>
-          <p className="text-3xl font-bold text-white">{formatKRW(stats.totalReceivable)}</p>
-          <p className="text-white/60 text-xs mt-1">미납 합계 (완납 제외)</p>
+          <p className="text-background/60 text-xs mb-1">총 미수금</p>
+          <p className="text-2xl font-bold text-background">{formatKRW(stats.totalReceivable)}</p>
+          <p className="text-background/60 text-xs mt-1">미납 합계 (완납 제외)</p>
         </div>
         {stats.overdueCount > 0 && (
           <div className="text-right">
