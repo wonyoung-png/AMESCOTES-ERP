@@ -14,8 +14,12 @@
 
 import { store, genId, type AppUser, type UserRole } from './store';
 
-/** 사용자 초대 기능에서만 초대 가능한 관리자 */
-export const ADMIN_EMAIL = 'wonyoung@atlm.kr';
+/** 전체 페이지·사용자 관리 접근 가능한 관리자 목록 */
+export const ADMIN_EMAILS = ['wonyoung@atlm.kr', 'saintluxpgw@bgrow.co.kr'];
+export const ADMIN_EMAIL = ADMIN_EMAILS[0]; // 하위 호환
+export function isAdminEmail(email?: string | null): boolean {
+  return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
+}
 
 // 간단한 해시 (Phase 1 임시용)
 function simpleHash(str: string): string {

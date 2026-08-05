@@ -114,7 +114,7 @@ export default function Login({ onLogin }: LoginProps) {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          © 2026 (주)아메스코테스 · B2B OEM/ODM ERP
+          AMESCOTES OS · Dev by BGROW Corp · 개발문의 dev@bgrow.co.kr
         </p>
       </div>
     </div>

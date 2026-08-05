@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { getCurrentUser, hashPassword, ADMIN_EMAIL } from '@/lib/auth';
+import { getCurrentUser, hashPassword, isAdminEmail, ADMIN_EMAILS } from '@/lib/auth';
 import type { UserRole } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +40,7 @@ async function fetchUsers(): Promise<DbUser[]> {
 export default function UserManagement() {
   const currentUser = getCurrentUser();
   const queryClient = useQueryClient();
-  const isAdmin = currentUser?.email.toLowerCase() === ADMIN_EMAIL;
+  const isAdmin = isAdminEmail(currentUser?.email);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['app_users'],
@@ -62,7 +62,7 @@ export default function UserManagement() {
         <div className="bg-card border border-border rounded-lg p-8 flex flex-col items-center gap-2">
           <Lock className="w-5 h-5 text-muted-foreground" />
           <p className="text-sm font-semibold text-foreground">접근 권한이 없습니다</p>
-          <p className="text-[13px] text-muted-foreground">사용자 관리는 대표 계정({ADMIN_EMAIL})만 사용할 수 있습니다.</p>
+          <p className="text-[13px] text-muted-foreground">사용자 관리는 관리자 계정({ADMIN_EMAILS.join(', ')})만 사용할 수 있습니다.</p>
         </div>
       </div>
     );
@@ -99,7 +99,7 @@ export default function UserManagement() {
   };
 
   const handleToggleActive = async (u: DbUser) => {
-    if (u.email.toLowerCase() === ADMIN_EMAIL) { toast.error('관리자 계정은 비활성화할 수 없습니다'); return; }
+    if (isAdminEmail(u.email)) { toast.error('관리자 계정은 비활성화할 수 없습니다'); return; }
     const { error } = await supabase.from('app_users').update({ is_active: !u.is_active }).eq('id', u.id);
     if (error) { toast.error('변경 실패'); return; }
     toast.success(`${u.name} — ${u.is_active ? '비활성화됨 (로그인 차단)' : '활성화됨'}`);
@@ -159,7 +159,7 @@ export default function UserManagement() {
               <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Data Loading by AMESCOTES</td></tr>
             )}
             {users.map(u => {
-              const isAdminRow = u.email.toLowerCase() === ADMIN_EMAIL;
+              const isAdminRow = isAdminEmail(u.email);
               return (
                 <tr key={u.id} className="hover:bg-[var(--fill-quaternary)]">
                   <td className="px-4 py-3 font-medium text-foreground">

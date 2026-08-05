@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useLocation, Link } from 'wouter';
 import { store } from '@/lib/store';
-import { getCurrentUser, logout, ADMIN_EMAIL } from '@/lib/auth';
+import { getCurrentUser, logout, isAdminEmail } from '@/lib/auth';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Workspace } from '@/lib/phase1';
@@ -156,8 +156,8 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           </div>
           {!collapsed && (
             <div className="overflow-hidden flex-1">
-              <h1 className="text-sm font-bold text-foreground leading-tight">ATLM ERP</h1>
-              <p className="text-[11px] text-muted-foreground leading-tight">제조 · Phase 1</p>
+              <h1 className="text-sm font-bold text-foreground leading-tight">AMESCOTES OS</h1>
+              <p className="text-[11px] text-muted-foreground leading-tight">Dev by BGROW Corp</p>
             </div>
           )}
           {!collapsed && (
@@ -213,7 +213,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
               {group.label && collapsed && <div className="my-2 mx-2 h-px bg-border" />}
               {group.items.map((item) => {
                 if (item.lumenOnly && workspace !== 'LUMEN') return null;
-                if (item.adminOnly && currentUser?.email.toLowerCase() !== ADMIN_EMAIL) return null;
+                if (item.adminOnly && !isAdminEmail(currentUser?.email)) return null;
                 const active = isActive(item.path);
                 return (
                   <Link
@@ -260,6 +260,11 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             <LogOut size={14} />
             {!collapsed && <span>로그아웃</span>}
           </button>
+          {!collapsed && (
+            <p className="px-3 pt-1 text-[11px] text-muted-foreground">
+              개발문의 <a href="mailto:dev@bgrow.co.kr" className="underline-offset-2 hover:underline">dev@bgrow.co.kr</a>
+            </p>
+          )}
           <button
             onClick={() => setCollapsed(!collapsed)}
             className={`w-full hidden md:flex items-center gap-2 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)] transition-colors text-xs ${collapsed ? 'justify-center' : ''}`}
