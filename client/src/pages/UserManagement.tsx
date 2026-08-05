@@ -130,7 +130,7 @@ export default function UserManagement() {
 
   return (
     <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">사용자 관리</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -142,8 +142,8 @@ export default function UserManagement() {
         </Button>
       </div>
 
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-card border border-border rounded-lg overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="text-[13px] font-semibold text-muted-foreground text-left">
               <th className="px-4 py-3">이름</th>
