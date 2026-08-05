@@ -17,5 +17,6 @@ INSERT INTO app_users (id, email, password_hash, name, role) VALUES
   ('mgr@atlm.kr',      'mgr@atlm.kr',      'xkvehy', '부관리 주임', '부관리 주임'),
   ('staff@atlm.kr',    'staff@atlm.kr',    '8nuuz1', '사원', '사원'),
   ('sales@atlm.kr',    'sales@atlm.kr',    'fse155', '영업과장', '영업과장'),
-  ('saintluxpgw@bgrow.co.kr', 'saintluxpgw@bgrow.co.kr', 'xtxs7a', '박관우', '대표')
+  ('saintluxpgw@bgrow.co.kr', 'saintluxpgw@bgrow.co.kr', 'ynnvp4', '박관우', '대표'),
+  ('wonyoung@atlm.co.kr', 'wonyoung@atlm.co.kr', '5a33sm', '이원영', '대표')
 ON CONFLICT (email) DO NOTHING;

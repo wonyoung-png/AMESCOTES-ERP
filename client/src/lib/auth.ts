@@ -15,7 +15,7 @@
 import { store, genId, type AppUser, type UserRole } from './store';
 
 /** 전체 페이지·사용자 관리 접근 가능한 관리자 목록 */
-export const ADMIN_EMAILS = ['wonyoung@atlm.kr', 'saintluxpgw@bgrow.co.kr'];
+export const ADMIN_EMAILS = ['wonyoung@atlm.kr', 'wonyoung@atlm.co.kr', 'saintluxpgw@bgrow.co.kr'];
 export const ADMIN_EMAIL = ADMIN_EMAILS[0]; // 하위 호환
 export function isAdminEmail(email?: string | null): boolean {
   return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
