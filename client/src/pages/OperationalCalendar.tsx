@@ -203,7 +203,7 @@ export default function OperationalCalendar() {
     : '연간/반기/분기/월/주 뷰 전환 · 막대 클릭 시 팀별 상세 업무 · 완료율은 캘린더에 표시';
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
       <div className="flex flex-wrap justify-between gap-3 items-start">
         <div>
           <h1 className="text-2xl font-bold text-foreground">운영 캘린더 · 기획전</h1>

@@ -43,8 +43,8 @@ export default function PayablesManagement() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-start">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-wrap justify-between items-start gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground">미지급 · 불량차감</h1>
           <p className="text-sm text-muted-foreground">매입 미지급 · 불량 차감 이월 (다음 명세 자동 반영)</p>
@@ -52,7 +52,7 @@ export default function PayablesManagement() {
         <Button onClick={() => setPayModal(true)}>+ 미지급 등록</Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
         <div className="bg-card rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">미지급 잔액</p>
           <p className="text-2xl font-bold text-[var(--system-red)]">{formatKRW(stats.pending)}</p>
@@ -65,7 +65,8 @@ export default function PayablesManagement() {
 
       <div className="bg-card rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">미지급 목록</div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[720px]">
           <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
               <th className="text-left px-4 py-2">거래처</th>
@@ -119,11 +120,13 @@ export default function PayablesManagement() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="bg-card rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">불량 차감 이월</div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[560px]">
           <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
               <th className="text-left px-4 py-2">발주</th>
@@ -149,6 +152,7 @@ export default function PayablesManagement() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <Dialog open={payModal} onOpenChange={setPayModal}>

@@ -1549,8 +1549,8 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
             </label>
           </div>
           {/* 행 테이블 */}
-          <div className="overflow-hidden rounded-md border border-border">
-            <table className="w-full">
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full min-w-[560px]">
               <thead className={`bg-muted border-b border-border`}>
                 <tr>
                   <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">부위</th>
@@ -3261,14 +3261,14 @@ export default function BomManagement() {
   const cnyKrw = editBom?.snapshotCnyKrw || settings.cnyKrw;
 
   return (
-    <div className="p-6 space-y-6 max-w-[1400px]">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-[1400px]">
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">BOM / 원가 관리</h1>
           <p className="text-sm text-muted-foreground mt-0.5">사전원가(BOM) 및 사후원가(공장 실적) 통합 관리</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handleExcelUpload} className="hidden" />
           <input ref={preFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePreExcelUpload} className="hidden" />
           <input ref={postFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePostExcelUpload} className="hidden" />
@@ -3805,7 +3805,7 @@ export default function BomManagement() {
                     </span>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
+                    <table className="w-full min-w-[900px] text-xs">
                       <thead>
                         <tr className="border-b border-border text-[11px] font-semibold text-muted-foreground">
                           <th className="px-2 py-2 text-left">부위 | 자재명</th>
@@ -4081,7 +4081,7 @@ export default function BomManagement() {
                           <div className="px-5 py-3 border-b border-primary/10 bg-primary/5">
                             <h4 className="font-semibold text-sm text-primary">본사제공 자재 목록</h4>
                           </div>
-                          <table className="w-full text-xs">
+                          <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-xs">
                             <thead>
                               <tr className="bg-primary/5 text-[13px] font-semibold text-muted-foreground">
                                 <th className="px-3 py-2 text-left">부위</th>
@@ -4108,7 +4108,7 @@ export default function BomManagement() {
                                 </tr>
                               ))}
                             </tbody>
-                          </table>
+                          </table></div>
                         </div>
                       )}
                       {vendorLines.length > 0 && (
@@ -4116,7 +4116,7 @@ export default function BomManagement() {
                           <div className="px-5 py-3 border-b border-border bg-[var(--fill-tertiary)]">
                             <h4 className="font-semibold text-sm text-muted-foreground">업체제공 자재 목록</h4>
                           </div>
-                          <table className="w-full text-xs">
+                          <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-xs">
                             <thead>
                               <tr className="bg-[var(--fill-tertiary)] text-[13px] font-semibold text-muted-foreground">
                                 <th className="px-3 py-2 text-left">부위</th>
@@ -4143,7 +4143,7 @@ export default function BomManagement() {
                                 </tr>
                               ))}
                             </tbody>
-                          </table>
+                          </table></div>
                         </div>
                       )}
                     </>
@@ -4159,7 +4159,7 @@ export default function BomManagement() {
                     <div className="p-5 space-y-5">
                       <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                         <h3 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h3>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                           {([
                             { label: '할인율 (Discount)', field: 'discountRate' as keyof BomPnlAssumptions },
                             { label: '플랫폼 수수료', field: 'platformFeeRate' as keyof BomPnlAssumptions },
@@ -4423,7 +4423,7 @@ export default function BomManagement() {
                       </div>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
+                      <table className="w-full min-w-[900px] text-xs">
                         <thead>
                           <tr className="border-b border-border text-[11px] font-semibold text-muted-foreground">
                             <th className="px-2 py-2 text-left">부위 | 자재명</th>
@@ -4779,7 +4779,7 @@ export default function BomManagement() {
                     <div className="p-5 space-y-5">
                       <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                         <h3 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h3>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                           {([
                             { label: '할인율 (Discount)', field: 'discountRate' as keyof BomPnlAssumptions },
                             { label: '플랫폼 수수료', field: 'platformFeeRate' as keyof BomPnlAssumptions },
@@ -5009,7 +5009,7 @@ export default function BomManagement() {
                       />
                       <span className="text-xs text-muted-foreground">최종 = Net × (1 + 로스율/100)</span>
                     </div>
-                    <table className="w-full">
+                    <div className="overflow-x-auto"><table className="w-full min-w-[640px]">
                       <thead className="bg-primary/5 border-b border-border">
                         <tr>
                           <th className={thCls} style={{width:'22%'}}>부위</th>
@@ -5043,7 +5043,7 @@ export default function BomManagement() {
                           );
                         })}
                       </tbody>
-                    </table>
+                    </table></div>
                     <div className="p-3 flex items-center justify-between">
                       <button onClick={addLeatherRow} className="text-xs text-primary hover:text-primary/80 font-semibold">+ 행 추가</button>
                       <div className="flex items-center gap-6">

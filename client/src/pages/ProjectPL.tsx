@@ -33,8 +33,8 @@ export default function ProjectPL() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-start">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-wrap justify-between items-start gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground">발주 손익</h1>
           <p className="text-sm text-muted-foreground">
@@ -78,7 +78,8 @@ export default function ProjectPL() {
 
           <div className="bg-card rounded-lg border overflow-hidden">
             <div className="px-4 py-3 border-b font-semibold text-sm">연결 발주 ({projOrders.length}건)</div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
               <thead className="text-[13px] font-semibold text-muted-foreground">
                 <tr>
                   <th className="text-left px-4 py-2">발주번호</th>
@@ -100,6 +101,7 @@ export default function ProjectPL() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           <div className="bg-card rounded-lg border overflow-hidden">

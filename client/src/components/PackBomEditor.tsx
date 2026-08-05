@@ -262,7 +262,7 @@ export function PackBomEditor({ lines, materials, onChange, compact }: PackBomEd
       )}
 
       <div className="overflow-x-auto rounded-md border border-border bg-card">
-        <table className="w-full text-xs">
+        <table className="w-full min-w-[640px] text-xs">
           <thead className="text-[13px] font-semibold text-muted-foreground border-b border-border">
             <tr>
               <th className="text-left px-3 py-2 w-28">품번</th>

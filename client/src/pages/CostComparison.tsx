@@ -384,9 +384,9 @@ export default function CostComparison() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-[1400px]">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-[1400px]">
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">사전/사후 원가 비교</h1>
           <p className="text-sm text-muted-foreground mt-0.5">등록된 BOM의 사전원가와 사후원가를 비교합니다</p>
@@ -468,7 +468,7 @@ export default function CostComparison() {
       ) : (
         <div className="bg-card rounded-lg border border-border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[720px] text-xs">
               <thead>
                 <tr className="border-b border-border text-[13px] font-semibold text-muted-foreground">
                   <th className="px-3 py-2.5 text-center w-8">#</th>

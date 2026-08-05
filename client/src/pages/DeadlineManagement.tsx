@@ -94,7 +94,7 @@ export default function DeadlineManagement() {
   }, [orders, calMonth, calYear]);
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">납기 관리</h1>
@@ -120,7 +120,7 @@ export default function DeadlineManagement() {
             const d = dDaySource ? Math.ceil((new Date(dDaySource).getTime() - Date.now()) / 86400000) : null;
             return (
               <Card key={order.id} className="border-border">
-                <CardContent className="p-4 flex items-center gap-4">
+                <CardContent className="p-4 flex flex-wrap items-center gap-4">
                   <div className={`w-14 h-14 rounded-md flex flex-col items-center justify-center text-xs font-medium shrink-0 ${d !== null ? dDayColor(d) : 'bg-muted text-muted-foreground'}`}>
                     {d !== null ? (
                       <>
@@ -187,7 +187,8 @@ export default function DeadlineManagement() {
               }}><ChevronRight className="w-4 h-4" /></Button>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-7 gap-px bg-border rounded overflow-hidden">
+              <div className="overflow-x-auto">
+              <div className="grid grid-cols-7 gap-px bg-border rounded overflow-hidden min-w-[560px]">
                 {['일', '월', '화', '수', '목', '금', '토'].map(d => (
                   <div key={d} className="bg-muted/50 text-center py-2 text-xs font-medium text-muted-foreground">{d}</div>
                 ))}
@@ -210,6 +211,7 @@ export default function DeadlineManagement() {
                     )}
                   </div>
                 ))}
+              </div>
               </div>
             </CardContent>
           </Card>

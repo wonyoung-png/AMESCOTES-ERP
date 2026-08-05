@@ -241,7 +241,7 @@ export default function AgentPanel() {
   return (
     <div className="flex flex-col h-full max-h-[calc(100vh-4rem)] bg-background">
       {/* 헤더 */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b">
+      <div className="flex items-center gap-3 px-4 md:px-6 py-4 border-b">
         <div className="flex items-center justify-center w-9 h-9 rounded-full bg-primary">
           <Bot className="w-5 h-5 text-primary-foreground" />
         </div>
@@ -252,7 +252,7 @@ export default function AgentPanel() {
       </div>
 
       {/* 빠른 입력 버튼 */}
-      <div className="flex flex-wrap gap-2 px-6 py-3 border-b bg-muted/30">
+      <div className="flex flex-wrap gap-2 px-4 md:px-6 py-3 border-b bg-muted/30">
         {QUICK_PROMPTS.map(({ label, prompt }) => (
           <button
             key={label}
@@ -267,7 +267,7 @@ export default function AgentPanel() {
       </div>
 
       {/* 메시지 영역 */}
-      <ScrollArea className="flex-1 px-6 py-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 px-4 md:px-6 py-4" ref={scrollRef}>
         <div className="space-y-6 max-w-4xl mx-auto">
           {messages.map(message => (
             <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -325,7 +325,7 @@ export default function AgentPanel() {
       </ScrollArea>
 
       {/* 입력 영역 */}
-      <div className="px-6 py-4 border-t">
+      <div className="px-4 md:px-6 py-4 border-t">
         {/* 대기 중인 이미지 미리보기 */}
         {pendingImages.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
@@ -343,7 +343,7 @@ export default function AgentPanel() {
           </div>
         )}
 
-        <div className="flex items-end gap-3 max-w-4xl mx-auto">
+        <div className="flex items-end gap-2 md:gap-3 max-w-4xl mx-auto">
           <input
             ref={fileInputRef}
             type="file"

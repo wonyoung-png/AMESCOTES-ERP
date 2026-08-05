@@ -158,14 +158,14 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">생산 대시보드</h1>
         <p className="text-sm text-muted-foreground mt-0.5">ATLM 제조 ERP — OEM 생산·납기·정산 현황</p>
       </div>
 
       {/* ── KPI 7개 ── */}
-      <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         <KpiCard
           icon={<Microscope className="w-5 h-5 text-primary" />}
           bg="bg-primary/10"
@@ -221,9 +221,9 @@ export default function Dashboard() {
       </div>
 
       {/* ── 메인 2단 레이아웃 ── */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* 좌측 60% — 납기 위험 현황 */}
-        <div className="col-span-3 bg-card rounded-lg border border-border p-5">
+        <div className="lg:col-span-3 bg-card rounded-lg border border-border p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-[var(--system-red)]" />
@@ -235,7 +235,7 @@ export default function Dashboard() {
           </div>
 
           {/* 요약 배지 */}
-          <div className="flex gap-2 mb-4">
+          <div className="flex flex-wrap gap-2 mb-4">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--system-red)]/10 border border-[var(--system-red)]/20">
               <span className="text-[var(--system-red)] text-xs font-bold">D-1 이하</span>
               <span className="text-[var(--system-red)] font-bold text-sm">{deadlineRisk.critical.length}</span>
@@ -276,7 +276,7 @@ export default function Dashboard() {
         </div>
 
         {/* 우측 40% */}
-        <div className="col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4">
           {/* 자재 입고 대기 */}
           <div className="bg-card rounded-lg border border-border p-4">
             <div className="flex items-center justify-between mb-3">
@@ -330,7 +330,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── 하단 2단 ── */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* 오더 파이프라인 */}
         <div className="bg-card rounded-lg border border-border p-5">
           <h3 className="text-sm font-semibold text-foreground mb-4">전체 오더 파이프라인</h3>
@@ -513,8 +513,8 @@ export default function Dashboard() {
               {/* 자재 요청 목록 */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-2">자재 요청 목록</p>
-                <div className="rounded-md border border-border overflow-hidden">
-                  <table className="w-full text-xs">
+                <div className="rounded-md border border-border overflow-x-auto">
+                  <table className="w-full min-w-[480px] text-xs">
                     <thead>
                       <tr className="bg-muted border-b border-border">
                         <th className="text-left px-3 py-1.5 text-muted-foreground font-medium">자재명</th>

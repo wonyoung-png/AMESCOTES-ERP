@@ -362,7 +362,7 @@ export default function BrandOrders() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">리오더 · 오더관리</h1>
@@ -427,7 +427,8 @@ export default function BrandOrders() {
                 {group.erpCategory && <Badge variant="outline" className="text-[11px]">{group.erpCategory}</Badge>}
                 <span className="text-[11px] text-muted-foreground ml-auto">{group.rows.length}차</span>
               </div>
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[720px]">
                 <thead className="text-[13px] font-semibold text-muted-foreground">
                   <tr>
                     <th className="text-left px-3 py-2">차수</th>
@@ -491,6 +492,7 @@ export default function BrandOrders() {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           ))}
         </TabsContent>
@@ -502,8 +504,8 @@ export default function BrandOrders() {
             <Button variant="secondary" onClick={createBatch}>+ 묶음 발주</Button>
           </div>
 
-          <div className="grid grid-cols-5 gap-4">
-            <div className="col-span-2 bg-card rounded-lg border divide-y divide-border max-h-[70vh] overflow-y-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-2 bg-card rounded-lg border divide-y divide-border max-h-[70vh] overflow-y-auto">
               {batches.length === 0 ? (
                 <p className="p-6 text-sm text-muted-foreground text-center">발주 없음</p>
               ) : batches.map(b => (
@@ -517,7 +519,7 @@ export default function BrandOrders() {
               ))}
             </div>
 
-            <div className="col-span-3 bg-card rounded-lg border p-5 space-y-4">
+            <div className="lg:col-span-3 bg-card rounded-lg border p-4 md:p-5 space-y-4">
               {!detail ? (
                 <p className="text-muted-foreground text-sm">왼쪽에서 발주 선택</p>
               ) : (
@@ -611,7 +613,8 @@ export default function BrandOrders() {
                     <Button size="sm" onClick={splitToOrders}><Split className="w-3 h-3 mr-1" />생산발주 분할</Button>
                   )}
 
-                  <table className="w-full text-sm border rounded-md overflow-hidden">
+                  <div className="overflow-x-auto border rounded-md">
+                  <table className="w-full text-sm min-w-[480px]">
                     <thead className="text-[13px] font-semibold text-muted-foreground">
                       <tr>
                         <th className="text-left px-3 py-2">SKU</th>
@@ -636,6 +639,7 @@ export default function BrandOrders() {
                       })}
                     </tbody>
                   </table>
+                  </div>
 
                   {detail.status === 'draft' && (
                     <div className="border-t pt-4 space-y-2">
@@ -736,7 +740,7 @@ export default function BrandOrders() {
                 })}
               </div>
 
-              <div className="grid grid-cols-4 gap-2 text-center text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                 <div className="rounded border p-2"><p className="text-muted-foreground">발주</p><p className="font-bold">{formatNumber(detailRow.qty)}</p></div>
                 <div className="rounded border p-2"><p className="text-muted-foreground">선입</p><p className="font-bold text-[var(--system-orange)]">{formatNumber(detailRow.advanceQty)}</p></div>
                 <div className="rounded border p-2"><p className="text-muted-foreground">입고</p><p className="font-bold">{formatNumber(detailRow.receivedQty)}</p></div>

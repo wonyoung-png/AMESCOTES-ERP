@@ -98,7 +98,7 @@ export default function ReceivingShipping() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">입고 · 출고</h1>
         <p className="text-sm text-muted-foreground">부분입고 · OEM 직출고 · 3PL 입고 (receipt_logs)</p>
@@ -113,8 +113,8 @@ export default function ReceivingShipping() {
         ))}
       </div>
 
-      <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-card rounded-lg border border-border overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
               <th className="text-left px-4 py-2">발주번호</th>
@@ -153,7 +153,7 @@ export default function ReceivingShipping() {
       </div>
 
       <div>
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex flex-wrap items-center gap-3 mb-3">
           <h2 className="font-semibold text-foreground">입출고 이력</h2>
           <Select value={logFilter} onValueChange={v => setLogFilter(v as ReceiptLogType | 'all')}>
             <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -169,7 +169,7 @@ export default function ReceivingShipping() {
           {allLogs.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground text-center">이력 없음</p>
           ) : allLogs.slice(0, 30).map(l => (
-            <div key={l.id} className="px-4 py-3 flex justify-between text-sm">
+            <div key={l.id} className="px-4 py-3 flex flex-wrap justify-between gap-x-2 gap-y-1 text-sm">
               <div>
                 <span className="font-mono text-xs">{l.orderNo}</span>
                 <span className="mx-2 text-muted-foreground">·</span>

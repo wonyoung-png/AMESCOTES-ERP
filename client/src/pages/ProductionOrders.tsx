@@ -1125,7 +1125,7 @@ export default function ProductionOrders() {
           {factoryStats.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-4">등록된 발주가 없습니다</p>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">공장명</th>
@@ -1150,7 +1150,7 @@ export default function ProductionOrders() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
       )}
@@ -2454,7 +2454,7 @@ export default function ProductionOrders() {
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                 <div><p className="text-xs text-muted-foreground">스타일</p><p className="font-medium">{showDetail.styleNo}</p></div>
                 <div><p className="text-xs text-muted-foreground">시즌</p><p className="font-medium">{showDetail.season}</p></div>
                 <div><p className="text-xs text-muted-foreground">수량</p><p className="font-mono font-medium">{formatNumber(showDetail.qty)} PCS</p></div>
@@ -3100,7 +3100,7 @@ export default function ProductionOrders() {
           ) : (
             <div className="space-y-4 py-2">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="border-b border-border bg-[var(--fill-quaternary)]">
                       <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">자재명</th>
@@ -3264,7 +3264,7 @@ export default function ProductionOrders() {
                     </Button>
                   </div>
                   {/* 발주 품목 테이블 */}
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm">
                     <thead>
                       <tr className="border-b border-border">
                         <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-8">No.</th>
@@ -3319,7 +3319,7 @@ export default function ProductionOrders() {
                         <td className="px-3 py-2"></td>
                       </tr>
                     </tfoot>
-                  </table>
+                  </table></div>
                   {/* 서명란 */}
                   <div className="px-4 py-3 border-t border-border grid grid-cols-3 gap-4 text-xs text-muted-foreground">
                     <div>발주담당: ___________</div>

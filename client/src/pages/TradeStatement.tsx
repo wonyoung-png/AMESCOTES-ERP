@@ -359,7 +359,7 @@ export default function TradeStatement() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-foreground">거래명세표</h1>
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">전표번호: YYYYMM-거래처코드-순번 · 건별 세율 설정 지원</p>
@@ -394,7 +394,7 @@ export default function TradeStatement() {
       </div>
 
       {/* 상태 탭 필터 */}
-      <div className="flex items-center gap-1 bg-muted p-1 rounded-lg w-fit">
+      <div className="flex items-center gap-1 bg-muted p-1 rounded-lg w-fit max-w-full overflow-x-auto">
         {[
           { value: 'all', label: '전체', count: stats.total },
           { value: '미청구', label: '미청구', count: stats.unclaimed },
@@ -763,7 +763,7 @@ export default function TradeStatement() {
                   )}
                 </p>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="rounded-md border border-border p-3 space-y-1">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">공급자</p>
                   <p className="text-sm font-bold text-foreground">{SUPPLIER.companyName}</p>
@@ -847,8 +847,8 @@ export default function TradeStatement() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="border border-border rounded-md overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="border border-border rounded-md overflow-x-auto">
+              <table className="w-full text-sm min-w-[560px]">
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">발주번호</th>
@@ -977,8 +977,8 @@ export default function TradeStatement() {
                   <Plus className="w-3 h-3" />항목 추가
                 </Button>
               </div>
-              <div className="rounded-md border border-border overflow-hidden">
-                <table className="w-full text-xs">
+              <div className="rounded-md border border-border overflow-x-auto">
+                <table className="w-full text-xs min-w-[720px]">
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-center px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-10">No</th>
@@ -1186,7 +1186,8 @@ function TradeStatementDetailModal({
                 </Button>
               </div>
             </div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">품목/내역</th>
@@ -1261,6 +1262,7 @@ function TradeStatementDetailModal({
                 })}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* 합계 */}

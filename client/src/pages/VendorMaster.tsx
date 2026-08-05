@@ -614,8 +614,8 @@ export default function VendorMaster() {
   }, [vendors]);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground">거래처 마스터</h1>
           <p className="text-sm text-muted-foreground mt-0.5">바이어 · 자재거래처 · 공장 · 물류업체</p>
@@ -635,7 +635,7 @@ export default function VendorMaster() {
       </div>
 
       {/* 유형별 통계 */}
-      <div className="grid grid-cols-6 gap-3">
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
         {VENDOR_TYPES.map(t => (
           <div key={t} className="bg-card rounded-lg border border-border p-3">
             <p className="text-xl font-bold text-foreground">{typeCounts[t] || 0}</p>
@@ -645,7 +645,7 @@ export default function VendorMaster() {
       </div>
 
       {/* 유형 탭 필터 */}
-      <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-lg w-fit">
+      <div className="flex flex-wrap items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-lg w-fit">
         {(['all', ...VENDOR_TYPES] as const).map(t => (
           <button
             key={t}
@@ -668,7 +668,7 @@ export default function VendorMaster() {
       {filterType === '자재거래처' && (
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">자재 유형:</span>
-          <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-lg w-fit">
+          <div className="flex flex-wrap items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-lg w-fit">
             {(['all', ...MATERIAL_TYPE_OPTIONS] as const).map(t => (
               <button
                 key={t}
@@ -712,8 +712,8 @@ export default function VendorMaster() {
       )}
 
       {/* 테이블 */}
-      <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-card rounded-lg border border-border overflow-x-auto">
+        <table className="w-full min-w-[880px] text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
               <th className="px-4 py-3 w-10">
@@ -857,7 +857,7 @@ export default function VendorMaster() {
 
       {/* 등록/수정 모달 */}
       <Dialog open={showModal} onOpenChange={(open) => { if (!open) handleModalClose(true); }}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{isEdit ? '거래처 수정' : '거래처 등록'}</DialogTitle></DialogHeader>
           <div className="space-y-5 py-2">
 
@@ -1199,7 +1199,7 @@ export default function VendorMaster() {
 
       {/* AI 서류 자동등록 */}
       <Dialog open={showAiModal} onOpenChange={(o) => { if (!o && !aiLoading) setShowAiModal(false); }}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />

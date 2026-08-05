@@ -710,7 +710,7 @@ export default function SampleManagement() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-foreground">샘플 관리</h1>
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">샘플 접수 · 차수별 메모 · 자재 체크리스트 · TEMP 품목 자동생성</p>
@@ -752,7 +752,7 @@ export default function SampleManagement() {
         const thisMonthApproved = thisMonthSamples.filter(s => s.stage === '최종승인').length;
         const thisMonthReceived = thisMonthSamples.length;
         return (
-          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-center justify-between">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-primary">이번 달 샘플 현황</span>
               <span className="text-xs text-muted-foreground">({thisMonth})</span>
@@ -1714,8 +1714,8 @@ export default function SampleManagement() {
                     <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1">
                       자재 요청 목록
                     </p>
-                    <div className="rounded-md border border-border overflow-hidden">
-                      <table className="w-full text-xs">
+                    <div className="rounded-md border border-border overflow-x-auto">
+                      <table className="w-full min-w-[520px] text-xs">
                         <thead>
                           <tr className="bg-[var(--fill-quaternary)] border-b border-border">
                             <th className="text-left px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">자재명</th>

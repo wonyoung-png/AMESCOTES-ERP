@@ -226,16 +226,16 @@ export default function ExchangeSettings() {
   const chartData = [...settings.exchangeHistory].sort((a, b) => a.date.localeCompare(b.date)).slice(-20);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">환율 설정</h1>
         <p className="text-sm text-muted-foreground mt-0.5">현재 적용 환율 및 시스템 설정 관리</p>
       </div>
 
       {/* 현재 환율 + 시스템 설정 */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-card rounded-lg border border-border p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-muted-foreground" />
               <span className="font-semibold text-foreground">현재 적용 환율</span>
@@ -299,7 +299,7 @@ export default function ExchangeSettings() {
           <RefreshCw className="w-4 h-4 text-muted-foreground" />
           환율 업데이트
         </h2>
-        <div className="grid grid-cols-4 gap-3 items-end">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <div className="space-y-1.5">
             <Label>USD/KRW</Label>
             <Input type="number" value={usdInput} onChange={e => setUsdInput(e.target.value)} placeholder="1380" />
@@ -342,7 +342,8 @@ export default function ExchangeSettings() {
           <History className="w-4 h-4 text-muted-foreground" />
           <h2 className="font-semibold text-foreground">환율 변경 이력</h2>
         </div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
               <th className="text-left px-5 py-3 text-[13px] font-semibold text-muted-foreground">날짜</th>
@@ -373,6 +374,7 @@ export default function ExchangeSettings() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* 데이터 관리 */}

@@ -218,7 +218,7 @@ export default function SettlementManagement() {
       )}
 
       {/* 미수금 총액 대시보드 */}
-      <div className="bg-foreground rounded-lg p-5 flex items-center justify-between">
+      <div className="bg-foreground rounded-lg p-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-background/60 text-xs mb-1">총 미수금</p>
           <p className="text-2xl font-bold text-background">{formatKRW(stats.totalReceivable)}</p>
@@ -279,7 +279,8 @@ export default function SettlementManagement() {
           buyerStats.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-3">등록된 정산 내역이 없습니다</p>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-2 text-[13px] font-semibold text-muted-foreground">바이어</th>
@@ -303,6 +304,7 @@ export default function SettlementManagement() {
                 ))}
               </tbody>
             </table>
+            </div>
           )
         )}
         {!showBuyerStats && buyerStats.length > 0 && (
@@ -310,8 +312,8 @@ export default function SettlementManagement() {
         )}
       </div>
 
-      <div className="flex gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 max-w-xs min-w-[180px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="바이어명 / 명세서번호 검색" className="pl-9 h-9" />
         </div>

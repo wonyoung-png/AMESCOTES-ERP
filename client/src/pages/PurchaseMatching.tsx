@@ -524,13 +524,13 @@ export default function PurchaseMatching() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground">자재 구매</h1>
           <p className="text-sm text-muted-foreground mt-0.5">발주번호 매칭 · 본사제공 자재 구매 이력 관리</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {/* 자재 장바구니 버튼 */}
           <button
             onClick={() => { refreshCart(); setCartModal(true); }}
@@ -550,7 +550,7 @@ export default function PurchaseMatching() {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: '전체 구매건', value: `${stats.total}건`, color: 'text-foreground' },
           { label: '미발주', value: `${stats.unpurchased}건`, color: 'text-[var(--system-orange)]' },
@@ -579,8 +579,8 @@ export default function PurchaseMatching() {
         )}
       </div>
 
-      <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-card rounded-lg border border-border overflow-x-auto">
+        <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b border-border">
               <th className="w-10 px-3 py-3">
@@ -918,7 +918,7 @@ export default function PurchaseMatching() {
           ) : (
             <div className="space-y-4 py-2">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="border-b border-border bg-[var(--fill-quaternary)]">
                       <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">자재명</th>
@@ -1087,7 +1087,7 @@ export default function PurchaseMatching() {
                       <Printer className="w-3 h-3 mr-1" />인쇄
                     </Button>
                   </div>
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm">
                     <thead>
                       <tr className="border-b border-border">
                         <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-8">No.</th>
@@ -1159,7 +1159,7 @@ export default function PurchaseMatching() {
                         <td className="px-3 py-2"></td>
                       </tr>
                     </tfoot>
-                  </table>
+                  </table></div>
                   <div className="px-4 py-3 border-t border-border grid grid-cols-3 gap-4 text-xs text-muted-foreground">
                     <div>발주담당: ___________</div>
                     <div>확인: ___________</div>
@@ -1476,7 +1476,7 @@ export default function PurchaseMatching() {
               />
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
+              <table className="w-full min-w-[560px] text-xs border-collapse">
                 <thead>
                   <tr className="bg-[var(--fill-quaternary)] text-[13px] font-semibold text-muted-foreground">
                     <th className="text-left px-2 py-2 border border-border">품목명</th>
@@ -1711,7 +1711,7 @@ function ExpenseDetailInlineModal({
                 <Plus className="w-3.5 h-3.5" />항목 추가
               </Button>
             </div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="bg-[var(--fill-quaternary)] border-b border-border">
                   <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">품목/내역</th>
@@ -1773,7 +1773,7 @@ function ExpenseDetailInlineModal({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
 
           <div className="bg-[var(--fill-quaternary)] rounded-md p-3 space-y-1.5 text-sm">

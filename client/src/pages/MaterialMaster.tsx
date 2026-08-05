@@ -162,8 +162,8 @@ export default function MaterialMaster() {
   }, [materials]);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground">자재 마스터</h1>
           <p className="text-sm text-muted-foreground mt-0.5">원자재·부자재 단가 등록 · BOM 자동 연결</p>
@@ -221,8 +221,8 @@ export default function MaterialMaster() {
       )}
 
       {/* 테이블 */}
-      <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-card rounded-lg border border-border overflow-x-auto">
+        <table className="w-full min-w-[820px] text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
               <th className="px-3 py-3 w-10">
@@ -305,7 +305,7 @@ export default function MaterialMaster() {
 
       {/* 등록/수정 모달 */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editId ? '자재 수정' : '자재 등록'}</DialogTitle>
           </DialogHeader>

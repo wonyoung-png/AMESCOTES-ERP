@@ -92,7 +92,7 @@ export default function OrgChartPage() {
   const candidatePool = ORG_MEMBERS.filter(m => !m.isVacant && !m.concurrent);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
@@ -127,7 +127,7 @@ export default function OrgChartPage() {
           </span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="text-xs text-muted-foreground bg-muted border-b border-border">
                 <th className="text-left px-4 py-2">R3 역할</th>

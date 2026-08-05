@@ -118,7 +118,7 @@ export default function ChinaWarehouse() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
@@ -168,7 +168,8 @@ export default function ChinaWarehouse() {
 
       <div className="bg-card rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">현재고 (품목 · 컬러)</div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
               <th className="text-left px-4 py-2">스타일</th>
@@ -208,6 +209,7 @@ export default function ChinaWarehouse() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="bg-card rounded-lg border overflow-hidden">

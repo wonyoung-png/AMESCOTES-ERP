@@ -1922,7 +1922,7 @@ export default function ItemMaster() {
   }, [items, isBrand]);
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-5">
       {/* 원가 일괄수정 저장 바 — 변경된 품목이 있을 때만 노출 */}
       {dirtyCostIds.size > 0 && (
         <div className="fixed bottom-6 right-8 z-50 flex items-center gap-3 bg-card border border-border shadow-xl rounded-md px-4 py-3">
@@ -1935,7 +1935,7 @@ export default function ItemMaster() {
           </button>
         </div>
       )}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground">품목 마스터</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -1999,7 +1999,7 @@ export default function ItemMaster() {
       </div>
 
       {/* 품목 수 통계 — 클릭 시 카테고리 필터 (바이어 지정 시 해당 바이어만 집계) */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-3 lg:grid-cols-5 gap-3">
         {([
           { key: 'HB', label: 'HB (핸드백)', count: tabCounts.HB, active: 'bg-[var(--fill-tertiary)] border-border ring-2 ring-primary/30', idle: 'bg-card border-border hover:border-border', num: 'text-foreground', sub: 'text-muted-foreground' },
           { key: 'ACC', label: 'ACC (소품)', count: tabCounts.ACC, active: 'bg-[var(--fill-tertiary)] border-border ring-2 ring-primary/30', idle: 'bg-card border-border hover:border-border', num: 'text-foreground', sub: 'text-muted-foreground' },
@@ -2945,7 +2945,7 @@ export default function ItemMaster() {
 
       {/* 시즌별 스타일 현황 모달 */}
       <Dialog open={showSeasonStats} onOpenChange={setShowSeasonStats}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-xl">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BarChart2 size={18} />시즌별 스타일 현황
@@ -2962,8 +2962,8 @@ export default function ItemMaster() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="rounded-lg border border-border overflow-x-auto">
+              <table className="w-full min-w-[480px] text-sm">
                 <thead>
                   <tr className="bg-[var(--fill-quaternary)] border-b border-border">
                     <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">시즌</th>
@@ -3013,7 +3013,7 @@ export default function ItemMaster() {
 
       {/* 등록/수정 모달 */}
       <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) handleModalClose(true); }}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEdit ? '품목 수정' : '품목 등록'}</DialogTitle>
           </DialogHeader>
@@ -3502,7 +3502,7 @@ export default function ItemMaster() {
 
       {/* 엑셀 일괄 등록 미리보기 모달 */}
       <Dialog open={excelPreviewOpen} onOpenChange={setExcelPreviewOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileSpreadsheet size={18} className="text-[var(--system-green)]" />
@@ -3521,8 +3521,8 @@ export default function ItemMaster() {
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
-            <table className="w-full text-xs">
+          <div className="flex-1 overflow-y-auto overflow-x-auto">
+            <table className="w-full min-w-[640px] text-xs">
               <thead className="sticky top-0 bg-[var(--fill-tertiary)]">
                 <tr>
                   <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">상태</th>
@@ -3586,13 +3586,13 @@ export default function ItemMaster() {
 
       {/* 공장 원가표 일괄 업로드 모달 */}
       <Dialog open={showBatchCostUpload} onOpenChange={open => { if (!open) setShowBatchCostUpload(false); }}>
-        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-foreground">공장 원가표 일괄 업로드</DialogTitle>
             <p className="text-xs text-muted-foreground mt-0.5">각 스타일별로 공장 원가표 엑셀을 업로드하세요. KMSRP(확정판매가)는 변경되지 않습니다.</p>
           </DialogHeader>
-          <div className="overflow-y-auto flex-1 mt-2">
-            <table className="w-full text-xs">
+          <div className="overflow-y-auto overflow-x-auto flex-1 mt-2">
+            <table className="w-full min-w-[640px] text-xs">
               <thead>
                 <tr className="bg-[var(--fill-tertiary)] text-muted-foreground">
                   <th className="px-3 py-2 text-left font-medium">스타일번호</th>
@@ -4013,7 +4013,7 @@ function MultiBulkOrderModal({
   if (postOrderState) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-[var(--system-green)]">
               <CheckCircle2 className="w-5 h-5" />발주 등록 완료
@@ -4073,7 +4073,7 @@ function MultiBulkOrderModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package size={18} className="text-primary" />
