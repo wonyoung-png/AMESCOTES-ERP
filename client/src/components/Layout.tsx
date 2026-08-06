@@ -175,7 +175,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         {!collapsed && (
           <div className="px-3 py-3 border-b border-sidebar-border">
             <div className="flex gap-1 bg-[var(--fill-tertiary)] rounded-md p-1">
-              {(['OEM', 'LUMEN', 'AETALOOP'] as WorkspaceId[]).map((ws) => {
+              {(['OEM', 'LUMEN', 'AETALOOF'] as WorkspaceId[]).map((ws) => {
                 const active = workspace === ws;
                 return (
                   <button
