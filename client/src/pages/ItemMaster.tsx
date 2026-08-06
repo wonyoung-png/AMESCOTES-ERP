@@ -12,7 +12,7 @@ import {
   applyPackLinesToBom, createEmptyPackBom, linesFromPackBom, packLinesTotal, type PackBomLine,
 } from '@/lib/packBom';
 import { seedLumenPackingData, hasPackageKitItems, isLegacyPackConsumable } from '@/lib/seedLumenPacking';
-import { seedLumen27ssRrp, hasLumen27ssItems, getLumen27ssProductCount } from '@/lib/seedLumen27ssRrp';
+import { seedLumen27ssRrp, hasLumen27ssItems } from '@/lib/seedLumen27ssRrp';
 import { parseExcelBomSheet } from '@/lib/bomExcelParser';
 import { resizeImage } from '@/lib/utils';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -1944,26 +1944,6 @@ export default function ItemMaster() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => runLumen27Seed(false)}
-            disabled={isLumen27Loading}
-            className="gap-2"
-          >
-            <Upload size={16} />
-            {isLumen27Loading ? '등록 중...' : `LUMEN 27SS 등록 (${getLumen27ssProductCount()})`}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadLumenPacking}
-            disabled={isPackLoading}
-            className="gap-2"
-          >
-            <Package size={16} />
-            {isPackLoading ? '불러오는 중...' : '핸드백 패키지 등록'}
-          </Button>
           <Button variant="outline" size="sm" onClick={() => setColSettingsOpen(true)} className="gap-2">
             <Columns3 size={16} />열 설정
           </Button>
