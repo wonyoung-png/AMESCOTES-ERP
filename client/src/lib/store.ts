@@ -796,15 +796,16 @@ export const store = {
       '봉사·접착제': 'T', '포장재': 'P', '철형': 'I', '후가공': 'F',
       '원자재': 'M', // 레거시 데이터 호환
     };
+    // 형식: [카테고리][YYMM]-[일련] 예) L2608-01 = 가죽 · 2026년 8월 등록 1번
     const prefix = PREFIX[category] || 'X';
+    const d = new Date();
+    const ym = `${String(d.getFullYear() % 100).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const head = `${prefix}${ym}-`;
     const existing = (list ?? getAll<Material>(KEYS.materials))
-      .filter(m => m.itemCode?.startsWith(prefix))
-      .map(m => {
-        const match = m.itemCode!.match(/^[A-Z](\d+)$/);
-        return match ? parseInt(match[1]) : 0;
-      });
+      .filter(m => m.itemCode?.startsWith(head))
+      .map(m => parseInt(m.itemCode!.slice(head.length), 10) || 0);
     const nextNum = existing.length > 0 ? Math.max(...existing) + 1 : 1;
-    return `${prefix}${String(nextNum).padStart(2, '0')}`;
+    return `${head}${String(nextNum).padStart(2, '0')}`;
   },
   addMaterial: (v: Material) => { const a = getAll<Material>(KEYS.materials); a.push(v); setAll(KEYS.materials, a); sbUpsert('materials', v); },
   updateMaterial: (id: string, u: Partial<Material>) => { const a = getAll<Material>(KEYS.materials); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.materials, a); sbUpdate('materials', id, u); } },

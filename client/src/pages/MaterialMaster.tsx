@@ -12,7 +12,48 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Search, Pencil, Trash2, Package } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Plus, Search, Pencil, Trash2, Package, ChevronDown } from 'lucide-react';
+
+/** 검색 가능한 단일 선택 드롭다운 — 네이티브 datalist 대신 (Select 와 같은 외형) */
+function SearchSelect({ value, options, placeholder, disabled, onChange }: {
+  value?: string; options: string[]; placeholder: string; disabled?: boolean; onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const filtered = options.filter(o => o.toLowerCase().includes(q.trim().toLowerCase()));
+  return (
+    <Popover open={open} onOpenChange={o => { setOpen(o); if (o) setQ(''); }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button" disabled={disabled}
+          className="flex h-9 w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span className={value ? 'text-foreground' : 'text-muted-foreground'}>{value || placeholder}</span>
+          <ChevronDown size={14} className="opacity-50 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="p-0 w-[var(--radix-popover-trigger-width)]">
+        <div className="p-2 border-b border-border">
+          <Input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="검색" className="h-8" />
+        </div>
+        <div className="max-h-56 overflow-y-auto py-1">
+          {filtered.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground">결과 없음</p>
+          ) : filtered.map(o => (
+            <button
+              key={o} type="button"
+              onClick={() => { onChange(o); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--fill-quaternary)] ${o === value ? 'bg-[var(--fill-tertiary)]' : ''}`}
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const UNITS = ['SF', 'YD', 'M', 'EA', 'L', '콘', 'KG', 'SET', '장', '개', 'PC', 'CM'];
 const CHIP = 'bg-[var(--fill-tertiary)] text-foreground border-border';
@@ -39,6 +80,11 @@ export default function MaterialMaster() {
     () => [COMMON_BRAND, ...allVendors.filter((v: Vendor) => v.type === '바이어').map((v: Vendor) => v.name)],
     [allVendors],
   );
+  const buyerNames = useMemo(() => brands.slice(1), [brands]);
+  const supplierNames = useMemo(
+    () => allVendors.filter((v: Vendor) => v.type === '자재거래처' && v.name?.trim()).map((v: Vendor) => v.name),
+    [allVendors],
+  );
   const [search, setSearch] = usePersistedState('materials.search', '');
   const [filterCat, setFilterCat] = usePersistedState('materials.filterCat', 'all');
   const [filterBrand, setFilterBrand] = usePersistedState('materials.filterBrand', 'all');
@@ -62,6 +108,8 @@ export default function MaterialMaster() {
   }, [materials, filterCat, filterBrand, search]);
 
   const nextCode = (cat: MaterialCategory) => store.getNextItemCode(cat, materials as Material[]);
+  // brand === '' 는 "브랜드 전용 선택했으나 바이어 미지정" 상태 (undefined 와 구분)
+  const isCommonBrand = form.brand === undefined || form.brand === COMMON_BRAND;
 
   const openNew = () => {
     setForm({ ...emptyForm, itemCode: nextCode(emptyForm.category as MaterialCategory) });
@@ -121,6 +169,7 @@ export default function MaterialMaster() {
   const handleSave = async () => {
     if (!form.name?.trim()) { toast.error('자재명을 입력하세요'); return; }
     if (!form.unit) { toast.error('단위를 입력하세요'); return; }
+    if (!isCommonBrand && !buyerNames.includes(form.brand || '')) { toast.error('브랜드 전용이면 바이어를 선택하세요'); return; }
 
     const mat = {
       ...form,
@@ -252,7 +301,7 @@ export default function MaterialMaster() {
       {/* 검색 */}
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="자재명 / 영문명 / 스펙 검색" className="pl-9 h-9" />
+        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="자재명 / 스펙 검색" className="pl-9 h-9" />
       </div>
 
       {/* 다중 선택 액션 바 */}
@@ -399,53 +448,61 @@ export default function MaterialMaster() {
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
             </div>
 
-            {/* 카테고리 + 브랜드 */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>카테고리 *</Label>
-                <Select value={form.category || '가죽'} onValueChange={v => {
-                  const cat = v as MaterialCategory;
-                  setForm(prev => ({ ...prev, category: cat, itemCode: editId ? prev.itemCode : nextCode(cat) }));
-                }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {MATERIAL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+            {/* 카테고리 */}
+            <div className="space-y-1.5">
+              <Label>카테고리 *</Label>
+              <Select value={form.category || '가죽'} onValueChange={v => {
+                const cat = v as MaterialCategory;
+                setForm(prev => ({ ...prev, category: cat, itemCode: editId ? prev.itemCode : nextCode(cat) }));
+              }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {MATERIAL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 브랜드 — 공통 / 브랜드 전용(바이어 검색 선택) */}
+            <div className="space-y-1.5">
+              <Label>브랜드</Label>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer whitespace-nowrap">
+                  <input type="radio" checked={isCommonBrand} onChange={() => setForm(prev => ({ ...prev, brand: COMMON_BRAND }))} className="w-4 h-4 accent-primary" />
+                  공통
+                </label>
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer whitespace-nowrap">
+                  <input type="radio" checked={!isCommonBrand} onChange={() => setForm(prev => ({ ...prev, brand: '' }))} className="w-4 h-4 accent-primary" />
+                  브랜드 전용
+                </label>
+                <div className="flex-1">
+                  <SearchSelect
+                    value={isCommonBrand ? '' : (form.brand || '')}
+                    options={buyerNames}
+                    placeholder="바이어 선택"
+                    disabled={isCommonBrand}
+                    onChange={v => setForm(prev => ({ ...prev, brand: v }))}
+                  />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>브랜드</Label>
-                <Select value={form.brand || COMMON_BRAND} onValueChange={v => setForm(prev => ({ ...prev, brand: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {brands.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              {buyerNames.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  브랜드 전용 자재만 지정 · 목록 추가는 <Link href="/vendors" className="underline">거래처 마스터</Link>
+                  <Link href="/vendors" className="underline">거래처 마스터</Link>에 바이어를 먼저 등록하세요
                 </p>
-              </div>
+              )}
             </div>
 
             {/* 품번 — 카테고리별 자동채번 (가죽 L01 · 원단 W01 · 장식 H01 …) */}
             <div className="space-y-1.5">
               <Label>품번</Label>
               <div className="flex gap-2">
-                <Input value={form.itemCode || ''} onChange={e => setForm(prev => ({ ...prev, itemCode: e.target.value }))} placeholder="L01" className="w-28 font-mono" />
+                <Input value={form.itemCode || ''} onChange={e => setForm(prev => ({ ...prev, itemCode: e.target.value }))} placeholder="L2608-01" className="w-36 font-mono" />
                 <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setForm(prev => ({ ...prev, itemCode: nextCode((prev.category as MaterialCategory) || '가죽') }))}>다시 생성</Button>
-                <span className="text-xs text-muted-foreground self-center">가죽 L · 원단 W · 장식 H · 지퍼 Z · 보강재 R · 봉사 T · 포장재 P · 철형 I · 후가공 F</span>
               </div>
             </div>
             {/* 자재명 */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>자재명 *</Label>
-                <Input value={form.name || ''} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} placeholder="소가죽 (블랙)" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>영문명</Label>
-                <Input value={form.nameEn || ''} onChange={e => setForm(prev => ({ ...prev, nameEn: e.target.value }))} placeholder="Cow Leather Black" />
-              </div>
+            <div className="space-y-1.5">
+              <Label>자재명 *</Label>
+              <Input value={form.name || ''} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} placeholder="소가죽 (블랙)" />
             </div>
 
             {/* 스펙 */}
@@ -484,29 +541,24 @@ export default function MaterialMaster() {
               </div>
             </div>
 
-            {/* 공급업체 — 거래처 마스터 전체에서 검색 선택 */}
+            {/* 공급업체 — 거래처 마스터의 자재거래처만 */}
             <div className="space-y-1.5">
               <Label>공급업체</Label>
-              <Input
-                list="material-vendor-options"
+              <SearchSelect
                 value={vendorQuery}
-                onChange={e => {
-                  const text = e.target.value;
-                  setVendorQuery(text);
-                  const hit = allVendors.find((v: Vendor) => v.name === text);
+                options={supplierNames}
+                placeholder="공급업체 선택"
+                onChange={name => {
+                  setVendorQuery(name);
+                  const hit = allVendors.find((v: Vendor) => v.name === name);
                   setForm(prev => ({ ...prev, vendorId: hit ? hit.id : '' }));
                 }}
-                placeholder="거래처명 검색 (예: 홍콩원단)"
               />
-              <datalist id="material-vendor-options">
-                {allVendors.filter((v: Vendor) => v.id?.trim()).map((v: Vendor) => (
-                  <option key={v.id} value={v.name}>{v.type}</option>
-                ))}
-              </datalist>
-              {vendorQuery && !form.vendorId && (
-                <p className="text-xs text-[var(--system-red)]">목록에 없는 거래처입니다 — 거래처 마스터에 먼저 등록하세요</p>
+              {supplierNames.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  <Link href="/vendors" className="underline">거래처 마스터</Link>에 자재거래처를 먼저 등록하세요
+                </p>
               )}
-              {allVendors.length === 0 && <p className="text-xs text-muted-foreground">등록된 거래처가 없습니다</p>}
             </div>
 
             {/* 메모 */}
