@@ -83,7 +83,7 @@ function UnitCard({ unit, depth }: { unit: OrgUnit; depth: number }) {
 
 export default function OrgChartPage() {
   const { workspace } = useWorkspace();
-  const ws = workspace === 'AETALOOP' ? 'AETALOOP' : workspace === 'LUMEN' ? 'LUMEN' : undefined;
+  const ws = workspace === 'AETALOOF' ? 'AETALOOF' : workspace === 'LUMEN' ? 'LUMEN' : undefined;
   const [, tick] = useState(0);
   const refresh = () => tick(n => n + 1);
 

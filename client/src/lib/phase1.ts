@@ -2,7 +2,7 @@
 import { supabase } from './supabase';
 import type { ColorQty } from './store';
 
-export type Workspace = 'OEM' | 'LUMEN' | 'AETALOOP';
+export type Workspace = 'OEM' | 'LUMEN' | 'AETALOOF';
 export type ProductionOrigin = 'domestic' | 'china';
 export type ReceiptLogType = 'inbound' | 'outbound_oem' | 'outbound_3pl';
 export type ReceiptDestination = 'korea' | 'china';
@@ -98,7 +98,7 @@ export type ChinaStockMoveType = 'inbound' | 'outbound' | 'adjust';
 
 export interface ChinaStockMove {
   id: string;
-  workspace: 'LUMEN' | 'AETALOOP';
+  workspace: 'LUMEN' | 'AETALOOF';
   styleNo: string;
   styleName?: string;
   color: string;
@@ -114,7 +114,7 @@ export interface ChinaStockMove {
 }
 
 export interface ChinaStockBalance {
-  workspace: 'LUMEN' | 'AETALOOP';
+  workspace: 'LUMEN' | 'AETALOOF';
   styleNo: string;
   styleName: string;
   color: string;
@@ -194,7 +194,7 @@ export interface ApprovalLog {
 
 export interface BrandOrderBatch {
   id: string;
-  workspace: 'LUMEN' | 'AETALOOP';
+  workspace: 'LUMEN' | 'AETALOOF';
   projectNo: string;
   title: string;
   weekLabel?: string;
@@ -275,7 +275,7 @@ export interface CampaignTask {
 
 export interface Campaign {
   id: string;
-  workspace: 'LUMEN' | 'AETALOOP';
+  workspace: 'LUMEN' | 'AETALOOF';
   title: string;
   channel: string;
   startDate: string;
@@ -639,7 +639,7 @@ export const phase1 = {
     });
   },
 
-  getBrandBatches: (workspace?: 'LUMEN' | 'AETALOOP') => {
+  getBrandBatches: (workspace?: 'LUMEN' | 'AETALOOF') => {
     const batches = getAll<BrandOrderBatch>(KEYS.brandBatches);
     const lines = getAll<BrandOrderLine>(KEYS.brandLines);
     return batches
@@ -649,7 +649,7 @@ export const phase1 = {
   },
   getBrandBatch: (id: string) => phase1.getBrandBatches().find(b => b.id === id),
 
-  createBrandBatch: (workspace: 'LUMEN' | 'AETALOOP', title: string, weekLabel?: string, createdBy?: string) => {
+  createBrandBatch: (workspace: 'LUMEN' | 'AETALOOF', title: string, weekLabel?: string, createdBy?: string) => {
     const projectNo = generateProjectNo(workspace);
     ensureProject(projectNo, workspace, title);
     const batch: BrandOrderBatch = {
@@ -780,13 +780,13 @@ export const phase1 = {
   /** 리오더·오더관리: 스타일별 차수 보드 */
   getReorderOrderBoard: (
     orders: BoardOrderInput[],
-    workspace?: 'LUMEN' | 'AETALOOP',
+    workspace?: 'LUMEN' | 'AETALOOF',
     items?: { styleNo: string; name?: string; erpCategory?: string }[],
   ): ReorderOrderBoardGroup[] => {
     const itemMap = new Map((items || []).map(i => [i.styleNo, i]));
     const filtered = orders.filter(o => {
       if (workspace && o.workspace && o.workspace !== workspace) return false;
-      // 브랜드 워크스페이스: 리오더·브랜드 분할·LUMEN/AETALOOP
+      // 브랜드 워크스페이스: 리오더·브랜드 분할·LUMEN/AETALOOF
       if (workspace) {
         return !!(o.isReorder || o.brandBatchId || o.workspace === workspace);
       }
@@ -936,13 +936,13 @@ export const phase1 = {
       .filter((p): p is Payable => !!p);
   },
 
-  getChinaStockMoves: (workspace?: 'LUMEN' | 'AETALOOP') => {
+  getChinaStockMoves: (workspace?: 'LUMEN' | 'AETALOOF') => {
     const all = getAll<ChinaStockMove>(KEYS.chinaStockMoves)
       .sort((a, b) => b.moveDate.localeCompare(a.moveDate) || b.createdAt.localeCompare(a.createdAt));
     return workspace ? all.filter(m => m.workspace === workspace) : all;
   },
 
-  getChinaStockBalances: (workspace?: 'LUMEN' | 'AETALOOP'): ChinaStockBalance[] => {
+  getChinaStockBalances: (workspace?: 'LUMEN' | 'AETALOOF'): ChinaStockBalance[] => {
     const moves = phase1.getChinaStockMoves(workspace);
     const map = new Map<string, ChinaStockBalance>();
     moves.forEach(m => {
@@ -1004,7 +1004,7 @@ export const phase1 = {
   postChinaInboundFromReceipt: (
     log: ReceiptLog,
     opts: {
-      workspace: 'LUMEN' | 'AETALOOP';
+      workspace: 'LUMEN' | 'AETALOOF';
       styleNo: string;
       styleName?: string;
       color: string;
@@ -1031,7 +1031,7 @@ export const phase1 = {
     });
   },
 
-  getCampaigns: (workspace?: 'LUMEN' | 'AETALOOP') => {
+  getCampaigns: (workspace?: 'LUMEN' | 'AETALOOF') => {
     seedCampaignsIfEmpty();
     let all = getAll<Campaign>(KEYS.campaigns).map(migrateCampaignTasks);
     const migrated = all.some((c, i) => c !== getAll<Campaign>(KEYS.campaigns)[i]);

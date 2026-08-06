@@ -44,7 +44,7 @@ const HB_CATEGORIES: Category[] = ['숄더백', '토트백', '크로스백', '�
 const ACC_CATEGORIES: Category[] = ['파우치', '키링', '지갑', '기타'];
 // SHOES 전용 세부 카테고리
 const SHOES_CATEGORIES: Category[] = ['스니커즈', '힐', '로퍼', '부츠', '샌들', '기타'];
-// PACK 전용 세부 카테고리 (LUMEN·AETALOOP 패키지 키트 — 소모품은 자재마스터)
+// PACK 전용 세부 카테고리 (LUMEN·AETALOOF 패키지 키트 — 소모품은 자재마스터)
 const PACK_CATEGORIES: Category[] = ['기타', '택배박스', '내부박스', '더스트백', '쇼핑백', '노루지', '소모품'];
 const PACKING_SIZES: PackingSize[] = ['SS', 'S', 'M', 'L', 'XL'];
 
@@ -1911,7 +1911,7 @@ export default function ItemMaster() {
     void runLumen27Seed(true);
   }, [itemsRaw]);
 
-  // LUMEN/AETALOOP — PACKAGE 키트 없으면 자동 시드 (브랜드 워크스페이스만)
+  // LUMEN/AETALOOF — PACKAGE 키트 없으면 자동 시드 (브랜드 워크스페이스만)
   useEffect(() => {
     if (import.meta.env.VITE_ENABLE_DEMO_SEED !== 'true') return;
     if (!isBrand) return;

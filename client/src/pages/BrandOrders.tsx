@@ -57,7 +57,7 @@ function ensureChinaCorpVendor(): { id: string; name: string } {
 
 export default function BrandOrders() {
   const { workspace } = useWorkspace();
-  const ws = workspace === 'AETALOOP' ? 'AETALOOP' : 'LUMEN';
+  const ws = workspace === 'AETALOOF' ? 'AETALOOF' : 'LUMEN';
   const queryClient = useQueryClient();
   const { data: remoteOrders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
   const [, tick] = useState(0);
@@ -302,7 +302,7 @@ export default function BrandOrders() {
 
     if (recvForm.destination === 'china') {
       const stock = phase1.postChinaInboundFromReceipt(log, {
-        workspace: (detailRow.workspace === 'AETALOOP' ? 'AETALOOP' : 'LUMEN'),
+        workspace: (detailRow.workspace === 'AETALOOF' ? 'AETALOOF' : 'LUMEN'),
         styleNo: detailRow.styleNo,
         styleName: detailRow.styleName,
         color: recvForm.color.trim(),

@@ -20,7 +20,7 @@ const MOVE_LABEL: Record<ChinaStockMoveType, string> = {
 
 export default function ChinaWarehouse() {
   const { workspace } = useWorkspace();
-  const ws = workspace === 'AETALOOP' ? 'AETALOOP' : 'LUMEN';
+  const ws = workspace === 'AETALOOF' ? 'AETALOOF' : 'LUMEN';
   const [, tick] = useState(0);
   const refresh = () => tick(n => n + 1);
 

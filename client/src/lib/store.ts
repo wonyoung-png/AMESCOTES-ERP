@@ -331,7 +331,7 @@ export interface ProductionOrder {
   receivedDate?: string;          // 입고일
   // Phase 1 — project_no · 워크스페이스
   projectNo?: string;
-  workspace?: 'OEM' | 'LUMEN' | 'AETALOOP';
+  workspace?: 'OEM' | 'LUMEN' | 'AETALOOF';
   productionOrigin?: 'domestic' | 'china';
   brandBatchId?: string;
   shippedQty?: number;
@@ -603,7 +603,7 @@ export interface TradeStatement {
   memo?: string;
   createdAt: string;
   projectNo?: string;
-  workspace?: 'OEM' | 'LUMEN' | 'AETALOOP';
+  workspace?: 'OEM' | 'LUMEN' | 'AETALOOF';
 }
 
 // ─── 자재 발주 장바구니 ───
@@ -650,7 +650,7 @@ export interface Settlement {
   memo?: string;
   createdAt: string;
   projectNo?: string;
-  workspace?: 'OEM' | 'LUMEN' | 'AETALOOP';
+  workspace?: 'OEM' | 'LUMEN' | 'AETALOOF';
 }
 
 // ─── 지출 전표 ───

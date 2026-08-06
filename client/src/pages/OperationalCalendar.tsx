@@ -41,7 +41,7 @@ interface PlacedEvent extends Campaign {
 
 export default function OperationalCalendar() {
   const { workspace } = useWorkspace();
-  const ws = workspace === 'AETALOOP' ? 'AETALOOP' : 'LUMEN';
+  const ws = workspace === 'AETALOOF' ? 'AETALOOF' : 'LUMEN';
   const today = new Date();
 
   const [viewMode, setViewMode] = useState<CalendarViewMode>('month');

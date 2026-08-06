@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS projects (
   id text PRIMARY KEY,
   project_no text UNIQUE NOT NULL,
-  workspace text NOT NULL CHECK (workspace IN ('OEM', 'LUMEN', 'AETALOOP')),
+  workspace text NOT NULL CHECK (workspace IN ('OEM', 'LUMEN', 'AETALOOF')),
   title text,
   status text DEFAULT 'active',
   created_at timestamptz DEFAULT now(),
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS projects (
 -- 브랜드 묶음 발주
 CREATE TABLE IF NOT EXISTS brand_order_batches (
   id text PRIMARY KEY,
-  workspace text NOT NULL CHECK (workspace IN ('LUMEN', 'AETALOOP')),
+  workspace text NOT NULL CHECK (workspace IN ('LUMEN', 'AETALOOF')),
   project_no text NOT NULL,
   title text,
   week_label text,

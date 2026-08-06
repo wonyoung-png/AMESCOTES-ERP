@@ -14,7 +14,7 @@ export interface OrgMember {
   isVacant?: boolean;
   concurrent?: boolean;    // 겸직
   r3Roles?: R3Role[];      // 기본 부여 역할 (임시)
-  brands?: Array<'LUMEN' | 'AETALOOP'>;
+  brands?: Array<'LUMEN' | 'AETALOOF'>;
 }
 
 export interface OrgUnit {
@@ -68,7 +68,7 @@ export const ORG_MEMBERS: OrgMember[] = [
   { id: 'm-park-jy', name: '박지영', title: '대리', unitId: 'brand-lumen', brands: ['LUMEN'], r3Roles: ['design_lead'] },
   { id: 'm-kim-sb', name: '김수빈', title: '대리', unitId: 'brand-lumen', brands: ['LUMEN'] },
   { id: 'm-song-yj', name: '송예진', title: '주임', unitId: 'brand-lumen', brands: ['LUMEN'] },
-  { id: 'm-kim-cy', name: '김채윤', title: '대리', unitId: 'brand-aetaloop', brands: ['AETALOOP'], r3Roles: ['design_lead'] },
+  { id: 'm-kim-cy', name: '김채윤', title: '대리', unitId: 'brand-aetaloop', brands: ['AETALOOF'], r3Roles: ['design_lead'] },
   { id: 'm-choi-jh', name: '최지혜', title: '대리', unitId: 'brand-visual' },
   { id: 'm-han-yj', name: '한유진', title: '주임', unitId: 'brand-visual' },
   // 안수정 비주얼 겸직 표시용
@@ -159,7 +159,7 @@ export function getAssigneeForRole(role: R3Role, workspace?: Workspace): OrgMemb
   }
 
   if (role === 'design_lead') {
-    if (workspace === 'AETALOOP') {
+    if (workspace === 'AETALOOF') {
       return getMember('m-kim-cy') || null;
     }
     if (workspace === 'LUMEN') {

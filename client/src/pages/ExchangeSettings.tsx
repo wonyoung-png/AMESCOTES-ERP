@@ -167,7 +167,7 @@ export default function ExchangeSettings() {
   };
 
   const handleSeedPacking = async () => {
-    if (!confirm('LUMEN·AETALOOP PACKAGE SS~XL 키트를 생성합니다.\n소모품은 자재 마스터(포장재)에 넣고, PACKAGE 품목 BOM으로 연결합니다.\n기존 LPKG-* 소모품 품목은 목록에서 제거됩니다. 계속할까요?')) return;
+    if (!confirm('LUMEN·AETALOOF PACKAGE SS~XL 키트를 생성합니다.\n소모품은 자재 마스터(포장재)에 넣고, PACKAGE 품목 BOM으로 연결합니다.\n기존 LPKG-* 소모품 품목은 목록에서 제거됩니다. 계속할까요?')) return;
     setIsPackSeeding(true);
     try {
       const result = await seedLumenPackingData();

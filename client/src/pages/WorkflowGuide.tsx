@@ -167,7 +167,7 @@ const QUICK_LINKS: FlowNode[] = [
 
 export default function WorkflowGuide() {
   const { workspace } = useWorkspace();
-  const isBrand = workspace === 'LUMEN' || workspace === 'AETALOOP';
+  const isBrand = workspace === 'LUMEN' || workspace === 'AETALOOF';
   const [flow, setFlow] = useState<FlowId>(isBrand ? 'brand' : 'oem');
   const [, navigate] = useLocation();
   const [hint, setHint] = useState<string | null>(null);
