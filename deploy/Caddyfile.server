@@ -1,6 +1,6 @@
 # ERP 라우팅 공통 (스니펫)
 (erp) {
-	encode gzip
+	encode zstd gzip
 	log {
 		output stdout
 		format json
@@ -30,14 +30,14 @@
 
 # BGROW OS 셸 (런처 — 정적, 컨테이너 불필요)
 os.54-116-241-64.sslip.io {
-	encode gzip
+	encode zstd gzip
 	root * /srv/shell
 	file_server
 }
 
 # Daily Check (PMS 모듈)
 daily.54-116-241-64.sslip.io {
-	encode gzip
+	encode zstd gzip
 	log {
 		output stdout
 		format json

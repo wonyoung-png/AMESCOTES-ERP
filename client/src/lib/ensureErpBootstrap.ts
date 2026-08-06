@@ -8,11 +8,18 @@ import { fillMissingItemColorsForTest, ITEM_COLOR_FILL_FLAG, ordersNeedColorFix 
 import { seedLumen27ssRrp, LUMEN_27SS_SEED_FLAG, lumen27ssMissingImages } from './seedLumen27ssRrp';
 import { store } from './store';
 
+const SYNC_STAMP_KEY = 'erp_last_full_sync';
+const SYNC_TTL_MS = 5 * 60 * 1000; // 5분 내 재부팅/새로고침은 전체 동기화 생략 (개별 화면 쿼리는 정상 동작)
+
 export async function ensureErpBootstrap(): Promise<{ seeded: boolean; message: string }> {
-  try {
-    await syncFromSupabase();
-  } catch {
-    /* Supabase 미연결 시 localStorage만 사용 */
+  const last = Number(localStorage.getItem(SYNC_STAMP_KEY) || 0);
+  if (Date.now() - last > SYNC_TTL_MS) {
+    try {
+      await syncFromSupabase();
+      localStorage.setItem(SYNC_STAMP_KEY, String(Date.now()));
+    } catch {
+      /* DB 미연결 시 localStorage만 사용 */
+    }
   }
 
   const hasData =

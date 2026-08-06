@@ -15,6 +15,20 @@ export default defineConfig({
   envDir: path.resolve(import.meta.dirname),
   root: path.resolve(import.meta.dirname, "client"),
   build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom", "wouter"],
+          radix: [
+            "@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-popover",
+            "@radix-ui/react-select", "@radix-ui/react-tabs", "@radix-ui/react-tooltip",
+          ],
+          charts: ["recharts"],
+          xlsx: ["xlsx"],
+          supabase: ["@supabase/supabase-js"],
+        },
+      },
+    },
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
   },

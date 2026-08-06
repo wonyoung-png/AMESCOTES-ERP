@@ -77,7 +77,8 @@ async function startServer() {
     console.error(`[server] UI 빌드 없음: ${indexHtml} — npm run build 후 재시작 필요`);
   }
 
-  app.use(express.static(staticPath));
+  // 해시 파일명(assets/*)은 1년 불변 캐시 — 재방문 시 재다운로드 없음
+  app.use(express.static(staticPath, { maxAge: "365d", immutable: true, index: false }));
 
   // Handle client-side routing - serve index.html for all routes
   // index.html은 캐시 금지 (새 빌드 즉시 반영 — 로그인 비번 변경 등)

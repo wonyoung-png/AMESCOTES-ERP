@@ -167,6 +167,31 @@ const SECTION_SUB_PARTS: Record<string, string[]> = {
   '철형': ['기타'],
 };
 // const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS']; // 미사용
+// 원자재 섹션은 기본 펼침, 나머지는 기본 접힘 (렌더마다 재생성 방지 — 모듈 상수)
+const NON_RAW_SECTIONS = ['지퍼', '장식', '보강재', '봉사·접착제', '포장재', '철형', '후가공'];
+const COUNTRY_OPTIONS = ['중국', '한국', '기타'] as const;
+const CURRENCY_OPTIONS = ['CNY', 'USD', 'KRW'] as const;
+// P&L 가정 입력 필드 (사전/사후 공용 — 모듈 상수)
+const PNL_RATE_FIELDS = [
+  { label: '할인율 (Discount)', field: 'discountRate' as keyof BomPnlAssumptions },
+  { label: '플랫폼 수수료', field: 'platformFeeRate' as keyof BomPnlAssumptions },
+  { label: '인건비 / 판관비', field: 'sgaRate' as keyof BomPnlAssumptions },
+] as const;
+
+// ─── 공용 스타일 토큰 (편집 표 규격 통일) ────────────────────────────────────
+const CELL_INPUT = 'h-8 rounded-lg text-[13px]';           // 자재 행 인풋 32px / r8 / 13px
+const ICON_BTN = 'w-7 h-7 shrink-0 flex items-center justify-center rounded-lg'; // 아이콘 버튼 28px 정사각
+const GHOST_ADD_BTN = 'flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-primary hover:bg-primary/10 transition-colors'; // "+ 행 추가" ghost 소형 버튼
+
+// ─── 검색/필터 입력 디바운스 (300ms) ─────────────────────────────────────────
+function useDebouncedValue<T>(value: T, delay = 300): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
 
 // ─── 계산 헬퍼 ──────────────────────────────────────────────────────────────
 const fmt = (n: number) => n.toLocaleString('ko-KR', { maximumFractionDigits: 3 });
@@ -1193,19 +1218,20 @@ function MaterialSearchPopover({ onSelect }: { onSelect: (m: Material) => void }
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
+  const debouncedSearch = useDebouncedValue(search, 300);
 
-  const filtered = materials.filter(m => {
+  const filtered = useMemo(() => materials.filter(m => {
     const matchCat = filterCat === 'all' || m.category === filterCat;
-    const matchSearch = !search ||
-      m.name.toLowerCase().includes(search.toLowerCase()) ||
-      (m.spec || '').toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !debouncedSearch ||
+      m.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      (m.spec || '').toLowerCase().includes(debouncedSearch.toLowerCase());
     return matchCat && matchSearch;
-  });
+  }), [materials, filterCat, debouncedSearch]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border border-primary/30 text-primary bg-primary/5 hover:bg-primary/15 transition-colors">
+        <button className="flex items-center gap-1 h-7 shrink-0 text-[11px] px-1.5 rounded-lg border border-primary/30 text-primary bg-primary/5 hover:bg-primary/15 transition-colors">
           <Search className="w-3 h-3" />자재
         </button>
       </PopoverTrigger>
@@ -1352,7 +1378,7 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
             );
             setOpen(true);
           }}
-          className="h-7 text-xs border-border bg-primary/5 w-full"
+          className="h-8 rounded-lg text-[13px] border-border bg-primary/5 w-full"
           placeholder="업체명 검색/입력"
           title="새 업체면 이름 입력 후 Enter 또는 신규 등록"
         />
@@ -1619,7 +1645,8 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
   );
 }
 
-function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재', accentColor = 'amber', showUsdHint = false, usdKrw = 1380 }: {
+// React.memo: 얕은 비교로 변경된 행만 리렌더 (부모에서 stable 콜백 + 행 데이터만 전달)
+const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재', accentColor = 'amber', showUsdHint = false, usdKrw = 1380 }: {
   line: ExtBomLine;
   onChange: (id: string, field: keyof ExtBomLine, val: unknown) => void;
   onDelete: (id: string) => void;
@@ -1679,7 +1706,8 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
     }
     if (m.unitPriceCny != null) onChange(line.id, 'unitPriceCny', m.unitPriceCny);
     if (m.vendorId) {
-      const vendor = allV.find((v: any) => v.id === m.vendorId);
+      // BomLineRow는 모듈 스코프라 컴포넌트 내부 쿼리(allV) 참조 불가 → 동기 캐시 사용
+      const vendor = store.getVendors().find((v: any) => v.id === m.vendorId);
       if (vendor) {
         onChange(line.id, 'vendorName', vendor.name);
         onChange(line.id, 'vendorId', vendor.id);
@@ -1739,7 +1767,7 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
       <td className="px-1 py-1">
         <div className="flex items-center gap-1">
           <Select value={line.subPart || ''} onValueChange={v => onChange(line.id, 'subPart', v as BomSubPart)}>
-            <SelectTrigger className="h-7 text-xs border-border w-20 shrink-0">
+            <SelectTrigger className={`${CELL_INPUT} border-border w-20 shrink-0`}>
               <SelectValue placeholder="-" />
             </SelectTrigger>
             <SelectContent>
@@ -1748,7 +1776,7 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
             </SelectContent>
           </Select>
           <MaterialSearchPopover onSelect={handleMaterialSelect} />
-          <Input value={line.itemName} onChange={e => onChange(line.id, 'itemName', e.target.value)} className="h-7 text-xs border-border bg-card min-w-[80px]" placeholder="자재명" />
+          <Input value={line.itemName} onChange={e => onChange(line.id, 'itemName', e.target.value)} className={`${CELL_INPUT} border-border bg-card min-w-[80px]`} placeholder="자재명" />
           {/* 이미지 기능 (원자재/장식 섹션에만) */}
           {showImageFeature && (
             <>
@@ -1763,14 +1791,14 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
                 <HoverZoomImage
                   src={line.imageUrl}
                   alt="자재 이미지"
-                  className="w-6 h-6 rounded border border-border overflow-hidden cursor-zoom-in shrink-0"
-                  imgClassName="w-6 h-6 object-cover"
+                  className="w-7 h-7 rounded-lg border border-border overflow-hidden cursor-zoom-in shrink-0"
+                  imgClassName="w-7 h-7 object-cover"
                   previewSize={280}
                 >
                   <img
                     src={line.imageUrl}
                     alt="자재 이미지"
-                    className="w-6 h-6 object-cover rounded cursor-pointer border border-border shrink-0"
+                    className="w-7 h-7 object-cover rounded-lg cursor-pointer border border-border shrink-0"
                     onClick={() => setShowImagePreview(true)}
                     title="클릭하여 확대 · 호버 미리보기"
                   />
@@ -1778,7 +1806,7 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
               ) : (
                 <button
                   onClick={() => imageInputRef.current?.click()}
-                  className="w-6 h-6 rounded border border-border text-muted-foreground hover:text-muted-foreground hover:border-[var(--separator-opaque,#C6C6C8)] flex items-center justify-center shrink-0 transition-colors"
+                  className={`${ICON_BTN} border border-border text-muted-foreground hover:border-[var(--separator-opaque,#C6C6C8)] transition-colors`}
                   title="이미지 추가"
                 >
                   <Camera className="w-3.5 h-3.5" />
@@ -1789,12 +1817,12 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
         </div>
       </td>
       {/* 규격 */}
-      <td className="px-1 py-1"><Input value={line.spec || ''} onChange={e => onChange(line.id, 'spec', e.target.value)} className="h-7 text-xs border-border bg-card min-w-[60px]" placeholder="규격" /></td>
+      <td className="px-1 py-1"><Input value={line.spec || ''} onChange={e => onChange(line.id, 'spec', e.target.value)} className={`${CELL_INPUT} border-border bg-card min-w-[60px]`} placeholder="규격" /></td>
       {/* 단위 */}
       <td className="px-1 py-1">
         <div className="flex flex-col gap-0.5">
           <Select value={line.unit} onValueChange={v => { onChange(line.id, 'unit', v); if (v !== '직접입력') onChange(line.id, 'customUnit', ''); }}>
-            <SelectTrigger className="h-7 text-xs border-border w-20"><SelectValue /></SelectTrigger>
+            <SelectTrigger className={`${CELL_INPUT} border-border w-20`}><SelectValue /></SelectTrigger>
             <SelectContent>
               {UNITS.map(u => <SelectItem key={u} value={u} className={`text-xs ${u === '직접입력' ? 'border-t border-border text-muted-foreground italic' : ''}`}>{u}</SelectItem>)}
             </SelectContent>
@@ -1803,7 +1831,7 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
             <Input
               value={line.customUnit || ''}
               onChange={e => onChange(line.id, 'customUnit', e.target.value)}
-              className="h-6 text-xs border-border bg-primary/5 w-20"
+              className={`${CELL_INPUT} border-border bg-primary/5 w-20`}
               placeholder="단위 입력"
             />
           )}
@@ -1815,15 +1843,15 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
           type="number"
           value={line.unitPriceCny || ''}
           onChange={e => onChange(line.id, 'unitPriceCny', Number(e.target.value))}
-          className="h-7 text-xs border-border bg-card text-right w-20"
+          className={`${CELL_INPUT} border-border bg-card text-right w-20`}
           placeholder="단가"
         />
         <div style={{fontSize:'10px', color:'#9CA3AF', textAlign:'right'}}>₩{Math.round(line.unitPriceCny * cnyKrw).toLocaleString()}</div>
       </td>
       {/* NET 소요량 */}
-      <td className="px-1 py-1"><Input type="number" step="any" value={netQtyStr} onChange={e => { setNetQtyStr(e.target.value); const n = parseFloat(e.target.value); if (!isNaN(n)) onChange(line.id, 'netQty', n); else onChange(line.id, 'netQty', 0); }} onBlur={e => { const n = parseFloat(e.target.value); const v = isNaN(n) ? 0 : n; onChange(line.id, 'netQty', v); setNetQtyStr(v !== 0 ? String(v) : ''); }} className="h-7 text-xs border-border bg-card text-right w-20" placeholder="0" /></td>
+      <td className="px-1 py-1"><Input type="number" step="any" value={netQtyStr} onChange={e => { setNetQtyStr(e.target.value); const n = parseFloat(e.target.value); if (!isNaN(n)) onChange(line.id, 'netQty', n); else onChange(line.id, 'netQty', 0); }} onBlur={e => { const n = parseFloat(e.target.value); const v = isNaN(n) ? 0 : n; onChange(line.id, 'netQty', v); setNetQtyStr(v !== 0 ? String(v) : ''); }} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder="0" /></td>
       {/* LOSS */}
-      <td className="px-1 py-1"><Input type="number" step="any" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className="h-7 text-xs border-border bg-card text-right w-14" placeholder="5" /></td>
+      <td className="px-1 py-1"><Input type="number" step="any" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className={`${CELL_INPUT} border-border bg-card text-right w-14`} placeholder="5" /></td>
       {/* 소요량 */}
       <td className="px-1 py-1">
         <div className="flex items-center gap-1">
@@ -1834,14 +1862,14 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
               const raw = e.target.value;
               onChange(line.id, 'manualQty', raw === '' ? undefined : parseFloat(raw) || 0);
             }}
-            className="h-7 text-xs border-border bg-primary/5 text-right w-20"
+            className={`${CELL_INPUT} border-border bg-primary/5 text-right w-20`}
             placeholder={fmt(computedQty)}
             title="소요량 직접 입력 (비우면 자동계산: NET × (1+LOSS))"
           />
           {showCalcBtn && (
             <button
               onClick={() => setShowCalcModal(true)}
-              className="h-7 w-7 shrink-0 flex items-center justify-center rounded border border-border bg-card hover:bg-primary/10 hover:border-primary/30 text-sm transition-colors"
+              className={`${ICON_BTN} border border-border bg-card hover:bg-primary/10 hover:border-primary/30 transition-colors`}
               title={`소요량 계산기 (${effectiveUnit})`}
             >
               <Ruler className="w-3.5 h-3.5" />
@@ -1886,11 +1914,11 @@ function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재'
         )}
       </td>
       {/* 삭제 */}
-      <td className="px-1 py-1"><button onClick={() => onDelete(line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-[var(--system-red)] p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
+      <td className="px-1 py-1"><button onClick={() => onDelete(line.id)} className={`${ICON_BTN} opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-[var(--system-red)] hover:bg-[var(--system-red)]/10`}><Trash2 className="w-3.5 h-3.5" /></button></td>
     </tr>
     </>
   );
-}
+});
 
 // ─── 사후원가 요약 컴포넌트 ───────────────────────────────────────────────────
 function PostCostSummary({
@@ -2053,7 +2081,7 @@ export default function BomManagement() {
   const { data: items = [] } = useQuery({ queryKey: ['items'], queryFn: fetchItems });
   const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
-  const buyers = allVendors.filter((v: any) => v.type === '바이어');
+  const buyers = useMemo(() => allVendors.filter((v: any) => v.type === '바이어'), [allVendors]);
   const packItems = useMemo(
     () => (items as Item[]).filter(i =>
       i.erpCategory === 'PACK'
@@ -2147,12 +2175,19 @@ export default function BomManagement() {
   });
   const [filterBuyerBom, setFilterBuyerBom] = useState<string>('all');
   const [styleSearch, setStyleSearch] = useState<string>('');
+  const debouncedStyleSearch = useDebouncedValue(styleSearch, 300);
+  // 스타일 셀렉트 옵션 — 키 입력마다 전체 items × getBomTotalCost(localStorage 파싱) 재실행 방지
+  const styleOptions = useMemo(() => {
+    const q = debouncedStyleSearch.toLowerCase();
+    return items
+      .filter(item => filterBuyerBom === 'all' || item.buyerId === filterBuyerBom)
+      .filter(item => !q || item.styleNo.toLowerCase().includes(q) || item.name.toLowerCase().includes(q))
+      .map(item => ({ item, bomCost: item.hasBom ? store.getBomTotalCost(item.styleNo) : 0 }));
+  }, [items, filterBuyerBom, debouncedStyleSearch, extBoms]);
   const [editBom, setEditBom] = useState<ExtBom | null>(null);
   const [showQuote, setShowQuote] = useState(false);
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [copySourceId, setCopySourceId] = useState('');
-  // 원자재 섹션은 기본 펼침, 나머지는 기본 접힘
-  const NON_RAW_SECTIONS = ['지퍼', '장식', '보강재', '봉사·접착제', '포장재', '철형', '후가공'];
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set(NON_RAW_SECTIONS));
   const [collapsedPostSections, setCollapsedPostSections] = useState<Set<string>>(new Set(NON_RAW_SECTIONS.filter(s => s !== '후가공')));
   const [isDirty, setIsDirty] = useState(false);
@@ -3244,24 +3279,48 @@ export default function BomManagement() {
     }
   };
 
-  // 현재 활성 컬러 BOM
-  const activeColorBom = editBom && mainTab === 'pre'
-    ? (editBom.colorBoms || []).find(cb => cb.color === activePreColor)
-    : undefined;
-  const activePostColorBom = editBom && mainTab === 'post'
-    ? (editBom.postColorBoms || []).find(cb => cb.color === activePostColor)
-    : undefined;
+  // 현재 활성 컬러 BOM (참조 안정화 — memo 행/파생 계산 재사용)
+  const activeColorBom = useMemo(() => (
+    editBom && mainTab === 'pre'
+      ? (editBom.colorBoms || []).find(cb => cb.color === activePreColor)
+      : undefined
+  ), [editBom, mainTab, activePreColor]);
+  const activePostColorBom = useMemo(() => (
+    editBom && mainTab === 'post'
+      ? (editBom.postColorBoms || []).find(cb => cb.color === activePostColor)
+      : undefined
+  ), [editBom, mainTab, activePostColor]);
+
+  // 활성 컬러 탭 전용 stable 콜백 — React.memo(BomLineRow) 얕은 비교가 깨지지 않도록
+  // 렌더마다 새 클로저를 만들지 않는다. (activeColorBom.color === activePreColor 보장됨)
+  const changeActivePreLine = useCallback((id: string, field: keyof ExtBomLine, val: unknown) => {
+    updateColorBomLine(activePreColor, id, field, val);
+  }, [activePreColor, updateColorBomLine]);
+  const removeActivePreLine = useCallback((id: string) => {
+    deleteColorBomLine(activePreColor, id);
+  }, [activePreColor, deleteColorBomLine]);
+  const changeActivePostLine = useCallback((id: string, field: keyof ExtBomLine, val: unknown) => {
+    updatePostColorBomLine(activePostColor, id, field, val);
+  }, [activePostColor, updatePostColorBomLine]);
+  const removeActivePostLine = useCallback((id: string) => {
+    deletePostColorBomLine(activePostColor, id);
+  }, [activePostColor, deletePostColorBomLine]);
+
   // summary는 활성 컬러 BOM 기준 (없으면 lines 기준 fallback)
-  const summary = editBom ? calcSummary(editBom, settings.usdKrw, activeColorBom) : null;
+  const summary = useMemo(() => (
+    editBom ? calcSummary(editBom, settings.usdKrw, activeColorBom) : null
+  ), [editBom, settings.usdKrw, activeColorBom]);
   // 총원가액은 calcSummary가 계산한 값을 그대로 쓴다.
   // 예전엔 여기서 다시 더했는데, 그 식은 업체제공 자재를 포함하고 관세를 빠뜨려서
   // 같은 화면의 P&L ⑥ 매출원가(summary.totalCostKrw)와 값이 어긋났다.
   const displayTotalCostKrw = summary ? summary.totalCostKrw : 0;
-  const pnlResult = summary && editBom?.pnl ? calcPnl(displayTotalCostKrw, editBom.pnl) : null;
+  const pnlResult = useMemo(() => (
+    summary && editBom?.pnl ? calcPnl(displayTotalCostKrw, editBom.pnl) : null
+  ), [summary, editBom?.pnl, displayTotalCostKrw]);
   const cnyKrw = editBom?.snapshotCnyKrw || settings.cnyKrw;
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-[1400px]">
+    <div className="w-full max-w-[1440px] mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
       {/* 헤더 */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
@@ -3313,21 +3372,15 @@ export default function BomManagement() {
             <Select value={selectedStyleId.replace('_reload', '')} onValueChange={setSelectedStyleId}>
               <SelectTrigger className="h-8 text-xs border-border"><SelectValue placeholder="스타일 선택..." /></SelectTrigger>
               <SelectContent>
-                {items
-                  .filter(item => filterBuyerBom === 'all' || item.buyerId === filterBuyerBom)
-                  .filter(item => !styleSearch || item.styleNo.toLowerCase().includes(styleSearch.toLowerCase()) || item.name.toLowerCase().includes(styleSearch.toLowerCase()))
-                  .map(item => {
-                    const bomCost = item.hasBom ? store.getBomTotalCost(item.styleNo) : 0;
-                    return (
-                      <SelectItem key={item.id} value={item.id} className="text-xs">
-                        <span className="flex items-center gap-1.5">
-                          {item.styleNo} — {item.name}
-                          {item.hasBom && <Badge variant="outline" className="text-[11px] py-0 h-4 border-[var(--system-green)]/30 text-[var(--system-green)]">BOM</Badge>}
-                          {item.hasBom && bomCost > 0 && <span className="text-[11px] text-primary font-medium">{fmtKrw(bomCost)}</span>}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
+                {styleOptions.map(({ item, bomCost }) => (
+                  <SelectItem key={item.id} value={item.id} className="text-xs">
+                    <span className="flex items-center gap-1.5">
+                      {item.styleNo} — {item.name}
+                      {item.hasBom && <Badge variant="outline" className="text-[11px] py-0 h-4 border-[var(--system-green)]/30 text-[var(--system-green)]">BOM</Badge>}
+                      {item.hasBom && bomCost > 0 && <span className="text-[11px] text-primary font-medium">{fmtKrw(bomCost)}</span>}
+                    </span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -3680,7 +3733,7 @@ export default function BomManagement() {
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block font-medium">제조국</label>
                       <div className="flex gap-1">
-                        {(['중국', '한국', '기타'] as const).map(country => (
+                        {COUNTRY_OPTIONS.map(country => (
                           <button
                             key={country}
                             onClick={() => {
@@ -3703,7 +3756,7 @@ export default function BomManagement() {
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block font-medium">입력 통화</label>
                       <div className="flex gap-1">
-                        {(['CNY', 'USD', 'KRW'] as const).map(cur => (
+                        {CURRENCY_OPTIONS.map(cur => (
                           <button
                             key={cur}
                             onClick={() => updateField('preCurrency', cur)}
@@ -3833,7 +3886,7 @@ export default function BomManagement() {
                               <tr className={`border-y ${isRawMaterial ? 'bg-primary/5 border-primary/20' : 'bg-[var(--fill-tertiary)] border-border'}`}>
                                 <td colSpan={11} className="px-3 py-1.5">
                                   <div className="flex items-center justify-between">
-                                    <button onClick={() => toggleSection(cat)} className={`flex items-center gap-2 font-semibold text-xs hover:opacity-80 ${isRawMaterial ? 'text-primary' : 'text-foreground'}`}>
+                                    <button onClick={() => toggleSection(cat)} className={`flex items-center gap-2 text-sm font-semibold hover:opacity-80 ${isRawMaterial ? 'text-primary' : 'text-foreground'}`}>
                                       {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                       {cat}
                                       {!isRawMaterial && filledLines.length > 0 && (
@@ -3847,7 +3900,7 @@ export default function BomManagement() {
                                           {preCur !== 'KRW' && <> = <span className="font-semibold text-[#C9A96E]">{fmtKrw(catTotal * preRate)}</span></>}
                                         </span>
                                       )}
-                                      <button onClick={() => addColorBomLine(colorBom.color, cat)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-primary/80 font-medium">
+                                      <button onClick={() => addColorBomLine(colorBom.color, cat)} className={GHOST_ADD_BTN}>
                                         <Plus className="w-3 h-3" /> 행 추가
                                       </button>
                                     </div>
@@ -3858,8 +3911,8 @@ export default function BomManagement() {
                                 <BomLineRow
                                   key={line.id}
                                   line={line}
-                                  onChange={(id, field, val) => updateColorBomLine(colorBom.color, id, field, val)}
-                                  onDelete={id => deleteColorBomLine(colorBom.color, id)}
+                                  onChange={changeActivePreLine}
+                                  onDelete={removeActivePreLine}
                                   cnyKrw={preRate}
                                   sectionKey={cat}
                                   accentColor="amber"
@@ -3874,14 +3927,14 @@ export default function BomManagement() {
                         <tr className="bg-[var(--fill-tertiary)] border-y border-border">
                           <td colSpan={11} className="px-3 py-1.5">
                             <div className="flex items-center justify-between">
-                              <button onClick={() => toggleSection('후가공')} className="flex items-center gap-2 text-foreground font-semibold text-xs hover:opacity-80">
+                              <button onClick={() => toggleSection('후가공')} className="flex items-center gap-2 text-foreground text-sm font-semibold hover:opacity-80">
                                 {collapsedSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                 후가공비
                                 {(colorBom.postProcessLines ?? []).filter(l => l.name).length > 0 && (
                                   <span className="text-[11px] font-normal text-muted-foreground">({(colorBom.postProcessLines ?? []).filter(l => l.name).length})</span>
                                 )}
                               </button>
-                              <button onClick={() => addColorPostLine(colorBom.color)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-primary/80 font-medium">
+                              <button onClick={() => addColorPostLine(colorBom.color)} className={GHOST_ADD_BTN}>
                                 <Plus className="w-3 h-3" /> 행 추가
                               </button>
                             </div>
@@ -3894,17 +3947,17 @@ export default function BomManagement() {
                               <td className="px-1 py-1" colSpan={3}>
                                 <div className="flex items-center gap-1">
                                   <Select value={(line as PostProcessLine & { subPart?: string }).subPart || ''} onValueChange={v => updateColorPostLine(colorBom.color, line.id, 'subPart' as keyof PostProcessLine, v)}>
-                                    <SelectTrigger className="h-7 text-xs border-border w-20 shrink-0"><SelectValue placeholder="-" /></SelectTrigger>
+                                    <SelectTrigger className={`${CELL_INPUT} border-border w-20 shrink-0`}><SelectValue placeholder="-" /></SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="none" className="text-xs text-muted-foreground">-</SelectItem>
                                       {SECTION_SUB_PARTS['후가공'].map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
                                     </SelectContent>
                                   </Select>
-                                  <Input value={line.name} onChange={e => updateColorPostLine(colorBom.color, line.id, 'name', e.target.value)} className="h-7 text-xs border-border bg-card min-w-[80px]" placeholder="후가공 품목명" />
+                                  <Input value={line.name} onChange={e => updateColorPostLine(colorBom.color, line.id, 'name', e.target.value)} className={`${CELL_INPUT} border-border bg-card min-w-[80px]`} placeholder="후가공 품목명" />
                                 </div>
                               </td>
-                              <td className="px-1 py-1"><Input type="number" value={line.unitPrice || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'unitPrice', Number(e.target.value))} className="h-7 text-xs border-border bg-card text-right w-20" placeholder={`단가(${curSymbol})`} /></td>
-                              <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'netQty', Number(e.target.value))} className="h-7 text-xs border-border bg-card text-right w-20" placeholder="수량" /></td>
+                              <td className="px-1 py-1"><Input type="number" value={line.unitPrice || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'unitPrice', Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={`단가(${curSymbol})`} /></td>
+                              <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'netQty', Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder="수량" /></td>
                               <td className="px-2 py-1 text-center text-xs text-muted-foreground">-</td>
                               <td className="px-2 py-1 text-right text-xs text-muted-foreground tabular-nums">{fmt(line.netQty)}</td>
                               <td className="px-2 py-1 text-right tabular-nums">
@@ -3920,16 +3973,16 @@ export default function BomManagement() {
                         {/* 임가공비 */}
                         <tr className="bg-primary/5 border-y border-border">
                           <td colSpan={11} className="px-3 py-1.5">
-                            <span className="text-xs font-semibold text-muted-foreground">임가공비</span>
+                            <span className="text-sm font-semibold text-foreground">임가공비</span>
                             <span className="text-[11px] text-muted-foreground ml-2">자재비와 별도 항목</span>
                           </td>
                         </tr>
                         <tr className="bg-primary/5 border-b border-border">
                           <td className="px-1 py-1" colSpan={3}>
-                            <span className="text-xs text-muted-foreground px-2">임가공비 (NET)</span>
+                            <span className="text-[13px] text-muted-foreground px-2">임가공비 (NET)</span>
                           </td>
                           <td className="px-1 py-1">
-                            <Input type="number" value={colorBom.processingFee || ''} onChange={e => updateColorProcessingFee(colorBom.color, Number(e.target.value))} className="h-7 text-xs border-border bg-card text-right w-20" placeholder={curSymbol} />
+                            <Input type="number" value={colorBom.processingFee || ''} onChange={e => updateColorProcessingFee(colorBom.color, Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={curSymbol} />
                           </td>
                           <td className="px-1 py-1"><span className="text-xs text-muted-foreground px-2">1</span></td>
                           <td></td>
@@ -3951,8 +4004,8 @@ export default function BomManagement() {
                     <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
                       <h2 className="text-sm font-semibold">사전 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— [{colorBom.color}] 기준</span></h2>
                     </div>
-                    <table className="w-full text-xs">
-                      <thead><tr className="bg-[var(--fill-tertiary)] text-muted-foreground"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-muted-foreground">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
+                    <table className="w-full text-[13px]">
+                      <thead><tr className="bg-[var(--fill-tertiary)] text-[13px] font-semibold text-muted-foreground"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-muted-foreground">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
                       <tbody>
                         {[
                           { key: '원', label: '원부자재 합산', desc: `원자재 + 부자재 + 보강재 + 포장재 (${summary.preCur}, 본사/업체제공 포함)`, val: summary.totalMaterialKrw + summary.postProcessKrw, editable: false },
@@ -3961,12 +4014,12 @@ export default function BomManagement() {
                           { key: '재', label: '포장/검사비', desc: '포장 잡비, 검사 인건비', val: summary.packagingKrw, editable: true, field: 'packagingCostKrw' as keyof ExtBom },
                         ].map(row => (
                           <tr key={row.key} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                            <td className="px-4 py-2 font-bold text-muted-foreground">{row.key}</td>
+                            <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">{row.key}</span></td>
                             <td className="px-4 py-2 font-medium text-foreground">{row.label}</td>
                             <td className="px-4 py-2 text-muted-foreground">{row.desc}</td>
                             <td className="px-4 py-2 text-right font-semibold tabular-nums">
                               {row.editable && row.field ? (
-                                <Input type="number" value={(editBom[row.field] as number) || ''} onChange={e => updateField(row.field!, Number(e.target.value) as ExtBom[typeof row.field])} className="h-6 text-xs border-border text-right w-36 ml-auto" placeholder="0" />
+                                <Input type="number" value={(editBom[row.field] as number) || ''} onChange={e => updateField(row.field!, Number(e.target.value) as ExtBom[typeof row.field])} className={`${CELL_INPUT} border-border text-right w-36 ml-auto`} placeholder="0" />
                               ) : (
                                 <span className={row.val === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(row.val)}</span>
                               )}
@@ -3974,14 +4027,14 @@ export default function BomManagement() {
                           </tr>
                         ))}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2 font-bold text-muted-foreground">패</td>
+                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">패</span></td>
                           <td className="px-4 py-2 font-medium text-foreground">패킹재</td>
                           <td className="px-4 py-2 text-muted-foreground">
                             <Select
                               value={editBom.packingItemId || '_none'}
                               onValueChange={selectPackingItem}
                             >
-                              <SelectTrigger className="h-7 text-xs border-border w-full max-w-[280px]">
+                              <SelectTrigger className={`${CELL_INPUT} border-border w-full max-w-[280px]`}>
                                 <SelectValue placeholder="품목마스터 PACK 선택" />
                               </SelectTrigger>
                               <SelectContent className="max-h-64">
@@ -4004,7 +4057,7 @@ export default function BomManagement() {
                           </td>
                         </tr>
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2 font-bold text-muted-foreground">마</td>
+                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">마</span></td>
                           <td className="px-4 py-2 font-medium text-foreground">생산마진</td>
                           <td className="px-4 py-2 text-muted-foreground">
                             <div className="flex items-center gap-1">
@@ -4012,7 +4065,7 @@ export default function BomManagement() {
                                 type="number"
                                 value={Math.round((editBom.productionMarginRate ?? 0.16) * 100)}
                                 onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)}
-                                className="h-6 text-xs border-border text-right w-16"
+                                className={`${CELL_INPUT} border-border text-right w-16`}
                                 placeholder="0"
                               />
                               <span className="text-muted-foreground text-xs">%</span>
@@ -4022,8 +4075,8 @@ export default function BomManagement() {
                             <span className={summary.productionMarginKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(summary.productionMarginKrw)}</span>
                           </td>
                         </tr>
-                        <tr className="bg-primary text-primary-foreground">
-                          <td className="px-4 py-3 font-bold">사</td>
+                        <tr className="bg-foreground text-background">
+                          <td className="px-4 py-3"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-background/15 text-[11px] font-semibold text-background">사</span></td>
                           <td className="px-4 py-3 font-bold text-base" colSpan={2}>총 원 가 액</td>
                           <td className="px-4 py-3 text-right font-bold text-lg tabular-nums">{fmtKrw(summary.totalCostKrw)}</td>
                         </tr>
@@ -4160,15 +4213,11 @@ export default function BomManagement() {
                       <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                         <h3 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          {([
-                            { label: '할인율 (Discount)', field: 'discountRate' as keyof BomPnlAssumptions },
-                            { label: '플랫폼 수수료', field: 'platformFeeRate' as keyof BomPnlAssumptions },
-                            { label: '인건비 / 판관비', field: 'sgaRate' as keyof BomPnlAssumptions },
-                          ] as const).map(item => (
+                          {PNL_RATE_FIELDS.map(item => (
                             <div key={item.field}>
                               <label className="text-[11px] text-muted-foreground mb-1 block">{item.label}</label>
                               <div className="flex items-center gap-1">
-                                <Input type="number" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className="h-7 text-xs border-border text-right w-20" />
+                                <Input type="number" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className={`${CELL_INPUT} border-border text-right w-20`} />
                                 <span className="text-xs text-muted-foreground">%</span>
                               </div>
                             </div>
@@ -4268,7 +4317,7 @@ export default function BomManagement() {
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block font-medium">제조국</label>
                     <div className="flex gap-1">
-                      {(['중국', '한국', '기타'] as const).map(country => (
+                      {COUNTRY_OPTIONS.map(country => (
                         <button
                           key={country}
                           onClick={() => {
@@ -4291,7 +4340,7 @@ export default function BomManagement() {
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block font-medium">입력 통화</label>
                     <div className="flex gap-1">
-                      {(['CNY', 'USD', 'KRW'] as const).map(cur => (
+                      {CURRENCY_OPTIONS.map(cur => (
                         <button
                           key={cur}
                           onClick={() => updateField('currency', cur)}
@@ -4452,7 +4501,7 @@ export default function BomManagement() {
                                 <tr className={`border-y ${isRawMaterial ? 'bg-primary/5 border-primary/20' : 'bg-[var(--fill-tertiary)] border-border'}`}>
                                   <td colSpan={colCount} className="px-3 py-1.5">
                                     <div className="flex items-center justify-between">
-                                      <button onClick={() => togglePostSection(cat)} className={`flex items-center gap-2 font-semibold text-xs hover:opacity-80 ${isRawMaterial ? 'text-primary' : 'text-foreground'}`}>
+                                      <button onClick={() => togglePostSection(cat)} className={`flex items-center gap-2 text-sm font-semibold hover:opacity-80 ${isRawMaterial ? 'text-primary' : 'text-foreground'}`}>
                                         {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                         {cat}
                                         {!isRawMaterial && filledLines.length > 0 && (
@@ -4466,7 +4515,7 @@ export default function BomManagement() {
                                             {postCur !== 'KRW' && <> = <span className="font-semibold text-[#C9A96E]">{fmtKrw(catTotal * postRate)}</span></>}
                                           </span>
                                         )}
-                                        <button onClick={() => addPostColorBomLine(postColorBom.color, cat)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-primary/80 font-medium">
+                                        <button onClick={() => addPostColorBomLine(postColorBom.color, cat)} className={GHOST_ADD_BTN}>
                                           <Plus className="w-3 h-3" /> 행 추가
                                         </button>
                                       </div>
@@ -4477,8 +4526,8 @@ export default function BomManagement() {
                                   <BomLineRow
                                     key={line.id}
                                     line={line}
-                                    onChange={(id, field, val) => updatePostColorBomLine(postColorBom.color, id, field, val)}
-                                    onDelete={id => deletePostColorBomLine(postColorBom.color, id)}
+                                    onChange={changeActivePostLine}
+                                    onDelete={removeActivePostLine}
                                     cnyKrw={postRate}
                                     sectionKey={cat}
                                     accentColor="amber"
@@ -4494,14 +4543,14 @@ export default function BomManagement() {
                             <tr className="bg-[var(--fill-tertiary)] border-y border-border">
                               <td colSpan={11} className="px-3 py-1.5">
                                 <div className="flex items-center justify-between">
-                                  <button onClick={() => togglePostSection('후가공')} className="flex items-center gap-2 font-semibold text-xs text-foreground hover:opacity-80">
+                                  <button onClick={() => togglePostSection('후가공')} className="flex items-center gap-2 text-sm font-semibold text-foreground hover:opacity-80">
                                     {collapsedPostSections.has('후가공') ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                                     후가공
                                     {(postColorBom.postProcessLines ?? []).filter(l => l.name).length > 0 && (
                                       <span className="text-[11px] font-normal text-muted-foreground">({(postColorBom.postProcessLines ?? []).filter(l => l.name).length})</span>
                                     )}
                                   </button>
-                                  <button onClick={() => addPostColorPostLine(postColorBom.color)} className="flex items-center gap-1 text-[11px] text-[#C9A96E] hover:text-primary/80 font-medium">
+                                  <button onClick={() => addPostColorPostLine(postColorBom.color)} className={GHOST_ADD_BTN}>
                                     <Plus className="w-3 h-3" /> 행 추가
                                   </button>
                                 </div>
@@ -4510,14 +4559,14 @@ export default function BomManagement() {
                             {!collapsedPostSections.has('후가공') && (postColorBom.postProcessLines ?? []).map(line => (
                               <tr key={line.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
                                 <td className="px-2 py-1" colSpan={2}>
-                                  <Input value={line.name} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'name', e.target.value)} placeholder="후가공 작업명" className="h-7 text-xs border-border w-full" />
+                                  <Input value={line.name} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'name', e.target.value)} placeholder="후가공 작업명" className={`${CELL_INPUT} border-border w-full`} />
                                 </td>
                                 <td className="px-1 py-1"></td>
                                 <td className="px-1 py-1">
-                                  <Input type="number" value={line.netQty || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'netQty', Number(e.target.value))} placeholder="NET" className="h-7 text-xs border-border w-16 text-right" />
+                                  <Input type="number" value={line.netQty || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'netQty', Number(e.target.value))} placeholder="NET" className={`${CELL_INPUT} border-border w-16 text-right`} />
                                 </td>
                                 <td className="px-1 py-1">
-                                  <Input type="number" value={line.unitPrice || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'unitPrice', Number(e.target.value))} placeholder="단가" className="h-7 text-xs border-border w-20 text-right" />
+                                  <Input type="number" value={line.unitPrice || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'unitPrice', Number(e.target.value))} placeholder="단가" className={`${CELL_INPUT} border-border w-20 text-right`} />
                                 </td>
                                 <td className="px-1 py-1"></td>
                                 <td className="px-2 py-1 text-right tabular-nums">
@@ -4534,16 +4583,16 @@ export default function BomManagement() {
                           {/* 임가공비 (postColorBom 기반) */}
                           <tr className="bg-primary/5 border-y border-border">
                             <td colSpan={11} className="px-3 py-1.5">
-                              <span className="text-xs font-semibold text-muted-foreground">임가공비</span>
+                              <span className="text-sm font-semibold text-foreground">임가공비</span>
                               <span className="text-[11px] text-muted-foreground ml-2">자재비와 별도 항목</span>
                             </td>
                           </tr>
                           <tr className="bg-primary/5 border-b border-border">
                             <td className="px-1 py-1" colSpan={3}>
-                              <span className="text-xs text-muted-foreground px-2">임가공비 (NET)</span>
+                              <span className="text-[13px] text-muted-foreground px-2">임가공비 (NET)</span>
                             </td>
                             <td className="px-1 py-1">
-                              <Input type="number" value={postColorBom.processingFee || ''} onChange={e => updateColorProcessingFee(postColorBom.color, Number(e.target.value), 'post')} className="h-7 text-xs border-border bg-card text-right w-20" placeholder={curSymbol} />
+                              <Input type="number" value={postColorBom.processingFee || ''} onChange={e => updateColorProcessingFee(postColorBom.color, Number(e.target.value), 'post')} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={curSymbol} />
                             </td>
                             <td className="px-1 py-1"><span className="text-xs text-muted-foreground px-2">1</span></td>
                             <td></td>
@@ -4583,26 +4632,26 @@ export default function BomManagement() {
                     <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
                       <h2 className="text-sm font-semibold">사후 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— [{activePostColorBom?.color}] 기준</span></h2>
                     </div>
-                    <table className="w-full text-xs">
-                      <thead><tr className="bg-[var(--fill-tertiary)] text-muted-foreground"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-muted-foreground">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
+                    <table className="w-full text-[13px]">
+                      <thead><tr className="bg-[var(--fill-tertiary)] text-[13px] font-semibold text-muted-foreground"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-muted-foreground">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
                       <tbody>
                         {/* 1. 공장구매 자재 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2 font-bold text-muted-foreground">자</td>
+                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">자</span></td>
                           <td className="px-4 py-2 font-medium text-foreground">공장구매 자재</td>
                           <td className="px-4 py-2 text-muted-foreground">본사제공 제외 ({postCur})</td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.factoryMaterialKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.factoryMaterialKrw)}</span></td>
                         </tr>
                         {/* 2. 본사제공 자재 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2 font-bold text-muted-foreground">본</td>
+                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">본</span></td>
                           <td className="px-4 py-2 font-medium text-foreground">본사제공 자재</td>
                           <td className="px-4 py-2 text-muted-foreground">본사에서 공급</td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.hqMaterialKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.hqMaterialKrw)}</span></td>
                         </tr>
                         {/* 3. 임가공비 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2 font-bold text-muted-foreground">공</td>
+                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">공</span></td>
                           <td className="px-4 py-2 font-medium text-foreground">임가공비</td>
                           <td className="px-4 py-2 text-muted-foreground">NET ({postCur})</td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.processingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.processingKrw)}</span></td>
@@ -4622,10 +4671,10 @@ export default function BomManagement() {
                         {/* 5. 관세 (율 > 0일 때만) */}
                         {/* 관세율 - 직접 입력 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2 font-bold text-muted-foreground">관</td>
+                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">관</span></td>
                           <td className="px-4 py-2 font-medium text-foreground">
                             관세
-                            <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className="inline-block h-6 text-xs border-border text-right w-14 ml-1" placeholder="%" />
+                            <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className={`inline-block ${CELL_INPUT} border-border text-right w-14 ml-1`} placeholder="%" />
                             <span className="text-xs text-muted-foreground ml-1">%</span>
                           </td>
                           <td className="px-4 py-2 text-muted-foreground text-xs">임가공비 × 관세율</td>
@@ -4633,32 +4682,32 @@ export default function BomManagement() {
                         </tr>
                         {/* 물류비 - 직접 입력 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2 font-bold text-muted-foreground">물</td>
+                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">물</span></td>
                           <td className="px-4 py-2 font-medium text-foreground">물류비</td>
                           <td className="px-4 py-2 text-muted-foreground">
-                            <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className="h-6 text-xs border-border text-right w-24" placeholder="₩" />
+                            <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className={`${CELL_INPUT} border-border text-right w-24`} placeholder="₩" />
                           </td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-foreground">{fmtKrw(ps.logisticsKrw)}</span></td>
                         </tr>
                         {/* 포장/검사비 - 직접 입력 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2 font-bold text-muted-foreground">포</td>
+                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">포</span></td>
                           <td className="px-4 py-2 font-medium text-foreground">포장/검사비</td>
                           <td className="px-4 py-2 text-muted-foreground">
-                            <Input type="number" value={editBom.packagingCostKrw || ''} onChange={e => updateField('packagingCostKrw', Number(e.target.value))} className="h-6 text-xs border-border text-right w-24" placeholder="₩" />
+                            <Input type="number" value={editBom.packagingCostKrw || ''} onChange={e => updateField('packagingCostKrw', Number(e.target.value))} className={`${CELL_INPUT} border-border text-right w-24`} placeholder="₩" />
                           </td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.packagingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.packagingKrw)}</span></td>
                         </tr>
                         {/* 패킹재 — 품목마스터 PACK 선택 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2 font-bold text-muted-foreground">패</td>
+                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">패</span></td>
                           <td className="px-4 py-2 font-medium text-foreground">패킹재</td>
                           <td className="px-4 py-2 text-muted-foreground">
                             <Select
                               value={editBom.packingItemId || '_none'}
                               onValueChange={selectPackingItem}
                             >
-                              <SelectTrigger className="h-7 text-xs border-border w-full max-w-[260px]">
+                              <SelectTrigger className={`${CELL_INPUT} border-border w-full max-w-[260px]`}>
                                 <SelectValue placeholder="품목마스터 PACK 선택" />
                               </SelectTrigger>
                               <SelectContent className="max-h-64">
@@ -4682,13 +4731,13 @@ export default function BomManagement() {
                         </tr>
                         {/* 9. 제품 총원가 (생산마진 전 실원가) */}
                         <tr className="bg-primary/5 border-y border-primary/20">
-                          <td className="px-4 py-2 font-bold text-primary">제</td>
+                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-primary/10 text-[11px] font-semibold text-primary">제</span></td>
                           <td className="px-4 py-2 font-semibold text-primary" colSpan={2}>제품 총원가 <span className="text-xs text-primary/70 font-normal">(생산마진 전 실원가)</span></td>
                           <td className="px-4 py-2 text-right font-bold tabular-nums text-primary">{fmtKrw(ps.totalCostKrw)}</td>
                         </tr>
                         {/* 10. 생산마진 - 직접 입력 가능 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2 font-bold text-muted-foreground">마</td>
+                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">마</span></td>
                           <td className="px-4 py-2 font-medium text-foreground">생산마진</td>
                           <td className="px-4 py-2">
                             <div className="flex items-center gap-1">
@@ -4696,7 +4745,7 @@ export default function BomManagement() {
                                 type="number"
                                 value={Math.round((editBom.productionMarginRate ?? 0) * 100)}
                                 onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)}
-                                className="h-6 text-xs border-border text-right w-16"
+                                className={`${CELL_INPUT} border-border text-right w-16`}
                                 placeholder="0"
                               />
                               <span className="text-muted-foreground text-xs">%</span>
@@ -4707,7 +4756,7 @@ export default function BomManagement() {
                           </td>
                         </tr>
                         {/* 11. 총원가액 */}
-                        <tr className="bg-primary text-primary-foreground">
+                        <tr className="bg-foreground text-background">
                           <td className="px-4 py-3 font-bold"><Package className="w-4 h-4" /></td>
                           <td className="px-4 py-3 font-bold text-base" colSpan={2}>{postMarginRate > 0 ? '총 원 가 액' : '제 품 원 가'}</td>
                           <td className="px-4 py-3 text-right font-bold text-lg tabular-nums">{fmtKrw(finalCost)}</td>
@@ -4780,15 +4829,11 @@ export default function BomManagement() {
                       <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                         <h3 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          {([
-                            { label: '할인율 (Discount)', field: 'discountRate' as keyof BomPnlAssumptions },
-                            { label: '플랫폼 수수료', field: 'platformFeeRate' as keyof BomPnlAssumptions },
-                            { label: '인건비 / 판관비', field: 'sgaRate' as keyof BomPnlAssumptions },
-                          ] as const).map(item => (
+                          {PNL_RATE_FIELDS.map(item => (
                             <div key={item.field}>
                               <label className="text-[11px] text-muted-foreground mb-1 block">{item.label}</label>
                               <div className="flex items-center gap-1">
-                                <Input type="number" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className="h-7 text-xs border-border text-right w-20" />
+                                <Input type="number" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className={`${CELL_INPUT} border-border text-right w-20`} />
                                 <span className="text-xs text-muted-foreground">%</span>
                               </div>
                             </div>
