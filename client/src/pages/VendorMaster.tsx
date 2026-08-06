@@ -89,6 +89,7 @@ export default function VendorMaster() {
   // 주소는 DB에 한 줄(vendors.address)로 저장하고, 입력만 기본주소/상세주소로 나눈다
   const [addrBase, setAddrBase] = useState('');
   const [addrDetail, setAddrDetail] = useState('');
+  const [brandInput, setBrandInput] = useState('');
   const addrDetailRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isOcrLoading, setIsOcrLoading] = useState(false);
@@ -208,20 +209,20 @@ export default function VendorMaster() {
         v.type === '자재거래처' && (v.materialTypes || []).includes(filterMaterialType as '장식' | '원단' | '가죽' | '기타')
       );
     }
-    // 검색 대상: 거래처명·영문/중문명·코드·담당자 + 사업자 회사명 + 검색창내용(memo)
-    // 회사명이 '(주)아메스코테스'여도 검색창내용에 '아뜰리에드루멘'을 적어두면 그 이름으로 찾힌다
+    // 검색 대상: 회사명·브랜드명(여러 개)·영문/중문명·코드·담당자
+    // 회사명이 '(주)아메스코테스'여도 브랜드명에 '아뜰리에 드 루멘'을 넣어두면 그 이름으로 찾힌다
     if (search) {
       const q = search.trim().toLowerCase();
       list = list.filter(v =>
-        [v.name, v.nameEn, v.nameCn, v.companyName, v.memo, v.vendorCode, v.code, v.contactName]
+        [v.name, v.companyName, v.nameEn, v.nameCn, v.vendorCode, v.code, v.contactName, v.memo, ...(v.brands || [])]
           .some(f => (f || '').toLowerCase().includes(q))
       );
     }
     return list;
   }, [vendors, search, filterRegion, filterType, filterMaterialType]);
 
-  // SWIFT는 해외 업체만 쓴다 — 국내만 보고 있으면 컬럼 자체를 숨긴다
-  const showSwiftCol = useMemo(() => filtered.some(v => regionOf(v) === '해외'), [filtered]);
+  // SWIFT는 해외 탭에서만 보여준다 — 전체/국내 탭 화면은 동일하게 유지
+  const showSwiftCol = filterRegion === '해외';
 
   const regionCounts = useMemo(() => {
     const c: Record<string, number> = { 국내: 0, 해외: 0 };
@@ -252,16 +253,21 @@ export default function VendorMaster() {
 
   const openAdd = () => {
     setEditVendor({ ...EMPTY_VENDOR, code: genVendorCode('국내') });
-    setAddrBase(''); setAddrDetail('');
+    setAddrBase(''); setAddrDetail(''); setBrandInput('');
     setIsEdit(false); setIsDirty(false); setShowModal(true);
   };
   const openEdit = (v: Vendor) => {
     // 회사명 칸이 거래처명을 겸한다 — 예전 데이터는 회사명이 비어 있으므로 거래처명으로 채워
     // 저장할 때 이름이 지워지지 않게 한다
-    setEditVendor({ ...v, companyName: v.companyName || v.name });
+    // 예전 데이터: 단일 브랜드명(nameEn)만 있으면 brands 로 옮겨 담는다
+    setEditVendor({
+      ...v,
+      companyName: v.companyName || v.name,
+      brands: v.brands?.length ? v.brands : (v.nameEn ? [v.nameEn] : []),
+    });
     // DB에는 주소 한 줄로만 저장한다 — 수정 화면에서는 저장된 값을 기본주소 칸에 그대로 놓고,
     // 상세주소는 비워 둔 뒤 새로 적는 만큼만 뒤에 붙인다
-    setAddrBase(v.address || ''); setAddrDetail('');
+    setAddrBase(v.address || ''); setAddrDetail(''); setBrandInput('');
     setIsEdit(true); setIsDirty(false); setShowModal(true);
   };
 
@@ -674,6 +680,15 @@ export default function VendorMaster() {
   const update = (field: keyof Vendor, value: unknown) => { setEditVendor(v => ({ ...v, [field]: value })); setIsDirty(true); };
   /** 모달에서 편집 중인 거래처의 국내/해외 (레거시 '해외공장'도 해외로 인식) */
   const editRegion: VendorRegion = editVendor.region ?? (editVendor.type === '해외공장' ? '해외' : '국내');
+
+  /** 브랜드명 추가 — 중복은 무시한다 */
+  const addBrand = () => {
+    const b = brandInput.trim();
+    if (!b) return;
+    const cur = editVendor.brands || [];
+    if (!cur.includes(b)) update('brands', [...cur, b]);
+    setBrandInput('');
+  };
 
   /** 기본주소 + 상세주소를 합쳐 vendors.address 한 칸에 저장한다 (DB 컬럼 추가 없이) */
   const setAddress = (base: string, detail: string) => {
@@ -1226,11 +1241,30 @@ export default function VendorMaster() {
 
             {/* 거래처명 입력칸은 없앴다 — 사업자 회사명이 곧 거래처명이라 저장 시 그대로 복사한다 */}
 
-            {/* 브랜드명 — 회사명과 다른 이름으로 부를 때. 검색에도 걸린다 */}
+            {/* 브랜드명 — 한 회사가 여러 브랜드를 운영할 수 있어 여러 개 등록한다. 검색에도 걸린다 */}
             <div className="space-y-1.5">
-              <Label>브랜드명 <span className="text-muted-foreground text-xs font-normal">(회사명과 다르게 부를 때)</span></Label>
-              <Input value={editVendor.nameEn || ''} onChange={e => update('nameEn', e.target.value)} placeholder="Atelier de LUMEN" />
-              <p className="text-[11px] text-muted-foreground">여기 적은 브랜드명으로도 거래처 목록에서 검색됩니다.</p>
+              <Label>브랜드명 <span className="text-muted-foreground text-xs font-normal">(여러 개 등록 가능)</span></Label>
+              <div className="flex gap-2">
+                <Input
+                  value={brandInput}
+                  onChange={e => setBrandInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addBrand(); } }}
+                  placeholder="브랜드명 입력 후 Enter (예: 아뜰리에 드 루멘)"
+                />
+                <Button type="button" variant="outline" onClick={addBrand}>추가</Button>
+              </div>
+              {(editVendor.brands || []).length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {(editVendor.brands || []).map(b => (
+                    <span key={b} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--fill-tertiary)] border border-border text-xs">
+                      {b}
+                      <button type="button" onClick={() => update('brands', (editVendor.brands || []).filter(x => x !== b))}
+                        className="text-muted-foreground hover:text-[var(--system-red)]">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground">회사명이 달라도 여기 적은 브랜드명으로 거래처 목록에서 검색됩니다.</p>
             </div>
 
             {/* 담당자 정보 */}
@@ -1396,15 +1430,7 @@ export default function VendorMaster() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>검색창내용 <span className="text-muted-foreground text-xs font-normal">(브랜드명 등 실제로 찾을 때 치는 이름)</span></Label>
-              <Input
-                value={editVendor.memo || ''}
-                onChange={e => update('memo', e.target.value)}
-                placeholder="예: 아뜰리에드루멘 (회사명이 (주)아메스코테스여도 이 이름으로 검색됨)"
-              />
-              <p className="text-[11px] text-muted-foreground">여기 적은 말로 거래처 목록에서 검색됩니다. 여러 개면 띄어쓰기로 구분하세요.</p>
-            </div>
+            
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => handleModalClose(true)}>취소</Button>

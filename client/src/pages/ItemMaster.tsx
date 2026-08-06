@@ -412,14 +412,16 @@ function BuyerPicker({ buyers, selectedId, onSelect }: {
   const sel = buyers.find(b => b.id === selectedId);
   const query = q.trim().toLowerCase();
   const list = query
-    ? buyers.filter(b => [b.code, b.name, b.companyName, b.nameEn, b.memo]
+    ? buyers.filter(b => [b.code, b.name, b.companyName, b.nameEn, ...(b.brands || [])]
         .some(f => (f || '').toLowerCase().includes(query)))
     : buyers;
   const line = (b: Vendor) => (
     <>
       <span className="font-mono font-bold text-primary mr-2">[{b.code}]</span>
       <span>{b.name}</span>
-      {b.nameEn && b.nameEn !== b.name && <span className="text-muted-foreground"> · {b.nameEn}</span>}
+      {(b.brands?.length ? b.brands : (b.nameEn ? [b.nameEn] : []))
+        .filter(x => x !== b.name)
+        .map(x => <span key={x} className="text-muted-foreground"> · {x}</span>)}
     </>
   );
 
@@ -1129,7 +1131,7 @@ export default function ItemMaster() {
       // 검색창 하나로 통일 — 스타일번호 · 품명(한/영) · 바이어를 한 번에 훑는다
       const q = search.trim().toLowerCase();
       const matchSearch = !q ||
-        [item.styleNo, item.name, item.nameEn, buyerName].some(f => (f || '').toLowerCase().includes(q));
+        [item.styleNo, item.buyerStyleNo, item.name, item.nameEn, buyerName].some(f => (f || '').toLowerCase().includes(q));
       const matchSeason = filterSeason === '전체'
         || item.season === filterSeason
         || item.erpCategory === 'PACK'; // 패키지 키트는 시즌 공통
@@ -2942,6 +2944,17 @@ export default function ItemMaster() {
                     />
                   )}
                 </div>
+              </div>
+
+              {/* 바이어가 자체 품번을 주는 경우 — 내부 스타일번호는 그대로 두고 서류에만 이 번호를 쓴다 */}
+              <div className="space-y-1.5">
+                <Label>바이어 품번 <span className="text-muted-foreground text-xs font-normal">(바이어가 지정한 번호가 있을 때만)</span></Label>
+                <Input
+                  value={editItem.buyerStyleNo || ''}
+                  onChange={e => setEditItem({ ...editItem, buyerStyleNo: e.target.value })}
+                  placeholder="예: ABC-2026-001"
+                />
+                <p className="text-[11px] text-muted-foreground">발주서·거래명세표·라인시트에는 이 번호가 우선 표기됩니다. 검색도 됩니다.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

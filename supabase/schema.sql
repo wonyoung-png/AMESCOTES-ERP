@@ -231,3 +231,7 @@ alter table vendors
   add column if not exists tt_condition text,
   add column if not exists custom_material_type text,
   add column if not exists contact_history jsonb;
+
+-- ─── 브랜드 다중 등록 · 바이어 지정 품번 (2026-08-07) ───
+alter table vendors add column if not exists brands text[];   -- 한 회사가 여러 브랜드 운영
+alter table items   add column if not exists buyer_style_no text;  -- 바이어가 지정한 품번

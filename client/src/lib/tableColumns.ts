@@ -9,11 +9,11 @@
 export const TABLE_COLUMNS: Record<string, string[]> = {
   vendors: ['id', 'code', 'name', 'company_name', 'type', 'material_types', 'custom_type',
             'contact_name', 'phone', 'email', 'memo', 'bank_info', 'created_at', 'updated_at',
-            'region', 'vendor_code', 'name_en', 'name_cn', 'biz_reg_no', 'address',
+            'region', 'brands', 'vendor_code', 'name_en', 'name_cn', 'biz_reg_no', 'address',
             'billing_email', 'country', 'currency', 'wechat_id', 'lead_time_days',
             'processing_unit_cost', 'billing_type', 'settlement_cycle', 'commission_rate',
             'tt_condition', 'custom_material_type', 'contact_history'],
-  items: ['id', 'style_no', 'name', 'erp_category', 'sub_category', 'buyer_id', 'season',
+  items: ['id', 'style_no', 'buyer_style_no', 'name', 'erp_category', 'sub_category', 'buyer_id', 'season',
           'designer', 'material', 'delivery_price', 'margin_amount', 'margin_rate',
           'last_order_date', 'memo', 'image_url',
           'has_bom', 'base_cost_krw', 'post_cost_krw', 'confirmed_sale_price', 'colors',

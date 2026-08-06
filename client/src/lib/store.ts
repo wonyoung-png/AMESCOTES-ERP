@@ -146,6 +146,7 @@ export interface ItemColor {
 export interface Item {
   id: string;
   styleNo: string;
+  buyerStyleNo?: string;     // 바이어가 지정한 품번 — 외부 서류(발주서·거래명세표·라인시트)에 우선 표기
   name: string;
   nameEn?: string;
   season: Season;
@@ -550,6 +551,7 @@ export interface Vendor {
   address?: string;          // 사업장 주소 (퀵/택배 발송용)         // 사업자등록번호 (000-00-00000 형식)
   vendorCode?: string;       // 거래처 코드 (전표번호용, 예: LLL)
   type: VendorType;
+  brands?: string[];         // 브랜드명 (한 회사가 여러 브랜드를 운영할 수 있다)
   region?: VendorRegion;     // 국내 / 해외 — 입력 항목과 목록 탭을 가르는 기준 (기본 국내)
   customType?: string;       // 거래처 유형 "기타" 선택 시 직접 입력값
   materialTypes?: ('장식' | '원단' | '가죽' | '기타')[];  // 자재거래처 자재 유형 (복수 선택)

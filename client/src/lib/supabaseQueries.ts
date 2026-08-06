@@ -177,6 +177,7 @@ function convertBomFromDB(row: any) {
   return {
     id: row.id,
     styleNo: row.style_no,
+    buyerStyleNo: row.buyer_style_no,
     styleName: row.style_name,
     season: row.season,
     erpCategory: row.erp_category,
@@ -293,6 +294,7 @@ export async function fetchVendors() {
     memo: row.memo,
     bankInfo: row.bank_info,
     region: row.region ?? '국내',
+    brands: row.brands ?? [],
     vendorCode: row.vendor_code,
     nameEn: row.name_en,
     nameCn: row.name_cn,
@@ -331,6 +333,7 @@ export async function upsertVendor(vendor: Record<string, any>) {
     memo: vendor.memo,
     bank_info: vendor.bankInfo,
     region: vendor.region ?? '국내',
+    brands: vendor.brands,
     vendor_code: vendor.vendorCode,
     name_en: vendor.nameEn,
     name_cn: vendor.nameCn,
@@ -423,6 +426,7 @@ export async function upsertItem(item: Record<string, any>) {
   const row = filterForTable('items', {
     id: item.id,
     style_no: item.styleNo,
+    buyer_style_no: item.buyerStyleNo,
     name: item.name,
     name_en: item.nameEn,
     erp_category: item.erpCategory === 'PACK' ? 'ACC' : item.erpCategory,
