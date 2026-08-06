@@ -13,7 +13,7 @@ import {
   ShoppingCart, Building2, FileText, Receipt, Settings,
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Warehouse, Network,
-  GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight,
+  GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight, ExternalLink,
 } from 'lucide-react';
 
 interface NavItem {
@@ -23,13 +23,18 @@ interface NavItem {
   table?: string;
   /** LUMEN 워크스페이스에서만 표시 */
   lumenOnly?: boolean;
+  /** OEM 워크스페이스에서만 표시 */
+  oemOnly?: boolean;
   /** 관리자(ADMIN_EMAIL)에게만 표시 */
   adminOnly?: boolean;
 }
 
 interface NavGroup {
   label: string;
+  /** LUMEN 또는 AETALOOF 탭에서만 표시 (OEM 탭에서는 숨김) */
   brandOnly?: boolean;
+  /** OEM 탭에서만 표시 (LUMEN/AETALOOF 탭에서는 숨김) */
+  oemOnly?: boolean;
   items: NavItem[];
 }
 
@@ -53,6 +58,7 @@ const navGroups: NavGroup[] = [
   },
   {
     label: '생산',
+    oemOnly: true,
     items: [
       { path: '/bom', label: 'BOM / 원가', icon: <ClipboardList size={17} />, table: 'boms' },
       { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} />, table: 'boms' },
@@ -73,12 +79,14 @@ const navGroups: NavGroup[] = [
   },
   {
     label: '구매',
+    oemOnly: true,
     items: [
       { path: '/purchase', label: '자재 구매', icon: <ShoppingCart size={17} />, table: 'purchase_items' },
     ],
   },
   {
     label: '정산',
+    oemOnly: true,
     items: [
       { path: '/trade-statement', label: '거래명세표', icon: <FileText size={17} />, table: 'trade_statements' },
       { path: '/settlement', label: '미수금 / 정산', icon: <Receipt size={17} />, table: 'settlements' },
@@ -105,6 +113,8 @@ const bottomTabs = [
   { path: '/', label: '더보기', icon: <MoreHorizontal size={20} />, isMore: true },
 ];
 
+const PMS_URL = 'https://daily.54-116-241-64.sslip.io/app/';
+
 type WorkspaceId = Workspace;
 
 interface LayoutProps {
@@ -130,6 +140,8 @@ export default function Layout({ children, onLogout }: LayoutProps) {
     logout();
     onLogout?.();
   };
+
+  const isBrand = workspace !== 'OEM';
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -171,7 +183,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           )}
         </div>
 
-        {/* 워크스페이스 — Phase 1: OEM만 활성 */}
+        {/* 워크스페이스 탭 */}
         {!collapsed && (
           <div className="px-3 py-3 border-b border-sidebar-border">
             <div className="flex gap-1 bg-[var(--fill-tertiary)] rounded-md p-1">
@@ -193,14 +205,33 @@ export default function Layout({ children, onLogout }: LayoutProps) {
               })}
             </div>
             <p className="text-[11px] text-muted-foreground mt-1.5 px-1">
-              {workspace === 'OEM' ? 'OEM + 브랜드 생산 공유' : `${workspace} 브랜드 발주`}
+              {workspace === 'OEM' ? 'OEM 제조 운영' : `${workspace} 브랜드 운영`}
             </p>
+          </div>
+        )}
+
+        {/* LUMEN / AETALOOF 탭: PMS 바로가기 */}
+        {!collapsed && isBrand && (
+          <div className="px-3 py-2 border-b border-sidebar-border">
+            <a
+              href={PMS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-semibold"
+            >
+              <ExternalLink size={13} />
+              <span>PMS ({workspace}) 열기 ↗</span>
+            </a>
+            <p className="text-[10px] text-muted-foreground mt-1.5 px-1">일일 매출 · 캠페인 · 재고 · 물류</p>
           </div>
         )}
 
         <nav className="flex-1 overflow-y-auto py-3 px-2">
           {navGroups.map((group, gi) => {
-            if (group.brandOnly && workspace === 'OEM') return null;
+            // brandOnly: OEM 탭에서 숨김
+            if (group.brandOnly && !isBrand) return null;
+            // oemOnly: LUMEN/AETALOOF 탭에서 숨김
+            if (group.oemOnly && isBrand) return null;
             if (!group.items.length) return null;
             return (
             <div key={gi} className="mb-1">
@@ -214,6 +245,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
               {group.label && collapsed && <div className="my-2 mx-2 h-px bg-border" />}
               {group.items.map((item) => {
                 if (item.lumenOnly && workspace !== 'LUMEN') return null;
+                if (item.oemOnly && isBrand) return null;
                 if (item.adminOnly && !isAdminEmail(currentUser?.email)) return null;
                 const active = isActive(item.path);
                 return (
