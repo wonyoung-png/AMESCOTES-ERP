@@ -478,6 +478,13 @@ export default function ItemMaster() {
   const [modalOpen, setModalOpen] = useState(false);
   // 품목 등록/수정 모달 탭 — 기본 정보 / 원가·부가정보(BOM 연동)
   const [itemTab, setItemTab] = useState('basic');
+  // 품목 등록/수정 중 공장 원가표를 바로 올려 BOM까지 만든다 (BOM 페이지로 안 넘어감)
+  const [costSheetMode, setCostSheetMode] = useState<'pre' | 'post'>('post');
+  const [costSheetName, setCostSheetName] = useState('');
+  const [costSheetData, setCostSheetData] = useState<null | {
+    materials: any[]; processingFee: number; exchangeRateCny: number; postProcessLines: any[];
+  }>(null);
+  const costSheetRef = useRef<HTMLInputElement>(null);
   const [editItem, setEditItem] = useState<Partial<Item>>({ ...emptyItem });
   const [isEdit, setIsEdit] = useState(false);
   // 변경사항 추적
@@ -1567,6 +1574,72 @@ export default function ItemMaster() {
     }
   }, [isDirty]);
 
+  /** 공장 원가표 엑셀을 파싱해 두었다가, 품목 저장 시 BOM으로 반영한다 */
+  const handleCostSheetPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (costSheetRef.current) costSheetRef.current.value = '';
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
+      const existing = (boms as any[]).find(b => b.styleId === editItem.id || b.styleNo === editItem.styleNo);
+      const { materials, parsedProcessingFee, parsedRate, postProcessLines } =
+        parseExcelBomSheet(raw, existing?.exchangeRateCny ?? 191);
+      if (!materials.length) { toast.error('원가표에서 자재를 읽지 못했습니다'); return; }
+      setCostSheetData({ materials, processingFee: parsedProcessingFee, exchangeRateCny: parsedRate, postProcessLines });
+      setCostSheetName(file.name);
+      setIsDirty(true);
+      toast.success(`${file.name} — 자재 ${materials.length}건 읽음. 저장하면 BOM에 반영됩니다`);
+    } catch (err) {
+      toast.error(`원가표 파싱 실패: ${(err as Error).message}`);
+    }
+  };
+
+  /** 파싱해 둔 원가표를 사전/사후 원가로 BOM에 기록한다 */
+  const applyCostSheet = async (item: Item) => {
+    if (!costSheetData) return;
+    const { materials, processingFee, exchangeRateCny, postProcessLines } = costSheetData;
+    const withIds = (ls: any[]) => ls.map(l => ({ ...l, id: genId() }));
+    const existing = (boms as any[]).find(b => b.styleId === item.id || b.styleNo === item.styleNo);
+    const base = existing || {
+      id: genId(), styleId: item.id, styleNo: item.styleNo, styleName: item.name,
+      version: 1, season: item.season, lines: [], postProcessLines: [], processingFee: 0,
+      snapshotCnyKrw: exchangeRateCny || 191, colorBoms: [], postColorBoms: [],
+      productionMarginRate: 0.16, logisticsCostKrw: 0, packagingCostKrw: 0, packingCostKrw: 0,
+      pnl: { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 },
+    };
+    const bom: any = costSheetMode === 'pre'
+      ? {
+          ...base,
+          lines: withIds(materials),
+          preMaterials: withIds(materials),
+          processingFee: processingFee || 0,
+          preProcessingFee: processingFee || 0,
+          postProcessLines: withIds(postProcessLines),
+          colorBoms: [{ color: '기본', lines: withIds(materials), postProcessLines: withIds(postProcessLines), processingFee: processingFee || 0 }],
+          exchangeRateCny: exchangeRateCny || base.exchangeRateCny,
+          snapshotCnyKrw: exchangeRateCny || base.snapshotCnyKrw,
+        }
+      : {
+          ...base,
+          postMaterials: withIds(materials),
+          postProcessingFee: processingFee || 0,
+          postProcessLines: withIds(postProcessLines),
+          postColorBoms: [{ color: '기본', lines: withIds(materials), postProcessLines: withIds(postProcessLines), processingFee: processingFee || 0 }],
+          exchangeRateCny: exchangeRateCny || base.exchangeRateCny,
+          snapshotCnyKrw: exchangeRateCny || base.snapshotCnyKrw,
+        };
+    const { totalCostKrw, factoryUnitCostKrw } = calcBomCosts(bom);
+    if (costSheetMode === 'post') { bom.postSubtotalKrw = totalCostKrw; bom.postTotalCostKrw = totalCostKrw; }
+    if (factoryUnitCostKrw > 0) bom.pnl = { ...(bom.pnl || {}), factoryUnitCostKrw };
+    await upsertBom(bom);
+    if (totalCostKrw > 0) await updateItemCostData(item.id, totalCostKrw);
+    queryClient.invalidateQueries({ queryKey: ['boms'] });
+    toast.success(`${costSheetMode === 'pre' ? '사전' : '사후'}원가 반영 — 원가 ${formatKRW(totalCostKrw)}`);
+  };
+
   const handleSave = () => {
     if (!editItem.styleNo || !editItem.name) { toast.error('스타일번호와 품명을 입력하세요'); return; }
     if (!isEdit) {
@@ -1630,6 +1703,7 @@ export default function ItemMaster() {
 
     upsertItem(itemData)
       .then(async () => {
+        if (costSheetData) await applyCostSheet(itemData);
         if (isPack) {
           const existingBom = (boms as any[]).find(b => b.styleId === itemData.id || b.styleNo === itemData.styleNo);
           const bomBase = existingBom || createEmptyPackBom({
@@ -1666,6 +1740,7 @@ export default function ItemMaster() {
           toast.success('품목이 수정되었습니다');
         }
         setIsDirty(false);
+        setCostSheetData(null); setCostSheetName('');
         setModalOpen(false);
         refresh();
       })
@@ -3021,6 +3096,37 @@ export default function ItemMaster() {
           </TabsContent>
 
           <TabsContent value="cost" className="space-y-5 mt-4">
+            {/* 공장 원가표 업로드 — 여기서 올리면 저장할 때 BOM까지 자동 생성된다 */}
+            <div className="p-3 border border-primary/20 bg-primary/5 rounded-md space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Factory className="w-4 h-4 text-primary" />
+                <span className="text-xs font-medium text-primary">공장 원가표 업로드</span>
+                <select
+                  value={costSheetMode}
+                  onChange={e => setCostSheetMode(e.target.value as 'pre' | 'post')}
+                  className="h-8 text-xs border border-border rounded-md bg-card px-2"
+                >
+                  <option value="pre">사전원가</option>
+                  <option value="post">사후원가</option>
+                </select>
+                <input ref={costSheetRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleCostSheetPick} />
+                <Button type="button" variant="outline" size="sm" onClick={() => costSheetRef.current?.click()} className="gap-1.5">
+                  <Upload size={14} />엑셀 선택
+                </Button>
+                {costSheetData && (
+                  <button type="button" onClick={() => { setCostSheetData(null); setCostSheetName(''); }}
+                    className="text-[11px] text-[var(--system-red)] hover:underline">취소</button>
+                )}
+              </div>
+              {costSheetData ? (
+                <p className="text-[11px] text-[var(--system-green)]">
+                  {costSheetName} — 자재 {costSheetData.materials.length}건 · 저장하면 {costSheetMode === 'pre' ? '사전' : '사후'}원가로 BOM에 반영됩니다
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">엑셀을 올리면 BOM 페이지로 가지 않고 저장 시 원가가 자동 계산됩니다.</p>
+              )}
+            </div>
+
             {/* 가격 정보 — BOM이 등록되면 원가·컬러가 자동으로 따라온다 */}
             <div className="space-y-3">
               <p className="text-xs font-medium text-muted-foreground">가격 정보</p>
