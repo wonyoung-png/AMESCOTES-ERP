@@ -5,7 +5,7 @@ import { useLocation, useSearch } from 'wouter';
 import { calcPostSummary } from '@/lib/costing';
 import { nextOrderNo, parseRevision } from '@/lib/orderNo';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type PackingSize, type ProductionOrder, type ColorQty } from '@/lib/store';
+import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type PackingSize, type ProductionOrder, type ColorQty, type Vendor } from '@/lib/store';
 import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, fetchBomsLight, updateItemCostData, saveConfirmedSalePrice, fetchMaterials, fetchOrders } from '@/lib/supabaseQueries';
 import { PackBomEditor } from '@/components/PackBomEditor';
 import {
@@ -21,6 +21,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { HoverZoomImage } from '@/components/HoverZoomImage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -398,6 +400,59 @@ function orderNodes(order: string[], nodes: any[]): any[] {
     .sort((a, b) => idx(String(a.key)) - idx(String(b.key)));
 }
 
+/**
+ * 바이어 선택 콤보박스 — 거래처 마스터에서 '바이어'로 등록된 곳만 검색해서 고른다.
+ * 회사명과 브랜드명이 다를 수 있어 둘 다 보여준다 (헷갈림 방지).
+ */
+function BuyerPicker({ buyers, selectedId, onSelect }: {
+  buyers: Vendor[]; selectedId: string; onSelect: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const sel = buyers.find(b => b.id === selectedId);
+  const query = q.trim().toLowerCase();
+  const list = query
+    ? buyers.filter(b => [b.code, b.name, b.companyName, b.nameEn, b.memo]
+        .some(f => (f || '').toLowerCase().includes(query)))
+    : buyers;
+  const line = (b: Vendor) => (
+    <>
+      <span className="font-mono font-bold text-primary mr-2">[{b.code}]</span>
+      <span>{b.name}</span>
+      {b.nameEn && b.nameEn !== b.name && <span className="text-muted-foreground"> · {b.nameEn}</span>}
+    </>
+  );
+
+  return (
+    <Popover open={open} onOpenChange={o => { setOpen(o); if (o) setQ(''); }}>
+      <PopoverTrigger asChild>
+        <button type="button" className="w-full h-8 px-3 text-sm bg-card border border-border rounded-md flex items-center justify-between gap-2 hover:border-primary/40">
+          <span className="truncate">{sel ? line(sel) : <span className="text-muted-foreground">거래처 선택</span>}</span>
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)]" align="start">
+        <div className="p-2 border-b border-border">
+          <Input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="브랜드명 · 회사명 · 코드" className="h-8 text-sm" />
+        </div>
+        <div className="max-h-64 overflow-y-auto py-1">
+          {list.length === 0 && <p className="px-3 py-6 text-center text-xs text-muted-foreground">바이어로 등록된 거래처가 없습니다</p>}
+          {list.map(b => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => { onSelect(b.id); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--fill-quaternary)] truncate ${b.id === selectedId ? 'bg-[var(--fill-quaternary)] font-medium' : ''}`}
+            >
+              {line(b)}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function ItemMaster() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
@@ -419,6 +474,8 @@ export default function ItemMaster() {
   const [filterCategory, setFilterCategory] = usePersistedState('items.filterCategory', '전체');
   const [filterErpCategory, setFilterErpCategory] = usePersistedState('items.filterErpCategory', '전체');
   const [modalOpen, setModalOpen] = useState(false);
+  // 품목 등록/수정 모달 탭 — 기본 정보 / 원가·부가정보(BOM 연동)
+  const [itemTab, setItemTab] = useState('basic');
   const [editItem, setEditItem] = useState<Partial<Item>>({ ...emptyItem });
   const [isEdit, setIsEdit] = useState(false);
   // 변경사항 추적
@@ -1712,7 +1769,9 @@ export default function ItemMaster() {
 
   // 바이어 거래처만
   const buyerVendors = vendors.filter(v => v.type === '바이어');
-  const brandVendors = vendors.filter(v => v.code);
+  // 품번 자동생성에 쓰는 거래처 = 거래처 마스터에서 '바이어'로 등록되고 브랜드코드가 있는 곳만
+  const brandVendors = vendors.filter(v => v.type === '바이어' && v.code);
+  const buyersWithoutCode = vendors.filter(v => v.type === '바이어' && !v.code).length;
 
   // 미발주기간·발주차수·누적생산량 (styleId + styleNo 매칭)
   const mergedOrders = useMemo(() => {
@@ -2754,7 +2813,13 @@ export default function ItemMaster() {
             <DialogTitle>{isEdit ? '품목 수정' : '품목 등록'}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-5">
+          <Tabs value={itemTab} onValueChange={setItemTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="basic">기본 정보</TabsTrigger>
+              <TabsTrigger value="cost">원가 · 부가정보 <span className="ml-1 text-[11px] text-muted-foreground">(BOM 연동)</span></TabsTrigger>
+            </TabsList>
+
+          <TabsContent value="basic" className="space-y-5 mt-4">
             {/* 스타일번호 자동생성 */}
             <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
               <div className="flex items-center justify-between">
@@ -2772,19 +2837,17 @@ export default function ItemMaster() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-primary">거래처 (브랜드코드 보유)</Label>
-                  <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
-                    <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder="거래처 선택" /></SelectTrigger>
-                    <SelectContent>
-                      {brandVendors.length === 0
-                        ? <div className="px-3 py-2 text-xs text-muted-foreground">브랜드코드 등록된 거래처 없음</div>
-                        : brandVendors.map(v => (
-                          <SelectItem key={v.id} value={v.id}>
-                            <span className="font-mono font-bold text-primary mr-2">[{v.code}]</span>{v.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs text-primary">거래처 (바이어)</Label>
+                  <BuyerPicker
+                    buyers={brandVendors}
+                    selectedId={selectedVendorId}
+                    onSelect={setSelectedVendorId}
+                  />
+                  {buyersWithoutCode > 0 && (
+                    <p className="text-[11px] text-muted-foreground">
+                      브랜드코드가 없는 바이어 {buyersWithoutCode}곳은 품번을 만들 수 없어 목록에서 빠집니다
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-primary">등록일 (YYMM 기준)</Label>
@@ -2939,14 +3002,13 @@ export default function ItemMaster() {
                     />
                   </div>
                 ) : null}
-                <div className="space-y-1.5">
-                  <Label>소재 / 스펙</Label>
-                  <Input value={editItem.material || ''} onChange={e => setEditItem({ ...editItem, material: e.target.value })} placeholder={editItem.erpCategory === 'PACK' ? 'BAG 표준키트 L' : '소가죽'} />
-                </div>
               </div>
             </div>
 
-            {/* 가격 정보 */}
+          </TabsContent>
+
+          <TabsContent value="cost" className="space-y-5 mt-4">
+            {/* 가격 정보 — BOM이 등록되면 원가·컬러가 자동으로 따라온다 */}
             <div className="space-y-3">
               <p className="text-xs font-medium text-muted-foreground">가격 정보</p>
 
@@ -3197,7 +3259,8 @@ export default function ItemMaster() {
               </div>
               <input ref={imageFileRef} type="file" accept="image/*" className="hidden" onChange={handleItemImageUpload} />
             </div>
-          </div>
+          </TabsContent>
+          </Tabs>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalOpen(false)}>취소</Button>

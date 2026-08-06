@@ -169,6 +169,84 @@ const SECTION_SUB_PARTS: Record<string, string[]> = {
 // const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS']; // 미사용
 // 원자재 섹션은 기본 펼침, 나머지는 기본 접힘 (렌더마다 재생성 방지 — 모듈 상수)
 const NON_RAW_SECTIONS = ['지퍼', '장식', '보강재', '봉사·접착제', '포장재', '철형', '후가공'];
+/**
+ * 스타일 선택 콤보박스 — 검색 · 브랜드 필터 · 선택을 한 칸에서 처리한다.
+ * cmdk 의존성을 추가하지 않으려고 Popover + Input 으로 직접 짰다.
+ */
+type StyleOption = { item: Item; buyerName: string; bomCost: number };
+function StylePicker({
+  options, selectedId, search, onSearchChange, onSelect, fmtKrw,
+}: {
+  options: StyleOption[];
+  selectedId: string;
+  search: string;
+  onSearchChange: (v: string) => void;
+  onSelect: (id: string) => void;
+  fmtKrw: (n: number) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find(o => o.item.id === selectedId)
+    // 검색어로 목록이 좁혀져도 선택된 항목 표시는 유지돼야 한다
+    || (selectedId ? undefined : undefined);
+  const label = selected
+    ? `${selected.item.styleNo} — ${selected.item.name}`
+    : '스타일 선택...';
+  // ponytail: 목록은 200개까지만 그린다. 더 필요하면 검색어로 좁힌다
+  const shown = options.slice(0, 200);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="w-full h-8 px-3 text-xs border border-border rounded-md bg-card flex items-center justify-between gap-2 hover:border-primary/40"
+        >
+          <span className={`truncate ${selected ? 'text-foreground' : 'text-muted-foreground'}`}>{label}</span>
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)]" align="start">
+        <div className="p-2 border-b border-border">
+          <Input
+            autoFocus
+            value={search}
+            onChange={e => onSearchChange(e.target.value)}
+            placeholder="브랜드명 · 스타일번호 · 품명"
+            className="h-8 text-xs"
+          />
+        </div>
+        <div className="max-h-72 overflow-y-auto py-1">
+          {shown.length === 0 && (
+            <p className="px-3 py-6 text-center text-xs text-muted-foreground">일치하는 스타일이 없습니다</p>
+          )}
+          {shown.map(({ item, buyerName, bomCost }) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => { onSelect(item.id); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-[var(--fill-quaternary)] ${
+                item.id === selectedId ? 'bg-[var(--fill-quaternary)] font-medium' : ''
+              }`}
+            >
+              <span className="truncate flex-1">
+                {buyerName && <span className="text-muted-foreground">{buyerName} · </span>}
+                {item.styleNo} — {item.name}
+              </span>
+              {item.hasBom && <Badge variant="outline" className="text-[11px] py-0 h-4 border-[var(--system-green)]/30 text-[var(--system-green)]">BOM</Badge>}
+              {item.hasBom && bomCost > 0 && <span className="text-[11px] text-primary font-medium shrink-0">{fmtKrw(bomCost)}</span>}
+            </button>
+          ))}
+          {options.length > shown.length && (
+            <p className="px-3 py-2 text-[11px] text-muted-foreground">
+              {options.length}건 중 {shown.length}건 표시 — 검색어로 좁혀주세요
+            </p>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const COUNTRY_OPTIONS = ['중국', '한국', '기타'] as const;
 const CURRENCY_OPTIONS = ['CNY', 'USD', 'KRW'] as const;
 // P&L 가정 입력 필드 (사전/사후 공용 — 모듈 상수)
@@ -2177,13 +2255,25 @@ export default function BomManagement() {
   const [styleSearch, setStyleSearch] = useState<string>('');
   const debouncedStyleSearch = useDebouncedValue(styleSearch, 300);
   // 스타일 셀렉트 옵션 — 키 입력마다 전체 items × getBomTotalCost(localStorage 파싱) 재실행 방지
+  /**
+   * 스타일 검색 = 스타일번호 · 품명 · 브랜드(바이어)명을 한 칸에서 찾는다.
+   * 브랜드명을 치면 그 브랜드로 등록된 품목만 남으므로 별도 바이어 필터가 필요 없다.
+   */
   const styleOptions = useMemo(() => {
-    const q = debouncedStyleSearch.toLowerCase();
+    const q = debouncedStyleSearch.trim().toLowerCase();
     return items
-      .filter(item => filterBuyerBom === 'all' || item.buyerId === filterBuyerBom)
-      .filter(item => !q || item.styleNo.toLowerCase().includes(q) || item.name.toLowerCase().includes(q))
-      .map(item => ({ item, bomCost: item.hasBom ? store.getBomTotalCost(item.styleNo) : 0 }));
-  }, [items, filterBuyerBom, debouncedStyleSearch, extBoms]);
+      .filter(item => {
+        if (!q) return true;
+        const buyer = buyers.find(b => b.id === item.buyerId);
+        return [item.styleNo, item.name, item.nameEn, buyer?.name, buyer?.nameEn, buyer?.code]
+          .some(f => (f || '').toLowerCase().includes(q));
+      })
+      .map(item => ({
+        item,
+        buyerName: buyers.find(b => b.id === item.buyerId)?.name || '',
+        bomCost: item.hasBom ? store.getBomTotalCost(item.styleNo) : 0,
+      }));
+  }, [items, buyers, debouncedStyleSearch, extBoms]);
   const [editBom, setEditBom] = useState<ExtBom | null>(null);
   const [showQuote, setShowQuote] = useState(false);
   const [showCopyModal, setShowCopyModal] = useState(false);
@@ -3353,58 +3443,25 @@ export default function BomManagement() {
       {/* 스타일 선택 */}
       <div className="bg-card rounded-lg border border-border p-5">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <div className="col-span-1">
-            <label className="text-xs text-muted-foreground mb-1 block font-medium">바이어 필터</label>
-            <Select value={filterBuyerBom} onValueChange={setFilterBuyerBom}>
-              <SelectTrigger className="h-8 text-xs border-border"><SelectValue placeholder="전체 바이어" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs">전체 바이어</SelectItem>
-                {buyers.map(b => <SelectItem key={b.id} value={b.id} className="text-xs">{b.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="col-span-1">
-            <label className="text-xs text-muted-foreground mb-1 block font-medium">스타일 검색</label>
-            <Input value={styleSearch} onChange={e => setStyleSearch(e.target.value)} className="h-8 text-xs border-border" placeholder="스타일번호 / 품명" />
-          </div>
-          <div className="col-span-2">
-            <label className="text-xs text-muted-foreground mb-1 block font-medium">스타일 선택</label>
-            <Select value={selectedStyleId.replace('_reload', '')} onValueChange={setSelectedStyleId}>
-              <SelectTrigger className="h-8 text-xs border-border"><SelectValue placeholder="스타일 선택..." /></SelectTrigger>
-              <SelectContent>
-                {styleOptions.map(({ item, bomCost }) => (
-                  <SelectItem key={item.id} value={item.id} className="text-xs">
-                    <span className="flex items-center gap-1.5">
-                      {item.styleNo} — {item.name}
-                      {item.hasBom && <Badge variant="outline" className="text-[11px] py-0 h-4 border-[var(--system-green)]/30 text-[var(--system-green)]">BOM</Badge>}
-                      {item.hasBom && bomCost > 0 && <span className="text-[11px] text-primary font-medium">{fmtKrw(bomCost)}</span>}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* 스타일 선택 — 검색·바이어필터·선택을 콤보박스 하나로 합쳤다 */}
+          <div className="col-span-2 md:col-span-3 lg:col-span-4">
+            <label className="text-xs text-muted-foreground mb-1 block font-medium">스타일 선택 <span className="text-[11px] text-muted-foreground font-normal">(브랜드명 · 스타일번호 · 품명으로 검색)</span></label>
+            <StylePicker
+              options={styleOptions}
+              selectedId={selectedStyleId.replace('_reload', '')}
+              search={styleSearch}
+              onSearchChange={setStyleSearch}
+              onSelect={setSelectedStyleId}
+              fmtKrw={fmtKrw}
+            />
           </div>
           {editBom && (
             <>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block font-medium">스타일번호 <span className="text-[11px] text-primary font-normal">자동</span></label>
-                <Input value={editBom.styleNo} disabled className="h-8 text-xs border-border bg-[var(--fill-quaternary)] text-muted-foreground cursor-not-allowed" />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block font-medium">품명 <span className="text-[11px] text-primary font-normal">자동</span></label>
-                <Input value={editBom.styleName} disabled className="h-8 text-xs border-border bg-[var(--fill-quaternary)] text-muted-foreground cursor-not-allowed" />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block font-medium">시즌 <span className="text-[11px] text-primary font-normal">자동</span></label>
-                <Input value={editBom.season} disabled className="h-8 text-xs border-border bg-[var(--fill-quaternary)] text-muted-foreground cursor-not-allowed" />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block font-medium">카테고리 <span className="text-[11px] text-primary font-normal">자동</span></label>
-                <Input value={editBom.erpCategory || ''} disabled className="h-8 text-xs border-border bg-[var(--fill-quaternary)] text-muted-foreground cursor-not-allowed" />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block font-medium">담당 디자이너 <span className="text-[11px] text-primary font-normal">자동</span></label>
-                <Input value={editBom.designer || ''} disabled className="h-8 text-xs border-border bg-[var(--fill-quaternary)] text-muted-foreground cursor-not-allowed" />
+              {/* 선택한 품목에서 따라오는 값들 — 읽기 전용이라 배지 한 줄로 줄였다 */}
+              <div className="col-span-2 lg:col-span-2 flex flex-wrap items-end gap-1.5 pb-1">
+                {[editBom.season, editBom.erpCategory, editBom.designer].filter(Boolean).map((v, i) => (
+                  <Badge key={i} variant="outline" className="text-[11px] font-normal text-muted-foreground border-border">{v}</Badge>
+                ))}
               </div>
               <div><label className="text-xs text-muted-foreground mb-1 block font-medium">라인명</label><Input value={editBom.lineName || ''} onChange={e => updateField('lineName', e.target.value)} className="h-8 text-xs border-border" placeholder="라인명" /></div>
               {/* 제품이미지 업로드 (품목 imageUrl 폴백) */}
