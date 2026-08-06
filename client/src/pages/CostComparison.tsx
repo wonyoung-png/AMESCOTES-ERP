@@ -6,7 +6,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchBoms, fetchItems } from '@/lib/supabaseQueries';
+import { fetchBoms, fetchItems, fetchVendors } from '@/lib/supabaseQueries';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,7 @@ interface CostRow {
   isSimple: boolean;
   hasDetailedBom: boolean;
   bomId: string;
+  brandText: string;   // 바이어 회사명 + 브랜드명들 (검색 전용)
 }
 
 // ─── 포맷 헬퍼 ────────────────────────────────────────────────────────────
@@ -79,16 +80,25 @@ export default function CostComparison() {
     queryKey: ['items'],
     queryFn: fetchItems,
   });
+  // 브랜드명으로도 찾을 수 있게 바이어(거래처)를 함께 읽는다
+  const { data: vendors = [] } = useQuery({
+    queryKey: ['vendors'],
+    queryFn: fetchVendors,
+  });
 
   const isLoading = bomsLoading || itemsLoading;
 
   // BOM 데이터를 CostRow로 변환
   const costRows = useMemo<CostRow[]>(() => {
     const itemMap = new Map(items.map((i: any) => [i.id, i]));
+    const vendorMap = new Map((vendors as any[]).map(v => [v.id, v]));
 
     return rawBoms.map((bom: any) => {
       const item = itemMap.get(bom.styleId) || itemMap.get(bom.styleNo);
       const isSimple = !!(bom as any).isSimpleCost;
+      const buyer: any = item?.buyerId ? vendorMap.get(item.buyerId) : undefined;
+      const brandText = [buyer?.name, buyer?.companyName, buyer?.nameEn, ...(buyer?.brands || []), item?.buyerStyleNo]
+        .filter(Boolean).join(' ');
 
       // 사전원가
       let preCost: number | null = null;
@@ -149,9 +159,10 @@ export default function CostComparison() {
         isSimple,
         hasDetailedBom,
         bomId: bom.id,
+        brandText,
       } as CostRow;
     });
-  }, [rawBoms, items]);
+  }, [rawBoms, items, vendors]);
 
   // 검색 & 필터 & 정렬
   const filtered = useMemo(() => {
@@ -163,7 +174,8 @@ export default function CostComparison() {
       rows = rows.filter(r =>
         r.styleNo.toLowerCase().includes(q) ||
         r.styleName.toLowerCase().includes(q) ||
-        r.season.toLowerCase().includes(q)
+        r.season.toLowerCase().includes(q) ||
+        r.brandText.toLowerCase().includes(q)
       );
     }
 
@@ -431,7 +443,7 @@ export default function CostComparison() {
             <Input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="스타일번호 / 품목명 / 시즌 검색"
+              placeholder="브랜드명 / 스타일번호 / 품목명 / 시즌 검색"
               className="pl-8 h-8 text-xs"
             />
           </div>
