@@ -1,10 +1,23 @@
 # AMESCOTES ERP — 하네스 엔지니어링 규칙
 
-## 🧵 멀티 세션 동시 작업 규칙 (2026-08-06)
+## 🧵 병렬 작업 규칙 (2026-08-06 개정)
 
-여러 클로드 세션을 동시에 돌릴 때. **페이지(탭) 단위로 분배**한다 — 페이지마다 파일이 1:1로 독립이라 충돌이 안 난다.
+**🔴 여러 클로드 세션을 동시에 띄우지 않는다.** 실제로 해보니 git 리베이스 충돌과 동시 배포로
+서버가 다운됐다. 대신 **한 세션이 주도하고, 그 안에서 에이전트(subagent)를 병렬로 돌린다.**
 
-### 1. 세션당 담당 페이지 = 담당 파일
+### 주도 세션(오케스트레이터)이 전담하는 것 — 에이전트에게 절대 넘기지 않는다
+- `git commit` · `git push` · `git pull --rebase`
+- 서버 배포(SSM) — **항상 1건씩, 여러 작업을 모아서 마지막에 한 번**
+- 공용 파일 수정: `components/Layout.tsx` · `App.tsx` · `lib/store.ts` · `lib/phase1.ts`
+  · `lib/tableColumns.ts` · `lib/auth.ts` · `lib/supabaseQueries.ts` · `supabase/schema.sql`
+- DB 스키마 변경(ALTER TABLE)
+
+### 에이전트에게 맡기는 것
+- 페이지 1개 = 에이전트 1개. 담당 파일만 수정하게 한다 (아래 표).
+- 조사·탐색(어디에 뭐가 있는지 찾기)은 병렬로 여러 개 띄워도 안전하다.
+- 에이전트에게 반드시 지시할 것: "커밋·푸시·배포하지 말 것. 수정만 하고 무엇을 바꿨는지 보고할 것."
+
+### 페이지 ↔ 담당 파일
 | ERP 탭 | 담당 파일 (이 세션만 수정) |
 |---|---|
 | 거래처 마스터 | `client/src/pages/VendorMaster.tsx` |
@@ -19,29 +32,16 @@
 | 입고·출고 | `client/src/pages/ReceivingShipping.tsx` |
 | (그 외) | `pages/` 내 동명 파일 1개 |
 
-### 2. 공용 파일 = 잠금 대상 (여러 세션이 동시에 만지면 충돌)
-`components/Layout.tsx` · `App.tsx` · `lib/store.ts` · `lib/phase1.ts` · `lib/tableColumns.ts` · `lib/auth.ts` · `lib/supabaseQueries.ts` · `supabase/schema.sql`
-
-- 공용 파일을 고쳐야 하면 → **대표에게 먼저 알리고, 그 순간 다른 세션은 대기**
-- 새 컬럼 추가로 `tableColumns.ts`를 건드려야 하면 → 그 변경만 따로 즉시 커밋·푸시하고 알린다
-
-### 3. 작업 폴더 분리 (필수)
-같은 폴더를 두 세션이 쓰면 서로의 빌드·git 상태를 덮어쓴다. 세션마다 worktree:
-```bash
-git worktree add ../erp-w2 aws-migration   # 세션2
-git worktree add ../erp-w3 aws-migration   # 세션3
-```
-
-### 4. 커밋·푸시
-- 커밋 메시지 앞에 담당 페이지 표기: `fix(품목마스터): ...`
+### 커밋·배포 (오케스트레이터만)
+- 에이전트 작업이 모두 끝난 뒤 **한 번에** 커밋한다. 커밋 메시지에 담당 페이지 표기: `fix(품목마스터): ...`
 - 푸시 전 항상 `git pull --rebase origin aws-migration`
-- 남의 담당 파일이 diff에 섞였으면 → 커밋하지 말고 되돌린다 (`git checkout -- <파일>`)
-
-### 5. 🔴 서버 배포는 한 번에 1개 세션만
-EC2가 t4g.small(2GB, 스왑 없음)이라 동시 빌드 시 OOM, ECR `:latest` 도 서로 덮어쓴다.
-- 배포 전 다른 세션이 배포 중인지 확인:
+- 배포는 여러 작업을 **모아서 마지막에 1회**. 배포 전 진행 중인 것이 없는지 확인:
   `aws ssm list-commands --instance-id i-0d463039630706c76 --max-items 3` → `InProgress` 있으면 대기
-- 여러 세션 작업을 **모아서 마지막에 1회 배포**하는 것이 가장 안전
+
+### 서버 자원 (2026-08-06 사고 기록)
+EC2 t4g.small = 메모리 2GB. 스왑이 없어 docker 빌드 중 **서버 전체가 멈추고 사이트가 다운됐다**
+(SSM 연결 끊김 → 자동 재부팅으로 복구). 이후 **스왑 2GB를 상시 설정**해 두었다(`/swapfile`, fstab 등록).
+스왑을 지우거나 동시에 2건 이상 빌드하지 말 것.
 
 ## 🔴 레드라인 (자동 차단)
 - **빌드 실패 상태로 커밋 금지** → pre-commit hook이 자동 차단
