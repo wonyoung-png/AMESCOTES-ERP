@@ -29,6 +29,7 @@ function lazyWithReload<T extends ComponentType<unknown>>(factory: () => Promise
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 const ItemMaster = lazyWithReload(() => import("./pages/ItemMaster"));
+const SalesSummary = lazyWithReload(() => import("./pages/SalesSummary"));
 const BomManagement = lazyWithReload(() => import("./pages/BomManagement"));
 const SampleManagement = lazyWithReload(() => import("./pages/SampleManagement"));
 const ProductionOrders = lazyWithReload(() => import("./pages/ProductionOrders"));
@@ -148,6 +149,7 @@ function Router() {
         <Route path="/workflow" component={WorkflowGuide} />
         <Route path="/users" component={UserManagement} />
         <Route path="/items" component={ItemMaster} />
+        <Route path="/sales-summary" component={SalesSummary} />
         <Route path="/bom" component={BomManagement} />
         <Route path="/samples" component={SampleManagement} />
         <Route path="/orders" component={ProductionOrders} />
