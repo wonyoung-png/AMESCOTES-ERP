@@ -1,5 +1,5 @@
 // AMESCOTES ERP — 품목 마스터 (대규모 개편)
-import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useLocation, useSearch } from 'wouter';
 import { calcPostSummary } from '@/lib/costing';
@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { HoverZoomImage } from '@/components/HoverZoomImage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link, ShoppingCart, Printer, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Columns3, Factory, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link, ShoppingCart, Printer, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Columns3, Factory, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -442,9 +442,6 @@ export default function ItemMaster() {
   const [seasonStatsTarget, setSeasonStatsTarget] = useState('전체');
   const [customCategory, setCustomCategory] = useState(''); // 세부 카테고리 직접 입력
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: () => import('@/lib/supabaseQueries').then(m => m.fetchOrders()) }); // 미발주·발주차수·누적생산
-  const [listTab, setListTab] = useState<'items' | 'production'>('items');
-  const [prodExpanded, setProdExpanded] = useState<Set<string>>(new Set());
-  const [prodOrderedOnly, setProdOrderedOnly] = useState(true);
   const imageFileRef = useRef<HTMLInputElement>(null);
   const excelUploadRef = useRef<HTMLInputElement>(null);
   // 공장 원가표 일괄 업로드
@@ -1809,44 +1806,6 @@ export default function ItemMaster() {
     return Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30));
   };
 
-  const toggleProdExpand = (id: string) => {
-    setProdExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const prodSummary = useMemo(() => {
-    let styles = 0;
-    let ordersN = 0;
-    let qty = 0;
-    displayItems.forEach(item => {
-      const s = itemOrderStats.get(item.id) || EMPTY_ORDER_STAT;
-      if (s.orderCount > 0) {
-        styles += 1;
-        ordersN += s.orderCount;
-        qty += s.cumQty;
-      }
-    });
-    return { styles, ordersN, qty };
-  }, [displayItems, itemOrderStats]);
-
-  /** 누적생산량 탭: 발주 있는 품목 우선 */
-  const prodDisplayItems = useMemo(() => {
-    const base = prodOrderedOnly
-      ? displayItems.filter(i => (itemOrderStats.get(i.id)?.orderCount || 0) > 0)
-      : displayItems;
-    return [...base].sort((a, b) => {
-      const sa = itemOrderStats.get(a.id) || EMPTY_ORDER_STAT;
-      const sb = itemOrderStats.get(b.id) || EMPTY_ORDER_STAT;
-      if (sb.orderCount !== sa.orderCount) return sb.orderCount - sa.orderCount;
-      if (sb.cumQty !== sa.cumQty) return sb.cumQty - sa.cumQty;
-      return (a.styleNo || '').localeCompare(b.styleNo || '');
-    });
-  }, [displayItems, itemOrderStats, prodOrderedOnly]);
-
   const [isPackLoading, setIsPackLoading] = useState(false);
   const packAutoTried = useRef(false);
   const lumen27AutoTried = useRef(false);
@@ -2011,47 +1970,6 @@ export default function ItemMaster() {
         </p>
       )}
 
-      {/* 품목목록 / 누적생산량 */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-md border border-border bg-card p-0.5">
-          <button
-            type="button"
-            onClick={() => setListTab('items')}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-              listTab === 'items' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-[var(--fill-quaternary)]'
-            }`}
-          >
-            품목목록
-          </button>
-          <button
-            type="button"
-            onClick={() => setListTab('production')}
-            className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1.5 transition-colors ${
-              listTab === 'production' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-[var(--fill-quaternary)]'
-            }`}
-          >
-            <Factory size={14} />
-            누적생산량
-          </button>
-        </div>
-        {listTab === 'production' && (
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <span>
-              누적발주 {prodSummary.ordersN.toLocaleString()}회 · 스타일 {prodSummary.styles}종 · 누적 {prodSummary.qty.toLocaleString()}pcs
-            </span>
-            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                className="accent-primary"
-                checked={prodOrderedOnly}
-                onChange={e => setProdOrderedOnly(e.target.checked)}
-              />
-              발주 있는 품목만
-            </label>
-          </div>
-        )}
-      </div>
-
       {/* 필터 */}
       <Card className="border-border">
         <CardContent className="p-3 space-y-2">
@@ -2166,7 +2084,6 @@ export default function ItemMaster() {
       )}
 
       {/* 테이블 */}
-      {listTab === 'items' ? (
       <div className="bg-card rounded-lg border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="text-sm table-fixed w-full" style={{ minWidth: 40 + 70 + ITEM_COLUMN_DEFS.filter(c => showCol(c.key)).reduce((s, c) => s + (colWidths[c.key] || 80), 0) }}>
@@ -2625,8 +2542,8 @@ export default function ItemMaster() {
                             <button
                               type="button"
                               className="inline-flex items-center"
-                              title="발주 누적 횟수 (1차·2차·…N차) · 클릭 시 상세"
-                              onClick={() => setListTab('production')}
+                              title="발주 누적 횟수 (1차·2차·…N차) · 클릭 시 매출집계"
+                              onClick={() => navigate('/sales-summary')}
                             >
                               <span className="text-xs font-semibold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
                                 {st.orderCount}차
@@ -2723,159 +2640,6 @@ export default function ItemMaster() {
           )}
         </div>
       </div>
-      ) : (
-      <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <div className="px-4 py-3 border-b border-border bg-[var(--fill-quaternary)] flex flex-wrap items-center gap-2">
-          <Factory size={16} className="text-muted-foreground" />
-          <span className="text-sm font-semibold text-foreground">스타일별 누적생산량</span>
-          <span className="text-xs text-muted-foreground">발주차수 = 누적 발주 횟수 (5번 발주면 5차) · 컬러별 수량 · 행 클릭 시 발주 상세</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[880px]">
-            <thead>
-              <tr className="border-b border-border bg-card text-xs text-muted-foreground">
-                <th className="w-8 px-2 py-2" />
-                <th className="text-left px-3 py-2">스타일번호</th>
-                <th className="text-left px-3 py-2">품명</th>
-                <th className="text-left px-3 py-2">시즌</th>
-                <th className="text-left px-3 py-2">바이어</th>
-                <th className="text-center px-3 py-2 whitespace-nowrap">발주차수</th>
-                <th className="text-right px-3 py-2 whitespace-nowrap">누적생산량</th>
-                <th className="text-left px-3 py-2 min-w-[280px]">컬러별 생산수량</th>
-                <th className="text-center px-3 py-2">최종발주</th>
-              </tr>
-            </thead>
-            <tbody>
-              {prodDisplayItems.map(item => {
-                const st = itemOrderStats.get(item.id) || EMPTY_ORDER_STAT;
-                const open = prodExpanded.has(item.id);
-                const colorEntries = Object.entries(st.byColor).sort((a, b) => b[1] - a[1]);
-                const totalForBar = st.cumQty || colorEntries.reduce((s, [, q]) => s + q, 0) || 1;
-                return (
-                  <Fragment key={item.id}>
-                    <tr
-                      className={`border-t border-border hover:bg-[var(--fill-quaternary)] cursor-pointer align-top ${st.orderCount === 0 ? 'opacity-50' : ''}`}
-                      onClick={() => st.orderCount > 0 && toggleProdExpand(item.id)}
-                    >
-                      <td className="px-2 py-3 text-muted-foreground">
-                        {st.orderCount > 0 ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}
-                      </td>
-                      <td className="px-3 py-3 font-mono text-xs text-primary whitespace-nowrap">{item.styleNo}</td>
-                      <td className="px-3 py-3">
-                        <p className="font-medium text-foreground truncate max-w-[200px]" title={item.name}>{item.name}</p>
-                        {item.nameEn && <p className="text-[11px] text-muted-foreground truncate max-w-[200px]">{item.nameEn}</p>}
-                      </td>
-                      <td className="px-3 py-3 text-xs text-muted-foreground">{item.season || '—'}</td>
-                      <td className="px-3 py-3 text-xs">
-                        {item.buyerId
-                          ? (vendorMap.get(item.buyerId)?.code || vendorMap.get(item.buyerId)?.name || '—')
-                          : '—'}
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        {st.orderCount > 0 ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 text-base font-bold tabular-nums text-primary">
-                            {st.orderCount}차
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">미발주</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        {st.cumQty > 0 ? (
-                          <div className="inline-flex flex-col items-end">
-                            <span className="text-base font-bold tabular-nums text-foreground leading-none">{st.cumQty.toLocaleString()}</span>
-                            <span className="text-[11px] text-muted-foreground mt-0.5">pcs</span>
-                          </div>
-                        ) : <span className="text-xs text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-3 py-3">
-                        {colorEntries.length > 0 ? (
-                          <div className="space-y-1.5 min-w-[260px]">
-                            {colorEntries.map(([c, q]) => {
-                              const pct = Math.round((q / totalForBar) * 100);
-                              return (
-                                <div key={c} className="grid grid-cols-[minmax(72px,1fr)_64px_minmax(80px,1.2fr)] gap-2 items-center">
-                                  <span className="text-xs font-medium text-foreground truncate" title={c}>{c}</span>
-                                  <span className="text-xs font-mono font-semibold text-foreground text-right tabular-nums">{q.toLocaleString()}</span>
-                                  <div className="flex items-center gap-1.5">
-                                    <div className="flex-1 h-2 rounded-full bg-[var(--fill-tertiary)] overflow-hidden">
-                                      <div
-                                        className="h-full rounded-full bg-primary/80"
-                                        style={{ width: `${Math.max(pct, q > 0 ? 4 : 0)}%` }}
-                                      />
-                                    </div>
-                                    <span className="text-[11px] text-muted-foreground w-7 text-right tabular-nums">{pct}%</span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : <span className="text-xs text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-3 py-3 text-center text-xs text-muted-foreground whitespace-nowrap">
-                        {st.lastOrderDate || '—'}
-                      </td>
-                    </tr>
-                    {open && (
-                      <tr className="bg-[var(--fill-quaternary)] border-t border-border">
-                        <td colSpan={9} className="px-4 py-3">
-                          <p className="text-[11px] font-semibold text-muted-foreground mb-2">발주 상세 (누적 {st.orderCount}차)</p>
-                          <div className="rounded-md border border-border overflow-hidden bg-card">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="bg-[var(--fill-quaternary)] text-muted-foreground">
-                                  <th className="text-left px-3 py-2">차수</th>
-                                  <th className="text-left px-3 py-2">발주번호</th>
-                                  <th className="text-left px-3 py-2">발주일</th>
-                                  <th className="text-left px-3 py-2">상태</th>
-                                  <th className="text-right px-3 py-2">수량</th>
-                                  <th className="text-left px-3 py-2">컬러별</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {st.rounds.map((r, idx) => (
-                                  <tr key={`${item.id}-${r.orderId}`} className="border-t border-border">
-                                    <td className="px-3 py-2 font-semibold text-foreground">{idx + 1}차</td>
-                                    <td className="px-3 py-2 font-mono text-primary">{r.orderNo}</td>
-                                    <td className="px-3 py-2 text-muted-foreground">{r.orderDate || '—'}</td>
-                                    <td className="px-3 py-2 text-muted-foreground">{r.status || '—'}</td>
-                                    <td className="px-3 py-2 text-right font-mono font-semibold">{r.qty.toLocaleString()}</td>
-                                    <td className="px-3 py-2">
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {(r.colorQtys || []).map(cq => (
-                                          <span
-                                            key={`${r.orderId}-${cq.color}`}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-border bg-[var(--fill-quaternary)]"
-                                          >
-                                            <span className="text-muted-foreground">{cq.color}</span>
-                                            <span className="font-mono font-semibold text-foreground">{cq.qty.toLocaleString()}</span>
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-              {prodDisplayItems.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="text-center py-12 text-muted-foreground">
-                    {prodOrderedOnly ? '발주 이력이 있는 품목이 없습니다 · 「발주 있는 품목만」 해제해 보세요' : '필터에 해당하는 품목이 없습니다'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      )}
 
       {/* 열 설정 */}
       <Dialog open={colSettingsOpen} onOpenChange={setColSettingsOpen}>
