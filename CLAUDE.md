@@ -1,5 +1,48 @@
 # AMESCOTES ERP — 하네스 엔지니어링 규칙
 
+## 🧵 멀티 세션 동시 작업 규칙 (2026-08-06)
+
+여러 클로드 세션을 동시에 돌릴 때. **페이지(탭) 단위로 분배**한다 — 페이지마다 파일이 1:1로 독립이라 충돌이 안 난다.
+
+### 1. 세션당 담당 페이지 = 담당 파일
+| ERP 탭 | 담당 파일 (이 세션만 수정) |
+|---|---|
+| 거래처 마스터 | `client/src/pages/VendorMaster.tsx` |
+| 품목 마스터 | `client/src/pages/ItemMaster.tsx` |
+| 자재 마스터 | `client/src/pages/MaterialMaster.tsx` |
+| 샘플 관리 | `client/src/pages/SampleManagement.tsx` |
+| BOM / 원가 | `client/src/pages/BomManagement.tsx` |
+| 생산 발주 | `client/src/pages/ProductionOrders.tsx` |
+| 자재 구매 | `client/src/pages/PurchaseMatching.tsx` |
+| 거래명세표 | `client/src/pages/TradeStatement.tsx` |
+| 미수금/정산 | `client/src/pages/SettlementManagement.tsx` |
+| 입고·출고 | `client/src/pages/ReceivingShipping.tsx` |
+| (그 외) | `pages/` 내 동명 파일 1개 |
+
+### 2. 공용 파일 = 잠금 대상 (여러 세션이 동시에 만지면 충돌)
+`components/Layout.tsx` · `App.tsx` · `lib/store.ts` · `lib/phase1.ts` · `lib/tableColumns.ts` · `lib/auth.ts` · `lib/supabaseQueries.ts` · `supabase/schema.sql`
+
+- 공용 파일을 고쳐야 하면 → **대표에게 먼저 알리고, 그 순간 다른 세션은 대기**
+- 새 컬럼 추가로 `tableColumns.ts`를 건드려야 하면 → 그 변경만 따로 즉시 커밋·푸시하고 알린다
+
+### 3. 작업 폴더 분리 (필수)
+같은 폴더를 두 세션이 쓰면 서로의 빌드·git 상태를 덮어쓴다. 세션마다 worktree:
+```bash
+git worktree add ../erp-w2 aws-migration   # 세션2
+git worktree add ../erp-w3 aws-migration   # 세션3
+```
+
+### 4. 커밋·푸시
+- 커밋 메시지 앞에 담당 페이지 표기: `fix(품목마스터): ...`
+- 푸시 전 항상 `git pull --rebase origin aws-migration`
+- 남의 담당 파일이 diff에 섞였으면 → 커밋하지 말고 되돌린다 (`git checkout -- <파일>`)
+
+### 5. 🔴 서버 배포는 한 번에 1개 세션만
+EC2가 t4g.small(2GB, 스왑 없음)이라 동시 빌드 시 OOM, ECR `:latest` 도 서로 덮어쓴다.
+- 배포 전 다른 세션이 배포 중인지 확인:
+  `aws ssm list-commands --instance-id i-0d463039630706c76 --max-items 3` → `InProgress` 있으면 대기
+- 여러 세션 작업을 **모아서 마지막에 1회 배포**하는 것이 가장 안전
+
 ## 🔴 레드라인 (자동 차단)
 - **빌드 실패 상태로 커밋 금지** → pre-commit hook이 자동 차단
 - **Supabase 테이블 DROP/DELETE 금지** → 데이터 복구 불가
