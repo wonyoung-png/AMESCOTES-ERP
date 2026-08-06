@@ -13,7 +13,7 @@ import {
   ShoppingCart, Building2, FileText, Receipt, Settings,
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Network,
-  GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight, ExternalLink,
+  GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight,
   LineChart, Globe, BookOpen, Percent, Image as ImageIcon,
 } from 'lucide-react';
 
@@ -229,22 +229,6 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             <p className="text-[11px] text-muted-foreground mt-1.5 px-1">
               {workspace === 'OEM' ? 'OEM 제조 운영' : `${workspace} 브랜드 운영`}
             </p>
-          </div>
-        )}
-
-        {/* LUMEN / AETALOOF 탭: PMS 안내 배너 */}
-        {!collapsed && isBrand && (
-          <div className="px-3 py-2 border-b border-sidebar-border">
-            <a
-              href={PMS_URL}
-              target="pms"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-2.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-semibold"
-            >
-              <ExternalLink size={13} />
-              <span>PMS ({workspace}) 열기 ↗</span>
-            </a>
-            <p className="text-[10px] text-muted-foreground mt-1.5 px-1">일일 매출 · 캠페인 · 재고 · 물류</p>
           </div>
         )}
 
