@@ -12,8 +12,9 @@ import {
   BarChart3, Package, ClipboardList, FlaskConical, Factory,
   ShoppingCart, Building2, FileText, Receipt, Settings,
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
-  Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Warehouse, Network,
+  Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Network,
   GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight, ExternalLink,
+  LineChart, Globe, BookOpen, Percent, Image as ImageIcon,
 } from 'lucide-react';
 
 interface NavItem {
@@ -69,15 +70,6 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: '브랜드 운영',
-    brandOnly: true,
-    items: [
-      { path: '/brand-orders', label: '리오더 · 오더관리', icon: <ClipboardCheck size={17} />, table: 'brand_order_batches' },
-      { path: '/line-sheet', label: '라인시트', icon: <FileSpreadsheet size={17} />, table: 'wholesale line sheet', lumenOnly: true },
-      { path: '/china-warehouse', label: '중국창고', icon: <Warehouse size={17} />, table: 'china_stock' },
-    ],
-  },
-  {
     label: '구매',
     oemOnly: true,
     items: [
@@ -114,6 +106,36 @@ const bottomTabs = [
 ];
 
 const PMS_URL = 'https://daily.54-116-241-64.sslip.io/app/';
+
+/**
+ * LUMEN/AETALOOF 탭 사이드바 = PMS 탭 미러.
+ * PMS(atlm-daily-check web/src/App.tsx) 탭 구조와 동기 — PMS 탭이 바뀌면 이 배열만 갱신.
+ * 링크는 PMS의 location.hash 라우팅(#탭이름)으로 해당 탭 직행. 인증은 ERP 쿠키 SSO.
+ */
+const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
+  { group: '데이터 & 점검', label: '일일점검', icon: <BarChart3 size={17} /> },
+  { group: '데이터 & 점검', label: '채널별 매출', icon: <LineChart size={17} /> },
+  { group: '데이터 & 점검', label: '주문관리', icon: <Truck size={17} /> },
+  { group: '데이터 & 점검', label: '국가별 주간', icon: <Globe size={17} /> },
+  { group: '데이터 & 점검', label: '주간·일회성', icon: <FileSpreadsheet size={17} /> },
+  { group: '데이터 & 점검', label: '점검 가이드', icon: <BookOpen size={17} /> },
+  { group: '데이터 & 점검', label: '상품 리스트', icon: <Package size={17} /> },
+  { group: '데이터 & 점검', label: '상품 손익', icon: <FileSpreadsheet size={17} /> },
+  { group: '데이터 & 점검', label: '재고관리', icon: <Layers size={17} /> },
+  { group: '데이터 & 점검', label: '채널 플랜', icon: <FileSpreadsheet size={17} /> },
+  { group: '상품 운영', label: '상품 콘텐츠', icon: <Package size={17} /> },
+  { group: '상품 운영', label: '상세페이지 교정', icon: <ClipboardCheck size={17} /> },
+  { group: '콘텐츠 제작', label: '이미지 생성', icon: <ImageIcon size={17} /> },
+  { group: '브랜드 인텔리전스', label: '브랜드 분석', icon: <Building2 size={17} /> },
+  { group: '분석 & 진단', label: '매출분석', icon: <BarChart3 size={17} /> },
+  { group: '실행 & 일정', label: '할인 캠페인', icon: <Percent size={17} /> },
+  { group: '실행 & 일정', label: '배송비 분석', icon: <Truck size={17} /> },
+  { group: '실행 & 일정', label: '사이트 진단', icon: <Globe size={17} /> },
+  { group: '실행 & 일정', label: '업로드 캘린더', icon: <CalendarDays size={17} /> },
+  { group: '실행 & 일정', label: '일정 목록', icon: <CalendarDays size={17} /> },
+];
+
+const pmsTabUrl = (label: string) => `${PMS_URL}#${encodeURIComponent(label)}`;
 
 type WorkspaceId = Workspace;
 
@@ -210,12 +232,12 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           </div>
         )}
 
-        {/* LUMEN / AETALOOF 탭: PMS 바로가기 */}
+        {/* LUMEN / AETALOOF 탭: PMS 안내 배너 */}
         {!collapsed && isBrand && (
           <div className="px-3 py-2 border-b border-sidebar-border">
             <a
               href={PMS_URL}
-              target="_blank"
+              target="pms"
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-3 py-2.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-semibold"
             >
@@ -227,9 +249,41 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         )}
 
         <nav className="flex-1 overflow-y-auto py-3 px-2">
-          {navGroups.map((group, gi) => {
-            // brandOnly: OEM 탭에서 숨김
-            if (group.brandOnly && !isBrand) return null;
+          {isBrand ? (
+            /* LUMEN/AETALOOF: PMS 탭 미러 — 클릭 시 PMS 해당 탭으로 (named window 재사용) */
+            pmsTabs.map((tab, ti) => {
+              const groupStart = ti === 0 || pmsTabs[ti - 1].group !== tab.group;
+              return (
+                <div key={tab.label} className="mb-0.5">
+                  {groupStart && !collapsed && (
+                    <div className="px-3 pt-4 pb-1.5">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase">
+                        {tab.group}
+                      </span>
+                    </div>
+                  )}
+                  {groupStart && collapsed && ti !== 0 && <div className="my-2 mx-2 h-px bg-border" />}
+                  <a
+                    href={pmsTabUrl(tab.label)}
+                    target="pms"
+                    rel="noopener noreferrer"
+                    onClick={() => setSidebarOpen(false)}
+                    className={`
+                      relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 outline-none focus-visible:outline-none
+                      text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]
+                      ${collapsed ? 'justify-center px-2' : ''}
+                    `}
+                  >
+                    <span className="shrink-0">{tab.icon}</span>
+                    {!collapsed && (
+                      <span className="flex-1 min-w-0 truncate">{tab.label}</span>
+                    )}
+                  </a>
+                </div>
+              );
+            })
+          ) : (
+          navGroups.map((group, gi) => {
             // oemOnly: LUMEN/AETALOOF 탭에서 숨김
             if (group.oemOnly && isBrand) return null;
             if (!group.items.length) return null;
@@ -244,7 +298,6 @@ export default function Layout({ children, onLogout }: LayoutProps) {
               )}
               {group.label && collapsed && <div className="my-2 mx-2 h-px bg-border" />}
               {group.items.map((item) => {
-                if (item.lumenOnly && workspace !== 'LUMEN') return null;
                 if (item.oemOnly && isBrand) return null;
                 if (item.adminOnly && !isAdminEmail(currentUser?.email)) return null;
                 const active = isActive(item.path);
@@ -276,7 +329,8 @@ export default function Layout({ children, onLogout }: LayoutProps) {
               })}
             </div>
             );
-          })}
+          })
+          )}
         </nav>
 
         <div className="px-2 py-3 border-t border-sidebar-border space-y-1">
