@@ -74,6 +74,8 @@ export type BomCategory = '원자재' | '지퍼' | '장식' | '보강재' | '봉
 export type BomSectionKey = BomCategory;
 export type MaterialCategory = BomCategory;
 export type VendorType = '바이어' | '자재거래처' | '공장' | '해외공장' | '물류업체' | '기타';
+// '해외공장'은 레거시 값 — 신규 등록은 type='공장' + region='해외' 로 저장한다
+export type VendorRegion = '국내' | '해외';
 export type BillingType = '월별합산' | '건별즉시';
 export type ItemStatus = 'TEMP' | 'ACTIVE' | 'INACTIVE';
 export type ErpCategory = 'HB' | 'ACC' | 'SHOES' | 'PACK';
@@ -532,6 +534,7 @@ export interface Vendor {
   address?: string;          // 사업장 주소 (퀵/택배 발송용)         // 사업자등록번호 (000-00-00000 형식)
   vendorCode?: string;       // 거래처 코드 (전표번호용, 예: LLL)
   type: VendorType;
+  region?: VendorRegion;     // 국내 / 해외 — 입력 항목과 목록 탭을 가르는 기준 (기본 국내)
   customType?: string;       // 거래처 유형 "기타" 선택 시 직접 입력값
   materialTypes?: ('장식' | '원단' | '가죽' | '기타')[];  // 자재거래처 자재 유형 (복수 선택)
   customMaterialType?: string;   // 자재유형 "기타" 선택 시 직접 입력값

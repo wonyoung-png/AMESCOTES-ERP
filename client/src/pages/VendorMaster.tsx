@@ -3,7 +3,7 @@ import { useState, useMemo, useRef, useCallback } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
-import { store, genId, type Vendor, type VendorType, type Currency, type BillingType } from '@/lib/store';
+import { store, genId, type Vendor, type VendorType, type VendorRegion, type Currency, type BillingType } from '@/lib/store';
 import { fetchVendors, upsertVendor, deleteVendor as deleteVendorSB } from '@/lib/supabaseQueries';
 import { parseBizLicense } from '@/lib/bizLicense';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,12 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Search, Pencil, Trash2, Building2, Clock, Loader2, Paperclip, Upload, Sparkles, Factory, ShoppingBag, Users, AlertCircle } from 'lucide-react';
 
-const VENDOR_TYPES: VendorType[] = ['바이어', '자재거래처', '공장', '해외공장', '물류업체', '기타'];
+// '해외공장'은 레거시 — 신규 등록은 '공장' + region='해외'. 기존 데이터 표시용으로만 남김
+const VENDOR_TYPES: VendorType[] = ['바이어', '자재거래처', '공장', '물류업체', '기타'];
+const REGIONS: VendorRegion[] = ['국내', '해외'];
+/** 레거시 '해외공장' 값도 해외로 취급 */
+const regionOf = (v: Pick<Vendor, 'region' | 'type'>): VendorRegion =>
+  v.region ?? (v.type === '해외공장' ? '해외' : '국내');
 const CURRENCIES: Currency[] = ['KRW', 'USD', 'CNY'];
 const COUNTRIES = ['한국', '중국', '이탈리아', '프랑스', '일본', '미국', '기타'];
 const BILLING_TYPES: BillingType[] = ['월별합산', '건별즉시'];
@@ -34,7 +39,7 @@ const TYPE_COLOR: Record<VendorType, string> = {
 const MATERIAL_TYPE_OPTIONS: ('장식' | '원단' | '가죽' | '기타')[] = ['장식', '원단', '가죽', '기타'];
 
 const EMPTY_VENDOR: Partial<Vendor> = {
-  name: '', nameEn: '', nameCn: '', type: '바이어', country: '한국', currency: 'KRW',
+  name: '', nameEn: '', nameCn: '', type: '바이어', region: '국내', country: '한국', currency: 'KRW',
   contactName: '', contactEmail: '', contactPhone: '',
   leadTimeDays: undefined,
   billingType: undefined, settlementCycle: '', bankInfo: undefined, memo: '',
@@ -76,6 +81,7 @@ export default function VendorMaster() {
   const { data: vendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const setVendors = (_v: Vendor[]) => {}; // no-op, replaced by useQuery
   const [search, setSearch] = usePersistedState('vendors.search', '');
+  const [filterRegion, setFilterRegion] = usePersistedState<string>('vendors.filterRegion', 'all');
   const [filterType, setFilterType] = usePersistedState<string>('vendors.filterType', 'all');
   const [filterMaterialType, setFilterMaterialType] = usePersistedState<string>('vendors.filterMaterialType', 'all');
   const [showModal, setShowModal] = useState(false);
@@ -191,6 +197,7 @@ export default function VendorMaster() {
 
   const filtered = useMemo(() => {
     let list = vendors;
+    if (filterRegion !== 'all') list = list.filter(v => regionOf(v) === filterRegion);
     if (filterType !== 'all') list = list.filter(v => v.type === filterType);
     // 자재유형 필터 (자재거래처만 해당)
     if (filterMaterialType !== 'all') {
@@ -206,7 +213,16 @@ export default function VendorMaster() {
       (v.contactName || '').toLowerCase().includes(search.toLowerCase())
     );
     return list;
-  }, [vendors, search, filterType, filterMaterialType]);
+  }, [vendors, search, filterRegion, filterType, filterMaterialType]);
+
+  // SWIFT는 해외 업체만 쓴다 — 국내만 보고 있으면 컬럼 자체를 숨긴다
+  const showSwiftCol = useMemo(() => filtered.some(v => regionOf(v) === '해외'), [filtered]);
+
+  const regionCounts = useMemo(() => {
+    const c: Record<string, number> = { 국내: 0, 해외: 0 };
+    vendors.forEach(v => { c[regionOf(v)] = (c[regionOf(v)] || 0) + 1; });
+    return c;
+  }, [vendors]);
 
   const openAdd = () => { setEditVendor({ ...EMPTY_VENDOR }); setIsEdit(false); setIsDirty(false); setShowModal(true); };
   const openEdit = (v: Vendor) => { setEditVendor({ ...v }); setIsEdit(true); setIsDirty(false); setShowModal(true); };
@@ -599,6 +615,8 @@ export default function VendorMaster() {
   };
 
   const update = (field: keyof Vendor, value: unknown) => { setEditVendor(v => ({ ...v, [field]: value })); setIsDirty(true); };
+  /** 모달에서 편집 중인 거래처의 국내/해외 (레거시 '해외공장'도 해외로 인식) */
+  const editRegion: VendorRegion = editVendor.region ?? (editVendor.type === '해외공장' ? '해외' : '국내');
 
   const updateCode = (field: 'code' | 'vendorCode', val: string, maxLen: number) => {
     const clean = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, maxLen);
@@ -607,11 +625,16 @@ export default function VendorMaster() {
   };
 
   // 유형별 카운트
+  // 선택된 국내/해외 탭 범위 안에서 집계 — 상단 카드·유형 탭 숫자 모두 이 값을 쓴다
+  const regionScoped = useMemo(
+    () => (filterRegion === 'all' ? vendors : vendors.filter(v => regionOf(v) === filterRegion)),
+    [vendors, filterRegion],
+  );
   const typeCounts = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const v of vendors) map[v.type] = (map[v.type] || 0) + 1;
+    for (const v of regionScoped) map[v.type] = (map[v.type] || 0) + 1;
     return map;
-  }, [vendors]);
+  }, [regionScoped]);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -644,6 +667,29 @@ export default function VendorMaster() {
         ))}
       </div>
 
+      {/* 국내 / 해외 탭 */}
+      <div className="flex items-center gap-1 border-b border-border">
+        {(['all', ...REGIONS] as const).map(r => (
+          <button
+            key={r}
+            onClick={() => setFilterRegion(r)}
+            className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
+              filterRegion === r
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {r === 'all' ? '전체' : r}
+            <span className="ml-1.5 text-xs opacity-60">
+              {r === 'all' ? vendors.length : (regionCounts[r] || 0)}
+            </span>
+            {filterRegion === r && (
+              <span className="absolute left-0 -bottom-px h-0.5 w-full rounded-full bg-[var(--accent-mint)]" />
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* 유형 탭 필터 */}
       <div className="flex flex-wrap items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-lg w-fit">
         {(['all', ...VENDOR_TYPES] as const).map(t => (
@@ -658,7 +704,7 @@ export default function VendorMaster() {
           >
             {t === 'all' ? '전체' : t}
             <span className="ml-1.5 text-[11px] opacity-60">
-              {t === 'all' ? vendors.length : (typeCounts[t] || 0)}
+              {t === 'all' ? regionScoped.length : (typeCounts[t] || 0)}
             </span>
           </button>
         ))}
@@ -733,7 +779,7 @@ export default function VendorMaster() {
               <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">연락처</th>
               <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">결제조건</th>
               {/* 공장 유형 필터 시 SWIFT CODE 컬럼 표시 */}
-              {(filterType === '공장' || filterType === '해외공장' || filtered.some(v => v.type === '공장' || v.type === '해외공장')) && (
+              {showSwiftCol && (
                 <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">SWIFT CODE</th>
               )}
               <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
@@ -821,9 +867,9 @@ export default function VendorMaster() {
                   {v.settlementCycle && <p>{v.settlementCycle}</p>}
                 </td>
                 {/* SWIFT CODE 컬럼 (공장 유형이 목록에 있을 때만 표시) */}
-                {(filterType === '공장' || filterType === '해외공장' || filtered.some(vv => vv.type === '공장' || vv.type === '해외공장')) && (
+                {showSwiftCol && (
                   <td className="px-4 py-3 text-muted-foreground text-xs">
-                    {(v.type === '공장' || v.type === '해외공장') && v.bankInfo?.swiftCode ? (
+                    {regionOf(v) === '해외' && v.bankInfo?.swiftCode ? (
                       <span className="font-mono text-foreground bg-[var(--fill-tertiary)] px-2 py-0.5 rounded text-xs border border-border">
                         {v.bankInfo.swiftCode}
                       </span>
@@ -861,7 +907,42 @@ export default function VendorMaster() {
           <DialogHeader><DialogTitle>{isEdit ? '거래처 수정' : '거래처 등록'}</DialogTitle></DialogHeader>
           <div className="space-y-5 py-2">
 
-            {/* 사업자등록증 / 거래처정보 업로드 */}
+            {/* 국내 / 해외 — 이 선택이 아래 입력 항목을 가른다 (가장 먼저 고른다) */}
+            <div className="space-y-1.5">
+              <Label>국내 / 해외 <span className="text-[var(--system-red)]">*</span></Label>
+              <div className="flex gap-2">
+                {REGIONS.map(r => {
+                  const active = editRegion === r;
+                  return (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => {
+                        update('region', r);
+                        // 국가·통화 기본값도 함께 맞춘다
+                        if (r === '국내') { update('country', '한국'); update('currency', 'KRW'); }
+                        else if (!editVendor.country || editVendor.country === '한국') { update('country', '중국'); update('currency', 'CNY'); }
+                      }}
+                      className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium border transition-colors ${
+                        active
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-card text-muted-foreground border-border hover:border-primary/40'
+                      }`}
+                    >
+                      {r === '국내' ? '국내 업체' : '해외 업체'}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {editRegion === '국내'
+                  ? '사업자등록번호 · 세금계산서 정보를 입력합니다.'
+                  : '국가 · 통화 · 해외 송금 계좌(SWIFT)를 입력합니다.'}
+              </p>
+            </div>
+
+            {/* 사업자등록증 / 거래처정보 업로드 (국내 전용 — 해외는 사업자등록증이 없다) */}
+            {editRegion === '국내' && (
             <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-md">
               <input
                 ref={fileInputRef}
@@ -887,6 +968,7 @@ export default function VendorMaster() {
               </Button>
               <p className="text-xs text-muted-foreground">이미지·PDF → 사업자등록증 OCR | 엑셀(.xlsx/.xls) → 거래처 정보 자동 매핑</p>
             </div>
+            )}
 
             {/* 코드 + 회사명 섹션 */}
             <div className="p-3 bg-[var(--fill-quaternary)] border border-border rounded-md">
@@ -904,46 +986,89 @@ export default function VendorMaster() {
                   <p className="text-[11px] text-muted-foreground">예: 202603-LLL-001 / AT2603HB01</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">사업자 회사명 <span className="text-muted-foreground font-normal">(계산서 발급용)</span></Label>
+                  <Label className="text-xs">
+                    {editRegion === '국내' ? '사업자 회사명' : '영문 회사명'}
+                    <span className="text-muted-foreground font-normal"> ({editRegion === '국내' ? '계산서 발급용' : '인보이스 표기용'})</span>
+                  </Label>
                   <Input
                     value={editVendor.companyName || ''}
                     onChange={e => update('companyName', e.target.value)}
-                    placeholder="(주)아뜰리에드루멘"
-                    className="text-sm"
-                  />
-                  <p className="text-[11px] text-muted-foreground">세금계산서에 표기되는 공식 회사명</p>
-                </div>
-                <div className="space-y-1.5 col-span-2">
-                  <Label className="text-xs">사업자등록번호</Label>
-                  <Input
-                    value={editVendor.bizRegNo || ''}
-                    onChange={e => update('bizRegNo', e.target.value)}
-                    placeholder="000-00-00000"
-                    className="text-sm font-mono"
-                  />
-                </div>
-                <div className="space-y-1.5 col-span-2">
-                  <Label className="text-xs">사업장 주소 <span className="text-muted-foreground font-normal">(퀵/택배 발송용)</span></Label>
-                  <Input
-                    value={editVendor.address || ''}
-                    onChange={e => update('address', e.target.value)}
-                    placeholder="서울시 강남구 테헤란로 123"
+                    placeholder={editRegion === '국내' ? '(주)아뜰리에드루멘' : 'HONGKONG GIOCH TRADING LIMITED'}
                     className="text-sm"
                   />
                 </div>
+
+                {/* 국내 전용 — 사업자등록번호 / 사업장 주소 */}
+                {editRegion === '국내' && (
+                  <>
+                    <div className="space-y-1.5 col-span-2">
+                      <Label className="text-xs">사업자등록번호</Label>
+                      <Input
+                        value={editVendor.bizRegNo || ''}
+                        onChange={e => update('bizRegNo', e.target.value)}
+                        placeholder="000-00-00000"
+                        className="text-sm font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                      <Label className="text-xs">사업장 주소 <span className="text-muted-foreground font-normal">(퀵/택배 발송용)</span></Label>
+                      <Input
+                        value={editVendor.address || ''}
+                        onChange={e => update('address', e.target.value)}
+                        placeholder="서울시 강남구 테헤란로 123"
+                        className="text-sm"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* 해외 전용 — 국가 / 통화 / 위챗 / 영문·중문명 */}
+                {editRegion === '해외' && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">국가</Label>
+                      <Select value={editVendor.country || '중국'} onValueChange={v => update('country', v)}>
+                        <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {COUNTRIES.filter(c => c !== '한국').map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">통화</Label>
+                      <Select value={editVendor.currency || 'CNY'} onValueChange={v => update('currency', v as Currency)}>
+                        <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">영문명</Label>
+                      <Input value={editVendor.nameEn || ''} onChange={e => update('nameEn', e.target.value)} placeholder="Gioch Trading" className="text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">중문명</Label>
+                      <Input value={editVendor.nameCn || ''} onChange={e => update('nameCn', e.target.value)} placeholder="佳兆贸易" className="text-sm" />
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                      <Label className="text-xs">위챗 ID <span className="text-muted-foreground font-normal">(중국 거래처 연락용)</span></Label>
+                      <Input value={editVendor.wechatId || ''} onChange={e => update('wechatId', e.target.value)} placeholder="wxid_xxxxx" className="text-sm" />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
             {/* 거래처 유형 */}
             <div className="space-y-1.5">
               <Label>거래처 유형 <span className="text-[var(--system-red)]">*</span></Label>
-              <Select value={editVendor.type || '바이어'} onValueChange={v => update('type', v as VendorType)}>
+              <Select value={editVendor.type === '해외공장' ? '공장' : (editVendor.type || '바이어')} onValueChange={v => update('type', v as VendorType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="바이어">바이어</SelectItem>
                   <SelectItem value="자재거래처">자재거래처</SelectItem>
-                  <SelectItem value="공장">공장 (국내)</SelectItem>
-                  <SelectItem value="해외공장">공장 (해외)</SelectItem>
+                  <SelectItem value="공장">공장</SelectItem>
                   <SelectItem value="물류업체">물류업체</SelectItem>
                   <SelectItem value="기타">기타</SelectItem>
                 </SelectContent>
@@ -1041,7 +1166,8 @@ export default function VendorMaster() {
               </div>
             </div>
 
-            {/* 계산서 발행 이메일 */}
+            {/* 계산서 발행 이메일 (국내 전용 — 해외는 세금계산서 대상이 아님) */}
+            {editRegion === '국내' && (
             <div className="p-3 bg-primary/5 border border-primary/20 rounded-md space-y-2">
               <p className="text-xs font-medium text-primary">계산서 / 세금계산서 발행 정보</p>
               <div className="space-y-1.5">
@@ -1055,14 +1181,13 @@ export default function VendorMaster() {
                 <p className="text-[11px] text-muted-foreground">비워두면 담당자 이메일로 발송됩니다.</p>
               </div>
             </div>
+            )}
 
-
-
-            {/* 해외공장 계좌정보 섹션 (해외공장 유형일 때만 표시) */}
-            {editVendor.type === '해외공장' && (
+            {/* 해외 송금 계좌정보 (해외 업체 전용) */}
+            {editRegion === '해외' && (
               <div className="p-4 bg-primary/5 border border-primary/20 rounded-md space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-primary">해외 송금 계좌정보 (해외공장 전용)</p>
+                  <p className="text-xs font-medium text-primary">해외 송금 계좌정보 (해외 업체 전용)</p>
                   {/* 파일 업로드 버튼 */}
                   <div>
                     <input

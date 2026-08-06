@@ -209,3 +209,25 @@ ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS received_qty integer;
 ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS defect_qty integer;
 ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS defect_note text;
 ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS received_date date;
+
+-- ─── 거래처 국내/해외 분리 (2026-08-06) ───
+-- 기존 vendors 테이블에 누락돼 있던 폼 입력 항목 + region 컬럼 추가
+alter table vendors
+  add column if not exists region text default '국내',   -- '국내' | '해외'
+  add column if not exists vendor_code text,
+  add column if not exists name_en text,
+  add column if not exists name_cn text,
+  add column if not exists biz_reg_no text,
+  add column if not exists address text,
+  add column if not exists billing_email text,
+  add column if not exists country text,
+  add column if not exists currency text,
+  add column if not exists wechat_id text,
+  add column if not exists lead_time_days integer,
+  add column if not exists processing_unit_cost numeric,
+  add column if not exists billing_type text,
+  add column if not exists settlement_cycle text,
+  add column if not exists commission_rate numeric,
+  add column if not exists tt_condition text,
+  add column if not exists custom_material_type text,
+  add column if not exists contact_history jsonb;
