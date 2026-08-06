@@ -2,7 +2,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { store, genId, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
+import { store, genId, MATERIAL_CATEGORIES, COMMON_BRAND, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
+import { Link } from 'wouter';
 import { fetchMaterials, upsertMaterial, deleteMaterial as deleteMaterialSB, fetchVendors, updateMaterialStatus } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -13,22 +14,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner';
 import { Plus, Search, Pencil, Trash2, Package } from 'lucide-react';
 
-const MATERIAL_CATEGORIES: MaterialCategory[] = ['원자재', '지퍼', '장식', '보강재', '봉사·접착제', '포장재', '철형', '후가공'];
 const UNITS = ['SF', 'YD', 'M', 'EA', 'L', '콘', 'KG', 'SET', '장', '개', 'PC', 'CM'];
-
-const CATEGORY_COLOR: Record<MaterialCategory, string> = {
-  '원자재': 'bg-[var(--fill-tertiary)] text-foreground border-border',
-  '지퍼': 'bg-[var(--fill-tertiary)] text-foreground border-border',
-  '장식': 'bg-[var(--fill-tertiary)] text-foreground border-border',
-  '보강재': 'bg-[var(--fill-tertiary)] text-foreground border-border',
-  '봉사·접착제': 'bg-[var(--fill-tertiary)] text-foreground border-border',
-  '포장재': 'bg-[var(--fill-tertiary)] text-foreground border-border',
-  '철형': 'bg-[var(--fill-tertiary)] text-foreground border-border',
-  '후가공': 'bg-[var(--fill-tertiary)] text-foreground border-border',
-};
+const CHIP = 'bg-[var(--fill-tertiary)] text-foreground border-border';
+type PriceCurrency = 'KRW' | 'CNY' | 'USD';
+const CURRENCIES: PriceCurrency[] = ['KRW', 'CNY', 'USD'];
+const CURRENCY_SIGN: Record<PriceCurrency, string> = { KRW: '₩', CNY: '¥', USD: '$' };
 
 const emptyForm: Partial<Material> = {
-  name: '', nameEn: '', category: '원자재', spec: '', unit: 'YD',
+  name: '', nameEn: '', category: '가죽', brand: COMMON_BRAND, spec: '', unit: 'SF',
   unitPriceCny: undefined, unitPriceKrw: undefined, vendorId: '', memo: '',
 };
 
@@ -41,29 +34,39 @@ export default function MaterialMaster() {
     refetchMaterials();
   }, []);
   const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
-  const vendors = allVendors.filter((v: Vendor) => v.type === '자재거래처');
+  // 브랜드 선택지 = 공통 + 거래처 마스터의 바이어 (LUMEN / AETALOOF …)
+  const brands = useMemo(
+    () => [COMMON_BRAND, ...allVendors.filter((v: Vendor) => v.type === '바이어').map((v: Vendor) => v.name)],
+    [allVendors],
+  );
   const [search, setSearch] = usePersistedState('materials.search', '');
   const [filterCat, setFilterCat] = usePersistedState('materials.filterCat', 'all');
+  const [filterBrand, setFilterBrand] = usePersistedState('materials.filterBrand', 'all');
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Material>>({ ...emptyForm });
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [vendorQuery, setVendorQuery] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     let list = materials as any[];
     if (filterCat !== 'all') list = list.filter((m: any) => m.category === filterCat);
+    if (filterBrand !== 'all') list = list.filter((m: any) => (m.brand || COMMON_BRAND) === filterBrand);
     if (search) list = list.filter((m: any) =>
       m.name.toLowerCase().includes(search.toLowerCase()) ||
       (m.nameEn || '').toLowerCase().includes(search.toLowerCase()) ||
       (m.spec || '').toLowerCase().includes(search.toLowerCase())
     );
     return list;
-  }, [materials, filterCat, search]);
+  }, [materials, filterCat, filterBrand, search]);
+
+  const nextCode = (cat: MaterialCategory) => store.getNextItemCode(cat, materials as Material[]);
 
   const openNew = () => {
-    setForm({ ...emptyForm });
+    setForm({ ...emptyForm, itemCode: nextCode(emptyForm.category as MaterialCategory) });
     setPreviewImage(null);
+    setVendorQuery('');
     setEditId(null);
     setShowModal(true);
   };
@@ -71,13 +74,14 @@ export default function MaterialMaster() {
   const openEdit = (m: any) => {
     setForm({ ...m });
     setPreviewImage(m.imageUrl || null);
+    setVendorQuery(allVendors.find((v: Vendor) => v.id === m.vendorId)?.name || '');
     setEditId(m.id);
     setShowModal(true);
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const applyImage = async (file?: File | null) => {
     if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('이미지 파일만 가능합니다'); return; }
     try {
       const base64 = await resizeImage(file);
       setForm(prev => ({ ...prev, imageUrl: base64 }));
@@ -86,6 +90,33 @@ export default function MaterialMaster() {
       toast.error('이미지 업로드 실패');
     }
   };
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => applyImage(e.target.files?.[0]);
+  const [dragOver, setDragOver] = useState(false);
+  const handleImageDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const f = e.dataTransfer.files?.[0]
+      // 브라우저에서 이미지를 끌어오면 파일 대신 URL 로 올 때가 있다 → 그 경우는 URL 그대로 저장
+      || null;
+    if (f) { void applyImage(f); return; }
+    const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+    if (url?.startsWith('http')) { setForm(prev => ({ ...prev, imageUrl: url })); setPreviewImage(url); }
+  };
+
+  // 단가는 통화 1개만 보유 — 선택한 통화 칸에만 값을 넣고 나머지는 비운다
+  const currencyOf = (m: any): PriceCurrency =>
+    m?.priceCurrency || (m?.unitPriceCny != null ? 'CNY' : m?.unitPriceUsd != null ? 'USD' : 'KRW');
+  const priceOf = (m: any) => {
+    const c = currencyOf(m);
+    return c === 'CNY' ? m?.unitPriceCny : c === 'USD' ? m?.unitPriceUsd : m?.unitPriceKrw;
+  };
+  const setPrice = (value: number | undefined, cur: PriceCurrency) =>
+    setForm(prev => ({
+      ...prev, priceCurrency: cur,
+      unitPriceKrw: cur === 'KRW' ? value : undefined,
+      unitPriceCny: cur === 'CNY' ? value : undefined,
+      unitPriceUsd: cur === 'USD' ? value : undefined,
+    }));
 
   const handleSave = async () => {
     if (!form.name?.trim()) { toast.error('자재명을 입력하세요'); return; }
@@ -161,6 +192,12 @@ export default function MaterialMaster() {
     return map;
   }, [materials]);
 
+  const brandCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    (materials as any[]).forEach((m: any) => { const b = m.brand || COMMON_BRAND; map[b] = (map[b] || 0) + 1; });
+    return map;
+  }, [materials]);
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -193,6 +230,23 @@ export default function MaterialMaster() {
             {cat} ({catCounts[cat] || 0})
           </button>
         ))}
+      </div>
+
+      {/* 브랜드 필터 — 공통 + 거래처 마스터의 바이어 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">브랜드</span>
+        {['all', ...brands].map(b => (
+          <button
+            key={b}
+            onClick={() => setFilterBrand(b)}
+            className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${filterBrand === b ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'}`}
+          >
+            {b === 'all' ? '전체' : b} ({b === 'all' ? (materials as any[]).length : brandCounts[b] || 0})
+          </button>
+        ))}
+        <Link href="/vendors" className="px-3 py-1.5 rounded-md text-xs border border-dashed border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]">
+          + 거래처 마스터에서 추가
+        </Link>
       </div>
 
       {/* 검색 */}
@@ -236,10 +290,10 @@ export default function MaterialMaster() {
               </th>
               <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">품번</th>
               <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">카테고리</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">브랜드</th>
               <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">자재명</th>
               <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">스펙</th>
-              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground">단가 (CNY)</th>
-              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground">단가 (KRW)</th>
+              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground">단가</th>
               <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">단위</th>
               
               <th className="text-center px-3 py-3 text-[13px] font-semibold text-muted-foreground">편집</th>
@@ -269,9 +323,12 @@ export default function MaterialMaster() {
                     <span className="font-mono text-xs bg-[var(--fill-tertiary)] px-2 py-0.5 rounded text-muted-foreground">{m.itemCode || '—'}</span>
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className={`text-xs px-2 py-0.5 rounded-full border ${CATEGORY_COLOR[m.category as MaterialCategory] || 'bg-[var(--fill-quaternary)] text-muted-foreground border-border'}`}>
-                      {m.category}
-                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${CHIP}`}>{m.category}</span>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {(m.brand || COMMON_BRAND) === COMMON_BRAND
+                      ? <span className="text-xs text-muted-foreground">{COMMON_BRAND}</span>
+                      : <span className={`text-xs px-2 py-0.5 rounded-full border ${CHIP}`}>{m.brand}</span>}
                   </td>
                   <td className="px-3 py-2.5">
                     <p className="font-medium text-foreground">{m.name}</p>
@@ -279,10 +336,9 @@ export default function MaterialMaster() {
                   </td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.spec || '—'}</td>
                   <td className="px-3 py-2.5 text-right font-mono text-xs text-foreground">
-                    {m.unitPriceCny != null ? `¥${Number(m.unitPriceCny).toFixed(2)}` : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-right font-mono text-xs text-foreground">
-                    {m.unitPriceKrw != null ? `₩${Number(m.unitPriceKrw).toLocaleString()}` : '—'}
+                    {priceOf(m) != null
+                      ? `${CURRENCY_SIGN[currencyOf(m)]}${Number(priceOf(m)).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                      : '—'}
                   </td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.unit}</td>
                   
@@ -316,8 +372,11 @@ export default function MaterialMaster() {
               <Label>이미지</Label>
               <div className="flex items-center gap-3">
                 <div
-                  className="w-20 h-20 rounded-lg border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
+                  className={`w-20 h-20 rounded-lg border border-dashed flex items-center justify-center cursor-pointer transition-colors overflow-hidden ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary'}`}
                   onClick={() => fileRef.current?.click()}
+                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleImageDrop}
                 >
                   {previewImage ? (
                     <img src={previewImage} alt="미리보기" className="w-full h-full object-cover" />
@@ -334,37 +393,47 @@ export default function MaterialMaster() {
                       삭제
                     </Button>
                   )}
-                  <p className="text-xs text-muted-foreground">최대 800px, JPEG 자동 변환</p>
+                  <p className="text-xs text-muted-foreground">끌어다 놓기도 가능 · 최대 800px, JPEG 자동 변환</p>
                 </div>
               </div>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
             </div>
 
-            {/* 카테고리 */}
-            <div className="space-y-1.5">
-              <Label>카테고리 *</Label>
-              <Select value={form.category || '원자재'} onValueChange={v => {
-                const newCode = !editId ? store.getNextItemCode(v as MaterialCategory) : form.itemCode;
-                setForm(prev => ({ ...prev, category: v as MaterialCategory, itemCode: newCode || prev.itemCode }));
-              }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {MATERIAL_CATEGORIES.map(c => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* 카테고리 + 브랜드 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>카테고리 *</Label>
+                <Select value={form.category || '가죽'} onValueChange={v => {
+                  const cat = v as MaterialCategory;
+                  setForm(prev => ({ ...prev, category: cat, itemCode: editId ? prev.itemCode : nextCode(cat) }));
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {MATERIAL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>브랜드</Label>
+                <Select value={form.brand || COMMON_BRAND} onValueChange={v => setForm(prev => ({ ...prev, brand: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {brands.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  브랜드 전용 자재만 지정 · 목록 추가는 <Link href="/vendors" className="underline">거래처 마스터</Link>
+                </p>
+              </div>
             </div>
 
-            {/* 품번 */}
+            {/* 품번 — 카테고리별 자동채번 (가죽 L01 · 원단 W01 · 장식 H01 …) */}
             <div className="space-y-1.5">
               <Label>품번</Label>
               <div className="flex gap-2">
-                <Input value={form.itemCode || ''} onChange={e => setForm(prev => ({ ...prev, itemCode: e.target.value }))} placeholder="M01" className="w-24 font-mono" />
-                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setForm(prev => ({ ...prev, itemCode: store.getNextItemCode(prev.category as any || '원자재') }))}>자동생성</Button>
-                <span className="text-xs text-muted-foreground self-center">카테고리별 자동: M01, Z01, H01...</span>
+                <Input value={form.itemCode || ''} onChange={e => setForm(prev => ({ ...prev, itemCode: e.target.value }))} placeholder="L01" className="w-28 font-mono" />
+                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setForm(prev => ({ ...prev, itemCode: nextCode((prev.category as MaterialCategory) || '가죽') }))}>다시 생성</Button>
+                <span className="text-xs text-muted-foreground self-center">가죽 L · 원단 W · 장식 H · 지퍼 Z · 보강재 R · 봉사 T · 포장재 P · 철형 I · 후가공 F</span>
               </div>
             </div>
             {/* 자재명 */}
@@ -396,31 +465,48 @@ export default function MaterialMaster() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>단가 (CNY)</Label>
-                <Input type="number" step="0.01" value={form.unitPriceCny ?? ''} onChange={e => setForm(prev => ({ ...prev, unitPriceCny: e.target.value === '' ? undefined : Number(e.target.value) }))} placeholder="0.00" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>단가 (KRW)</Label>
-                <Input type="number" value={form.unitPriceKrw ?? ''} onChange={e => setForm(prev => ({ ...prev, unitPriceKrw: e.target.value === '' ? undefined : Number(e.target.value) }))} placeholder="0" />
+              <div className="space-y-1.5 col-span-2">
+                <Label>단가</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number" step="0.01" className="flex-1"
+                    value={priceOf(form) ?? ''}
+                    onChange={e => setPrice(e.target.value === '' ? undefined : Number(e.target.value), currencyOf(form))}
+                    placeholder="0"
+                  />
+                  <Select value={currencyOf(form)} onValueChange={v => setPrice(priceOf(form), v as PriceCurrency)}>
+                    <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
-            {/* 공급업체 */}
+            {/* 공급업체 — 거래처 마스터 전체에서 검색 선택 */}
             <div className="space-y-1.5">
-              <Label>주 공급업체</Label>
-              <Select value={form.vendorId || 'none'} onValueChange={v => setForm(prev => ({ ...prev, vendorId: v === 'none' ? '' : v }))}>
-                <SelectTrigger><SelectValue placeholder="공급업체 선택" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">선택 없음</SelectItem>
-                  {vendors.filter((v: any) => v.id && v.id.trim() !== '').map((v: any) => (
-                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {vendors.length === 0 && (
-                <p className="text-xs text-muted-foreground">자재거래처 타입의 거래처를 먼저 등록하세요</p>
+              <Label>공급업체</Label>
+              <Input
+                list="material-vendor-options"
+                value={vendorQuery}
+                onChange={e => {
+                  const text = e.target.value;
+                  setVendorQuery(text);
+                  const hit = allVendors.find((v: Vendor) => v.name === text);
+                  setForm(prev => ({ ...prev, vendorId: hit ? hit.id : '' }));
+                }}
+                placeholder="거래처명 검색 (예: 홍콩원단)"
+              />
+              <datalist id="material-vendor-options">
+                {allVendors.filter((v: Vendor) => v.id?.trim()).map((v: Vendor) => (
+                  <option key={v.id} value={v.name}>{v.type}</option>
+                ))}
+              </datalist>
+              {vendorQuery && !form.vendorId && (
+                <p className="text-xs text-[var(--system-red)]">목록에 없는 거래처입니다 — 거래처 마스터에 먼저 등록하세요</p>
               )}
+              {allVendors.length === 0 && <p className="text-xs text-muted-foreground">등록된 거래처가 없습니다</p>}
             </div>
 
             {/* 메모 */}

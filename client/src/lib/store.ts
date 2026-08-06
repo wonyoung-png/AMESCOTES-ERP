@@ -72,7 +72,22 @@ export type Category =
 export type BomCategory = '원자재' | '지퍼' | '장식' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
 /** @deprecated BomCategory 로 대체됨 */
 export type BomSectionKey = BomCategory;
-export type MaterialCategory = BomCategory;
+/** 자재 마스터 카테고리 — BOM 섹션과 별개 (BOM은 가죽/원단을 '원자재' 한 섹션으로 묶는다) */
+export type MaterialCategory =
+  | '가죽' | '원단' | '장식' | '지퍼' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
+export const MATERIAL_CATEGORIES: MaterialCategory[] =
+  ['가죽', '원단', '장식', '지퍼', '보강재', '봉사·접착제', '포장재', '철형', '후가공'];
+/** 자재 카테고리 → BOM 섹션 */
+export const toBomCategory = (c: string): BomCategory =>
+  (c === '가죽' || c === '원단') ? '원자재' : (c as BomCategory);
+/** 레거시 값(원자재/부자재) 정규화 — 구 데이터 읽을 때만 사용 */
+export const normalizeMaterialCategory = (c?: string): MaterialCategory => {
+  if (c === '원자재') return '가죽';
+  if (c === '부자재') return '장식';
+  return (MATERIAL_CATEGORIES as string[]).includes(c || '') ? (c as MaterialCategory) : '가죽';
+};
+/** 자재 브랜드 — '공통' 또는 거래처 마스터의 바이어명 (LUMEN / AETALOOF …) */
+export const COMMON_BRAND = '공통';
 export type VendorType = '바이어' | '자재거래처' | '공장' | '해외공장' | '물류업체' | '기타';
 // '해외공장'은 레거시 값 — 신규 등록은 type='공장' + region='해외' 로 저장한다
 export type VendorRegion = '국내' | '해외';
@@ -102,6 +117,7 @@ export interface Material {
   name: string;           // 자재명
   nameEn?: string;        // 영문명
   category: MaterialCategory;
+  brand?: string;         // 전용 브랜드 ('공통' | 바이어명, 예: LUMEN / AETALOOF)
   spec?: string;          // 스펙 (두께, 사이즈 등)
   unit: string;           // 단위 (SF, YD, EA, M, L, 콘 등)
   unitPriceCny?: number;  // 단가 (CNY)
@@ -773,14 +789,16 @@ export const store = {
   // Materials
   getMaterials: () => getAll<Material>(KEYS.materials),
   setMaterials: (v: Material[]) => setAll(KEYS.materials, v),
-  getNextItemCode: (category: MaterialCategory): string => {
+  /** 카테고리별 다음 품번. list 를 넘기면(=Supabase 조회분) 그 목록 기준으로 채번한다. */
+  getNextItemCode: (category: MaterialCategory, list?: Material[]): string => {
     const PREFIX: Record<string, string> = {
-      '원자재': 'M', '지퍼': 'Z', '장식': 'H', '보강재': 'R',
+      '가죽': 'L', '원단': 'W', '지퍼': 'Z', '장식': 'H', '보강재': 'R',
       '봉사·접착제': 'T', '포장재': 'P', '철형': 'I', '후가공': 'F',
+      '원자재': 'M', // 레거시 데이터 호환
     };
     const prefix = PREFIX[category] || 'X';
-    const existing = getAll<Material>(KEYS.materials)
-      .filter(m => m.category === category && m.itemCode)
+    const existing = (list ?? getAll<Material>(KEYS.materials))
+      .filter(m => m.itemCode?.startsWith(prefix))
       .map(m => {
         const match = m.itemCode!.match(/^[A-Z](\d+)$/);
         return match ? parseInt(match[1]) : 0;

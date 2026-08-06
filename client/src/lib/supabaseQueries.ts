@@ -2,7 +2,7 @@
 // Supabase 우선 · 비어있거나 실패 시 localStorage 폴백
 
 import { supabase } from './supabase';
-import { store } from './store';
+import { store, normalizeMaterialCategory, COMMON_BRAND } from './store';
 import { filterForTable, toSnakeCase } from './tableColumns';
 
 async function withLocalFallback<T>(remote: () => Promise<T[]>, local: () => T[]): Promise<T[]> {
@@ -787,11 +787,15 @@ export async function fetchMaterials() {
     itemCode: row.item_code || undefined,
     name: row.name ?? '',
     nameEn: row.name_en || '',
-    category: row.category || '원자재',
+    category: normalizeMaterialCategory(row.category),
+    brand: row.brand || COMMON_BRAND,
     spec: row.spec || '',
     unit: row.unit || 'YD',
     unitPriceCny: row.unit_price_cny,
     unitPriceKrw: row.unit_price_krw,
+    unitPriceUsd: row.unit_price_usd,
+    priceCurrency: row.price_currency || undefined,
+    imageUrl: row.image_url || undefined,
     stockQty: row.stock_qty || 0,
     vendorId: row.vendor_id || '',
     memo: row.memo || '',
@@ -810,14 +814,18 @@ export async function upsertMaterial(mat: Record<string, any>): Promise<void> {
     id: mat.id,
     name: mat.name,
     unit: mat.unit,
-    category: mat.category || '원자재',
+    category: mat.category || '가죽',
     updated_at: new Date().toISOString(),
   };
+  if (mat.brand !== undefined) row.brand = mat.brand || COMMON_BRAND;
   if (mat.itemCode !== undefined) row.item_code = mat.itemCode || null;
   if (mat.spec !== undefined) row.spec = mat.spec || null;
   if (mat.nameEn !== undefined) row.name_en = mat.nameEn || null;
   if (mat.unitPriceCny !== undefined) row.unit_price_cny = mat.unitPriceCny;
   if (mat.unitPriceKrw !== undefined) row.unit_price_krw = mat.unitPriceKrw;
+  if (mat.unitPriceUsd !== undefined) row.unit_price_usd = mat.unitPriceUsd;
+  if (mat.priceCurrency !== undefined) row.price_currency = mat.priceCurrency || null;
+  if (mat.imageUrl !== undefined) row.image_url = mat.imageUrl || null;
   if (mat.stockQty !== undefined) row.stock_qty = mat.stockQty;
   if (mat.vendorId !== undefined) row.vendor_id = mat.vendorId || null;
   if (mat.memo !== undefined) row.memo = mat.memo || null;
@@ -827,8 +835,16 @@ export async function upsertMaterial(mat: Record<string, any>): Promise<void> {
   if (mat.orderVendorName !== undefined) row.order_vendor_name = mat.orderVendorName || null;
   if (!mat.id) row.created_at = mat.createdAt || new Date().toISOString();
 
-  const { error } = await supabase.from('materials').upsert(row, { onConflict: 'id' });
-  if (error) throw error;
+  // ponytail: 운영 DB가 코드보다 뒤처져 있으면(brand/name_en/단가 컬럼 미생성) 그 컬럼만 떼고 재시도.
+  //           supabase/migrations/20260806_materials_brand.sql 적용 후엔 첫 시도에서 끝난다.
+  for (let i = 0; i < 6; i++) {
+    const { error } = await supabase.from('materials').upsert(row, { onConflict: 'id' });
+    if (!error) return;
+    const missing = /Could not find the '([^']+)' column/.exec(error.message)?.[1];
+    if (!missing || !(missing in row)) throw error;
+    console.warn(`[upsertMaterial] materials.${missing} 컬럼 없음 → 이 값은 저장되지 않습니다 (마이그레이션 필요)`);
+    delete row[missing];
+  }
 }
 
 export async function updateMaterialStatus(id: string, status: '발주중' | '입고완료', extra?: Record<string, any>): Promise<void> {
