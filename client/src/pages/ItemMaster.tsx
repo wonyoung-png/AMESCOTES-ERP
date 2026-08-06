@@ -432,8 +432,6 @@ export default function ItemMaster() {
   const [colorDetailOpen, setColorDetailOpen] = useState<number | null>(null); // 열린 컬러 세부정보 인덱스
   const [filterBuyer, setFilterBuyer] = usePersistedState('items.filterBuyer', '전체');
   const [filterNoBom, setFilterNoBom] = usePersistedState('items.filterNoBom', false);
-  const [filterStyleNo, setFilterStyleNo] = usePersistedState('items.filterStyleNo', '');
-  const [filterName, setFilterName] = usePersistedState('items.filterName', '');
   const [sortField, setSortField] = useState<'styleNo' | 'name' | 'season' | 'createdAt' | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [showSeasonStats, setShowSeasonStats] = useState(false);
@@ -1036,8 +1034,7 @@ export default function ItemMaster() {
   };
 
   const activeFilterCount = [
-    filterStyleNo !== '',
-    filterName !== '',
+    search !== '',
     filterSeason !== '전체',
     filterCategory !== '전체',
     filterErpCategory !== '전체',
@@ -1047,8 +1044,6 @@ export default function ItemMaster() {
 
   const resetFilters = () => {
     setSearch('');
-    setFilterStyleNo('');
-    setFilterName('');
     setFilterSeason('전체');
     setFilterCategory('전체');
     setFilterErpCategory('전체');
@@ -1074,14 +1069,10 @@ export default function ItemMaster() {
   const filtered = useMemo(() => {
     let result = items.filter(item => {
       const buyerName = vendors.find(v => v.id === item.buyerId)?.name || '';
-      const matchSearch = !search ||
-        item.styleNo.toLowerCase().includes(search.toLowerCase()) ||
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        buyerName.toLowerCase().includes(search.toLowerCase());
-      const matchStyleNo = !filterStyleNo || item.styleNo.toLowerCase().includes(filterStyleNo.toLowerCase());
-      const matchName = !filterName ||
-        item.name.toLowerCase().includes(filterName.toLowerCase()) ||
-        (item.nameEn || '').toLowerCase().includes(filterName.toLowerCase());
+      // 검색창 하나로 통일 — 스타일번호 · 품명(한/영) · 바이어를 한 번에 훑는다
+      const q = search.trim().toLowerCase();
+      const matchSearch = !q ||
+        [item.styleNo, item.name, item.nameEn, buyerName].some(f => (f || '').toLowerCase().includes(q));
       const matchSeason = filterSeason === '전체'
         || item.season === filterSeason
         || item.erpCategory === 'PACK'; // 패키지 키트는 시즌 공통
@@ -1089,7 +1080,7 @@ export default function ItemMaster() {
       const matchErpCat = filterErpCategory === '전체' || item.erpCategory === filterErpCategory;
       const matchBuyer = filterBuyer === '전체' || item.buyerId === filterBuyer;
       const matchNoBom = !filterNoBom || !item.hasBom;
-      return matchSearch && matchStyleNo && matchName && matchSeason && matchCat && matchErpCat && matchBuyer && matchNoBom;
+      return matchSearch && matchSeason && matchCat && matchErpCat && matchBuyer && matchNoBom;
     });
 
     if (sortField) {
@@ -1105,7 +1096,7 @@ export default function ItemMaster() {
     }
 
     return result;
-  }, [items, search, filterStyleNo, filterName, filterSeason, filterCategory, filterErpCategory, filterBuyer, filterNoBom, sortField, sortDir, vendors]);
+  }, [items, search, filterSeason, filterCategory, filterErpCategory, filterBuyer, filterNoBom, sortField, sortDir, vendors]);
 
   // 바이어 지정 시 탭 카운트도 해당 바이어 품목만 반영
   const tabItems = useMemo(() => {
@@ -1634,7 +1625,7 @@ export default function ItemMaster() {
   const displayItems = showSelectedOnly ? filtered.filter(i => selectedIds.has(i.id)) : filtered;
   // 렌더 상한 — 802행 × 20열을 한 번에 그리면 브라우저가 멈춘다. 필터가 바뀌면 다시 100부터.
   const [renderLimit, setRenderLimit] = useState(100);
-  useEffect(() => { setRenderLimit(100); }, [search, filterSeason, filterCategory, filterErpCategory, filterBuyer, filterNoBom, filterStyleNo, filterName, showSelectedOnly]);
+  useEffect(() => { setRenderLimit(100); }, [search, filterSeason, filterCategory, filterErpCategory, filterBuyer, filterNoBom, showSelectedOnly]);
   const visibleItems = displayItems.slice(0, renderLimit);
   const isAllSelected = filtered.length > 0 && filtered.every(item => selectedIds.has(item.id));
   const isIndeterminate = filtered.some(item => selectedIds.has(item.id)) && !isAllSelected;
@@ -1975,13 +1966,14 @@ export default function ItemMaster() {
         <CardContent className="p-3 space-y-2">
           {/* 1행: 텍스트 검색 + 바이어 + 입희화 */}
           <div className="flex flex-wrap gap-2 items-center">
-            <div className="relative flex-1 min-w-[150px]">
+            <div className="relative flex-1 min-w-[240px]">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="스타일번호 검색" value={filterStyleNo} onChange={e => setFilterStyleNo(e.target.value)} className="pl-8 h-9 text-sm" />
-            </div>
-            <div className="relative flex-1 min-w-[150px]">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="품명 검색 (한/영)" value={filterName} onChange={e => setFilterName(e.target.value)} className="pl-8 h-9 text-sm" />
+              <Input
+                placeholder="검색 — 스타일번호 · 품명(한/영) · 바이어"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-8 h-9 text-sm"
+              />
             </div>
             <Select value={filterBuyer} onValueChange={setFilterBuyer}>
               <SelectTrigger className="w-36 h-9"><SelectValue placeholder="바이어" /></SelectTrigger>
