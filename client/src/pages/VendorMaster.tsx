@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { store, genId, type Vendor, type VendorType, type VendorRegion, type Currency, type BillingType } from '@/lib/store';
 import { fetchVendors, upsertVendor, deleteVendor as deleteVendorSB } from '@/lib/supabaseQueries';
-import { parseBizLicense } from '@/lib/bizLicense';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -464,17 +463,32 @@ export default function VendorMaster() {
 
     setIsOcrLoading(true);
     try {
-      const info = await parseBizLicense(file);
+      // 서버 OCR(/api/vendor/ocr, Anthropic)로 처리 — 이미지와 PDF를 모두 읽는다
+      const fd = new FormData();
+      fd.append('images', file);
+      const res = await fetch('/api/vendor/ocr', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: '' }));
+        throw new Error(error || `서버 오류 (${res.status})`);
+      }
+      const info = await res.json();
       setEditVendor(v => ({
         ...v,
         companyName: info.companyName || v.companyName,
         bizRegNo: info.bizRegNo || v.bizRegNo,
-        contactName: info.representativeName || v.contactName,
-        contactEmail: info.email || v.contactEmail,
+        contactName: info.contactName || v.contactName,
+        contactPhone: info.contactPhone || v.contactPhone,
+        contactEmail: info.contactEmail || v.contactEmail,
+        billingEmail: info.billingEmail || v.billingEmail,
         address: info.address || v.address,
+        nameEn: info.nameEn || v.nameEn,
+        nameCn: info.nameCn || v.nameCn,
+        wechatId: info.wechatId || v.wechatId,
+        bankInfo: info.bankInfo ? { ...(v.bankInfo || {}), ...info.bankInfo } : v.bankInfo,
       }));
+      if (info.address) setAddrBase(info.address);
       setIsDirty(true);
-      toast.success('사업자등록증 정보가 자동 입력되었습니다');
+      toast.success('서류에서 거래처 정보를 자동 입력했습니다');
     } catch (err) {
       const msg = err instanceof Error ? err.message : '알 수 없는 오류';
       toast.error(`OCR 실패: ${msg}`);
