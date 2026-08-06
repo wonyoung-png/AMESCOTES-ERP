@@ -87,6 +87,10 @@ export default function VendorMaster() {
   const [showModal, setShowModal] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [editVendor, setEditVendor] = useState<Partial<Vendor>>({ ...EMPTY_VENDOR });
+  // 주소는 DB에 한 줄(vendors.address)로 저장하고, 입력만 기본주소/상세주소로 나눈다
+  const [addrBase, setAddrBase] = useState('');
+  const [addrDetail, setAddrDetail] = useState('');
+  const addrDetailRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isOcrLoading, setIsOcrLoading] = useState(false);
   const [isBankFileLoading, setIsBankFileLoading] = useState(false);
@@ -249,9 +253,18 @@ export default function VendorMaster() {
 
   const openAdd = () => {
     setEditVendor({ ...EMPTY_VENDOR, code: genVendorCode('국내') });
+    setAddrBase(''); setAddrDetail('');
     setIsEdit(false); setIsDirty(false); setShowModal(true);
   };
-  const openEdit = (v: Vendor) => { setEditVendor({ ...v }); setIsEdit(true); setIsDirty(false); setShowModal(true); };
+  const openEdit = (v: Vendor) => {
+    // 회사명 칸이 거래처명을 겸한다 — 예전 데이터는 회사명이 비어 있으므로 거래처명으로 채워
+    // 저장할 때 이름이 지워지지 않게 한다
+    setEditVendor({ ...v, companyName: v.companyName || v.name });
+    // DB에는 주소 한 줄로만 저장한다 — 수정 화면에서는 저장된 값을 기본주소 칸에 그대로 놓고,
+    // 상세주소는 비워 둔 뒤 새로 적는 만큼만 뒤에 붙인다
+    setAddrBase(v.address || ''); setAddrDetail('');
+    setIsEdit(true); setIsDirty(false); setShowModal(true);
+  };
 
   const handleModalClose = useCallback((requestClose: boolean) => {
     if (!requestClose) return;
@@ -263,12 +276,14 @@ export default function VendorMaster() {
   }, [isDirty]);
 
   const handleSave = () => {
-    if (!editVendor.name) { toast.error('거래처명을 입력해주세요'); return; }
+    // 회사명이 곧 거래처명 — 입력칸을 하나로 합쳤으므로 저장 직전에 name에 복사한다
+    const companyName = (editVendor.companyName || '').trim();
+    if (!companyName) { toast.error('회사명을 입력해주세요'); return; }
     if (!editVendor.type) { toast.error('거래처 유형을 선택해주세요'); return; }
 
     // 거래처명 중복 검사 (신규/수정 모두)
-    const dupName = vendors.find((v: Vendor) => v.name.trim() === editVendor.name.trim() && v.id !== editVendor.id);
-    if (dupName) { toast.error(`'${editVendor.name}'은(는) 이미 등록된 거래처입니다`); return; }
+    const dupName = vendors.find((v: Vendor) => v.name.trim() === companyName && v.id !== editVendor.id);
+    if (dupName) { toast.error(`'${companyName}'은(는) 이미 등록된 거래처입니다`); return; }
 
     // 코드 중복 검사
     if (editVendor.code) {
@@ -287,11 +302,13 @@ export default function VendorMaster() {
     const vendorData = isEdit && editVendor.id
       ? {
           ...editVendor,
+          name: companyName,
           code: editVendor.code?.toUpperCase(),
           vendorCode: editVendor.vendorCode?.toUpperCase(),
         } as Vendor
       : {
           ...editVendor,
+          name: companyName,
           code: editVendor.code ? editVendor.code.toUpperCase() : undefined,
           vendorCode: editVendor.vendorCode ? editVendor.vendorCode.toUpperCase() : undefined,
           id: genId(),
@@ -644,6 +661,12 @@ export default function VendorMaster() {
   /** 모달에서 편집 중인 거래처의 국내/해외 (레거시 '해외공장'도 해외로 인식) */
   const editRegion: VendorRegion = editVendor.region ?? (editVendor.type === '해외공장' ? '해외' : '국내');
 
+  /** 기본주소 + 상세주소를 합쳐 vendors.address 한 칸에 저장한다 (DB 컬럼 추가 없이) */
+  const setAddress = (base: string, detail: string) => {
+    setAddrBase(base); setAddrDetail(detail);
+    update('address', [base.trim(), detail.trim()].filter(Boolean).join(' '));
+  };
+
   /**
    * 사업장 주소 검색 — 다음(카카오) 우편번호 서비스 팝업.
    * 키 발급이 필요 없는 무료 스크립트라 npm 의존성 없이 최초 1회만 동적 로드한다.
@@ -655,7 +678,8 @@ export default function VendorMaster() {
       new Postcode({
         oncomplete: (data: { roadAddress?: string; jibunAddress?: string; zonecode?: string }) => {
           const addr = data.roadAddress || data.jibunAddress || '';
-          update('address', data.zonecode ? `(${data.zonecode}) ${addr}` : addr);
+          setAddress(data.zonecode ? `(${data.zonecode}) ${addr}` : addr, addrDetail);
+          setTimeout(() => addrDetailRef.current?.focus(), 100);
         },
       }).open();
     };
@@ -1035,7 +1059,8 @@ export default function VendorMaster() {
                 <div className="space-y-1.5">
                   <Label className="text-xs">
                     {editRegion === '국내' ? '사업자 회사명' : '영문 회사명'}
-                    <span className="text-muted-foreground font-normal"> ({editRegion === '국내' ? '계산서 발급용' : '인보이스 표기용'})</span>
+                    <span className="text-[var(--system-red)]"> *</span>
+                    <span className="text-muted-foreground font-normal"> (거래처명으로 사용)</span>
                   </Label>
                   <Input
                     value={editVendor.companyName || ''}
@@ -1061,8 +1086,8 @@ export default function VendorMaster() {
                       <Label className="text-xs">사업장 주소 <span className="text-muted-foreground font-normal">(퀵/택배 발송용)</span></Label>
                       <div className="flex gap-2">
                         <Input
-                          value={editVendor.address || ''}
-                          onChange={e => update('address', e.target.value)}
+                          value={addrBase}
+                          onChange={e => setAddress(e.target.value, addrDetail)}
                           placeholder="주소 검색을 누르거나 직접 입력"
                           className="text-sm flex-1"
                         />
@@ -1070,7 +1095,13 @@ export default function VendorMaster() {
                           <Search className="w-3.5 h-3.5" />주소 검색
                         </Button>
                       </div>
-                      <p className="text-[11px] text-muted-foreground">검색으로 채운 뒤 상세주소(동·호수)는 직접 덧붙이세요.</p>
+                      <Input
+                        ref={addrDetailRef}
+                        value={addrDetail}
+                        onChange={e => setAddress(addrBase, e.target.value)}
+                        placeholder="상세주소 (예: 3층 301호)"
+                        className="text-sm"
+                      />
                     </div>
                   </>
                 )}
@@ -1179,19 +1210,14 @@ export default function VendorMaster() {
               </div>
             )}
 
-            {/* 거래처명 */}
-            <div className="space-y-1.5">
-              <Label>거래처명 <span className="text-[var(--system-red)]">*</span></Label>
-              <Input value={editVendor.name || ''} onChange={e => update('name', e.target.value)} placeholder="아뜰리에 드 루멘" />
-            </div>
+            {/* 거래처명 입력칸은 없앴다 — 사업자 회사명이 곧 거래처명이라 저장 시 그대로 복사한다 */}
 
-            {/* 브랜딩 (바이어만 표시) */}
-            {editVendor.type === '바이어' && (
-              <div className="space-y-1.5">
-                <Label>브랜드명 <span className="text-muted-foreground text-xs font-normal">(브랜딩 표기용, 바이어 전용)</span></Label>
-                <Input value={editVendor.nameEn || ''} onChange={e => update('nameEn', e.target.value)} placeholder="Atelier de LUMEN" />
-              </div>
-            )}
+            {/* 브랜드명 — 회사명과 다른 이름으로 부를 때. 검색에도 걸린다 */}
+            <div className="space-y-1.5">
+              <Label>브랜드명 <span className="text-muted-foreground text-xs font-normal">(회사명과 다르게 부를 때)</span></Label>
+              <Input value={editVendor.nameEn || ''} onChange={e => update('nameEn', e.target.value)} placeholder="Atelier de LUMEN" />
+              <p className="text-[11px] text-muted-foreground">여기 적은 브랜드명으로도 거래처 목록에서 검색됩니다.</p>
+            </div>
 
             {/* 담당자 정보 */}
             <div className="space-y-3">
