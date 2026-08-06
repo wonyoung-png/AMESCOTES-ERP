@@ -56,6 +56,8 @@ export default function ProductionOrders() {
   const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const buyers = allVendors.filter((v: any) => v.type === '바이어');
   const factories = allVendors.filter((v: any) => v.type === '공장' || v.type === '해외공장');
+  // 해외 판별은 region 기준 — '해외공장' 타입은 신규 생성되지 않는 레거시 값이라 폴백으로만 본다
+  const isOverseas = (v: any) => (v?.region ?? (v?.type === '해외공장' ? '해외' : '국내')) === '해외';
   const [search, setSearch] = usePersistedState('orders.search', '');
   const [filterBuyer, setFilterBuyer] = usePersistedState('orders.filterBuyer', 'all');
   const [filterStatus, setFilterStatus] = usePersistedState('orders.filterStatus', 'all');
@@ -1042,12 +1044,12 @@ export default function ProductionOrders() {
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [orders]);
 
-  // 공장 목록: BOM 제조국이 중국이면 해외공장 우선
+  // 공장 목록: BOM 제조국이 중국이면 해외 공장 우선
   const sortedFactories = useMemo(() => {
     if (bomCalc.manufacturingCountry === '중국') {
       return [
-        ...factories.filter(f => f.type === '해외공장'),
-        ...factories.filter(f => f.type === '공장'),
+        ...factories.filter(isOverseas),
+        ...factories.filter(f => !isOverseas(f)),
       ];
     }
     return factories;
@@ -1544,7 +1546,7 @@ export default function ProductionOrders() {
                   )}
                   {bomCalc.manufacturingCountry && (
                     <p className="text-xs text-muted-foreground mt-1">제조국: {bomCalc.manufacturingCountry}
-                      {bomCalc.manufacturingCountry === '중국' && <span className="text-primary ml-1">(해외공장 목록 우선 표시)</span>}
+                      {bomCalc.manufacturingCountry === '중국' && <span className="text-primary ml-1">(해외 공장 목록 우선 표시)</span>}
                     </p>
                   )}
                 </div>
@@ -1782,8 +1784,8 @@ export default function ProductionOrders() {
                         <SelectContent>
                           {bomCalc.manufacturingCountry === '중국' && (
                             <>
-                              <div className="px-2 py-1 text-[11px] text-muted-foreground font-medium">해외공장 (중국 제조국)</div>
-                              {sortedFactories.filter(f => f.type === '해외공장').map(v => (
+                              <div className="px-2 py-1 text-[11px] text-muted-foreground font-medium">해외 공장 (중국 제조국)</div>
+                              {sortedFactories.filter(isOverseas).map(v => (
                                 <SelectItem key={v.id} value={v.id}>
                                   {v.name}{v.leadTimeDays ? <span className="text-muted-foreground ml-1">({v.leadTimeDays}일)</span> : null}
                                 </SelectItem>
@@ -1792,7 +1794,7 @@ export default function ProductionOrders() {
                             </>
                           )}
                           {sortedFactories
-                            .filter(f => bomCalc.manufacturingCountry === '중국' ? f.type === '공장' : true)
+                            .filter(f => bomCalc.manufacturingCountry === '중국' ? !isOverseas(f) : true)
                             .map(v => (
                             <SelectItem key={v.id} value={v.id}>
                               {v.name}{v.leadTimeDays ? <span className="text-muted-foreground ml-1">({v.leadTimeDays}일)</span> : null}
