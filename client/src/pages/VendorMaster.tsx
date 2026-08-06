@@ -205,13 +205,15 @@ export default function VendorMaster() {
         v.type === '자재거래처' && (v.materialTypes || []).includes(filterMaterialType as '장식' | '원단' | '가죽' | '기타')
       );
     }
-    if (search) list = list.filter(v =>
-      v.name.toLowerCase().includes(search.toLowerCase()) ||
-      (v.nameEn || '').toLowerCase().includes(search.toLowerCase()) ||
-      (v.nameCn || '').includes(search) ||
-      (v.vendorCode || '').toUpperCase().includes(search.toUpperCase()) ||
-      (v.contactName || '').toLowerCase().includes(search.toLowerCase())
-    );
+    // 검색 대상: 거래처명·영문/중문명·코드·담당자 + 사업자 회사명 + 검색창내용(memo)
+    // 회사명이 '(주)아메스코테스'여도 검색창내용에 '아뜰리에드루멘'을 적어두면 그 이름으로 찾힌다
+    if (search) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(v =>
+        [v.name, v.nameEn, v.nameCn, v.companyName, v.memo, v.vendorCode, v.code, v.contactName]
+          .some(f => (f || '').toLowerCase().includes(q))
+      );
+    }
     return list;
   }, [vendors, search, filterRegion, filterType, filterMaterialType]);
 
@@ -224,7 +226,31 @@ export default function VendorMaster() {
     return c;
   }, [vendors]);
 
-  const openAdd = () => { setEditVendor({ ...EMPTY_VENDOR }); setIsEdit(false); setIsDirty(false); setShowModal(true); };
+  /**
+   * 코드 자동생성 — 국내 'K', 해외 'F' + 36진수 1자리 (2자리 고정, 기존 코드와 중복 회피).
+   * 36개를 다 쓰면 남은 2자리 조합에서 아무거나 하나 집는다.
+   */
+  const genVendorCode = (region: VendorRegion, selfId?: string): string => {
+    const used = new Set(
+      vendors.filter((v: Vendor) => v.id !== selfId).map((v: Vendor) => (v.code || '').toUpperCase()).filter(Boolean),
+    );
+    const prefix = region === '해외' ? 'F' : 'K';
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    for (const c of chars) {
+      const code = prefix + c;
+      if (!used.has(code)) return code;
+    }
+    for (const a of chars) for (const b of chars) {
+      const code = a + b;
+      if (!used.has(code)) return code;
+    }
+    return '';
+  };
+
+  const openAdd = () => {
+    setEditVendor({ ...EMPTY_VENDOR, code: genVendorCode('국내') });
+    setIsEdit(false); setIsDirty(false); setShowModal(true);
+  };
   const openEdit = (v: Vendor) => { setEditVendor({ ...v }); setIsEdit(true); setIsDirty(false); setShowModal(true); };
 
   const handleModalClose = useCallback((requestClose: boolean) => {
@@ -618,10 +644,31 @@ export default function VendorMaster() {
   /** 모달에서 편집 중인 거래처의 국내/해외 (레거시 '해외공장'도 해외로 인식) */
   const editRegion: VendorRegion = editVendor.region ?? (editVendor.type === '해외공장' ? '해외' : '국내');
 
-  const updateCode = (field: 'code' | 'vendorCode', val: string, maxLen: number) => {
-    const clean = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, maxLen);
-    setEditVendor(v => ({ ...v, [field]: clean }));
-    setIsDirty(true);
+  /**
+   * 사업장 주소 검색 — 다음(카카오) 우편번호 서비스 팝업.
+   * 키 발급이 필요 없는 무료 스크립트라 npm 의존성 없이 최초 1회만 동적 로드한다.
+   */
+  const openAddressSearch = () => {
+    const open = () => {
+      const Postcode = (window as any).daum?.Postcode;
+      if (!Postcode) { toast.error('주소 검색을 불러오지 못했습니다. 주소를 직접 입력해주세요'); return; }
+      new Postcode({
+        oncomplete: (data: { roadAddress?: string; jibunAddress?: string; zonecode?: string }) => {
+          const addr = data.roadAddress || data.jibunAddress || '';
+          update('address', data.zonecode ? `(${data.zonecode}) ${addr}` : addr);
+        },
+      }).open();
+    };
+    if ((window as any).daum?.Postcode) { open(); return; }
+    const SRC = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+    let s = document.querySelector<HTMLScriptElement>(`script[src="${SRC}"]`);
+    if (!s) {
+      s = document.createElement('script');
+      s.src = SRC;
+      document.body.appendChild(s);
+    }
+    s.addEventListener('load', open, { once: true });
+    s.addEventListener('error', () => toast.error('주소 검색 서비스에 연결할 수 없습니다. 직접 입력해주세요'), { once: true });
   };
 
   // 유형별 카운트
@@ -922,6 +969,8 @@ export default function VendorMaster() {
                         // 국가·통화 기본값도 함께 맞춘다
                         if (r === '국내') { update('country', '한국'); update('currency', 'KRW'); }
                         else if (!editVendor.country || editVendor.country === '한국') { update('country', '중국'); update('currency', 'CNY'); }
+                        // 신규 등록일 때만 코드 재발급 — 기존 거래처 코드는 전표번호에 박혀 있어 바꾸지 않는다
+                        if (!isEdit) update('code', genVendorCode(r, editVendor.id));
                       }}
                       className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium border transition-colors ${
                         active
@@ -975,15 +1024,13 @@ export default function VendorMaster() {
               <p className="text-xs font-medium text-muted-foreground mb-3">식별 정보</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">코드 <span className="text-muted-foreground font-normal">(2자리, 중복불가)</span></Label>
+                  <Label className="text-xs">코드 <span className="text-muted-foreground font-normal">(자동생성)</span></Label>
                   <Input
                     value={editVendor.code || ''}
-                    onChange={e => updateCode('code', e.target.value, 2)}
-                    placeholder="AT"
-                    maxLength={2}
-                    className="w-28 font-mono uppercase text-center font-bold"
+                    readOnly
+                    tabIndex={-1}
+                    className="w-28 font-mono uppercase text-center font-bold bg-[var(--fill-tertiary)] text-muted-foreground cursor-default"
                   />
-                  <p className="text-[11px] text-muted-foreground">예: 202603-LLL-001 / AT2603HB01</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">
@@ -1012,12 +1059,18 @@ export default function VendorMaster() {
                     </div>
                     <div className="space-y-1.5 col-span-2">
                       <Label className="text-xs">사업장 주소 <span className="text-muted-foreground font-normal">(퀵/택배 발송용)</span></Label>
-                      <Input
-                        value={editVendor.address || ''}
-                        onChange={e => update('address', e.target.value)}
-                        placeholder="서울시 강남구 테헤란로 123"
-                        className="text-sm"
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          value={editVendor.address || ''}
+                          onChange={e => update('address', e.target.value)}
+                          placeholder="주소 검색을 누르거나 직접 입력"
+                          className="text-sm flex-1"
+                        />
+                        <Button type="button" variant="outline" size="sm" onClick={openAddressSearch} className="gap-1.5 whitespace-nowrap">
+                          <Search className="w-3.5 h-3.5" />주소 검색
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">검색으로 채운 뒤 상세주소(동·호수)는 직접 덧붙이세요.</p>
                     </div>
                   </>
                 )}
@@ -1156,13 +1209,6 @@ export default function VendorMaster() {
                   <Label>담당자 이메일</Label>
                   <Input value={editVendor.contactEmail || ''} onChange={e => update('contactEmail', e.target.value)} placeholder="contact@example.com" />
                 </div>
-                {/* 공장일 때 리드타임 표시 */}
-                {(editVendor.type === '공장' || editVendor.type === '해외공장') && (
-                  <div className="space-y-1.5 col-span-2">
-                    <Label>리드타임 (일) <span className="text-muted-foreground text-xs">(발주→납품 소요일)</span></Label>
-                    <Input type="number" value={editVendor.leadTimeDays ?? ''} onChange={e => update('leadTimeDays', e.target.value ? Number(e.target.value) : undefined)} placeholder="예: 45" />
-                  </div>
-                )}
               </div>
             </div>
 
@@ -1311,8 +1357,13 @@ export default function VendorMaster() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>메모</Label>
-              <Input value={editVendor.memo || ''} onChange={e => update('memo', e.target.value)} placeholder="비고" />
+              <Label>검색창내용 <span className="text-muted-foreground text-xs font-normal">(브랜드명 등 실제로 찾을 때 치는 이름)</span></Label>
+              <Input
+                value={editVendor.memo || ''}
+                onChange={e => update('memo', e.target.value)}
+                placeholder="예: 아뜰리에드루멘 (회사명이 (주)아메스코테스여도 이 이름으로 검색됨)"
+              />
+              <p className="text-[11px] text-muted-foreground">여기 적은 말로 거래처 목록에서 검색됩니다. 여러 개면 띄어쓰기로 구분하세요.</p>
             </div>
           </div>
           <DialogFooter>
