@@ -107,14 +107,6 @@ export default function ProductionOrders() {
   const [customColorInput, setCustomColorInput] = useState('');
   const [showCustomColorInput, setShowCustomColorInput] = useState(false);
 
-  // 리오더 네고 상태
-  const [negoRequestedPrice, setNegoRequestedPrice] = useState<number>(0);
-  const [negoCurrency, setNegoCurrency] = useState<'CNY' | 'USD' | 'KRW'>('CNY');
-  const [negoMemo, setNegoMemo] = useState('');
-  // 네고 단가 발주 적용 상태
-  const [negoApplied, setNegoApplied] = useState(false);
-  const [originalFactoryPriceKrw, setOriginalFactoryPriceKrw] = useState<number>(0);
-
   // 입고 처리 팝업 상태
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receiveOrderId, setReceiveOrderId] = useState<string>('');
@@ -449,11 +441,6 @@ export default function ProductionOrders() {
     setShowColorDropdown(false);
     setShowCustomColorInput(false);
     setCustomColorInput('');
-    setNegoRequestedPrice(0);
-    setNegoCurrency('CNY');
-    setNegoMemo('');
-    setNegoApplied(false);
-    setOriginalFactoryPriceKrw(0);
     setShowModal(true);
 
     if (prefillStyleIdToUse) {
@@ -474,11 +461,6 @@ export default function ProductionOrders() {
     setShowColorDropdown(false);
     setShowCustomColorInput(false);
     setCustomColorInput('');
-    setNegoRequestedPrice(0);
-    setNegoCurrency('CNY');
-    setNegoMemo('');
-    setNegoApplied(false);
-    setOriginalFactoryPriceKrw(order.factoryUnitPriceKrw || 0);
     setShowModal(true);
   };
 
@@ -577,10 +559,9 @@ export default function ProductionOrders() {
       }));
     setHqItems(hqFromBom);
 
-    // BOM currency → factoryCurrency / negoCurrency 기본값 설정
+    // BOM currency → factoryCurrency 기본값 설정
     if (bomForOrder?.currency) {
       setFactoryCurrency(bomForOrder.currency);
-      setNegoCurrency(bomForOrder.currency as 'CNY' | 'USD' | 'KRW');
     }
 
     setForm(f => ({
@@ -780,59 +761,16 @@ export default function ProductionOrders() {
     let finalFactoryUnitPriceCny: number;
     let finalFactoryUnitPriceKrw: number;
 
-    if (negoApplied && form.factoryUnitPriceKrw) {
-      // 네고 단가 적용: form에 저장된 KRW 값 사용
-      finalFactoryUnitPriceKrw = form.factoryUnitPriceKrw;
-      // CNY 역산
-      if (factoryCurrency === 'KRW') {
-        finalFactoryUnitPriceCny = form.factoryUnitPriceKrw;
-      } else if (factoryCurrency === 'USD') {
-        finalFactoryUnitPriceCny = usdKrw > 0 ? form.factoryUnitPriceKrw / usdKrw : 0;
-      } else {
-        finalFactoryUnitPriceCny = cnyKrw > 0 ? form.factoryUnitPriceKrw / cnyKrw : 0;
-      }
+    finalFactoryUnitPriceCny = manualFactoryPrice ? manualPriceCny : bomCalc.factoryUnitPriceCny;
+    if (factoryCurrency === 'KRW') {
+      finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny);
+    } else if (factoryCurrency === 'USD') {
+      finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * usdKrw);
     } else {
-      finalFactoryUnitPriceCny = manualFactoryPrice ? manualPriceCny : bomCalc.factoryUnitPriceCny;
-      if (factoryCurrency === 'KRW') {
-        finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny);
-      } else if (factoryCurrency === 'USD') {
-        finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * usdKrw);
-      } else {
-        finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * cnyKrw);
-      }
+      finalFactoryUnitPriceKrw = Math.round(finalFactoryUnitPriceCny * cnyKrw);
     }
 
-    // 네고 적용 후 저장 시 negoHistory에 자동 이력 추가
-    let finalNegoHistory = (form as any).negoHistory || [];
-    if (negoApplied && negoRequestedPrice > 0) {
-      const negoReqKrwForHistory = (() => {
-        if (negoCurrency === 'KRW') return negoRequestedPrice;
-        if (negoCurrency === 'USD') return Math.round(negoRequestedPrice * usdKrwDisplay);
-        return Math.round(negoRequestedPrice * cnyKrw);
-      })();
-      const savedPerPcsForHistory = originalFactoryPriceKrw > 0 ? originalFactoryPriceKrw - negoReqKrwForHistory : 0;
-      const savedTotalForHistory = savedPerPcsForHistory * totalQty;
-      const savedRateForHistory = originalFactoryPriceKrw > 0 && savedPerPcsForHistory > 0
-        ? Math.round((savedPerPcsForHistory / originalFactoryPriceKrw) * 1000) / 10
-        : 0;
-      // 이미 동일한 이력이 없으면 추가
-      const isDuplicate = finalNegoHistory.some(
-        (n: any) => n.requestedPrice === negoRequestedPrice && n.currency === negoCurrency
-      );
-      if (!isDuplicate) {
-        finalNegoHistory = [
-          ...finalNegoHistory,
-          {
-            requestedPrice: negoRequestedPrice,
-            currency: negoCurrency,
-            savedAmount: savedTotalForHistory,
-            savedRate: savedRateForHistory,
-            memo: negoMemo || '발주 적용 시 자동 저장',
-            date: new Date().toISOString().split('T')[0],
-          },
-        ];
-      }
-    }
+    const finalNegoHistory = (form as any).negoHistory || [];
 
     if (isEditMode && editOrderId) {
       // 편집 모드: 기존 발주 업데이트
@@ -848,7 +786,7 @@ export default function ProductionOrders() {
         factoryUnitPriceCny: finalFactoryUnitPriceCny,
         factoryUnitPriceKrw: finalFactoryUnitPriceKrw,
         factoryCurrency,
-        bomType: negoApplied ? 'manual' : (manualFactoryPrice ? 'manual' : (bomCalc.bomType ?? undefined)),
+        bomType: manualFactoryPrice ? 'manual' : (bomCalc.bomType ?? undefined),
         negoHistory: finalNegoHistory,
         memo: form.memo,
         updatedAt: new Date().toISOString(),
@@ -887,7 +825,7 @@ export default function ProductionOrders() {
       factoryUnitPriceCny: finalFactoryUnitPriceCny,
       factoryUnitPriceKrw: finalFactoryUnitPriceKrw,
       factoryCurrency,
-      bomType: negoApplied ? 'manual' : (manualFactoryPrice ? 'manual' : (bomCalc.bomType ?? undefined)),
+      bomType: manualFactoryPrice ? 'manual' : (bomCalc.bomType ?? undefined),
       deliveryDate: form.deliveryDate,
       negoHistory: finalNegoHistory,
       createdAt: new Date().toISOString(),
@@ -2295,9 +2233,10 @@ export default function ProductionOrders() {
                     <span className="text-xs text-muted-foreground">(임가공비 + 본사미제공 자재)</span>
                   </div>
                   <div className="p-4 space-y-3">
-                    {/* 공장 선택 */}
+                    {/* 발주처 · 공장단가 · KRW 환산을 한 줄에 맞춘다 */}
+                    <div className="grid grid-cols-3 gap-3 items-start">
                     <div className="space-y-1.5">
-                      <Label>발주처 (공장) *</Label>
+                      <div className="flex items-center h-5"><Label>발주처 (공장) *</Label></div>
                       <Select value={form.vendorId || ''} onValueChange={v => {
                         const vendor = allVendors.find(x => x.id === v);
                         if (vendor?.leadTimeDays && vendor.leadTimeDays > 0 && !form.deliveryDate) {
@@ -2333,10 +2272,8 @@ export default function ProductionOrders() {
                         </SelectContent>
                       </Select>
                     </div>
-                    {/* 공장단가 */}
-                    <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between h-5">
                           <div className="flex items-center gap-1.5">
                             <Label>공장단가 ({factoryCurrency}/PCS)</Label>
                             <Select value={factoryCurrency} onValueChange={(v) => setFactoryCurrency(v as 'CNY' | 'USD' | 'KRW')}>
@@ -2368,9 +2305,10 @@ export default function ProductionOrders() {
                             onChange={e => setManualPriceCny(parseFloat(e.target.value) || 0)}
                             placeholder="0.00"
                             step="0.01"
+                            className="h-9 text-right font-mono"
                           />
                         ) : (
-                          <div className={`h-9 px-3 py-2 border rounded-md text-sm font-mono flex items-center ${bomCalc.bomLoaded ? 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20 text-[var(--system-green)]' : 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20 text-[var(--system-orange)]'}`}>
+                          <div className={`h-9 px-3 py-2 border rounded-md text-sm font-mono flex items-center justify-end ${bomCalc.bomLoaded ? 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20 text-[var(--system-green)]' : 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20 text-[var(--system-orange)]'}`}>
                             {bomCalc.bomLoaded
                               ? factoryCurrency === 'CNY'
                                 ? `¥${bomCalc.factoryUnitPriceCny.toFixed(2)}`
@@ -2382,20 +2320,10 @@ export default function ProductionOrders() {
                         )}
                       </div>
                       <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <Label>공장단가 (KRW 환산)</Label>
-                          {negoApplied && (
-                            <span className="text-[11px] px-1.5 py-0.5 bg-[var(--system-green)]/10 text-[var(--system-green)] border border-transparent rounded-full font-medium">네고 적용</span>
-                          )}
-                        </div>
-                        <div className={`h-9 px-3 py-2 border rounded-md text-sm font-mono flex items-center ${negoApplied ? 'bg-[var(--system-green)]/10 border-[var(--system-green)]/30 text-[var(--system-green)] font-bold' : 'bg-[var(--fill-quaternary)] border-border text-muted-foreground'}`}>
+                        <div className="flex items-center h-5"><Label>공장단가 (KRW 환산)</Label></div>
+                        <div className="h-9 px-3 py-2 border border-border rounded-md text-sm font-mono flex items-center justify-end bg-[var(--fill-quaternary)] text-foreground">
                           {displayFactoryPriceKrw > 0 ? formatKRW(displayFactoryPriceKrw) : '—'}
                         </div>
-                        {negoApplied && originalFactoryPriceKrw > 0 && (
-                          <p className="text-[11px] text-[var(--system-green)] font-medium">
-                            원래 단가: {formatKRW(originalFactoryPriceKrw)} → 네고 단가: {formatKRW(displayFactoryPriceKrw)}
-                          </p>
-                        )}
                       </div>
                     </div>
                     {/* 총 발주금액 */}
@@ -2419,258 +2347,6 @@ export default function ProductionOrders() {
                     )}
                   </div>
                 </div>
-
-                {/* ── 리오더 네고 패널 ── */}
-                {(() => {
-                  // 이전 발주 이력에서 같은 스타일의 최저 공장단가(KRW) 계산
-                  const prevOrders = orders.filter(o => o.styleNo === form.styleNo && o.id !== form.id);
-                  const prevPrices = prevOrders
-                    .map(o => o.factoryUnitPriceKrw)
-                    .filter((p): p is number => !!p && p > 0);
-                  const prevLowestKrw = prevPrices.length > 0 ? Math.min(...prevPrices) : null;
-
-                  // 현재 공장 제시단가 KRW
-                  const currentPriceKrw = displayFactoryPriceKrw;
-
-                  // 공장 제시단가를 원본 통화 기준으로 역산
-                  const currentPriceInFactoryCurrency = (() => {
-                    if (factoryCurrency === 'KRW') return currentPriceKrw;
-                    if (factoryCurrency === 'USD') return usdKrwDisplay > 0 ? currentPriceKrw / usdKrwDisplay : 0;
-                    return cnyKrwDisplay > 0 ? currentPriceKrw / cnyKrwDisplay : 0;
-                  })();
-
-                  // 공장 제시단가 통화별 환산
-                  const factoryPriceUsd = usdKrwDisplay > 0 ? currentPriceKrw / usdKrwDisplay : 0;
-                  const factoryPriceCny = cnyKrwDisplay > 0 ? currentPriceKrw / cnyKrwDisplay : 0;
-                  const factoryPriceKrw = currentPriceKrw;
-
-                  // 네고 최종단가 → KRW 환산
-                  const negoReqKrw = (() => {
-                    if (!negoRequestedPrice || negoRequestedPrice <= 0) return 0;
-                    if (negoCurrency === 'KRW') return negoRequestedPrice;
-                    if (negoCurrency === 'USD') return Math.round(negoRequestedPrice * usdKrwDisplay);
-                    return Math.round(negoRequestedPrice * cnyKrwDisplay);
-                  })();
-
-                  // 네고 최종단가 통화별 환산
-                  const negoPriceUsd = negoReqKrw > 0 && usdKrwDisplay > 0 ? negoReqKrw / usdKrwDisplay : 0;
-                  const negoPriceCny = negoReqKrw > 0 && cnyKrwDisplay > 0 ? negoReqKrw / cnyKrwDisplay : 0;
-
-                  const savedPerPcs = currentPriceKrw > 0 && negoReqKrw > 0 ? currentPriceKrw - negoReqKrw : 0;
-                  const savedTotal = savedPerPcs * currentQty;
-                  const savedRate = currentPriceKrw > 0 && savedPerPcs > 0
-                    ? Math.round((savedPerPcs / currentPriceKrw) * 1000) / 10
-                    : 0;
-                  const isBelowPrevLowest = prevLowestKrw !== null && negoReqKrw > 0 && negoReqKrw < prevLowestKrw;
-
-                  const handleApplyNegoToOrder = () => {
-                    if (!negoRequestedPrice || negoRequestedPrice <= 0) {
-                      toast.error('네고 후 최종단가를 먼저 입력해주세요');
-                      return;
-                    }
-                    // 원래 공장단가 기록
-                    if (!negoApplied) {
-                      setOriginalFactoryPriceKrw(currentPriceKrw);
-                    }
-                    // factoryUnitPrice를 네고 단가의 KRW 환산값으로 업데이트
-                    setForm(f => ({
-                      ...f,
-                      factoryUnitPriceKrw: negoReqKrw,
-                      factoryUnitPriceCny: negoCurrency === 'CNY' ? negoRequestedPrice : (negoCurrency === 'USD' ? negoRequestedPrice * usdKrwDisplay / cnyKrwDisplay : negoReqKrw / cnyKrwDisplay),
-                    }));
-                    setFactoryCurrency(negoCurrency);
-                    setManualFactoryPrice(true);
-                    setManualPriceCny(negoRequestedPrice);
-                    setNegoApplied(true);
-                    toast.success(`네고 단가가 공장단가에 적용됐습니다 — ${formatKRW(negoReqKrw)}/PCS`);
-                  };
-
-                  const handleSaveNego = () => {
-                    if (!form.styleId) { toast.error('스타일을 먼저 선택해주세요'); return; }
-                    if (!negoRequestedPrice || negoRequestedPrice <= 0) { toast.error('네고 후 최종단가를 입력해주세요'); return; }
-                    // 현재 폼에 임시 저장 (발주 등록 시 함께 저장됨)
-                    setForm(f => ({
-                      ...f,
-                      negoHistory: [
-                        ...((f as any).negoHistory || []),
-                        {
-                          requestedPrice: negoRequestedPrice,
-                          currency: negoCurrency,
-                          savedAmount: savedTotal,
-                          savedRate,
-                          memo: negoMemo,
-                          date: new Date().toISOString().split('T')[0],
-                        },
-                      ],
-                    }));
-                    toast.success(`네고 내역이 저장됐습니다 — 절감 ${formatKRW(savedTotal)} (${savedRate}%)`);
-                    setNegoRequestedPrice(0);
-                    setNegoMemo('');
-                  };
-
-                  // 통화 심볼
-                  const currencySymbol = (cur: string) => cur === 'KRW' ? '₩' : cur === 'USD' ? '$' : '¥';
-
-                  // 가격 포맷 (소수점)
-                  const fmtFx = (val: number, cur: string) => {
-                    if (cur === 'KRW') return `₩${Math.round(val).toLocaleString()}`;
-                    if (cur === 'USD') return `$${val.toFixed(2)}`;
-                    return `¥${val.toFixed(2)}`;
-                  };
-
-                  return (
-                    <div className="rounded-md border border-border overflow-hidden">
-                      <div className="bg-[var(--fill-quaternary)] border-b border-border px-4 py-2 flex items-center gap-2">
-                        <span className="text-sm font-semibold text-foreground">리오더 네고</span>
-                        <span className="text-xs text-muted-foreground">단가 협상 내역 기록</span>
-                      </div>
-                      <div className="p-4 space-y-3">
-                        {/* 공장 제시단가 / 이전 최저단가 */}
-                        <div className="grid grid-cols-2 gap-3 text-xs">
-                          <div className="p-2.5 bg-[var(--fill-quaternary)] rounded border border-border">
-                            <p className="text-muted-foreground mb-1">공장 제시단가</p>
-                            {currentPriceKrw > 0 ? (
-                              <div className="space-y-0.5">
-                                <p className="font-mono font-semibold text-foreground">{fmtFx(currentPriceInFactoryCurrency, factoryCurrency)}</p>
-                                {factoryCurrency !== 'USD' && <p className="font-mono text-muted-foreground">{fmtFx(factoryPriceUsd, 'USD')}</p>}
-                                {factoryCurrency !== 'CNY' && <p className="font-mono text-muted-foreground">{fmtFx(factoryPriceCny, 'CNY')}</p>}
-                                {factoryCurrency !== 'KRW' && <p className="font-mono text-muted-foreground">{fmtFx(factoryPriceKrw, 'KRW')}</p>}
-                              </div>
-                            ) : <p className="font-mono font-semibold text-muted-foreground">—</p>}
-                          </div>
-                          <div className={`p-2.5 rounded border ${prevLowestKrw ? 'bg-primary/10 border-primary/20' : 'bg-[var(--fill-quaternary)] border-border'}`}>
-                            <p className="text-muted-foreground mb-1">이전 최저단가</p>
-                            <p className={`font-mono font-semibold ${prevLowestKrw ? 'text-primary' : 'text-muted-foreground'}`}>
-                              {prevLowestKrw ? formatKRW(prevLowestKrw) : '이력 없음'}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* 네고 후 최종단가 입력 */}
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">네고 후 최종단가 (PCS)</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              type="number"
-                              value={negoRequestedPrice || ''}
-                              onChange={e => setNegoRequestedPrice(parseFloat(e.target.value) || 0)}
-                              placeholder={`0.00 ${negoCurrency}`}
-                              step="0.01"
-                              className="h-9 flex-1"
-                            />
-                            <Select
-                              value={negoCurrency}
-                              onValueChange={v => setNegoCurrency(v as 'CNY' | 'USD' | 'KRW')}
-                            >
-                              <SelectTrigger className="h-9 w-24">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="CNY">CNY (¥)</SelectItem>
-                                <SelectItem value="USD">USD ($)</SelectItem>
-                                <SelectItem value="KRW">KRW (₩)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          {/* 네고 최종단가 통화별 환산 표시 */}
-                          {negoReqKrw > 0 && (
-                            <div className="text-[11px] text-muted-foreground font-mono flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                              {negoCurrency !== 'KRW' && <span>₩{Math.round(negoReqKrw).toLocaleString()} KRW</span>}
-                              {negoCurrency !== 'USD' && <span>${negoPriceUsd.toFixed(2)} USD</span>}
-                              {negoCurrency !== 'CNY' && <span>¥{negoPriceCny.toFixed(2)} CNY</span>}
-                            </div>
-                          )}
-                          {isBelowPrevLowest && (
-                            <p className="text-[11px] text-[var(--system-green)] font-medium">
-                              이전 최저단가보다 낮음 — 신규 최저가 달성!
-                            </p>
-                          )}
-                        </div>
-
-                        {/* 절감 계산 결과 */}
-                        {savedTotal !== 0 && (
-                          <div className={`p-3 rounded-md border ${savedTotal > 0 ? 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20' : 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20'}`}>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              <div>
-                                <p className="text-muted-foreground">절감 금액 (총)</p>
-                                <p className={`font-mono font-bold text-sm ${savedTotal > 0 ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]'}`}>
-                                  {savedTotal > 0 ? '+' : ''}{formatKRW(savedTotal)}
-                                </p>
-                                <p className="text-muted-foreground mt-0.5">
-                                  {formatKRW(savedPerPcs)}/PCS × {currentQty.toLocaleString()} PCS
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">절감률</p>
-                                <p className={`font-mono font-bold text-sm ${savedTotal > 0 ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]'}`}>
-                                  {savedTotal > 0 ? '+' : ''}{savedRate}%
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 네고 메모 */}
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">네고 메모</Label>
-                          <Input
-                            value={negoMemo}
-                            onChange={e => setNegoMemo(e.target.value)}
-                            placeholder="예: 수량 증가로 단가 인하 요청"
-                            className="h-9 text-sm"
-                          />
-                        </div>
-
-                        {/* "이 단가로 발주 적용" 버튼 */}
-                        {negoApplied && negoReqKrw > 0 ? (
-                          <button
-                            type="button"
-                            className="w-full h-9 rounded-md border border-[var(--system-green)]/40 bg-[var(--system-green)]/10 text-[var(--system-green)] text-xs font-semibold flex items-center justify-center gap-1.5 cursor-default"
-                            disabled
-                          >
-                            적용됨 ({formatKRW(negoReqKrw)})
-                          </button>
-                        ) : (
-                          <Button
-                            type="button"
-                            size="sm"
-                            className={`w-full h-9 text-xs font-semibold ${negoRequestedPrice > 0 ? '' : 'bg-[var(--fill-tertiary)] text-muted-foreground cursor-not-allowed'}`}
-                            disabled={!negoRequestedPrice || negoRequestedPrice <= 0}
-                            onClick={handleApplyNegoToOrder}
-                          >
-                            이 단가로 발주 적용
-                          </Button>
-                        )}
-
-                        {/* 저장 버튼 */}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-9 text-xs font-medium"
-                          onClick={handleSaveNego}
-                        >
-                          네고 내역만 저장 (발주 적용 제외)
-                        </Button>
-
-                        {/* 이미 저장된 네고 이력 표시 */}
-                        {((form as any).negoHistory || []).length > 0 && (
-                          <div className="space-y-1.5">
-                            <p className="text-[13px] font-semibold text-muted-foreground">저장된 네고 이력</p>
-                            {((form as any).negoHistory || []).map((n: any, i: number) => (
-                              <div key={i} className="text-[11px] bg-[var(--fill-quaternary)] border border-border rounded px-2 py-1.5 flex items-center justify-between">
-                                <span className="text-muted-foreground">{n.date} — 최종 {n.requestedPrice} {n.currency}</span>
-                                <span className={`font-mono font-medium ${n.savedAmount > 0 ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]'}`}>
-                                  {n.savedAmount > 0 ? '+' : ''}{formatKRW(n.savedAmount)} ({n.savedRate}%)
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
 
                 {/* ── 자재 발주 섹션 (본사제공) ── */}
                 {(bomCalc.hqProvided.length > 0 || hqItems.length > 0) && (
