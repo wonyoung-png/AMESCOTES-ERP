@@ -345,6 +345,15 @@ export default function SampleManagement() {
   const todayD = new Date();
   const [calYear, setCalYear] = useState(todayD.getFullYear());
   const [calMonth, setCalMonth] = useState(todayD.getMonth());
+  const [calPlace, setCalPlace] = useState<'all' | '내부개발실' | '중국공장'>('all');
+
+  /** 운영은 브랜드명 기준 — 브랜드가 있으면 브랜드명, 없으면 회사명 */
+  const buyerLabel = (v?: { name?: string; brands?: string[]; nameEn?: string } | null) => {
+    if (!v) return '';
+    const brand = v.brands?.[0] || v.nameEn;
+    return brand || v.name || '';
+  };
+  const buyerLabelById = (id?: string) => buyerLabel(vendors.find((x: any) => x.id === id) as any);
 
   /**
    * 샘플 일정 캘린더 — 의뢰일(접수)과 목표완료일을 한 달력에 얹는다.
@@ -360,8 +369,10 @@ export default function SampleManagement() {
     for (let d = 1; d <= daysInMonth; d++) {
       const ds = iso(d);
       const events: { id: string; label: string; kind: 'req' | 'due'; late: boolean }[] = [];
-      (filtered as Sample[]).forEach(sm => {
-        const label = `${sm.styleNo} ${sm.stage}`;
+        (filtered as Sample[]).forEach(sm => {
+        if (calPlace !== 'all' && (sm.location || '내부개발실') !== calPlace) return;
+        // 브랜드명 - 제품명 - 차수
+        const label = [buyerLabelById(sm.buyerId), sm.styleName || sm.styleNo, sm.stage].filter(Boolean).join(' - ');
         if (sm.requestDate === ds) events.push({ id: sm.id + '-r', label, kind: 'req', late: false });
         if (sm.expectedDate === ds) {
           events.push({ id: sm.id + '-d', label, kind: 'due', late: ds < todayIso && sm.stage !== '최종승인' });
@@ -370,15 +381,7 @@ export default function SampleManagement() {
       cells.push({ day: d, events });
     }
     return cells;
-  }, [filtered, calYear, calMonth]);
-
-  /** 운영은 브랜드명 기준 — 브랜드가 있으면 브랜드명, 없으면 회사명 */
-  const buyerLabel = (v?: { name?: string; brands?: string[]; nameEn?: string } | null) => {
-    if (!v) return '';
-    const brand = v.brands?.[0] || v.nameEn;
-    return brand || v.name || '';
-  };
-  const buyerLabelById = (id?: string) => buyerLabel(vendors.find((x: any) => x.id === id) as any);
+  }, [filtered, calYear, calMonth, calPlace, vendors]);
 
   const openNew = () => {
     // 같은 스타일번호로 새 샘플 접수 시 기존 최대 차수 + 1로 자동 설정 (스타일 선택 시 처리)
@@ -1102,6 +1105,20 @@ export default function SampleManagement() {
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary" />목표완료</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[var(--system-red)]" />지연</span>
             </div>
+          </div>
+
+          <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-lg w-fit">
+            {(['all', '내부개발실', '중국공장'] as const).map(pl => (
+              <button
+                key={pl}
+                onClick={() => setCalPlace(pl)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  calPlace === pl ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {pl === 'all' ? '전체' : pl === '중국공장' ? '중국개발실' : pl}
+              </button>
+            ))}
           </div>
 
           <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden">
