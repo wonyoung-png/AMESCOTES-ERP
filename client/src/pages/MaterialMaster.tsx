@@ -13,43 +13,64 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Plus, Search, Pencil, Trash2, Package, ChevronDown, Eye } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, ChevronDown, Eye, X } from 'lucide-react';
 import { HoverZoomImage } from '@/components/HoverZoomImage';
 
 /** 검색 가능한 단일 선택 드롭다운 — 네이티브 datalist 대신 (Select 와 같은 외형) */
-function SearchSelect({ value, options, placeholder, disabled, onChange }: {
+function SearchSelect({ value, options, placeholder, disabled, onChange, counts, allLabel, compact, label }: {
   value?: string; options: string[]; placeholder: string; disabled?: boolean; onChange: (v: string) => void;
+  /** 항목별 건수 — 넘기면 우측에 표시하고 0건은 흐리게 */
+  counts?: Record<string, number>;
+  /** 넘기면 목록 맨 위에 "전체" 항목을 두고, 선택 시 '' 를 돌려준다 */
+  allLabel?: string;
+  /** 툴바용 — 높이를 낮추고 폭을 내용에 맞춘다 */
+  compact?: boolean;
+  /** 트리거 앞에 붙는 회색 라벨 (예: "카테고리") */
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const filtered = options.filter(o => o.toLowerCase().includes(q.trim().toLowerCase()));
+  const pick = (v: string) => { onChange(v); setOpen(false); };
   return (
     <Popover open={open} onOpenChange={o => { setOpen(o); if (o) setQ(''); }}>
       <PopoverTrigger asChild>
         <button
           type="button" disabled={disabled}
-          className="flex h-9 w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className={compact
+            ? 'flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm disabled:opacity-50 whitespace-nowrap hover:bg-[var(--fill-quaternary)]'
+            : 'flex h-9 w-full items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed'}
         >
-          <span className={value ? 'text-foreground' : 'text-muted-foreground'}>{value || placeholder}</span>
+          {label && <span className="text-muted-foreground">{label}</span>}
+          <span className={value ? 'text-foreground font-medium' : 'text-muted-foreground'}>{value || placeholder}</span>
           <ChevronDown size={14} className="opacity-50 shrink-0" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="p-0 w-[var(--radix-popover-trigger-width)]">
+      <PopoverContent align="start" className={compact ? 'p-0 w-56' : 'p-0 w-[var(--radix-popover-trigger-width)]'}>
         <div className="p-2 border-b border-border">
           <Input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="검색" className="h-8" />
         </div>
-        <div className="max-h-56 overflow-y-auto py-1">
+        <div className="max-h-64 overflow-y-auto py-1">
+          {allLabel && !q && (
+            <button type="button" onClick={() => pick('')}
+              className={`w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-[var(--fill-quaternary)] ${!value ? 'bg-[var(--fill-tertiary)] font-medium' : ''}`}>
+              {allLabel}
+            </button>
+          )}
           {filtered.length === 0 ? (
             <p className="px-3 py-2 text-xs text-muted-foreground">결과 없음</p>
-          ) : filtered.map(o => (
-            <button
-              key={o} type="button"
-              onClick={() => { onChange(o); setOpen(false); }}
-              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--fill-quaternary)] ${o === value ? 'bg-[var(--fill-tertiary)]' : ''}`}
-            >
-              {o}
-            </button>
-          ))}
+          ) : filtered.map(o => {
+            const n = counts?.[o];
+            return (
+              <button
+                key={o} type="button" onClick={() => pick(o)}
+                className={`w-full flex items-center justify-between gap-3 px-3 py-1.5 text-sm hover:bg-[var(--fill-quaternary)] ${o === value ? 'bg-[var(--fill-tertiary)] font-medium' : ''} ${n === 0 ? 'opacity-40' : ''}`}
+              >
+                <span className="truncate">{o}</span>
+                {n !== undefined && <span className="text-xs text-muted-foreground tabular-nums">{n}</span>}
+              </button>
+            );
+          })}
         </div>
       </PopoverContent>
     </Popover>
@@ -292,40 +313,57 @@ export default function MaterialMaster() {
         </Button>
       </div>
 
-      {/* KPI by category */}
-      {/* 종류 · 브랜드 필터 — 칩을 다 펼치면 화면을 잡아먹어 드롭다운으로 접어둔다 */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">종류</Label>
-          <Select value={filterCat} onValueChange={setFilterCat}>
-            <SelectTrigger className="h-9 w-52 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">전체 ({(materials as any[]).length})</SelectItem>
-              {MATERIAL_CATEGORIES.map(cat => (
-                <SelectItem key={cat} value={cat}>{cat} ({catCounts[cat] || 0})</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* 필터 툴바 — 검색 · 카테고리 · 브랜드를 한 줄에 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="자재명 / 스펙 검색" className="pl-9 h-9" />
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">브랜드</Label>
-          <Select value={filterBrand} onValueChange={setFilterBrand}>
-            <SelectTrigger className="h-9 w-52 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">전체 ({(materials as any[]).length})</SelectItem>
-              {brands.map(b => (
-                <SelectItem key={b} value={b}>{b} ({brandCounts[b] || 0})</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <SearchSelect
+          compact label="카테고리" allLabel="전체" placeholder="전체"
+          value={filterCat === 'all' ? '' : filterCat}
+          options={MATERIAL_CATEGORIES}
+          counts={catCounts}
+          onChange={v => setFilterCat(v || 'all')}
+        />
+        <SearchSelect
+          compact label="브랜드" allLabel="전체" placeholder="전체"
+          value={filterBrand === 'all' ? '' : filterBrand}
+          options={brands}
+          counts={brandCounts}
+          onChange={v => setFilterBrand(v || 'all')}
+        />
+        <span className="text-xs text-muted-foreground ml-auto tabular-nums">
+          {materials.length}건 중 {filtered.length}건
+        </span>
       </div>
 
-      {/* 검색 */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="자재명 / 스펙 검색" className="pl-9 h-9" />
-      </div>
+      {/* 적용된 필터 */}
+      {(filterCat !== 'all' || filterBrand !== 'all' || search) && (
+        <div className="flex flex-wrap items-center gap-2 -mt-2">
+          {filterCat !== 'all' && (
+            <button onClick={() => setFilterCat('all')} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-primary text-primary-foreground">
+              {filterCat} <X size={12} className="opacity-70" />
+            </button>
+          )}
+          {filterBrand !== 'all' && (
+            <button onClick={() => setFilterBrand('all')} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-primary text-primary-foreground">
+              {filterBrand} <X size={12} className="opacity-70" />
+            </button>
+          )}
+          {search && (
+            <button onClick={() => setSearch('')} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-primary text-primary-foreground">
+              “{search}” <X size={12} className="opacity-70" />
+            </button>
+          )}
+          <button
+            onClick={() => { setFilterCat('all'); setFilterBrand('all'); setSearch(''); }}
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            필터 초기화
+          </button>
+        </div>
+      )}
 
       {/* 다중 선택 액션 바 */}
       {selectedIds.size > 0 && (
