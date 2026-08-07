@@ -28,6 +28,10 @@ export async function renderPng(el: HTMLElement, scale = 2): Promise<Blob> {
   // 계산된 스타일을 인라인으로 굳혀야 foreignObject 안에서도 같은 모양이 나온다
   const clone = el.cloneNode(true) as HTMLElement;
   inlineStyles(el, clone);
+  // 상대경로 이미지는 data: SVG 안에서 기준 URL 이 없어 사라진다 → 미리 data URI 로 박는다
+  await inlineImages(el, clone);
+  // 화면 전용 조작 버튼은 서류 이미지에 들어가면 안 된다
+  clone.querySelectorAll('.no-capture, button').forEach(n => n.remove());
   clone.style.width = `${width}px`;
   clone.style.background = '#ffffff';
   clone.style.margin = '0';
@@ -65,11 +69,18 @@ export async function renderPng(el: HTMLElement, scale = 2): Promise<Blob> {
 
 /** 위챗·카톡에 바로 붙여넣기 — 클립보드에 이미지로 복사 */
 export async function copyDocAsImage(el: HTMLElement): Promise<void> {
-  const blob = await renderPng(el);
   if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
     throw new Error('이 브라우저는 이미지 복사를 지원하지 않습니다 — 이미지 저장을 쓰세요');
   }
-  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+  // Safari 는 await 를 거치면 클릭의 사용자 제스처가 풀려 복사가 거부된다.
+  // 렌더가 끝나기 전에 Promise 상태의 ClipboardItem 을 먼저 건네준다.
+  const pending = renderPng(el);
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': pending })]);
+  } catch {
+    // Promise 형 ClipboardItem 을 못 받는 브라우저 → 렌더 후 재시도
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': await pending })]);
+  }
 }
 
 /** 카톡 첨부용 — PNG 파일로 저장 */
@@ -117,4 +128,29 @@ function inlineStyles(src: HTMLElement, dst: HTMLElement) {
     css += 'overflow:visible;max-height:none;';
     d.setAttribute('style', css);
   }
+}
+
+/** 상대경로·외부 이미지를 data URI 로 바꿔 clone 에 박는다 */
+async function inlineImages(src: HTMLElement, dst: HTMLElement) {
+  const srcImgs = Array.from(src.querySelectorAll('img'));
+  const dstImgs = Array.from(dst.querySelectorAll('img'));
+  await Promise.all(srcImgs.map(async (img, i) => {
+    const target = dstImgs[i];
+    if (!target) return;
+    const url = img.currentSrc || img.src;
+    if (!url || url.startsWith('data:')) { if (url) target.setAttribute('src', url); return; }
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result));
+        fr.onerror = () => reject(new Error('이미지 읽기 실패'));
+        fr.readAsDataURL(blob);
+      });
+      target.setAttribute('src', dataUrl);
+    } catch {
+      target.remove();   // 못 받아오면 깨진 아이콘 대신 비운다
+    }
+  }));
 }

@@ -3790,7 +3790,7 @@ export default function ProductionOrders() {
                   </table>
                 </div>
 
-                <div>
+                <div className="no-capture no-print">
                   <p className="text-xs text-muted-foreground mb-2">작업지시서는 스타일별로 따로 나갑니다</p>
                   <div className="flex flex-wrap gap-2">
                     {list.map(o => (
