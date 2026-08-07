@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Plus, Search, Pencil, Trash2, Package, ChevronDown } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, ChevronDown, Eye } from 'lucide-react';
+import { HoverZoomImage } from '@/components/HoverZoomImage';
 
 /** 검색 가능한 단일 선택 드롭다운 — 네이티브 datalist 대신 (Select 와 같은 외형) */
 function SearchSelect({ value, options, placeholder, disabled, onChange }: {
@@ -108,13 +109,40 @@ export default function MaterialMaster() {
     return list;
   }, [materials, filterCat, filterBrand, search]);
 
-  const nextCode = (cat: MaterialCategory) => store.getNextItemCode(cat, materials as Material[]);
+  /** 브랜드 전용이면 거래처 코드를 앞에 붙인다 (예: LMN-H2608-01) */
+  const brandCodeOf = (brandName?: string) => {
+    if (!brandName || brandName === COMMON_BRAND) return undefined;
+    return (allVendors.find((v: Vendor) => v.name === brandName) as Vendor | undefined)?.code || undefined;
+  };
+  const nextCode = (cat: MaterialCategory, brandName?: string) =>
+    store.getNextItemCode(cat, materials as Material[], brandCodeOf(brandName));
   const subTypeOptions = MATERIAL_SUB_TYPES[(form.category as MaterialCategory) || '가죽'] ?? [];
   // brand === '' 는 "브랜드 전용 선택했으나 바이어 미지정" 상태 (undefined 와 구분)
   const isCommonBrand = form.brand === undefined || form.brand === COMMON_BRAND;
 
+  const [detail, setDetail] = useState<any>(null);
+  const [platingPick, setPlatingPick] = useState('');
+  const addPlatingColor = () => {
+    const c = platingPick.trim();
+    if (!c) return;
+    setForm(prev => {
+      const cur = prev.platingPrices || [];
+      if (cur.some(p => p.color === c)) return prev;
+      // 대표 컬러(레거시 표시용)도 첫 컬러로 채워둔다
+      return { ...prev, platingPrices: [...cur, { color: c }], platingColor: prev.platingColor || c };
+    });
+    setPlatingPick('');
+  };
+  const updatePlating = (idx: number, patch: Partial<{ price?: number; currency?: string }>) =>
+    setForm(prev => ({
+      ...prev,
+      platingPrices: (prev.platingPrices || []).map((r, i) => (i === idx ? { ...r, ...patch } : r)),
+    }));
+  const removePlating = (idx: number) =>
+    setForm(prev => ({ ...prev, platingPrices: (prev.platingPrices || []).filter((_, i) => i !== idx) }));
+
   const openNew = () => {
-    setForm({ ...emptyForm, itemCode: nextCode(emptyForm.category as MaterialCategory) });
+    setForm({ ...emptyForm, itemCode: nextCode(emptyForm.category as MaterialCategory, emptyForm.brand) });
     setPreviewImage(null);
     setVendorQuery('');
     setEditId(null);
@@ -265,39 +293,32 @@ export default function MaterialMaster() {
       </div>
 
       {/* KPI by category */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setFilterCat('all')}
-          className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${filterCat === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'}`}
-        >
-          전체 ({(materials as any[]).length})
-        </button>
-        {MATERIAL_CATEGORIES.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setFilterCat(cat)}
-            className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${filterCat === cat ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'}`}
-          >
-            {cat} ({catCounts[cat] || 0})
-          </button>
-        ))}
-      </div>
-
-      {/* 브랜드 필터 — 공통 + 거래처 마스터의 바이어 */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">브랜드</span>
-        {['all', ...brands].map(b => (
-          <button
-            key={b}
-            onClick={() => setFilterBrand(b)}
-            className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${filterBrand === b ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'}`}
-          >
-            {b === 'all' ? '전체' : b} ({b === 'all' ? (materials as any[]).length : brandCounts[b] || 0})
-          </button>
-        ))}
-        <Link href="/vendors" className="px-3 py-1.5 rounded-md text-xs border border-dashed border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]">
-          + 거래처 마스터에서 추가
-        </Link>
+      {/* 종류 · 브랜드 필터 — 칩을 다 펼치면 화면을 잡아먹어 드롭다운으로 접어둔다 */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">종류</Label>
+          <Select value={filterCat} onValueChange={setFilterCat}>
+            <SelectTrigger className="h-9 w-52 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 ({(materials as any[]).length})</SelectItem>
+              {MATERIAL_CATEGORIES.map(cat => (
+                <SelectItem key={cat} value={cat}>{cat} ({catCounts[cat] || 0})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">브랜드</Label>
+          <Select value={filterBrand} onValueChange={setFilterBrand}>
+            <SelectTrigger className="h-9 w-52 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체 ({(materials as any[]).length})</SelectItem>
+              {brands.map(b => (
+                <SelectItem key={b} value={b}>{b} ({brandCounts[b] || 0})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* 검색 */}
@@ -339,6 +360,7 @@ export default function MaterialMaster() {
                   className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                 />
               </th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">이미지</th>
               <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">품번</th>
               <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">카테고리</th>
               <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">브랜드</th>
@@ -353,7 +375,7 @@ export default function MaterialMaster() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center py-12 text-muted-foreground">
+                <td colSpan={11} className="text-center py-12 text-muted-foreground">
                   <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">등록된 자재가 없습니다</p>
                 </td>
@@ -370,6 +392,20 @@ export default function MaterialMaster() {
                       className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                     />
                   </td>
+                  <td className="px-3 py-2.5">
+                    {m.imageUrl ? (
+                      <HoverZoomImage
+                        src={m.imageUrl}
+                        alt={m.name}
+                        className="w-10 h-10 rounded-md border border-border overflow-hidden cursor-zoom-in"
+                        imgClassName="w-10 h-10 object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-md bg-[var(--fill-tertiary)] border border-border flex items-center justify-center">
+                        <Package size={16} className="text-muted-foreground" />
+                      </div>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 w-16">
                     <span className="font-mono text-xs bg-[var(--fill-tertiary)] px-2 py-0.5 rounded text-muted-foreground">{m.itemCode || '—'}</span>
                   </td>
@@ -383,8 +419,10 @@ export default function MaterialMaster() {
                       : <span className={`text-xs px-2 py-0.5 rounded-full border ${CHIP}`}>{m.brand}</span>}
                   </td>
                   <td className="px-3 py-2.5">
-                    <p className="font-medium text-foreground">{m.name}</p>
-                    {m.nameEn && <p className="text-xs text-muted-foreground">{m.nameEn}</p>}
+                    <button type="button" onClick={() => setDetail(m)} className="text-left hover:underline">
+                      <p className="font-medium text-foreground">{m.name}</p>
+                      {m.nameEn && <p className="text-xs text-muted-foreground">{m.nameEn}</p>}
+                    </button>
                   </td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.spec || '—'}</td>
                   <td className="px-3 py-2.5 text-right font-mono text-xs text-foreground">
@@ -396,7 +434,10 @@ export default function MaterialMaster() {
                   
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => openEdit(m)} className="p-1.5 rounded hover:bg-[var(--fill-tertiary)] text-muted-foreground">
+                      <button onClick={() => setDetail(m)} title="상세보기" className="p-1.5 rounded hover:bg-[var(--fill-tertiary)] text-muted-foreground">
+                        <Eye size={14} />
+                      </button>
+                      <button onClick={() => openEdit(m)} title="수정" className="p-1.5 rounded hover:bg-[var(--fill-tertiary)] text-muted-foreground">
                         <Pencil size={14} />
                       </button>
                       <button onClick={() => handleDelete(m.id)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-[var(--system-red)]">
@@ -412,6 +453,75 @@ export default function MaterialMaster() {
       </div>
 
       {/* 등록/수정 모달 */}
+      {/* 자재 상세보기 */}
+      <Dialog open={!!detail} onOpenChange={o => { if (!o) setDetail(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{detail?.name || '자재 상세'}</DialogTitle></DialogHeader>
+          {detail && (
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                {detail.imageUrl ? (
+                  <HoverZoomImage src={detail.imageUrl} alt={detail.name}
+                    className="w-28 h-28 rounded-md border border-border overflow-hidden cursor-zoom-in shrink-0"
+                    imgClassName="w-28 h-28 object-cover" />
+                ) : (
+                  <div className="w-28 h-28 rounded-md bg-[var(--fill-tertiary)] border border-border flex items-center justify-center shrink-0">
+                    <Package size={24} className="text-muted-foreground" />
+                  </div>
+                )}
+                <dl className="text-sm space-y-1 flex-1 min-w-0">
+                  {[
+                    ['품번', detail.itemCode],
+                    ['카테고리', [detail.category, detail.subType].filter(Boolean).join(' · ')],
+                    ['브랜드', detail.brand || COMMON_BRAND],
+                    ['스펙', detail.spec],
+                    ['단위', detail.unit],
+                    ['단가', priceOf(detail) != null ? `${CURRENCY_SIGN[currencyOf(detail)]}${Number(priceOf(detail)).toLocaleString()}` : null],
+                    ['시즌', detail.season],
+                  ].filter(([, v]) => v).map(([k, v]) => (
+                    <div key={String(k)} className="flex gap-2">
+                      <dt className="w-16 shrink-0 text-muted-foreground text-xs pt-0.5">{k}</dt>
+                      <dd className="text-foreground break-words">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+
+              {(detail.platingPrices || []).length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">도금 컬러별 단가</p>
+                  <div className="rounded-md border border-border divide-y divide-border">
+                    {(detail.platingPrices || []).map((r: any) => (
+                      <div key={r.color} className="flex items-center justify-between px-3 py-1.5 text-sm">
+                        <span>{r.color}</span>
+                        <span className="font-mono">
+                          {r.price != null ? `${CURRENCY_SIGN[r.currency || currencyOf(detail)] || ''}${Number(r.price).toLocaleString()}` : '—'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(detail.moldCostAmount != null || detail.moldCost) && (
+                <p className="text-sm">
+                  <span className="text-muted-foreground text-xs mr-2">금형비</span>
+                  {detail.moldCostAmount != null
+                    ? `${CURRENCY_SIGN[detail.moldCostCurrency || currencyOf(detail)] || ''}${Number(detail.moldCostAmount).toLocaleString()}`
+                    : detail.moldCost}
+                </p>
+              )}
+              {detail.memo && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{detail.memo}</p>}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setDetail(null)}>닫기</Button>
+                <Button onClick={() => { const m = detail; setDetail(null); openEdit(m); }}>수정</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -458,7 +568,7 @@ export default function MaterialMaster() {
                 <Select value={form.category || '가죽'} onValueChange={v => {
                   const cat = v as MaterialCategory;
                   // 카테고리가 바뀌면 이전 카테고리의 세부 타입은 무효 → 비운다
-                  setForm(prev => ({ ...prev, category: cat, subType: '', itemCode: editId ? prev.itemCode : nextCode(cat) }));
+                  setForm(prev => ({ ...prev, category: cat, subType: '', itemCode: editId ? prev.itemCode : nextCode(cat, prev.brand) }));
                 }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -484,7 +594,7 @@ export default function MaterialMaster() {
               <Label>브랜드</Label>
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-1.5 text-sm cursor-pointer whitespace-nowrap">
-                  <input type="radio" checked={isCommonBrand} onChange={() => setForm(prev => ({ ...prev, brand: COMMON_BRAND }))} className="w-4 h-4 accent-primary" />
+                  <input type="radio" checked={isCommonBrand} onChange={() => setForm(prev => ({ ...prev, brand: COMMON_BRAND, itemCode: editId ? prev.itemCode : nextCode((prev.category as MaterialCategory) || '가죽') }))} className="w-4 h-4 accent-primary" />
                   공통
                 </label>
                 <label className="flex items-center gap-1.5 text-sm cursor-pointer whitespace-nowrap">
@@ -497,7 +607,7 @@ export default function MaterialMaster() {
                     options={buyerNames}
                     placeholder="바이어 선택"
                     disabled={isCommonBrand}
-                    onChange={v => setForm(prev => ({ ...prev, brand: v }))}
+                    onChange={v => setForm(prev => ({ ...prev, brand: v, itemCode: editId ? prev.itemCode : nextCode((prev.category as MaterialCategory) || '가죽', v) }))}
                   />
                 </div>
               </div>
@@ -513,7 +623,7 @@ export default function MaterialMaster() {
               <Label>품번</Label>
               <div className="flex gap-2">
                 <Input value={form.itemCode || ''} onChange={e => setForm(prev => ({ ...prev, itemCode: e.target.value }))} placeholder="L2608-01" className="w-36 font-mono" />
-                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setForm(prev => ({ ...prev, itemCode: nextCode((prev.category as MaterialCategory) || '가죽') }))}>다시 생성</Button>
+                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setForm(prev => ({ ...prev, itemCode: nextCode((prev.category as MaterialCategory) || '가죽', prev.brand) }))}>다시 생성</Button>
               </div>
             </div>
             {/* 자재명 */}
@@ -558,27 +668,76 @@ export default function MaterialMaster() {
               </div>
             </div>
 
-            {/* 장식 전용 — 도금컬러 · 금형비 · 시즌 */}
+            {/* 장식 전용 — 도금컬러별 단가 · 금형비 · 시즌 */}
             {form.category === '장식' && (
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1.5">
-                  <Label>도금 컬러</Label>
-                  <SearchSelect
-                    value={form.platingColor || ''}
-                    options={PLATING_COLORS}
-                    placeholder="니켈가랑 …"
-                    onChange={v => setForm(prev => ({ ...prev, platingColor: v }))}
-                  />
+              <>
+              {/* 도금 컬러별 단가 — 자재는 하나인데 컬러마다 단가가 다르다 */}
+              <div className="space-y-1.5">
+                <Label>도금 컬러별 단가</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <SearchSelect
+                      value={platingPick}
+                      options={PLATING_COLORS.filter(c => !(form.platingPrices || []).some(p => p.color === c))}
+                      placeholder="컬러 선택 후 추가"
+                      onChange={setPlatingPick}
+                    />
+                  </div>
+                  <Button type="button" variant="outline" onClick={addPlatingColor}>추가</Button>
                 </div>
+                {(form.platingPrices || []).length > 0 && (
+                  <div className="space-y-1.5 p-2 rounded-md bg-[var(--fill-quaternary)] border border-border">
+                    {(form.platingPrices || []).map((row, i) => (
+                      <div key={row.color} className="flex items-center gap-2">
+                        <span className="text-sm flex-1 truncate">{row.color}</span>
+                        <Input
+                          type="number" step="0.01" className="w-32 h-8"
+                          value={row.price ?? ''}
+                          placeholder="단가"
+                          onChange={e => updatePlating(i, { price: e.target.value === '' ? undefined : Number(e.target.value) })}
+                        />
+                        <Select value={row.currency || currencyOf(form)} onValueChange={v => updatePlating(i, { currency: v })}>
+                          <SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <button type="button" onClick={() => removePlating(i)}
+                          className="text-muted-foreground hover:text-[var(--system-red)] px-1">×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[11px] text-muted-foreground">컬러를 추가하면 컬러마다 단가를 따로 넣을 수 있습니다.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>금형비</Label>
-                  <Input value={form.moldCost || ''} onChange={e => setForm(prev => ({ ...prev, moldCost: e.target.value }))} placeholder="$200 / ₩280,000" />
+                  <div className="flex gap-2">
+                    <Input
+                      type="number" step="0.01" className="flex-1"
+                      value={form.moldCostAmount ?? ''}
+                      onChange={e => setForm(prev => ({ ...prev, moldCostAmount: e.target.value === '' ? undefined : Number(e.target.value) }))}
+                      placeholder="0"
+                    />
+                    <Select
+                      value={form.moldCostCurrency || currencyOf(form)}
+                      onValueChange={v => setForm(prev => ({ ...prev, moldCostCurrency: v }))}
+                    >
+                      <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label>시즌</Label>
                   <Input value={form.season || ''} onChange={e => setForm(prev => ({ ...prev, season: e.target.value }))} placeholder="27ss" />
                 </div>
               </div>
+              </>
             )}
 
             {/* 공급업체 — 거래처 마스터의 자재거래처만 */}

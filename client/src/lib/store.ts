@@ -131,8 +131,12 @@ export interface Material {
   subType?: string;       // 세부 타입 (가죽: 소가죽/양가죽… · 장식: 버클/링/프레임…)
   brand?: string;         // 전용 브랜드 ('공통' | 바이어명, 예: LUMEN / AETALOOF)
   spec?: string;          // 스펙 (두께, 사이즈 등)
-  platingColor?: string;  // 도금 컬러 (장식)
-  moldCost?: string;      // 금형비 — 통화 혼재($·¥·₩)라 문자열로 둔다
+  platingColor?: string;  // 도금 컬러 (장식) — 대표 컬러 (레거시·표시용)
+  /** 도금 컬러별 단가 — 품목은 하나인데 컬러마다 값이 다를 때 */
+  platingPrices?: { color: string; price?: number; currency?: string }[];
+  moldCost?: string;      // 금형비 (레거시 문자열 표기)
+  moldCostAmount?: number;   // 금형비 금액
+  moldCostCurrency?: string; // 금형비 통화 — 단가와 동일 통화 목록
   season?: string;        // 시즌 (27ss 등)
   unit: string;           // 단위 (SF, YD, EA, M, L, 콘 등)
   unitPriceCny?: number;  // 단가 (CNY)
@@ -807,17 +811,19 @@ export const store = {
   getMaterials: () => getAll<Material>(KEYS.materials),
   setMaterials: (v: Material[]) => setAll(KEYS.materials, v),
   /** 카테고리별 다음 품번. list 를 넘기면(=Supabase 조회분) 그 목록 기준으로 채번한다. */
-  getNextItemCode: (category: MaterialCategory, list?: Material[]): string => {
+  getNextItemCode: (category: MaterialCategory, list?: Material[], brandCode?: string): string => {
     const PREFIX: Record<string, string> = {
       '가죽': 'L', '원단': 'W', '지퍼': 'Z', '장식': 'H', '보강재': 'R',
       '봉사·접착제': 'T', '포장재': 'P', '철형': 'I', '후가공': 'F',
       '원자재': 'M', // 레거시 데이터 호환
     };
-    // 형식: [카테고리][YYMM]-[일련] 예) L2608-01 = 가죽 · 2026년 8월 등록 1번
+    // 공통    : [카테고리][YYMM]-[일련]        예) L2608-01
+    // 브랜드전용: [브랜드코드][카테고리][YYMM]-[일련] 예) LMN-L2608-01
     const prefix = PREFIX[category] || 'X';
     const d = new Date();
     const ym = `${String(d.getFullYear() % 100).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const head = `${prefix}${ym}-`;
+    const brand = brandCode ? `${brandCode.toUpperCase()}-` : '';
+    const head = `${brand}${prefix}${ym}-`;
     const existing = (list ?? getAll<Material>(KEYS.materials))
       .filter(m => m.itemCode?.startsWith(head))
       .map(m => parseInt(m.itemCode!.slice(head.length), 10) || 0);
