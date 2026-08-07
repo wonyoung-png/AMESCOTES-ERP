@@ -320,9 +320,11 @@ function calcSummary(bom: ExtBom, settingsUsdKrw?: number, colorBom?: ExtColorBo
   const processingKrw = processingAmt * toKrw;
   const postProcessKrw = postProcessAmt * toKrw;
   const logisticsKrw = bom.logisticsCostKrw || 0;
-  // 관세 = 임가공비(KRW) × 관세율(%)
+  // 관세 = 공장단가(공장구매자재 + 임가공 + 후가공) × 관세율(%)
+  // 공장에 실제로 결제하는 금액에 부과되므로 임가공비만이 아니라 공장단가 전체가 기준이다
   const customsRate = bom.customsRate || 0;
-  const customsKrw = processingKrw * (customsRate / 100);
+  const factoryUnitKrwForCustoms = materialKrw + processingKrw + postProcessKrw;
+  const customsKrw = factoryUnitKrwForCustoms * (customsRate / 100);
   const packagingKrw = bom.packagingCostKrw || 0;
   const packingKrw = bom.packingCostKrw || 0;
   const marginRate = bom.productionMarginRate ?? 0.16;
@@ -1291,10 +1293,21 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
 }
 
 // ─── 자재 검색 팝오버 ────────────────────────────────────────────────────────
-function MaterialSearchPopover({ onSelect }: { onSelect: (m: Material) => void }) {
+function MaterialSearchPopover({ onSelect, defaultName, defaultCategory, defaultUnit }: {
+  onSelect: (m: Material) => void;
+  defaultName?: string;
+  defaultCategory?: string;
+  defaultUnit?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
+  // 자재 마스터에 없는 자재는 여기서 바로 등록한다 (페이지 이동 없음)
+  const [creating, setCreating] = useState(false);
+  const [newMat, setNewMat] = useState<{ name: string; spec: string; unit: string; category: string; price: string }>(
+    { name: '', spec: '', unit: 'EA', category: '원자재', price: '' },
+  );
+  const queryClient = useQueryClient();
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
   const debouncedSearch = useDebouncedValue(search, 300);
 
@@ -1323,7 +1336,7 @@ function MaterialSearchPopover({ onSelect }: { onSelect: (m: Material) => void }
           </select>
           <div className="max-h-48 overflow-y-auto space-y-0.5">
             {filtered.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-3">자재 없음</p>
+              <p className="text-xs text-muted-foreground text-center py-3">일치하는 자재가 없습니다</p>
             ) : filtered.map(m => (
               <button
                 key={m.id}
@@ -1337,6 +1350,73 @@ function MaterialSearchPopover({ onSelect }: { onSelect: (m: Material) => void }
               </button>
             ))}
           </div>
+
+          {/* 자재 마스터에 없으면 여기서 바로 등록 */}
+          {!creating ? (
+            <button
+              type="button"
+              onClick={() => {
+                setCreating(true);
+                setNewMat({
+                  name: search || defaultName || '',
+                  spec: '',
+                  unit: defaultUnit || 'EA',
+                  category: defaultCategory || '원자재',
+                  price: '',
+                });
+              }}
+              className="w-full mt-1 py-1.5 rounded-md border border-dashed border-primary/40 text-xs text-primary hover:bg-primary/10"
+            >
+              + 자재 마스터에 새로 등록
+            </button>
+          ) : (
+            <div className="mt-1 space-y-1.5 border-t border-border pt-2">
+              <p className="text-xs font-semibold text-foreground">새 자재 등록</p>
+              <Input value={newMat.name} onChange={e => setNewMat(v => ({ ...v, name: e.target.value }))} placeholder="자재명 *" className="h-7 text-xs" />
+              <div className="flex gap-1.5">
+                <Input value={newMat.spec} onChange={e => setNewMat(v => ({ ...v, spec: e.target.value }))} placeholder="규격" className="h-7 text-xs flex-1" />
+                <Input value={newMat.unit} onChange={e => setNewMat(v => ({ ...v, unit: e.target.value }))} placeholder="단위" className="h-7 text-xs w-16" />
+              </div>
+              <div className="flex gap-1.5">
+                <select
+                  value={newMat.category}
+                  onChange={e => setNewMat(v => ({ ...v, category: e.target.value }))}
+                  className="h-7 text-xs border border-border rounded px-1 flex-1"
+                >
+                  {BOM_SECTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <Input type="number" value={newMat.price} onChange={e => setNewMat(v => ({ ...v, price: e.target.value }))} placeholder="단가" className="h-7 text-xs w-20" />
+              </div>
+              <div className="flex gap-1.5 justify-end pt-0.5">
+                <button type="button" onClick={() => setCreating(false)} className="text-xs px-2 py-1 text-muted-foreground hover:text-foreground">취소</button>
+                <button
+                  type="button"
+                  className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground disabled:opacity-40"
+                  disabled={!newMat.name.trim()}
+                  onClick={async () => {
+                    const mat: any = {
+                      id: genId(),
+                      name: newMat.name.trim(),
+                      spec: newMat.spec.trim() || undefined,
+                      unit: newMat.unit.trim() || 'EA',
+                      category: newMat.category,
+                      unitPriceCny: newMat.price ? Number(newMat.price) : undefined,
+                      createdAt: new Date().toISOString(),
+                    };
+                    try {
+                      await upsertMaterial(mat);
+                      queryClient.invalidateQueries({ queryKey: ['materials'] });
+                      onSelect(mat as Material);
+                      toast.success(`${mat.name} — 자재 마스터에 등록했습니다`);
+                      setCreating(false); setOpen(false); setSearch('');
+                    } catch (err) {
+                      toast.error(`자재 등록 실패: ${(err as Error).message}`);
+                    }
+                  }}
+                >등록하고 선택</button>
+              </div>
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>
@@ -4754,7 +4834,7 @@ export default function BomManagement() {
                             <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className={`inline-block ${CELL_INPUT} border-border text-right w-14 ml-1`} placeholder="%" />
                             <span className="text-xs text-muted-foreground ml-1">%</span>
                           </td>
-                          <td className="px-4 py-2 text-muted-foreground text-xs">임가공비 × 관세율</td>
+                          <td className="px-4 py-2 text-muted-foreground text-xs">공장단가 × 관세율</td>
                           <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.customsKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.customsKrw)}</span></td>
                         </tr>
                         {/* 물류비 - 직접 입력 */}
