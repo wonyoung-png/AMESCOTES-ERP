@@ -17,6 +17,7 @@ import {
 } from '@/lib/store';
 import { fetchBoms, upsertBom, deleteBom as deleteBomSB, fetchItems, fetchVendors, fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
 import { PackBomEditor } from '@/components/PackBomEditor';
+import { MaterialQuickAddDialog } from '@/components/MaterialQuickAddDialog';
 import { SalesPricingPanel } from '@/components/SalesPricingPanel';
 import {
   applyPackLinesToBom, createEmptyPackBom, isPackItem,
@@ -1312,12 +1313,8 @@ function MaterialSearchPopover({ onSelect, defaultName, defaultCategory, default
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
-  // 자재 마스터에 없는 자재는 여기서 바로 등록한다 (페이지 이동 없음)
-  const [creating, setCreating] = useState(false);
-  const [newMat, setNewMat] = useState<{ name: string; spec: string; unit: string; category: string; price: string; vendorName: string }>(
-    { name: '', spec: '', unit: 'EA', category: '가죽', price: '', vendorName: '' },
-  );
-  const queryClient = useQueryClient();
+  // 자재 마스터에 없는 자재는 등록 창을 띄워 바로 만든다 (페이지 이동 없음)
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
   const debouncedSearch = useDebouncedValue(search, 300);
 
@@ -1330,6 +1327,7 @@ function MaterialSearchPopover({ onSelect, defaultName, defaultCategory, default
   }), [materials, filterCat, debouncedSearch]);
 
   return (
+    <>
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button className="flex items-center gap-1 h-7 shrink-0 text-[11px] px-1.5 rounded-lg border border-primary/30 text-primary bg-primary/5 hover:bg-primary/15 transition-colors">
@@ -1361,78 +1359,27 @@ function MaterialSearchPopover({ onSelect, defaultName, defaultCategory, default
             ))}
           </div>
 
-          {/* 자재 마스터에 없으면 여기서 바로 등록 */}
-          {!creating ? (
-            <button
-              type="button"
-              onClick={() => {
-                setCreating(true);
-                setNewMat({
-                  name: search || defaultName || '',
-                  spec: '',
-                  unit: defaultUnit || 'EA',
-                  category: defaultCategory || '가죽',
-                  price: '',
-                  vendorName: '',
-                });
-              }}
-              className="w-full mt-1 py-1.5 rounded-md border border-dashed border-primary/40 text-xs text-primary hover:bg-primary/10"
-            >
-              + 자재 마스터에 새로 등록
-            </button>
-          ) : (
-            <div className="mt-1 space-y-1.5 border-t border-border pt-2">
-              <p className="text-xs font-semibold text-foreground">새 자재 등록</p>
-              <Input value={newMat.name} onChange={e => setNewMat(v => ({ ...v, name: e.target.value }))} placeholder="자재명 *" className="h-7 text-xs" />
-              <div className="flex gap-1.5">
-                <Input value={newMat.spec} onChange={e => setNewMat(v => ({ ...v, spec: e.target.value }))} placeholder="규격" className="h-7 text-xs flex-1" />
-                <Input value={newMat.unit} onChange={e => setNewMat(v => ({ ...v, unit: e.target.value }))} placeholder="단위" className="h-7 text-xs w-16" />
-              </div>
-              <div className="flex gap-1.5">
-                <select
-                  value={newMat.category}
-                  onChange={e => setNewMat(v => ({ ...v, category: e.target.value }))}
-                  className="h-7 text-xs border border-border rounded px-1 flex-1"
-                >
-                  {MATERIAL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <Input type="number" value={newMat.price} onChange={e => setNewMat(v => ({ ...v, price: e.target.value }))} placeholder="단가" className="h-7 text-xs w-20" />
-              </div>
-              <Input value={newMat.vendorName} onChange={e => setNewMat(v => ({ ...v, vendorName: e.target.value }))} placeholder="공급업체 (선택)" className="h-7 text-xs" />
-              <div className="flex gap-1.5 justify-end pt-0.5">
-                <button type="button" onClick={() => setCreating(false)} className="text-xs px-2 py-1 text-muted-foreground hover:text-foreground">취소</button>
-                <button
-                  type="button"
-                  className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground disabled:opacity-40"
-                  disabled={!newMat.name.trim()}
-                  onClick={async () => {
-                    const mat: any = {
-                      id: genId(),
-                      name: newMat.name.trim(),
-                      spec: newMat.spec.trim() || undefined,
-                      unit: newMat.unit.trim() || 'EA',
-                      category: newMat.category,
-                      unitPriceCny: newMat.price ? Number(newMat.price) : undefined,
-                      vendorName: newMat.vendorName.trim() || undefined,
-                      createdAt: new Date().toISOString(),
-                    };
-                    try {
-                      await upsertMaterial(mat);
-                      queryClient.invalidateQueries({ queryKey: ['materials'] });
-                      onSelect(mat as Material);
-                      toast.success(`${mat.name} — 자재 마스터에 등록했습니다`);
-                      setCreating(false); setOpen(false); setSearch('');
-                    } catch (err) {
-                      toast.error(`자재 등록 실패: ${(err as Error).message}`);
-                    }
-                  }}
-                >등록하고 선택</button>
-              </div>
-            </div>
-          )}
+          {/* 자재 마스터에 없으면 등록 창을 띄운다 (자재 마스터와 동일한 양식) */}
+          <button
+            type="button"
+            onClick={() => { setQuickAddOpen(true); setOpen(false); }}
+            className="w-full mt-1 py-1.5 rounded-md border border-dashed border-primary/40 text-xs text-primary hover:bg-primary/10"
+          >
+            + 자재 마스터에 새로 등록
+          </button>
+
         </div>
       </PopoverContent>
     </Popover>
+
+    <MaterialQuickAddDialog
+      open={quickAddOpen}
+      onOpenChange={setQuickAddOpen}
+      defaultName={search || defaultName}
+      defaultUnit={defaultUnit}
+      onSaved={m => { onSelect(m); setSearch(''); }}
+    />
+    </>
   );
 }
 
@@ -1946,7 +1893,7 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
               {subPartOptions.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
             </SelectContent>
           </Select>
-          <MaterialSearchPopover onSelect={handleMaterialSelect} />
+          <MaterialSearchPopover onSelect={handleMaterialSelect} defaultName={line.itemName} defaultUnit={line.unit} />
           <Input value={line.itemName} onChange={e => onChange(line.id, 'itemName', e.target.value)} className={`${CELL_INPUT} border-border bg-card min-w-[80px]`} placeholder="자재명" />
           {/* 이미지 기능 (원자재/장식 섹션에만) */}
           {showImageFeature && (
