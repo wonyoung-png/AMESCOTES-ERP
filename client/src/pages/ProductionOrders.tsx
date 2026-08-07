@@ -803,7 +803,13 @@ export default function ProductionOrders() {
       updatedAt: new Date().toISOString(),
       memo: form.memo,
     };
-    upsertOrder(order).then(() => refresh()).catch((e: Error) => toast.error(`발주 저장 실패: ${e.message}`));
+    // 서버 저장이 끝난 뒤에만 다음 단계로 — 실패했는데 "등록 완료" 팝업이 뜨던 문제
+    try {
+      await upsertOrder(order);
+    } catch (e) {
+      toast.error(`발주 저장 실패 — 서버에 저장되지 않았습니다: ${(e as Error).message}`);
+      return;
+    }
 
     // 새 컬러 → 품목 마스터 자동 추가 (낙관적 업데이트)
     if (colorQtys.length > 0 && form.styleId) {
