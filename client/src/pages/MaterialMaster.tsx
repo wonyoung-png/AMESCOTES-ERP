@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { store, genId, MATERIAL_CATEGORIES, COMMON_BRAND, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
+import { store, genId, MATERIAL_CATEGORIES, MATERIAL_SUB_TYPES, PLATING_COLORS, COMMON_BRAND, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
 import { Link } from 'wouter';
 import { fetchMaterials, upsertMaterial, deleteMaterial as deleteMaterialSB, fetchVendors, updateMaterialStatus } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
@@ -102,12 +102,14 @@ export default function MaterialMaster() {
     if (search) list = list.filter((m: any) =>
       m.name.toLowerCase().includes(search.toLowerCase()) ||
       (m.nameEn || '').toLowerCase().includes(search.toLowerCase()) ||
+      (m.subType || '').toLowerCase().includes(search.toLowerCase()) ||
       (m.spec || '').toLowerCase().includes(search.toLowerCase())
     );
     return list;
   }, [materials, filterCat, filterBrand, search]);
 
   const nextCode = (cat: MaterialCategory) => store.getNextItemCode(cat, materials as Material[]);
+  const subTypeOptions = MATERIAL_SUB_TYPES[(form.category as MaterialCategory) || '가죽'] ?? [];
   // brand === '' 는 "브랜드 전용 선택했으나 바이어 미지정" 상태 (undefined 와 구분)
   const isCommonBrand = form.brand === undefined || form.brand === COMMON_BRAND;
 
@@ -373,6 +375,7 @@ export default function MaterialMaster() {
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full border ${CHIP}`}>{m.category}</span>
+                    {m.subType && <p className="text-xs text-muted-foreground mt-0.5">{m.subType}</p>}
                   </td>
                   <td className="px-3 py-2.5">
                     {(m.brand || COMMON_BRAND) === COMMON_BRAND
@@ -448,18 +451,32 @@ export default function MaterialMaster() {
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
             </div>
 
-            {/* 카테고리 */}
-            <div className="space-y-1.5">
-              <Label>카테고리 *</Label>
-              <Select value={form.category || '가죽'} onValueChange={v => {
-                const cat = v as MaterialCategory;
-                setForm(prev => ({ ...prev, category: cat, itemCode: editId ? prev.itemCode : nextCode(cat) }));
-              }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {MATERIAL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            {/* 카테고리 + 세부 타입 (가죽·장식만) */}
+            <div className={subTypeOptions.length > 0 ? 'grid grid-cols-2 gap-3' : 'space-y-1.5'}>
+              <div className="space-y-1.5">
+                <Label>카테고리 *</Label>
+                <Select value={form.category || '가죽'} onValueChange={v => {
+                  const cat = v as MaterialCategory;
+                  // 카테고리가 바뀌면 이전 카테고리의 세부 타입은 무효 → 비운다
+                  setForm(prev => ({ ...prev, category: cat, subType: '', itemCode: editId ? prev.itemCode : nextCode(cat) }));
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {MATERIAL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {subTypeOptions.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>{form.category === '장식' ? '장식 분류' : '가죽 타입'}</Label>
+                  <SearchSelect
+                    value={form.subType || ''}
+                    options={subTypeOptions}
+                    placeholder={form.category === '장식' ? '버클 / 링 / 프레임 …' : '소가죽 / 양가죽 …'}
+                    onChange={v => setForm(prev => ({ ...prev, subType: v }))}
+                  />
+                </div>
+              )}
             </div>
 
             {/* 브랜드 — 공통 / 브랜드 전용(바이어 검색 선택) */}
@@ -540,6 +557,29 @@ export default function MaterialMaster() {
                 </div>
               </div>
             </div>
+
+            {/* 장식 전용 — 도금컬러 · 금형비 · 시즌 */}
+            {form.category === '장식' && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>도금 컬러</Label>
+                  <SearchSelect
+                    value={form.platingColor || ''}
+                    options={PLATING_COLORS}
+                    placeholder="니켈가랑 …"
+                    onChange={v => setForm(prev => ({ ...prev, platingColor: v }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>금형비</Label>
+                  <Input value={form.moldCost || ''} onChange={e => setForm(prev => ({ ...prev, moldCost: e.target.value }))} placeholder="$200 / ₩280,000" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>시즌</Label>
+                  <Input value={form.season || ''} onChange={e => setForm(prev => ({ ...prev, season: e.target.value }))} placeholder="27ss" />
+                </div>
+              </div>
+            )}
 
             {/* 공급업체 — 거래처 마스터의 자재거래처만 */}
             <div className="space-y-1.5">

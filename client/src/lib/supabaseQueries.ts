@@ -792,8 +792,12 @@ export async function fetchMaterials() {
     name: row.name ?? '',
     nameEn: row.name_en || '',
     category: normalizeMaterialCategory(row.category),
+    subType: row.sub_type || '',
     brand: row.brand || COMMON_BRAND,
     spec: row.spec || '',
+    platingColor: row.plating_color || '',
+    moldCost: row.mold_cost || '',
+    season: row.season || '',
     unit: row.unit || 'YD',
     unitPriceCny: row.unit_price_cny,
     unitPriceKrw: row.unit_price_krw,
@@ -824,6 +828,10 @@ export async function upsertMaterial(mat: Record<string, any>): Promise<void> {
   if (mat.brand !== undefined) row.brand = mat.brand || COMMON_BRAND;
   if (mat.itemCode !== undefined) row.item_code = mat.itemCode || null;
   if (mat.spec !== undefined) row.spec = mat.spec || null;
+  if (mat.subType !== undefined) row.sub_type = mat.subType || null;
+  if (mat.platingColor !== undefined) row.plating_color = mat.platingColor || null;
+  if (mat.moldCost !== undefined) row.mold_cost = mat.moldCost || null;
+  if (mat.season !== undefined) row.season = mat.season || null;
   if (mat.nameEn !== undefined) row.name_en = mat.nameEn || null;
   if (mat.unitPriceCny !== undefined) row.unit_price_cny = mat.unitPriceCny;
   if (mat.unitPriceKrw !== undefined) row.unit_price_krw = mat.unitPriceKrw;

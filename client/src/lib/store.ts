@@ -77,6 +77,17 @@ export type MaterialCategory =
   | '가죽' | '원단' | '장식' | '지퍼' | '보강재' | '봉사·접착제' | '포장재' | '철형' | '후가공';
 export const MATERIAL_CATEGORIES: MaterialCategory[] =
   ['가죽', '원단', '장식', '지퍼', '보강재', '봉사·접착제', '포장재', '철형', '후가공'];
+/** 자재 세부 타입 — 카테고리별 선택지. 품번 채번과 무관하게 "선택만" 하는 값이다. */
+export const MATERIAL_SUB_TYPES: Partial<Record<MaterialCategory, string[]>> = {
+  '가죽': ['소가죽', '양가죽', '스플릿', '램스웨이드', '소가죽 스웨이드'],
+  '장식': [
+    '버클 / 비죠', '가락지 / 터널', '링 (오링·삼각링·사각링·타원링)',
+    '솔트레지 / 속고발 / 리벳 / 하도메 / 스냅', '프레임', '락장식 (푸쉬락·턴락·후크)',
+    '개고리', '지퍼 슬라이더', '자석', '오브제 장식 (키·볼·팁)', '봉장식 / 바장식',
+  ],
+};
+/** 도금 컬러 — 장식 자재용 */
+export const PLATING_COLORS = ['니켈가랑', '골드가랑', '금가랑', '니켈', '니켈사틴', '바렐'];
 /** 자재 카테고리 → BOM 섹션 */
 export const toBomCategory = (c: string): BomCategory =>
   (c === '가죽' || c === '원단') ? '원자재' : (c as BomCategory);
@@ -117,8 +128,12 @@ export interface Material {
   name: string;           // 자재명
   nameEn?: string;        // 영문명
   category: MaterialCategory;
+  subType?: string;       // 세부 타입 (가죽: 소가죽/양가죽… · 장식: 버클/링/프레임…)
   brand?: string;         // 전용 브랜드 ('공통' | 바이어명, 예: LUMEN / AETALOOF)
   spec?: string;          // 스펙 (두께, 사이즈 등)
+  platingColor?: string;  // 도금 컬러 (장식)
+  moldCost?: string;      // 금형비 — 통화 혼재($·¥·₩)라 문자열로 둔다
+  season?: string;        // 시즌 (27ss 등)
   unit: string;           // 단위 (SF, YD, EA, M, L, 콘 등)
   unitPriceCny?: number;  // 단가 (CNY)
   unitPriceUsd?: number;  // 단가 (USD)
