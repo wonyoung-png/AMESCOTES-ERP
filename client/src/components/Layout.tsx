@@ -52,9 +52,9 @@ const navGroups: NavGroup[] = [
     label: '마스터',
     items: [
       { path: '/vendors', label: '거래처 마스터', icon: <Building2 size={17} />, table: 'vendors' },
+      { path: '/samples', label: '샘플 관리', icon: <FlaskConical size={17} />, table: 'samples' },
       { path: '/items', label: '품목 마스터', icon: <Package size={17} />, table: 'items' },
       { path: '/materials', label: '자재 마스터', icon: <Layers size={17} />, table: 'materials' },
-      { path: '/samples', label: '샘플 관리', icon: <FlaskConical size={17} />, table: 'samples' },
     ],
   },
   {
@@ -148,6 +148,15 @@ interface LayoutProps {
 export default function Layout({ children, onLogout }: LayoutProps) {
   const [location] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  // 사이드바 그룹 접기 — 접힌 그룹 라벨을 저장한다
+  const [closedGroups, setClosedGroups] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('nav_closed_groups') || '[]'); } catch { return []; }
+  });
+  const toggleGroup = (label: string) => setClosedGroups(prev => {
+    const next = prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label];
+    localStorage.setItem('nav_closed_groups', JSON.stringify(next));
+    return next;
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { workspace, setWorkspace } = useWorkspace();
   const { theme, toggleTheme } = useTheme();
@@ -275,14 +284,22 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             return (
             <div key={gi} className="mb-1">
               {group.label && !collapsed && (
-                <div className="px-3 pt-4 pb-1.5">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.label)}
+                  className="w-full flex items-center justify-between px-3 pt-4 pb-1.5 group/nav"
+                >
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase">
                     {group.label}
                   </span>
-                </div>
+                  <ChevronRight
+                    size={12}
+                    className={`text-muted-foreground transition-transform ${closedGroups.includes(group.label) ? '' : 'rotate-90'}`}
+                  />
+                </button>
               )}
               {group.label && collapsed && <div className="my-2 mx-2 h-px bg-border" />}
-              {group.items.map((item) => {
+              {(group.label && !collapsed && closedGroups.includes(group.label) ? [] : group.items).map((item) => {
                 if (item.oemOnly && isBrand) return null;
                 if (item.adminOnly && !isAdminEmail(currentUser?.email)) return null;
                 const active = isActive(item.path);

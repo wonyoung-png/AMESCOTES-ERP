@@ -131,8 +131,13 @@ export default function SampleManagement() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<Partial<Sample>>({});
   const [editId, setEditId] = useState<string | null>(null);
-  const [createTempMode, setCreateTempMode] = useState(false);
-  const [tempStyleName, setTempStyleName] = useState('');
+  const [manualStyleNo, setManualStyleNo] = useState(false);
+  /** 품목마스터와 같은 규칙으로 만든 스타일번호 미리보기 (바이어 코드 + YYMM + 타입 + 일련) */
+  const previewStyleNo = useMemo(() => {
+    const buyer: any = vendors.find((v: any) => v.id === form.buyerId);
+    if (!buyer?.code) return '';
+    return generateStyleNo(buyer.code, new Date(), '숄더백', items as Item[], undefined, 'HB');
+  }, [vendors, items, form.buyerId]);
   // 변경사항 추적
   const [isDirty, setIsDirty] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -447,25 +452,26 @@ export default function SampleManagement() {
     let styleNo = form.styleNo;
     let styleName = form.styleName;
 
-    // 품목 자동생성 — 품목마스터와 동일한 정식 스타일번호를 바로 부여한다
-    if (createTempMode) {
-      if (!tempStyleName.trim()) { toast.error('품명을 입력해주세요'); return; }
-      const buyer = vendors.find((v: any) => v.id === form.buyerId);
-      const newItem = createLinkedItem(
-        tempStyleName.trim(),
-        form.season || '26SS',
-        (buyer as any)?.code || 'ATL',
-        items as Item[],
-      );
+    // 기존 스타일을 고르지 않았으면 새 품목을 만든다 — 스타일번호는 품목마스터와 같은 규칙
+    if (!editId && !styleId) {
+      const name = (form.styleName || '').trim();
+      if (!name) { toast.error('품명을 입력해주세요'); return; }
+      const finalStyleNo = (manualStyleNo ? (form.styleNo || '').trim() : previewStyleNo).trim();
+      if (!finalStyleNo) { toast.error('바이어를 선택하거나 스타일번호를 직접 입력하세요'); return; }
+      const newItem: Item = {
+        ...createLinkedItem(name, form.season || '26SS', 'ATL', items as Item[]),
+        styleNo: finalStyleNo,
+        buyerId: form.buyerId,
+      };
       upsertItemSB(newItem as any).catch((e: Error) => toast.error(`품목 생성 실패: ${e.message}`));
       styleId = newItem.id;
       styleNo = newItem.styleNo;
       styleName = newItem.name;
-      toast.success(`품목 ${newItem.styleNo} 자동생성 — 품목 마스터에 등록됐습니다`);
+      toast.success(`품목 ${newItem.styleNo} 등록 — 품목 마스터에 함께 저장됐습니다`);
       queryClient.invalidateQueries({ queryKey: ['items'] });
     }
 
-    if (!styleId && !form.styleNo) { toast.error('스타일번호를 입력해주세요'); return; }
+    if (!styleId && !styleNo) { toast.error('스타일번호를 입력해주세요'); return; }
     if (!form.requestDate) { toast.error('의뢰일을 입력해주세요'); return; }
 
     // 스타일번호 중복 체크 (신규 등록 시)
@@ -1460,33 +1466,6 @@ export default function SampleManagement() {
           <DialogHeader><DialogTitle>{editId ? '샘플 수정' : '샘플 접수'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
 
-            {/* 품목 자동생성 토글 — 정식 스타일번호를 바로 부여한다 */}
-            {!editId && (
-              <div className="p-3 bg-primary/5 border border-primary/20 rounded-md">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox" checked={createTempMode}
-                    onChange={e => setCreateTempMode(e.target.checked)}
-                    className="accent-primary"
-                  />
-                  <span className="text-sm font-medium text-primary">품목 자동생성</span>
-                  <span className="text-xs text-muted-foreground">(품목마스터에 정식 스타일번호로 함께 등록)</span>
-                </label>
-                {createTempMode && (
-                  <div className="mt-2 space-y-1.5">
-                    <Label className="text-xs text-primary">품명 *</Label>
-                    <Input
-                      value={tempStyleName}
-                      onChange={e => setTempStyleName(e.target.value)}
-                      placeholder="예: 파니에 쁘띠 백"
-                      className="bg-card"
-                    />
-                    <p className="text-[11px] text-muted-foreground">TEMP 상태로 품목 자동생성 후 샘플 연결됩니다</p>
-                  </div>
-                )}
-              </div>
-            )}
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* 바이어 (맨 위) */}
               <div className="col-span-2 space-y-1.5">
@@ -1500,68 +1479,64 @@ export default function SampleManagement() {
                 </Select>
               </div>
 
-              {/* 스타일 선택 (TEMP 자동생성이 아닐 때) */}
-              {!createTempMode && (
-                <div className="col-span-2 space-y-2">
-                  <Label>기존 스타일 연결 <span className="text-muted-foreground font-normal text-xs">(선택사항 — 컬러 추가 샘플)</span></Label>
-                  <Select value={form.styleId || 'none'} onValueChange={v => {
-                    if (v === 'none') { setForm(f => ({ ...f, styleId: undefined })); return; }
-                    const item = items.find(i => i.id === v);
-                    if (item) {
-                      // 컬러추가 샘플: 스타일번호 자동생성(기존번호-1,-2,...), 품명 자동입력, 이미지 불러오기
-                      const existingColorSamples = (samples as Sample[]).filter(s =>
-                        s.styleNo.startsWith(item.styleNo + '-') && /^.+-\d+$/.test(s.styleNo)
-                      );
-                      const maxSuffix = existingColorSamples.length > 0
-                        ? Math.max(...existingColorSamples.map(s => parseInt(s.styleNo.split('-').pop() || '0') || 0)) + 1
-                        : 1;
-                      const newStyleNo = `${item.styleNo}-${maxSuffix}`;
-                      setForm(f => ({
-                        ...f,
-                        styleId: item.id,
-                        styleNo: newStyleNo,
-                        styleName: item.name,
-                        buyerId: item.buyerId || f.buyerId,
-                      }));  // 이미지는 품목 등록에서만 관리한다 (여기서 끌어오지 않음)
-                    }
-                  }}>
-                    <SelectTrigger className="text-xs h-8"><SelectValue placeholder="스타일 선택 → 번호·품명 자동입력" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">선택 안 함</SelectItem>
-                      {items
-                        .filter(i => !form.buyerId || form.buyerId === 'none' || i.buyerId === form.buyerId)
-                        .map(i => (
-                        <SelectItem key={i.id} value={i.id} className="text-xs">
-                          {i.styleNo} — {i.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">새 스타일번호 *</Label>
-                      <Input value={form.styleNo || ''} onChange={e => setForm(f => ({ ...f, styleNo: e.target.value }))} placeholder="예: AT2603HB01" className="h-8 text-xs" />
-                      {/* 스타일번호 중복 체크 */}
-                      {form.styleNo && !editId && (() => {
-                        const dupSample = (samples as Sample[]).find(s => s.styleNo === form.styleNo && s.id !== editId);
-                        const dupItem = (items as Item[]).find(i => i.styleNo === form.styleNo);
-                        if (dupSample || dupItem) {
-                          return (
-                            <p className="text-xs text-[var(--system-orange)] flex items-center gap-1 mt-0.5">
-                              중복: {dupSample ? `샘플에 이미 존재 (${dupSample.stage})` : `품목 마스터에 존재 (${dupItem?.itemStatus})`}
-                            </p>
-                          );
-                        }
-                        return null;
-                      })()}
+              {/* 스타일 — 품목마스터와 같은 자동채번. 기존 스타일 연결도 여기서 */}
+              <div className="col-span-2 space-y-2">
+                <Label>기존 스타일 연결 <span className="text-muted-foreground font-normal text-xs">(선택 — 비우면 새 스타일번호가 자동 생성됩니다)</span></Label>
+                <Select value={form.styleId || 'none'} onValueChange={v => {
+                  if (v === 'none') { setForm(f => ({ ...f, styleId: undefined, styleNo: '' })); return; }
+                  const item = items.find(i => i.id === v);
+                  if (item) {
+                    setForm(f => ({
+                      ...f,
+                      styleId: item.id,
+                      styleNo: item.styleNo,
+                      styleName: item.name,
+                      buyerId: item.buyerId || f.buyerId,
+                    }));
+                  }
+                }}>
+                  <SelectTrigger className="text-xs h-8"><SelectValue placeholder="선택 안 함 (새 스타일)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">선택 안 함 (새 스타일)</SelectItem>
+                    {items
+                      .filter(i => !form.buyerId || form.buyerId === 'none' || i.buyerId === form.buyerId)
+                      .map(i => (
+                      <SelectItem key={i.id} value={i.id} className="text-xs">
+                        {i.styleNo} — {i.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">스타일번호 *</Label>
+                      {!form.styleId && !editId && (
+                        <label className="flex items-center gap-1 cursor-pointer text-[11px] text-primary">
+                          <input type="checkbox" checked={manualStyleNo}
+                            onChange={e => setManualStyleNo(e.target.checked)} className="w-3 h-3 accent-primary" />
+                          직접 입력
+                        </label>
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">품명 *</Label>
-                      <Input value={form.styleName || ''} onChange={e => setForm(f => ({ ...f, styleName: e.target.value }))} placeholder="품명 입력" className="h-8 text-xs" />
-                    </div>
+                    <Input
+                      value={form.styleId ? (form.styleNo || '') : (manualStyleNo ? (form.styleNo || '') : previewStyleNo)}
+                      onChange={e => setForm(f => ({ ...f, styleNo: e.target.value }))}
+                      readOnly={!!form.styleId || !manualStyleNo}
+                      placeholder="바이어를 선택하면 자동 생성됩니다"
+                      className={`h-8 text-xs font-mono ${(!!form.styleId || !manualStyleNo) ? 'bg-[var(--fill-tertiary)] text-muted-foreground' : ''}`}
+                    />
+                    {!form.styleId && !manualStyleNo && !previewStyleNo && (
+                      <p className="text-[11px] text-muted-foreground">바이어를 먼저 선택하세요</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">품명 *</Label>
+                    <Input value={form.styleName || ''} onChange={e => setForm(f => ({ ...f, styleName: e.target.value }))} placeholder="예: 파니에 쁘띠 백" className="h-8 text-xs" />
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* 컬러 */}
               <div className="col-span-2 space-y-1.5">
