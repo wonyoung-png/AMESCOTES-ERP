@@ -389,3 +389,40 @@
 .data-table :is(th, td).ctr { text-align: center; }
 /* 액션 버튼이 들어가는 열은 내용이 커도 행 높이를 흔들지 않게 */
 .data-table :is(th, td).act { text-align: right; white-space: nowrap; }
+
+/* ─────────────────────────────────────────────
+   A4 인쇄 규격 — 공장에 보내는 서류(발주서·작업지시서·거래명세표)
+   .print-doc 을 감싼 요소만 인쇄되고 나머지 화면 UI는 빠진다.
+   ───────────────────────────────────────────── */
+@page { size: A4 portrait; margin: 12mm; }
+
+@media print {
+  html, body { background: #fff !important; }
+  /* 화면 전용 요소는 인쇄에서 제외 */
+  .no-print, nav, aside, [data-sidebar], button:not(.print-keep) { display: none !important; }
+
+  /* 인쇄 대상이 지정되면 그 외 본문은 숨긴다 */
+  body:has(.print-doc) > * { visibility: hidden; }
+  body:has(.print-doc) .print-doc,
+  body:has(.print-doc) .print-doc * { visibility: visible; }
+  body:has(.print-doc) .print-doc {
+    position: absolute; left: 0; top: 0; width: 100%;
+    padding: 0 !important; margin: 0 !important;
+  }
+
+  .print-doc { font-size: 10.5pt; color: #000; }
+  .print-doc h1, .print-doc h2, .print-doc h3 { color: #000; }
+  /* 표: 페이지가 넘어가도 머리글 반복 + 행 중간 잘림 방지 */
+  .print-doc table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
+  .print-doc thead { display: table-header-group; }
+  .print-doc tfoot { display: table-footer-group; }
+  .print-doc tr { page-break-inside: avoid; break-inside: avoid; }
+  .print-doc th, .print-doc td {
+    border: 1px solid #999 !important; padding: 4pt 6pt !important;
+    font-size: 9.5pt; background: #fff !important; color: #000 !important;
+  }
+  .print-doc thead th { background: #f0f0f0 !important; font-weight: 700; }
+  .print-doc .page-break { page-break-before: always; }
+  /* 인쇄에서 접힘/스크롤 해제 */
+  .print-doc .overflow-x-auto, .print-doc .overflow-y-auto { overflow: visible !important; }
+}

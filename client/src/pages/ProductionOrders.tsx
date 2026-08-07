@@ -23,6 +23,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { printDoc, copyDocAsImage, saveDocAsImage } from '@/lib/docExport';
 import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera, MoreHorizontal, ChevronRight, ChevronDown, Layers } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
@@ -125,6 +126,7 @@ export default function ProductionOrders() {
 
   // 작업지시서 모달 상태
   const [batchSheet, setBatchSheet] = useState<{ batchNo: string; orders: ProductionOrder[] } | null>(null);
+  const batchSheetRef = useRef<HTMLDivElement>(null);
   const [workOrderModal, setWorkOrderModal] = useState(false);
   const [workOrderTarget, setWorkOrderTarget] = useState<ProductionOrder | null>(null);
   // 사후 불량 — 납품 후 뒤늦게 발견된 불량. 원본을 고치지 않고 차감 이력으로 쌓는다
@@ -132,6 +134,7 @@ export default function ProductionOrders() {
   const [postDefectForm, setPostDefectForm] = useState({ qty: '', reason: '', foundDate: new Date().toISOString().split('T')[0] });
   // 발주서(PO) 출력 — 작업지시서와 별개 문서
   const [poTarget, setPoTarget] = useState<ProductionOrder | null>(null);
+  const poSheetRef = useRef<HTMLDivElement>(null);
   // 납기관리에서 '작업지시서'를 누르고 넘어온 경우 해당 발주의 작업지시서를 바로 연다
   useEffect(() => {
     const id = localStorage.getItem('ames_open_work_order');
@@ -1239,6 +1242,16 @@ export default function ProductionOrders() {
 
   const handlePrintWorkOrder = () => {
     window.print();
+  };
+
+  /** 작업지시서를 이미지로 — 카톡·위챗 전달용 */
+  const workOrderAsImage = async (mode: 'copy' | 'save') => {
+    const el = document.getElementById('work-order-print-area') as HTMLElement | null;
+    if (!el) { toast.error('작업지시서 영역을 찾을 수 없습니다'); return; }
+    try {
+      if (mode === 'copy') { await copyDocAsImage(el); toast.success('이미지 복사됨 — 카톡·위챗에 붙여넣으세요'); }
+      else { await saveDocAsImage(el, `작업지시서_${workOrderTarget?.orderNo || ''}`); toast.success('이미지 저장됨'); }
+    } catch (e) { toast.error((e as Error).message); }
   };
 
   const [showFactoryView, setShowFactoryView] = useState(false);
@@ -3030,7 +3043,7 @@ export default function ProductionOrders() {
               : [{ color: '기본', qty: poTarget.qty }];
             const total = rows.reduce((sum, r) => sum + r.qty * unit, 0);
             return (
-              <div className="p-4 space-y-4 text-sm bg-white text-neutral-900 rounded">
+              <div ref={poSheetRef} className="p-4 space-y-4 text-sm bg-white text-neutral-900 rounded">
                 <h2 className="text-center text-lg font-bold tracking-widest border-b-2 border-neutral-800 pb-2">발 주 서</h2>
                 <table className="data-table w-full text-xs border-collapse">
                   <tbody>
@@ -3086,9 +3099,21 @@ export default function ProductionOrders() {
               </div>
             );
           })()}
-          <DialogFooter>
+          <DialogFooter className="flex-wrap gap-2">
             <Button variant="outline" onClick={() => setPoTarget(null)}>닫기</Button>
-            <Button onClick={() => window.print()}>인쇄</Button>
+            <Button variant="outline" onClick={async () => {
+              if (!poSheetRef.current) return;
+              try { await copyDocAsImage(poSheetRef.current); toast.success('이미지 복사됨 — 카톡·위챗에 붙여넣으세요'); }
+              catch (e) { toast.error((e as Error).message); }
+            }}>이미지 복사</Button>
+            <Button variant="outline" onClick={async () => {
+              if (!poSheetRef.current) return;
+              try { await saveDocAsImage(poSheetRef.current, `발주서_${poTarget?.orderNo}`); toast.success('이미지 저장됨'); }
+              catch (e) { toast.error((e as Error).message); }
+            }}>이미지 저장</Button>
+            <Button onClick={() => printDoc(poSheetRef.current)}>
+              <Printer className="w-4 h-4 mr-1.5" />A4 인쇄 · PDF
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3118,13 +3143,16 @@ export default function ProductionOrders() {
                 <Package className="w-4 h-4" />
                 작업지시서 — {workOrderTarget.orderNo}
               </h2>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setWorkOrderModal(false)}>닫기</Button>
-                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => window.print()}>
-                  <FileText className="w-3.5 h-3.5 mr-1" />PDF 저장
+                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => workOrderAsImage('copy')}>
+                  이미지 복사
                 </Button>
-                <Button size="sm" className="h-8 text-xs" onClick={() => window.print()}>
-                  <Printer className="w-3.5 h-3.5 mr-1" />인쇄
+                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => workOrderAsImage('save')}>
+                  이미지 저장
+                </Button>
+                <Button size="sm" className="h-8 text-xs" onClick={handlePrintWorkOrder}>
+                  <Printer className="w-3.5 h-3.5 mr-1" />A4 인쇄 · PDF
                 </Button>
               </div>
             </div>
@@ -3681,7 +3709,7 @@ export default function ProductionOrders() {
             const totalAmt = list.reduce((s, o) => s + (o.qty || 0) * (o.factoryUnitPriceKrw || 0), 0);
             const dates = list.map(o => o.deliveryDate).filter(Boolean).sort();
             return (
-              <div className="space-y-4 py-1">
+              <div className="space-y-4 py-1" ref={batchSheetRef}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                   <div><p className="text-xs text-muted-foreground">공장</p><p className="font-semibold">{vendorNames.join(', ') || '미지정'}</p></div>
                   <div><p className="text-xs text-muted-foreground">발주일</p><p className="font-semibold">{list[0]?.orderDate || '—'}</p></div>
@@ -3751,9 +3779,21 @@ export default function ProductionOrders() {
               </div>
             );
           })()}
-          <DialogFooter>
+          <DialogFooter className="flex-wrap gap-2">
             <Button variant="outline" onClick={() => setBatchSheet(null)}>닫기</Button>
-            <Button onClick={() => window.print()}><Printer className="w-4 h-4 mr-1.5" />발주서 인쇄</Button>
+            <Button variant="outline" onClick={async () => {
+              if (!batchSheetRef.current) return;
+              try { await copyDocAsImage(batchSheetRef.current); toast.success('이미지 복사됨 — 카톡·위챗에 붙여넣으세요'); }
+              catch (e) { toast.error((e as Error).message); }
+            }}>이미지 복사</Button>
+            <Button variant="outline" onClick={async () => {
+              if (!batchSheetRef.current) return;
+              try { await saveDocAsImage(batchSheetRef.current, `발주서_${batchSheet.batchNo}`); toast.success('이미지 저장됨'); }
+              catch (e) { toast.error((e as Error).message); }
+            }}>이미지 저장</Button>
+            <Button onClick={() => printDoc(batchSheetRef.current)}>
+              <Printer className="w-4 h-4 mr-1.5" />A4 인쇄 · PDF
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
