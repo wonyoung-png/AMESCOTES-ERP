@@ -64,7 +64,6 @@ const navGroups: NavGroup[] = [
       { path: '/bom', label: 'BOM / 원가', icon: <ClipboardList size={17} />, table: 'boms' },
       { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} />, table: 'boms' },
       { path: '/orders', label: '생산 발주', icon: <Factory size={17} />, table: 'production_orders' },
-      { path: '/receiving', label: '입고 · 출고', icon: <Truck size={17} />, table: 'receipt_logs' },
       { path: '/deadlines', label: '납기 캘린더', icon: <CalendarClock size={17} />, table: 'milestones' },
       { path: '/calendar', label: '운영 캘린더 · 기획전', icon: <CalendarDays size={17} />, table: 'campaigns' },
     ],

@@ -1047,7 +1047,22 @@ export default function ProductionOrders() {
     if (!buyer) { toast.error('바이어 정보가 없습니다. 품목의 바이어를 먼저 설정해주세요'); return; }
 
     const today = new Date().toISOString().split('T')[0];
-    const colorQtyList = order.colorQtys && order.colorQtys.length > 0 ? order.colorQtys : [{ color: '기본', qty: order.qty }];
+    // 청구 수량 = 실제 입고분 - 불량. 불량만큼 결제를 덜 하도록 명세표에서 빼준다
+    const billQty = order.receivedQty !== undefined
+      ? Math.max(0, (order.receivedQty || 0) - (order.defectQty || 0))
+      : order.qty;
+    const rawColorQtys = order.colorQtys && order.colorQtys.length > 0 ? order.colorQtys : [{ color: '기본', qty: order.qty }];
+    const orderedTotal = rawColorQtys.reduce((s, c) => s + c.qty, 0) || order.qty || 1;
+    // 컬러별로 청구 수량을 발주 비율대로 나눈다 (마지막 컬러가 잔여를 흡수)
+    const colorQtyList = (() => {
+      if (billQty === orderedTotal) return rawColorQtys;
+      let left = billQty;
+      return rawColorQtys.map((c, i) => {
+        const q = i === rawColorQtys.length - 1 ? left : Math.round((c.qty / orderedTotal) * billQty);
+        left -= q;
+        return { ...c, qty: Math.max(0, q) };
+      });
+    })();
     const unitPrice = item.deliveryPrice || item.targetSalePrice || order.factoryUnitPriceKrw || 0;
 
     if (billingMode === 'new') {
@@ -1061,7 +1076,9 @@ export default function ProductionOrders() {
         unitPrice,
         taxType: '과세' as const,
         taxRate: 0.1,
-        memo: `발주번호 ${order.orderNo}`,
+        memo: order.defectQty
+          ? `발주번호 ${order.orderNo} · 불량 ${order.defectQty}개 차감`
+          : `발주번호 ${order.orderNo}`,
       }));
 
       const newStatement: TradeStatement = {
@@ -1434,9 +1451,19 @@ export default function ProductionOrders() {
                         ))}
                       </div>
                     )}
-                    {o.receivedQty !== undefined && (
-                      <p className="text-[11px] text-[var(--system-green)] mt-0.5">입고 {formatNumber(o.receivedQty)}{o.defectQty ? ` / 불량 ${o.defectQty}` : ''}</p>
-                    )}
+                    {o.receivedQty !== undefined && (() => {
+                      // 부분입고면 미입고 잔량을, 불량이 있으면 정산 차감 대상 수량을 같이 보여준다
+                      const short = (o.qty || 0) - (o.receivedQty || 0);
+                      const good = (o.receivedQty || 0) - (o.defectQty || 0);
+                      return (
+                        <p className="text-[11px] mt-0.5 space-x-1">
+                          <span className="text-[var(--system-green)]">입고 {formatNumber(o.receivedQty)}</span>
+                          {short > 0 && <span className="text-[var(--system-orange)]">미입고 {formatNumber(short)}</span>}
+                          {!!o.defectQty && <span className="text-[var(--system-red)]">불량 {formatNumber(o.defectQty)}</span>}
+                          {!!o.defectQty && <span className="text-muted-foreground">정산 {formatNumber(good)}</span>}
+                        </p>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-foreground font-medium">{o.vendorName}</p>
@@ -2981,7 +3008,14 @@ export default function ProductionOrders() {
                     <p>발주번호: {billingTarget.orderNo}</p>
                     <p>스타일: {billingTarget.styleNo} — {billingTarget.styleName}</p>
                     <p>바이어: {buyer?.name || '미지정'}</p>
-                    <p>수량: {billingTarget.qty.toLocaleString()} PCS</p>
+                    <p>
+                      수량: {(billingTarget.receivedQty !== undefined
+                        ? Math.max(0, (billingTarget.receivedQty || 0) - (billingTarget.defectQty || 0))
+                        : billingTarget.qty).toLocaleString()} PCS
+                      {!!billingTarget.defectQty && (
+                        <span className="text-[var(--system-red)]"> (불량 {billingTarget.defectQty}개 차감)</span>
+                      )}
+                    </p>
                     {unitPrice > 0 && <p>단가: {formatKRW(unitPrice)} / 합계: {formatKRW(totalAmt)}</p>}
                     {billingTarget.deliveryDate && <p>납기일: {billingTarget.deliveryDate}</p>}
                   </div>
