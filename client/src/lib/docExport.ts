@@ -18,9 +18,12 @@ export function printDoc(el: HTMLElement | null) {
 
 /** 요소를 PNG 로 렌더 (배경 흰색, 2배 해상도) */
 export async function renderPng(el: HTMLElement, scale = 2): Promise<Blob> {
+  // 좁은 창에서도 문서 전체 폭을 담아야 한다 — min-w-[760px] 표가 잘리던 문제
   const rect = el.getBoundingClientRect();
-  const width = Math.ceil(rect.width);
-  const height = Math.ceil(el.scrollHeight || rect.height);
+  const inner = Array.from(el.querySelectorAll<HTMLElement>('*'))
+    .reduce((max, n) => Math.max(max, n.scrollWidth), 0);
+  const width = Math.ceil(Math.max(rect.width, el.scrollWidth, inner));
+  const height = Math.ceil(Math.max(el.scrollHeight, rect.height));
 
   // 계산된 스타일을 인라인으로 굳혀야 foreignObject 안에서도 같은 모양이 나온다
   const clone = el.cloneNode(true) as HTMLElement;
@@ -86,17 +89,26 @@ function inlineStyles(src: HTMLElement, dst: HTMLElement) {
   const dstNodes = [dst, ...Array.from(dst.querySelectorAll<HTMLElement>('*'))];
   const PROPS = [
     'font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing',
-    'color', 'background-color', 'text-align', 'vertical-align', 'white-space',
+    'color', 'background-color', 'text-align', 'vertical-align', 'white-space', 'word-break',
+    'text-decoration', 'font-variant-numeric',
     'border-top', 'border-right', 'border-bottom', 'border-left', 'border-radius',
+    'border-collapse', 'border-spacing', 'table-layout',
     'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
     'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-    'display', 'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'gap',
-    'width', 'height', 'min-width', 'max-width', 'box-sizing', 'overflow',
+    'display', 'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'align-content',
+    'flex-grow', 'flex-shrink', 'flex-basis', 'gap', 'row-gap', 'column-gap',
+    // 그리드 레이아웃 — 빠지면 작업지시서의 2·3열이 한 줄로 무너진다
+    'grid-template-columns', 'grid-template-rows', 'grid-column', 'grid-row',
+    'justify-items', 'place-items',
+    'object-fit', 'object-position',
+    'width', 'height', 'min-width', 'max-width', 'box-sizing',
   ];
   for (let i = 0; i < srcNodes.length && i < dstNodes.length; i++) {
     const cs = getComputedStyle(srcNodes[i]);
     const d = dstNodes[i];
-    let css = '';
+    // 원본에 직접 박혀 있던 인라인 스타일을 먼저 깔고 계산값을 얹는다
+    let css = srcNodes[i].getAttribute('style') || '';
+    if (css && !css.trim().endsWith(';')) css += ';';
     for (const p of PROPS) {
       const v = cs.getPropertyValue(p);
       if (v) css += `${p}:${v};`;
