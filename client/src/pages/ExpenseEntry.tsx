@@ -179,16 +179,16 @@ function ExpenseDetailModal({
               </Button>
             </div>
             <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[640px]">
+            <table className="data-table w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">스타일번호</th>
-                  <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">품명</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">수량</th>
-                  <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-14">단위</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">단가(원)</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">금액(원)</th>
-                  <th className="w-8 px-2"></th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">스타일번호</th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">품명</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground w-16">수량</th>
+                  <th className="ctr text-[13px] font-semibold text-muted-foreground w-14">단위</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground w-24">단가(원)</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground w-24">금액(원)</th>
+                  <th className="w-8"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -198,7 +198,7 @@ function ExpenseDetailModal({
                   const itemName = parsed.styleNo ? parsed.itemName : line.description;
                   return (
                     <tr key={line.id}>
-                      <td className="px-2 py-1.5">
+                      <td>
                         <Input
                           value={styleNo}
                           onChange={e => {
@@ -212,7 +212,7 @@ function ExpenseDetailModal({
                           className="h-8 text-sm font-mono w-32"
                         />
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td>
                         <Input
                           value={itemName}
                           onChange={e => {
@@ -226,7 +226,7 @@ function ExpenseDetailModal({
                           className="h-8 text-sm"
                         />
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td>
                         <Input
                           type="number"
                           value={line.qty}
@@ -242,7 +242,7 @@ function ExpenseDetailModal({
                           min={0}
                         />
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td>
                         <Input
                           value={line.unit}
                           onChange={e => updateDetailLine(line.id, 'unit', e.target.value)}
@@ -250,7 +250,7 @@ function ExpenseDetailModal({
                           placeholder="PCS"
                         />
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td>
                         <div className="space-y-0.5">
                           <Input
                             type="number"
@@ -264,10 +264,10 @@ function ExpenseDetailModal({
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-1.5 text-right text-sm font-medium text-foreground">
+                      <td className="num text-sm font-medium text-foreground">
                         {formatKRW(line.amountKrw)}
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -385,7 +385,7 @@ function printExpenseTradeStatement(expense: Expense) {
           <p>결제방법: ${expense.expenseType}</p>
         </div>
       </div>
-      <table>
+      <table className="data-table">
         <thead>
           <tr>
             <th>품목/내역</th>
@@ -400,7 +400,7 @@ function printExpenseTradeStatement(expense: Expense) {
         </tbody>
       </table>
       <div class="total-section">
-        <table>
+        <table className="data-table">
           <tr><td>공급가액</td><td style="text-align:right">${supplyAmount.toLocaleString()}원</td></tr>
           <tr><td>세액(10%)</td><td style="text-align:right">${taxAmount.toLocaleString()}원</td></tr>
           <tr style="font-weight:bold;background:#f5f5f5"><td>합계</td><td style="text-align:right">${total.toLocaleString()}원</td></tr>
@@ -558,19 +558,19 @@ export default function ExpenseEntry() {
           </Select>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[800px]">
+          <table className="data-table w-full text-sm min-w-[800px]">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">날짜</th>
-                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">결제</th>
-                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">카테고리</th>
-                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">내용</th>
-                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">항목수</th>
-                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">발주번호</th>
-                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">거래처</th>
-                <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">세금계산서</th>
-                <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">금액</th>
-                <th className="px-4 py-3"></th>
+                <th className="text-[13px] font-semibold text-muted-foreground">날짜</th>
+                <th className="text-[13px] font-semibold text-muted-foreground">결제</th>
+                <th className="text-[13px] font-semibold text-muted-foreground">카테고리</th>
+                <th className="text-[13px] font-semibold text-muted-foreground">내용</th>
+                <th className="text-[13px] font-semibold text-muted-foreground">항목수</th>
+                <th className="text-[13px] font-semibold text-muted-foreground">발주번호</th>
+                <th className="text-[13px] font-semibold text-muted-foreground">거래처</th>
+                <th className="ctr text-[13px] font-semibold text-muted-foreground">세금계산서</th>
+                <th className="num text-[13px] font-semibold text-muted-foreground">금액</th>
+                <th></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -582,30 +582,30 @@ export default function ExpenseEntry() {
                   className="hover:bg-[var(--fill-quaternary)] cursor-pointer"
                   onClick={() => setDetailExpense(e)}
                 >
-                  <td className="px-4 py-3 text-muted-foreground">{e.expenseDate}</td>
-                  <td className="px-4 py-3">
+                  <td className="text-muted-foreground">{e.expenseDate}</td>
+                  <td>
                     <Badge variant="outline" className={`text-xs gap-1 ${TYPE_COLOR[e.expenseType]}`}>
                       {TYPE_ICON[e.expenseType]}{e.expenseType}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     <span className="text-xs bg-[var(--fill-quaternary)] text-muted-foreground px-2 py-0.5 rounded-full">{e.category}</span>
                   </td>
-                  <td className="px-4 py-3 font-medium text-foreground">{e.description}</td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="font-medium text-foreground">{e.description}</td>
+                  <td className="ctr">
                     {e.lines && e.lines.length > 0
                       ? <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded-full">{e.lines.length}항목</span>
                       : <span className="text-xs text-muted-foreground">-</span>}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs">{e.orderNo || '-'}</td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs">{e.vendorName || '-'}</td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="text-muted-foreground text-xs">{e.orderNo || '-'}</td>
+                  <td className="text-muted-foreground text-xs">{e.vendorName || '-'}</td>
+                  <td className="ctr">
                     {e.hasTaxInvoice
                       ? <FileText className="w-4 h-4 text-[var(--system-green)] mx-auto" />
                       : <span className="text-muted-foreground text-xs">-</span>}
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-foreground">{formatKRW(e.amountKrw)}</td>
-                  <td className="px-4 py-3" onClick={ev => ev.stopPropagation()}>
+                  <td className="num font-semibold text-foreground">{formatKRW(e.amountKrw)}</td>
+                  <td onClick={ev => ev.stopPropagation()}>
                     <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
@@ -686,21 +686,21 @@ export default function ExpenseEntry() {
                 </Button>
               </div>
               <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[560px]">
+              <table className="data-table w-full text-sm min-w-[560px]">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground w-1/3">품목명</th>
-                    <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">수량</th>
-                    <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">단위</th>
-                    <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-28">단가(KRW)</th>
-                    <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-28">금액</th>
-                    <th className="w-8 px-2 py-2"></th>
+                    <th className="text-[13px] font-semibold text-muted-foreground w-1/3">품목명</th>
+                    <th className="num text-[13px] font-semibold text-muted-foreground w-16">수량</th>
+                    <th className="ctr text-[13px] font-semibold text-muted-foreground w-16">단위</th>
+                    <th className="num text-[13px] font-semibold text-muted-foreground w-28">단가(KRW)</th>
+                    <th className="num text-[13px] font-semibold text-muted-foreground w-28">금액</th>
+                    <th className="w-8"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {lines.map((line, idx) => (
                     <tr key={line.id}>
-                      <td className="px-2 py-1.5">
+                      <td>
                         <Input
                           value={line.description}
                           onChange={e => updateLine(line.id, 'description', e.target.value)}
@@ -708,7 +708,7 @@ export default function ExpenseEntry() {
                           className="h-8 text-sm"
                         />
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td>
                         <Input
                           type="number"
                           value={line.qty}
@@ -717,7 +717,7 @@ export default function ExpenseEntry() {
                           min={0}
                         />
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td>
                         <Input
                           value={line.unit}
                           onChange={e => updateLine(line.id, 'unit', e.target.value)}
@@ -725,7 +725,7 @@ export default function ExpenseEntry() {
                           placeholder="개"
                         />
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td>
                         <div className="space-y-0.5">
                           <Input
                             type="number"
@@ -739,10 +739,10 @@ export default function ExpenseEntry() {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-1.5 text-right text-sm font-medium text-foreground">
+                      <td className="num text-sm font-medium text-foreground">
                         {formatKRW(line.amountKrw)}
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td>
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => removeLine(line.id)}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
@@ -753,7 +753,7 @@ export default function ExpenseEntry() {
                 <tfoot>
                   <tr className="bg-muted border-t border-border">
                     <td colSpan={4} className="px-3 py-2 text-right text-sm font-medium text-muted-foreground">합계</td>
-                    <td className="px-3 py-2 text-right text-base font-bold text-foreground">{formatKRW(linesTotal)}</td>
+                    <td className="num text-base font-bold text-foreground">{formatKRW(linesTotal)}</td>
                     <td></td>
                   </tr>
                 </tfoot>

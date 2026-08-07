@@ -1350,26 +1350,26 @@ export default function ProductionOrders() {
           {factoryStats.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-4">등록된 발주가 없습니다</p>
           ) : (
-            <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm">
+            <div className="overflow-x-auto"><table className="data-table w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">공장명</th>
-                  <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">전체 발주</th>
-                  <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">진행중</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">총 수량</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">총 발주금액</th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">공장명</th>
+                  <th className="ctr text-[13px] font-semibold text-muted-foreground">전체 발주</th>
+                  <th className="ctr text-[13px] font-semibold text-muted-foreground">진행중</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground">총 수량</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground">총 발주금액</th>
                 </tr>
               </thead>
               <tbody>
                 {factoryStats.map(f => (
                   <tr key={f.name} className="border-b border-border">
-                    <td className="px-3 py-2 font-medium text-foreground">{f.name}</td>
-                    <td className="px-3 py-2 text-center text-muted-foreground">{f.total}건</td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="font-medium text-foreground">{f.name}</td>
+                    <td className="ctr text-muted-foreground">{f.total}건</td>
+                    <td className="ctr">
                       <span className={f.inProgress > 0 ? 'text-[var(--system-orange)] font-medium' : 'text-muted-foreground'}>{f.inProgress}건</span>
                     </td>
-                    <td className="px-3 py-2 text-right font-mono text-foreground">{f.totalQty.toLocaleString()} PCS</td>
-                    <td className="px-3 py-2 text-right font-mono text-foreground">
+                    <td className="num font-mono text-foreground">{f.totalQty.toLocaleString()} PCS</td>
+                    <td className="num font-mono text-foreground">
                       {f.totalAmountKrw > 0 ? formatKRW(f.totalAmountKrw) : '-'}
                     </td>
                   </tr>
@@ -1469,26 +1469,26 @@ export default function ProductionOrders() {
 
       {/* 테이블 (데스크탑) */}
       <div className="hidden md:block bg-card rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="data-table w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="w-10 px-3 py-3">
+              <th className="w-10">
                 <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} className="cursor-pointer" />
               </th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">발주일</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">발주번호</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">스타일</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">브랜드</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">컬러</th>
-              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">발주</th>
-              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">입고</th>
-              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">불량</th>
-              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">청구</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">공장 / 공장단가</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">총 발주금액</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">납기일</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">상태</th>
-              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
+              <th className="text-[13px] font-semibold text-muted-foreground whitespace-nowrap">발주일</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">발주번호</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">스타일</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">브랜드</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">컬러</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground whitespace-nowrap">발주</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground whitespace-nowrap">입고</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground whitespace-nowrap">불량</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground whitespace-nowrap">청구</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">공장 / 공장단가</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">총 발주금액</th>
+              <th className="text-[13px] font-semibold text-muted-foreground whitespace-nowrap">납기일</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">상태</th>
+              <th className="ctr text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
           <tbody>
@@ -1547,15 +1547,15 @@ export default function ProductionOrders() {
                 : 0;
               return (
                 <tr key={o.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${selectedIds.has(o.id) ? 'bg-primary/5' : ''}`}>
-                  <td className="w-10 px-3 py-3 text-center">
+                  <td className="w-10 ctr">
                     <input type="checkbox" checked={selectedIds.has(o.id)} onChange={() => toggleSelect(o.id)} className="cursor-pointer" />
                   </td>
-                  <td className="px-3 py-3 text-xs whitespace-nowrap">
+                  <td className="text-xs whitespace-nowrap">
                     {o.orderDate
                       ? <span className="font-mono text-muted-foreground">{o.orderDate}</span>
                       : <span className="text-muted-foreground">-</span>}
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono font-semibold text-foreground">{o.orderNo}</span>
                       {o.isReorder && <Badge variant="outline" className="text-[11px] h-4 text-primary border-primary/20">리오더</Badge>}
@@ -1575,7 +1575,7 @@ export default function ProductionOrders() {
                       {(o as any).expenseId && <Badge variant="outline" className="text-[11px] h-4 text-[var(--system-green)] border-transparent bg-[var(--system-green)]/10">전표완료</Badge>}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     <p className="font-medium text-foreground">{o.styleNo}</p>
                     <p className="text-xs text-muted-foreground">{o.styleName}</p>
                     {!hasBom && o.bomType !== 'manual' && (
@@ -1584,11 +1584,11 @@ export default function ProductionOrders() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     <span className="text-xs text-muted-foreground font-medium">{getBrandName(o) || <span className="text-muted-foreground">-</span>}</span>
                   </td>
                   {/* 컬러 — 컬러명만. 수량은 오른쪽 수량 열들이 담당한다 */}
-                  <td className="px-3 py-3 align-top">
+                  <td className="align-top">
                     {(o.colorQtys || []).length > 0 ? (
                       <div className="flex flex-col gap-0.5">
                         {(o.colorQtys || []).map((cq, i) => (
@@ -1608,10 +1608,10 @@ export default function ProductionOrders() {
                     const short = received === undefined ? 0 : (o.qty || 0) - received;
                     return (
                       <>
-                        <td className="px-3 py-3 text-right align-top font-mono text-foreground whitespace-nowrap">
+                        <td className="num align-top font-mono text-foreground whitespace-nowrap">
                           {formatNumber(o.qty)}
                         </td>
-                        <td className="px-3 py-3 text-right align-top whitespace-nowrap">
+                        <td className="num align-top whitespace-nowrap">
                           {received === undefined ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
@@ -1623,7 +1623,7 @@ export default function ProductionOrders() {
                             </>
                           )}
                         </td>
-                        <td className="px-3 py-3 text-right align-top whitespace-nowrap">
+                        <td className="num align-top whitespace-nowrap">
                           {defect > 0 ? (
                             <>
                               <span className="font-mono text-[var(--system-red)]">{formatNumber(defect)}</span>
@@ -1633,7 +1633,7 @@ export default function ProductionOrders() {
                             </>
                           ) : <span className="text-muted-foreground">—</span>}
                         </td>
-                        <td className="px-3 py-3 text-right align-top whitespace-nowrap">
+                        <td className="num align-top whitespace-nowrap">
                           {billable === null
                             ? <span className="text-muted-foreground">—</span>
                             : <span className="font-mono font-medium text-foreground">{formatNumber(billable)}</span>}
@@ -1641,7 +1641,7 @@ export default function ProductionOrders() {
                       </>
                     );
                   })()}
-                  <td className="px-4 py-3">
+                  <td>
                     <p className="text-foreground font-medium">{o.vendorName}</p>
                     {displayFactoryKrw > 0 ? (
                       <p className="text-xs text-muted-foreground font-mono">{formatKRW(displayFactoryKrw)}/PCS
@@ -1651,13 +1651,13 @@ export default function ProductionOrders() {
                       <p className="text-xs text-[var(--system-orange)]">{hasBom ? "공장단가 재계산 필요" : "공장단가 수동 입력 필요"}</p>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="num">
                     {totalAmtKrw > 0
                       ? <span className="font-mono text-foreground font-medium">{formatKRW(totalAmtKrw)}</span>
                       : <span className="text-muted-foreground">-</span>
                     }
                   </td>
-                  <td className="px-4 py-3 text-xs">
+                  <td className="text-xs">
                     {o.deliveryDate ? (
                       <div>
                         <span className={`font-mono ${calcDDay(o.deliveryDate) < 0 ? 'text-[var(--system-red)] font-bold' : calcDDay(o.deliveryDate) <= 14 ? 'text-[var(--system-orange)]' : 'text-muted-foreground'}`}>
@@ -1667,7 +1667,7 @@ export default function ProductionOrders() {
                       </div>
                     ) : <span className="text-muted-foreground">-</span>}
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     <Select value={o.status} onValueChange={v => handleStatusChange(o.id, v as OrderStatus)}>
                       <SelectTrigger className={`h-7 text-xs w-28 border ${STATUS_COLOR[o.status]}`}>
                         <SelectValue />
@@ -1677,7 +1677,7 @@ export default function ProductionOrders() {
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-3 py-3">
+                  <td>
                     {/* 작업 — 자주 쓰는 문서 2개만 노출, 나머지는 더보기로 */}
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="작업지시서"
@@ -2511,14 +2511,14 @@ export default function ProductionOrders() {
                                     </span>
                                   </button>
                                   {isOpen && (
-                                    <table className="w-full text-xs">
+                                    <table className="data-table w-full text-xs">
                                       <thead className="border-b border-border">
                                         <tr>
-                                          <th className="text-left px-3 py-1.5 font-semibold text-muted-foreground">자재명</th>
-                                          <th className="text-right px-3 py-1.5 font-semibold text-muted-foreground">소요량</th>
-                                          <th className="text-center px-3 py-1.5 font-semibold text-muted-foreground">단위</th>
-                                          <th className="text-left px-3 py-1.5 font-semibold text-muted-foreground">구매업체</th>
-                                          <th className="text-left px-3 py-1.5 font-semibold text-muted-foreground">구매상태</th>
+                                          <th className="font-semibold text-muted-foreground">자재명</th>
+                                          <th className="num font-semibold text-muted-foreground">소요량</th>
+                                          <th className="ctr font-semibold text-muted-foreground">단위</th>
+                                          <th className="font-semibold text-muted-foreground">구매업체</th>
+                                          <th className="font-semibold text-muted-foreground">구매상태</th>
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -2526,7 +2526,7 @@ export default function ProductionOrders() {
                                           const calcItem = bomCalc.hqProvided.find(h => h.bomLineId === item.bomLineId);
                                           return (
                                             <tr key={item.bomLineId} className="border-t border-border hover:bg-[var(--fill-quaternary)]">
-                                              <td className="px-3 py-2 font-medium text-foreground">
+                                              <td className="font-medium text-foreground">
                                                 <div className="flex items-center gap-2">
                                                   {calcItem?.imageUrl ? (
                                                     <img
@@ -2543,7 +2543,7 @@ export default function ProductionOrders() {
                                                   </span>
                                                 </div>
                                               </td>
-                                              <td className="px-3 py-2 text-right">
+                                              <td className="num">
                                                 {calcItem ? (
                                                   <span className="font-mono font-semibold text-primary">
                                                     {calcItem.reqQty % 1 === 0 ? calcItem.reqQty.toLocaleString() : calcItem.reqQty.toFixed(2)}
@@ -2560,11 +2560,11 @@ export default function ProductionOrders() {
                                                   />
                                                 )}
                                               </td>
-                                              <td className="px-3 py-2 text-center text-muted-foreground">{item.unit}</td>
-                                              <td className="px-3 py-2 text-muted-foreground">
+                                              <td className="ctr text-muted-foreground">{item.unit}</td>
+                                              <td className="text-muted-foreground">
                                                 {calcItem?.vendorName || item.memo?.replace('구매처: ', '') || <span className="text-muted-foreground">미지정</span>}
                                               </td>
-                                              <td className="px-3 py-2">
+                                              <td>
                                                 <Select value={item.purchaseStatus} onValueChange={v => {
                                                   const updated = [...hqItems];
                                                   updated[idx] = { ...updated[idx], purchaseStatus: v as HqSupplyItem['purchaseStatus'] };
@@ -3032,52 +3032,52 @@ export default function ProductionOrders() {
             return (
               <div className="p-4 space-y-4 text-sm bg-white text-neutral-900 rounded">
                 <h2 className="text-center text-lg font-bold tracking-widest border-b-2 border-neutral-800 pb-2">발 주 서</h2>
-                <table className="w-full text-xs border-collapse">
+                <table className="data-table w-full text-xs border-collapse">
                   <tbody>
                     <tr>
-                      <td className="border border-neutral-300 bg-neutral-100 px-2 py-1.5 font-semibold w-24">발주번호</td>
-                      <td className="border border-neutral-300 px-2 py-1.5 font-mono">{poTarget.orderNo}</td>
-                      <td className="border border-neutral-300 bg-neutral-100 px-2 py-1.5 font-semibold w-24">발주일</td>
-                      <td className="border border-neutral-300 px-2 py-1.5">{poTarget.orderDate}</td>
+                      <td className="border border-neutral-300 bg-neutral-100 font-semibold w-24">발주번호</td>
+                      <td className="border border-neutral-300 font-mono">{poTarget.orderNo}</td>
+                      <td className="border border-neutral-300 bg-neutral-100 font-semibold w-24">발주일</td>
+                      <td className="border border-neutral-300">{poTarget.orderDate}</td>
                     </tr>
                     <tr>
-                      <td className="border border-neutral-300 bg-neutral-100 px-2 py-1.5 font-semibold">공장</td>
-                      <td className="border border-neutral-300 px-2 py-1.5">{poTarget.vendorName || '—'}</td>
-                      <td className="border border-neutral-300 bg-neutral-100 px-2 py-1.5 font-semibold">납기일</td>
-                      <td className="border border-neutral-300 px-2 py-1.5 font-semibold text-red-600">{poTarget.deliveryDate || '—'}</td>
+                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">공장</td>
+                      <td className="border border-neutral-300">{poTarget.vendorName || '—'}</td>
+                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">납기일</td>
+                      <td className="border border-neutral-300 font-semibold text-red-600">{poTarget.deliveryDate || '—'}</td>
                     </tr>
                     <tr>
-                      <td className="border border-neutral-300 bg-neutral-100 px-2 py-1.5 font-semibold">스타일</td>
-                      <td className="border border-neutral-300 px-2 py-1.5" colSpan={3}>
+                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">스타일</td>
+                      <td className="border border-neutral-300" colSpan={3}>
                         {poTarget.styleNo} — {poTarget.styleName}{it?.buyerStyleNo ? ` (바이어 품번 ${it.buyerStyleNo})` : ''}
                       </td>
                     </tr>
                   </tbody>
                 </table>
 
-                <table className="w-full text-xs border-collapse">
+                <table className="data-table w-full text-xs border-collapse">
                   <thead>
                     <tr className="bg-neutral-100">
-                      <th className="border border-neutral-300 px-2 py-1.5 text-left">컬러</th>
-                      <th className="border border-neutral-300 px-2 py-1.5 text-right">수량</th>
-                      <th className="border border-neutral-300 px-2 py-1.5 text-right">단가</th>
-                      <th className="border border-neutral-300 px-2 py-1.5 text-right">금액</th>
+                      <th className="border border-neutral-300">컬러</th>
+                      <th className="border border-neutral-300 num">수량</th>
+                      <th className="border border-neutral-300 num">단가</th>
+                      <th className="border border-neutral-300 num">금액</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((r, i) => (
                       <tr key={i}>
-                        <td className="border border-neutral-300 px-2 py-1.5">{r.color}</td>
-                        <td className="border border-neutral-300 px-2 py-1.5 text-right font-mono">{formatNumber(r.qty)}</td>
-                        <td className="border border-neutral-300 px-2 py-1.5 text-right font-mono">{formatKRW(unit)}</td>
-                        <td className="border border-neutral-300 px-2 py-1.5 text-right font-mono">{formatKRW(r.qty * unit)}</td>
+                        <td className="border border-neutral-300">{r.color}</td>
+                        <td className="border border-neutral-300 num font-mono">{formatNumber(r.qty)}</td>
+                        <td className="border border-neutral-300 num font-mono">{formatKRW(unit)}</td>
+                        <td className="border border-neutral-300 num font-mono">{formatKRW(r.qty * unit)}</td>
                       </tr>
                     ))}
                     <tr className="bg-neutral-50 font-semibold">
-                      <td className="border border-neutral-300 px-2 py-1.5">합계</td>
-                      <td className="border border-neutral-300 px-2 py-1.5 text-right font-mono">{formatNumber(rows.reduce((s2, r) => s2 + r.qty, 0))}</td>
-                      <td className="border border-neutral-300 px-2 py-1.5"></td>
-                      <td className="border border-neutral-300 px-2 py-1.5 text-right font-mono">{formatKRW(total)}</td>
+                      <td className="border border-neutral-300">합계</td>
+                      <td className="border border-neutral-300 num font-mono">{formatNumber(rows.reduce((s2, r) => s2 + r.qty, 0))}</td>
+                      <td className="border border-neutral-300"></td>
+                      <td className="border border-neutral-300 num font-mono">{formatKRW(total)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -3545,18 +3545,18 @@ export default function ProductionOrders() {
           ) : (
             <div className="space-y-4 py-2">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
+                <table className="data-table w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="border-b border-border bg-[var(--fill-quaternary)]">
-                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">자재명</th>
-                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">규격</th>
-                      <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">단위</th>
-                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">소요수량</th>
-                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">보유재고</th>
-                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">발주수량</th>
-                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">담긴 발주</th>
-                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">구매처</th>
-                      <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">삭제</th>
+                      <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
+                      <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
+                      <th className="ctr text-[13px] font-semibold text-muted-foreground">단위</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground">발주수량</th>
+                      <th className="text-[13px] font-semibold text-muted-foreground">담긴 발주</th>
+                      <th className="text-[13px] font-semibold text-muted-foreground">구매처</th>
+                      <th className="ctr text-[13px] font-semibold text-muted-foreground">삭제</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3566,13 +3566,13 @@ export default function ProductionOrders() {
                       const isSufficient = orderQty === 0;
                       return (
                       <tr key={idx} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                        <td className="px-3 py-2 font-medium text-foreground">{item.materialName}</td>
-                        <td className="px-3 py-2 text-muted-foreground text-xs">{item.spec || '-'}</td>
-                        <td className="px-3 py-2 text-center text-muted-foreground">{item.unit}</td>
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground text-sm">
+                        <td className="font-medium text-foreground">{item.materialName}</td>
+                        <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
+                        <td className="ctr text-muted-foreground">{item.unit}</td>
+                        <td className="num font-mono text-muted-foreground text-sm">
                           {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="num">
                           <input
                             type="number"
                             step="0.001"
@@ -3587,7 +3587,7 @@ export default function ProductionOrders() {
                             className="w-20 h-7 text-right font-mono text-sm border border-border rounded px-2 focus:outline-none focus:ring-1 focus:ring-ring"
                           />
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="num">
                           <input
                             type="number"
                             step="0.001"
@@ -3607,7 +3607,7 @@ export default function ProductionOrders() {
                             }`}
                           />
                         </td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">
+                        <td className="text-xs text-muted-foreground">
                           {item.orders.map((o, i) => (
                             <span key={i}>
                               {i > 0 && <span className="mx-1 text-muted-foreground">+</span>}
@@ -3616,8 +3616,8 @@ export default function ProductionOrders() {
                             </span>
                           ))}
                         </td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">{item.vendorName || <span className="text-muted-foreground">-</span>}</td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="text-xs text-muted-foreground">{item.vendorName || <span className="text-muted-foreground">-</span>}</td>
+                        <td className="ctr">
                           <button
                             className="text-muted-foreground hover:text-[var(--system-red)] transition-colors"
                             onClick={() => {
@@ -3802,44 +3802,44 @@ export default function ProductionOrders() {
                     </Button>
                   </div>
                   {/* 발주 품목 테이블 */}
-                  <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm">
+                  <div className="overflow-x-auto"><table className="data-table w-full min-w-[720px] text-sm">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-8">No.</th>
-                        <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-10">이미지</th>
-                        <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">자재명</th>
-                        <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">규격</th>
-                        <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">단위</th>
-                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">소요수량</th>
-                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">보유재고</th>
-                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">발주수량</th>
-                        <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">비고 (담긴 발주)</th>
+                        <th className="ctr text-[13px] font-semibold text-muted-foreground w-8">No.</th>
+                        <th className="ctr text-[13px] font-semibold text-muted-foreground w-10">이미지</th>
+                        <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
+                        <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
+                        <th className="ctr text-[13px] font-semibold text-muted-foreground">단위</th>
+                        <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
+                        <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
+                        <th className="num text-[13px] font-semibold text-muted-foreground">발주수량</th>
+                        <th className="text-[13px] font-semibold text-muted-foreground">비고 (담긴 발주)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {items.map((item, i) => (
                         <tr key={i} className="border-b border-border">
-                          <td className="px-3 py-2 text-center text-muted-foreground text-xs">{i + 1}</td>
-                          <td className="px-2 py-1 text-center">
+                          <td className="ctr text-muted-foreground text-xs">{i + 1}</td>
+                          <td className="ctr">
                             {(item as any).imageUrl ? (
                               <img src={(item as any).imageUrl} alt={item.materialName} className="w-14 h-14 object-cover rounded cursor-pointer border border-border hover:scale-110 transition-transform" onClick={() => window.open((item as any).imageUrl, '_blank')} />
                             ) : (
                               <Camera className="w-4 h-4 mx-auto text-muted-foreground" />
                             )}
                           </td>
-                          <td className="px-3 py-2 font-medium text-foreground">{item.materialName}</td>
-                          <td className="px-3 py-2 text-muted-foreground text-xs">{item.spec || '-'}</td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">{item.unit}</td>
-                          <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
+                          <td className="font-medium text-foreground">{item.materialName}</td>
+                          <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
+                          <td className="ctr text-muted-foreground">{item.unit}</td>
+                          <td className="num font-mono text-muted-foreground text-xs">
                             {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
+                          <td className="num font-mono text-muted-foreground text-xs">
                             {(item.stockQty ?? 0) % 1 === 0 ? (item.stockQty ?? 0).toLocaleString() : (item.stockQty ?? 0).toFixed(3)}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono font-semibold text-primary">
+                          <td className="num font-mono font-semibold text-primary">
                             {item.orderQty % 1 === 0 ? item.orderQty.toLocaleString() : item.orderQty.toFixed(3)}
                           </td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">
+                          <td className="text-xs text-muted-foreground">
                             {item.orders.map((o, j) => (
                               <span key={j}>
                                 {j > 0 && ' + '}
@@ -3853,8 +3853,8 @@ export default function ProductionOrders() {
                     <tfoot>
                       <tr className="bg-[var(--fill-quaternary)] border-t border-border">
                         <td colSpan={6} className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">합계 {items.length}종</td>
-                        <td className="px-3 py-2 text-right text-xs font-bold text-foreground">{items.length}종 발주</td>
-                        <td className="px-3 py-2"></td>
+                        <td className="num text-xs font-bold text-foreground">{items.length}종 발주</td>
+                        <td></td>
                       </tr>
                     </tfoot>
                   </table></div>

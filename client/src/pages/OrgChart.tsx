@@ -127,13 +127,13 @@ export default function OrgChartPage() {
           </span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="data-table w-full min-w-[640px] text-sm">
             <thead>
               <tr className="text-xs text-muted-foreground bg-muted border-b border-border">
-                <th className="text-left px-4 py-2">R3 역할</th>
-                <th className="text-left px-4 py-2">승인 단계</th>
-                <th className="text-left px-4 py-2">현재 담당</th>
-                <th className="text-left px-4 py-2">담당자 변경</th>
+                <th>R3 역할</th>
+                <th>승인 단계</th>
+                <th>현재 담당</th>
+                <th>담당자 변경</th>
               </tr>
             </thead>
             <tbody>
@@ -141,14 +141,14 @@ export default function OrgChartPage() {
                 const steps = R3_STEPS.filter(s => R3_STEP_ROLE[s.step] === row.role);
                 return (
                   <tr key={row.role} className="border-t border-border">
-                    <td className="px-4 py-3">
+                    <td>
                       <span className="font-semibold text-foreground">{row.label}</span>
                       <span className="ml-2 text-[11px] font-mono text-muted-foreground">{row.role}</span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                    <td className="text-xs text-muted-foreground">
                       {steps.map(s => `${s.step}.${s.label}`).join(' · ')}
                     </td>
-                    <td className="px-4 py-3">
+                    <td>
                       {row.member ? (
                         <span className="text-sm font-medium text-foreground">
                           {row.member.name} <span className="text-xs text-muted-foreground font-normal">{row.member.title}</span>
@@ -157,7 +157,7 @@ export default function OrgChartPage() {
                         <span className="text-xs text-[var(--system-red)]">미지정</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td>
                       <select
                         className="border rounded-md h-8 px-2 text-xs min-w-[160px]"
                         value={row.member?.id || ''}

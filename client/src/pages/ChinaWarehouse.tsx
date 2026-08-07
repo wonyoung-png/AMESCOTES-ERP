@@ -169,16 +169,16 @@ export default function ChinaWarehouse() {
       <div className="bg-card rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b font-semibold text-sm">현재고 (품목 · 컬러)</div>
         <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
+        <table className="data-table w-full text-sm min-w-[640px]">
           <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
-              <th className="text-left px-4 py-2">스타일</th>
-              <th className="text-left px-4 py-2">품명</th>
-              <th className="text-left px-4 py-2">컬러</th>
-              <th className="text-right px-4 py-2">입고누계</th>
-              <th className="text-right px-4 py-2">출고누계</th>
-              <th className="text-right px-4 py-2">현재고</th>
-              <th className="px-4 py-2">액션</th>
+              <th>스타일</th>
+              <th>품명</th>
+              <th>컬러</th>
+              <th className="num">입고누계</th>
+              <th className="num">출고누계</th>
+              <th className="num">현재고</th>
+              <th>액션</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -190,15 +190,15 @@ export default function ChinaWarehouse() {
               </tr>
             ) : filteredBalances.map(b => (
               <tr key={`${b.styleNo}-${b.color}`} className="hover:bg-[var(--fill-quaternary)]">
-                <td className="px-4 py-3 font-mono text-xs text-primary">{b.styleNo}</td>
-                <td className="px-4 py-3">{b.styleName}</td>
-                <td className="px-4 py-3"><Badge variant="outline" className="text-[11px]">{b.color}</Badge></td>
-                <td className="px-4 py-3 text-right text-foreground">{formatNumber(b.inboundQty)}</td>
-                <td className="px-4 py-3 text-right text-muted-foreground">{formatNumber(b.outboundQty)}</td>
+                <td className="font-mono text-xs text-primary">{b.styleNo}</td>
+                <td>{b.styleName}</td>
+                <td><Badge variant="outline" className="text-[11px]">{b.color}</Badge></td>
+                <td className="num text-foreground">{formatNumber(b.inboundQty)}</td>
+                <td className="num text-muted-foreground">{formatNumber(b.outboundQty)}</td>
                 <td className={`px-4 py-3 text-right font-bold ${b.onHand < 0 ? 'text-[var(--system-red)]' : ''}`}>
                   {formatNumber(b.onHand)}
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="num">
                   <Button size="sm" variant="outline" className="h-7 text-[11px]"
                     disabled={b.onHand <= 0}
                     onClick={() => openOutbound(b.styleNo, b.color, b.styleName)}>

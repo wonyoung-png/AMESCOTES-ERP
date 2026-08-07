@@ -948,22 +948,22 @@ export default function SampleManagement() {
         {monthlyStats.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-2">해당 월 / 조건에 맞는 샘플 없음</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="data-table w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left py-1.5 text-[13px] font-semibold text-muted-foreground">작업담당자</th>
-                <th className="text-center py-1.5 text-[13px] font-semibold text-muted-foreground">전체 건수</th>
-                <th className="text-center py-1.5 text-[13px] font-semibold text-muted-foreground">최종승인</th>
-                <th className="text-center py-1.5 text-[13px] font-semibold text-muted-foreground">승인율</th>
+                <th className="text-[13px] font-semibold text-muted-foreground">작업담당자</th>
+                <th className="ctr text-[13px] font-semibold text-muted-foreground">전체 건수</th>
+                <th className="ctr text-[13px] font-semibold text-muted-foreground">최종승인</th>
+                <th className="ctr text-[13px] font-semibold text-muted-foreground">승인율</th>
               </tr>
             </thead>
             <tbody>
               {monthlyStats.map(row => (
                 <tr key={row.assignee} className="border-b border-border">
-                  <td className="py-1.5 text-foreground font-medium">{row.assignee}</td>
-                  <td className="py-1.5 text-center text-muted-foreground">{row.total}건</td>
-                  <td className="py-1.5 text-center text-[var(--system-green)] font-medium">{row.done}건</td>
-                  <td className="py-1.5 text-center text-xs">
+                  <td className="text-foreground font-medium">{row.assignee}</td>
+                  <td className="ctr text-muted-foreground">{row.total}건</td>
+                  <td className="ctr text-[var(--system-green)] font-medium">{row.done}건</td>
+                  <td className="ctr text-xs">
                     {row.total > 0 ? (
                       <span className={row.done / row.total >= 0.5 ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]'}>
                         {Math.round(row.done / row.total * 100)}%
@@ -1163,10 +1163,10 @@ export default function SampleManagement() {
 
       {/* 테이블 (데스크탑) */}
       <div className={`${view === 'calendar' ? 'hidden' : 'hidden md:block'} bg-card rounded-lg border border-border overflow-hidden`}>
-        <table className="w-full text-sm">
+        <table className="data-table w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
-              <th className="px-4 py-3 w-10">
+              <th className="w-10">
                 <input
                   type="checkbox"
                   checked={isAllSelected}
@@ -1175,17 +1175,17 @@ export default function SampleManagement() {
                   className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                 />
               </th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground w-12">이미지</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">바이어</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">스타일</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">장소/차수</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">단계</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">의뢰일</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">목표완료</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">비고</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">비용(KRW)</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">청구</th>
-              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
+              <th className="text-[13px] font-semibold text-muted-foreground w-12">이미지</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">바이어</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">스타일</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">장소/차수</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">단계</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">의뢰일</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">목표완료</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">비고</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">비용(KRW)</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">청구</th>
+              <th className="ctr text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
           <tbody>
@@ -1200,7 +1200,7 @@ export default function SampleManagement() {
               const isChecked = selectedIds.has(s.id);
               return (
                 <tr key={s.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${isChecked ? 'bg-primary/5' : ''}`}>
-                  <td className="px-4 py-3">
+                  <td>
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -1208,7 +1208,7 @@ export default function SampleManagement() {
                       className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                     />
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td>
                     {(s.imageUrls || []).length > 0 ? (
                       <img src={s.imageUrls[0]} alt={s.styleNo} className="w-14 h-14 object-cover rounded-md border border-border" />
                     ) : (
@@ -1217,19 +1217,19 @@ export default function SampleManagement() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     {s.buyerId ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fill-tertiary)] text-foreground border border-border">
                         {buyerLabelById(s.buyerId) || '-'}
                       </span>
                     ) : <span className="text-muted-foreground text-xs">-</span>}
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     <p className="font-medium text-foreground">{s.styleNo}</p>
                     <p className="text-xs text-muted-foreground">{s.styleName}</p>
                     <Badge variant="outline" className="text-[11px] mt-0.5">{s.season}</Badge>
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     {s.location && <p className="text-xs text-muted-foreground">{s.location}</p>}
                     {s.round && (
                       <p className="text-xs text-foreground font-medium">
@@ -1238,7 +1238,7 @@ export default function SampleManagement() {
                     )}
                     {s.assignee && <p className="text-[11px] text-muted-foreground">{s.assignee}</p>}
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     <Select value={s.stage} onValueChange={v => handleStageChange(s.id, v as SampleStage)}>
                       <SelectTrigger className={`h-7 text-xs w-28 border ${STAGE_COLOR[s.stage] || 'bg-[var(--fill-quaternary)] text-muted-foreground border-border'}`}>
                         <SelectValue />
@@ -1248,9 +1248,9 @@ export default function SampleManagement() {
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs">{s.requestDate}</td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs">{s.expectedDate || '-'}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground max-w-[120px]">
+                  <td className="text-muted-foreground text-xs">{s.requestDate}</td>
+                  <td className="text-muted-foreground text-xs">{s.expectedDate || '-'}</td>
+                  <td className="text-xs text-muted-foreground max-w-[120px]">
                     {s.memo && <p className="truncate">{s.memo}</p>}
                     {checkCount > 0 && (
                       <span className={`inline-flex items-center gap-1 text-xs ${readyCount === checkCount ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]'}`}>
@@ -1259,8 +1259,8 @@ export default function SampleManagement() {
                     )}
                     {!s.memo && checkCount === 0 && <span className="text-muted-foreground">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono text-foreground text-xs">{formatKRW(s.costKrw || Math.round((s.costCny || 0) * settings.cnyKrw))}</td>
-                  <td className="px-4 py-3">
+                  <td className="num font-mono text-foreground text-xs">{formatKRW(s.costKrw || Math.round((s.costCny || 0) * settings.cnyKrw))}</td>
+                  <td>
                     {s.billingStatus === '미청구' ? (
                       <button
                         onClick={() => {
@@ -1293,7 +1293,7 @@ export default function SampleManagement() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td>
                     <div className="flex items-center justify-center gap-1 flex-wrap">
                       <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => openDetail(s)}>
                         <Eye className="w-3.5 h-3.5" />
@@ -1884,15 +1884,15 @@ export default function SampleManagement() {
                       자재 요청 목록
                     </p>
                     <div className="rounded-md border border-border overflow-x-auto">
-                      <table className="w-full min-w-[520px] text-xs">
+                      <table className="data-table w-full min-w-[520px] text-xs">
                         <thead>
                           <tr className="bg-[var(--fill-quaternary)] border-b border-border">
-                            <th className="text-left px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">자재명</th>
-                            <th className="text-left px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">업체</th>
-                            <th className="text-left px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">컬러</th>
-                            <th className="text-right px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">수량</th>
-                            <th className="text-left px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">단위</th>
-                            <th className="text-center px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">이미지</th>
+                            <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
+                            <th className="text-[13px] font-semibold text-muted-foreground">업체</th>
+                            <th className="text-[13px] font-semibold text-muted-foreground">컬러</th>
+                            <th className="num text-[13px] font-semibold text-muted-foreground">수량</th>
+                            <th className="text-[13px] font-semibold text-muted-foreground">단위</th>
+                            <th className="ctr text-[13px] font-semibold text-muted-foreground">이미지</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1903,12 +1903,12 @@ export default function SampleManagement() {
                               : (req.vendor || '—');
                             return (
                             <tr key={i} className="border-b border-border last:border-0">
-                              <td className="px-3 py-2 text-foreground font-medium">{req.itemName}</td>
-                              <td className="px-3 py-2 text-muted-foreground">{vendorDisplay === '—' ? <span className="text-muted-foreground">—</span> : vendorDisplay}</td>
-                              <td className="px-3 py-2 text-muted-foreground">{req.color || <span className="text-muted-foreground">—</span>}</td>
-                              <td className="px-3 py-2 text-right text-foreground">{req.qty}</td>
-                              <td className="px-3 py-2 text-muted-foreground">{req.unit}</td>
-                              <td className="px-3 py-2 text-center">
+                              <td className="text-foreground font-medium">{req.itemName}</td>
+                              <td className="text-muted-foreground">{vendorDisplay === '—' ? <span className="text-muted-foreground">—</span> : vendorDisplay}</td>
+                              <td className="text-muted-foreground">{req.color || <span className="text-muted-foreground">—</span>}</td>
+                              <td className="num text-foreground">{req.qty}</td>
+                              <td className="text-muted-foreground">{req.unit}</td>
+                              <td className="ctr">
                                 {req.imageUrl ? (
                                   <img
                                     src={req.imageUrl}

@@ -79,24 +79,24 @@ export default function ProjectPL() {
           <div className="bg-card rounded-lg border overflow-hidden">
             <div className="px-4 py-3 border-b font-semibold text-sm">연결 발주 ({projOrders.length}건)</div>
             <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[560px]">
+            <table className="data-table w-full text-sm min-w-[560px]">
               <thead className="text-[13px] font-semibold text-muted-foreground">
                 <tr>
-                  <th className="text-left px-4 py-2">발주번호</th>
-                  <th className="text-left px-4 py-2">품목</th>
-                  <th className="text-right px-4 py-2">수량</th>
-                  <th className="text-right px-4 py-2">단가</th>
-                  <th className="text-right px-4 py-2">입고</th>
+                  <th>발주번호</th>
+                  <th>품목</th>
+                  <th className="num">수량</th>
+                  <th className="num">단가</th>
+                  <th className="num">입고</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {projOrders.map(o => (
                   <tr key={o.id} className="hover:bg-[var(--fill-quaternary)]">
-                    <td className="px-4 py-3 font-mono text-xs">{o.orderNo}</td>
-                    <td className="px-4 py-3">{o.styleName || o.styleNo}</td>
-                    <td className="px-4 py-3 text-right">{o.qty}</td>
-                    <td className="px-4 py-3 text-right">{formatKRW(o.factoryUnitPriceKrw || 0)}</td>
-                    <td className="px-4 py-3 text-right">{o.receivedQty ?? '—'}</td>
+                    <td className="font-mono text-xs">{o.orderNo}</td>
+                    <td>{o.styleName || o.styleNo}</td>
+                    <td className="num">{o.qty}</td>
+                    <td className="num">{formatKRW(o.factoryUnitPriceKrw || 0)}</td>
+                    <td className="num">{o.receivedQty ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -112,17 +112,17 @@ export default function ProjectPL() {
               </span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[640px]">
+              <table className="data-table w-full text-sm min-w-[640px]">
                 <thead className="text-[13px] font-semibold text-muted-foreground">
                   <tr>
-                    <th className="text-left px-4 py-2">발주</th>
-                    <th className="text-left px-4 py-2">스타일</th>
-                    <th className="text-left px-4 py-2">컬러</th>
-                    <th className="text-right px-4 py-2">수량</th>
-                    <th className="text-right px-4 py-2">자재</th>
-                    <th className="text-right px-4 py-2">임가공</th>
-                    <th className="text-right px-4 py-2">합계</th>
-                    <th className="text-right px-4 py-2">PCS당</th>
+                    <th>발주</th>
+                    <th>스타일</th>
+                    <th>컬러</th>
+                    <th className="num">수량</th>
+                    <th className="num">자재</th>
+                    <th className="num">임가공</th>
+                    <th className="num">합계</th>
+                    <th className="num">PCS당</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -134,17 +134,17 @@ export default function ProjectPL() {
                     </tr>
                   ) : (pl.byStyleColor || []).map((row, i) => (
                     <tr key={`${row.orderNo}-${row.color}-${i}`} className="hover:bg-[var(--fill-quaternary)]">
-                      <td className="px-4 py-2.5 font-mono text-xs">{row.orderNo}</td>
-                      <td className="px-4 py-2.5">
+                      <td className="font-mono text-xs">{row.orderNo}</td>
+                      <td>
                         <span className="font-mono text-xs text-muted-foreground">{row.styleNo}</span>
                         {row.styleName ? <span className="block text-xs">{row.styleName}</span> : null}
                       </td>
-                      <td className="px-4 py-2.5">{row.color}</td>
-                      <td className="px-4 py-2.5 text-right">{row.qty.toLocaleString()}</td>
-                      <td className="px-4 py-2.5 text-right">{formatKRW(row.materialCost)}</td>
-                      <td className="px-4 py-2.5 text-right">{formatKRW(row.factoryCost)}</td>
-                      <td className="px-4 py-2.5 text-right font-medium">{formatKRW(row.totalCost)}</td>
-                      <td className="px-4 py-2.5 text-right text-muted-foreground">
+                      <td>{row.color}</td>
+                      <td className="num">{row.qty.toLocaleString()}</td>
+                      <td className="num">{formatKRW(row.materialCost)}</td>
+                      <td className="num">{formatKRW(row.factoryCost)}</td>
+                      <td className="num font-medium">{formatKRW(row.totalCost)}</td>
+                      <td className="num text-muted-foreground">
                         {row.qty > 0 ? formatKRW(Math.round(row.totalCost / row.qty)) : '—'}
                       </td>
                     </tr>
@@ -154,13 +154,13 @@ export default function ProjectPL() {
                   <tfoot className="bg-muted border-t font-medium text-sm">
                     <tr>
                       <td colSpan={4} className="px-4 py-2.5 text-right text-muted-foreground">합계</td>
-                      <td className="px-4 py-2.5 text-right">
+                      <td className="num">
                         {formatKRW((pl.byStyleColor || []).reduce((s, r) => s + r.materialCost, 0))}
                       </td>
-                      <td className="px-4 py-2.5 text-right">
+                      <td className="num">
                         {formatKRW((pl.byStyleColor || []).reduce((s, r) => s + r.factoryCost, 0))}
                       </td>
-                      <td className="px-4 py-2.5 text-right">
+                      <td className="num">
                         {formatKRW((pl.byStyleColor || []).reduce((s, r) => s + r.totalCost, 0))}
                       </td>
                       <td />

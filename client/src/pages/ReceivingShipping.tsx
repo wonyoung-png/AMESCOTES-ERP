@@ -114,26 +114,26 @@ export default function ReceivingShipping() {
       </div>
 
       <div className="bg-card rounded-lg border border-border overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
+        <table className="data-table w-full text-sm min-w-[640px]">
           <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
-              <th className="text-left px-4 py-2">발주번호</th>
-              <th className="text-right px-4 py-2">발주</th>
-              <th className="text-right px-4 py-2">입고</th>
-              <th className="text-right px-4 py-2">출고</th>
-              <th className="text-right px-4 py-2">잔량</th>
-              <th className="px-4 py-2">처리</th>
+              <th>발주번호</th>
+              <th className="num">발주</th>
+              <th className="num">입고</th>
+              <th className="num">출고</th>
+              <th className="num">잔량</th>
+              <th>처리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.map(o => (
               <tr key={o.id} className="hover:bg-[var(--fill-quaternary)]">
-                <td className="px-4 py-3 font-mono text-xs">{o.orderNo}</td>
-                <td className="px-4 py-3 text-right">{formatNumber(o.qty)}</td>
-                <td className="px-4 py-3 text-right text-[var(--system-green)]">{formatNumber(o.receivedQty)}</td>
-                <td className="px-4 py-3 text-right text-primary">{formatNumber(o.shippedQty)}</td>
-                <td className="px-4 py-3 text-right font-semibold">{formatNumber(o.remaining)}</td>
-                <td className="px-4 py-3">
+                <td className="font-mono text-xs">{o.orderNo}</td>
+                <td className="num">{formatNumber(o.qty)}</td>
+                <td className="num text-[var(--system-green)]">{formatNumber(o.receivedQty)}</td>
+                <td className="num text-primary">{formatNumber(o.shippedQty)}</td>
+                <td className="num font-semibold">{formatNumber(o.remaining)}</td>
+                <td>
                   <div className="flex gap-1 flex-wrap">
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openModal(o.id, 'inbound')}>
                       <Package className="w-3 h-3 mr-1" />입고

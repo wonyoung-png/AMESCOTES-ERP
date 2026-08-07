@@ -428,18 +428,18 @@ export default function BrandOrders() {
                 <span className="text-[11px] text-muted-foreground ml-auto">{group.rows.length}차</span>
               </div>
               <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[720px]">
+              <table className="data-table w-full text-sm min-w-[720px]">
                 <thead className="text-[13px] font-semibold text-muted-foreground">
                   <tr>
-                    <th className="text-left px-3 py-2">차수</th>
-                    <th className="text-left px-3 py-2">컬러</th>
-                    <th className="text-left px-3 py-2">발주일</th>
-                    <th className="text-right px-3 py-2">발주</th>
-                    <th className="text-right px-3 py-2">선입</th>
-                    <th className="text-right px-3 py-2">입고</th>
-                    <th className="text-right px-3 py-2">잔량</th>
-                    <th className="text-left px-3 py-2">상태</th>
-                    <th className="px-3 py-2">액션</th>
+                    <th>차수</th>
+                    <th>컬러</th>
+                    <th>발주일</th>
+                    <th className="num">발주</th>
+                    <th className="num">선입</th>
+                    <th className="num">입고</th>
+                    <th className="num">잔량</th>
+                    <th>상태</th>
+                    <th>액션</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -447,21 +447,21 @@ export default function BrandOrders() {
                     const lines = (row.colorLines?.length ? row.colorLines : [{ color: '(미지정)', qty: row.qty, advanceQty: row.advanceQty, receivedQty: row.receivedQty, remaining: row.remaining }]);
                     return lines.map((cl, idx) => (
                       <tr key={`${row.orderId}-${cl.color}`} className="border-t border-border hover:bg-[var(--fill-quaternary)]">
-                        <td className="px-3 py-2 font-medium text-xs">
+                        <td className="font-medium text-xs">
                           {idx === 0 ? `${row.revision}차` : ''}
                           {idx === 0 && lines.length > 1 && (
                             <span className="block text-[11px] text-muted-foreground font-normal">합 {formatNumber(row.qty)}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td>
                           <Badge variant="outline" className="text-[11px] font-mono">{cl.color}</Badge>
                         </td>
-                        <td className="px-3 py-2 text-xs">{idx === 0 ? (row.orderDate || '—') : ''}</td>
-                        <td className="px-3 py-2 text-right">{formatNumber(cl.qty)}</td>
-                        <td className="px-3 py-2 text-right text-[var(--system-orange)]">{formatNumber(cl.advanceQty)}</td>
-                        <td className="px-3 py-2 text-right">{formatNumber(cl.receivedQty)}</td>
-                        <td className="px-3 py-2 text-right font-semibold">{formatNumber(cl.remaining)}</td>
-                        <td className="px-3 py-2">
+                        <td className="text-xs">{idx === 0 ? (row.orderDate || '—') : ''}</td>
+                        <td className="num">{formatNumber(cl.qty)}</td>
+                        <td className="num text-[var(--system-orange)]">{formatNumber(cl.advanceQty)}</td>
+                        <td className="num">{formatNumber(cl.receivedQty)}</td>
+                        <td className="num font-semibold">{formatNumber(cl.remaining)}</td>
+                        <td>
                           {idx === 0 ? (
                             <span className={`text-[11px] px-2 py-0.5 rounded border ${STATUS_CLASS[row.displayStatus]}`}>
                               {row.displayStatus}
@@ -470,7 +470,7 @@ export default function BrandOrders() {
                             <span className="text-[11px] text-muted-foreground">{cl.remaining <= 0 ? '입고완료' : cl.receivedQty > 0 ? '부분' : '대기'}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2">
+                        <td>
                           <div className="flex flex-wrap gap-1 justify-end">
                             {idx === 0 && (
                               <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => setDetailRow(row)}>상세</Button>
@@ -614,14 +614,14 @@ export default function BrandOrders() {
                   )}
 
                   <div className="overflow-x-auto border rounded-md">
-                  <table className="w-full text-sm min-w-[480px]">
+                  <table className="data-table w-full text-sm min-w-[480px]">
                     <thead className="text-[13px] font-semibold text-muted-foreground">
                       <tr>
-                        <th className="text-left px-3 py-2">SKU</th>
-                        <th className="text-left px-3 py-2">컬러</th>
-                        <th className="text-right px-3 py-2">수량</th>
-                        <th className="text-left px-3 py-2">공장</th>
-                        <th className="text-left px-3 py-2">생산지</th>
+                        <th>SKU</th>
+                        <th>컬러</th>
+                        <th className="num">수량</th>
+                        <th>공장</th>
+                        <th>생산지</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -629,11 +629,11 @@ export default function BrandOrders() {
                         const cqs = l.colorQtys?.length ? l.colorQtys : [{ color: '(미지정)', qty: l.qty }];
                         return cqs.map((cq, i) => (
                           <tr key={`${l.id}-${cq.color}-${i}`} className="hover:bg-[var(--fill-quaternary)]">
-                            <td className="px-3 py-2 font-mono text-xs">{i === 0 ? l.styleNo : ''}</td>
-                            <td className="px-3 py-2 text-xs">{cq.color}</td>
-                            <td className="px-3 py-2 text-right">{cq.qty}</td>
-                            <td className="px-3 py-2">{i === 0 ? (l.factoryName || '—') : ''}</td>
-                            <td className="px-3 py-2">{i === 0 ? (l.productionOrigin === 'china' ? '중국' : '국내') : ''}</td>
+                            <td className="font-mono text-xs">{i === 0 ? l.styleNo : ''}</td>
+                            <td className="text-xs">{cq.color}</td>
+                            <td className="num">{cq.qty}</td>
+                            <td>{i === 0 ? (l.factoryName || '—') : ''}</td>
+                            <td>{i === 0 ? (l.productionOrigin === 'china' ? '중국' : '국내') : ''}</td>
                           </tr>
                         ));
                       })}
@@ -749,26 +749,26 @@ export default function BrandOrders() {
 
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-1">컬러별</p>
-                <table className="w-full text-xs border rounded overflow-hidden">
+                <table className="data-table w-full text-xs border rounded overflow-hidden">
                   <thead className="text-muted-foreground font-semibold">
                     <tr>
-                      <th className="text-left px-2 py-1">컬러</th>
-                      <th className="text-right px-2 py-1">발주</th>
-                      <th className="text-right px-2 py-1">선입</th>
-                      <th className="text-right px-2 py-1">입고</th>
-                      <th className="text-right px-2 py-1">잔량</th>
-                      <th className="px-2 py-1"></th>
+                      <th>컬러</th>
+                      <th className="num">발주</th>
+                      <th className="num">선입</th>
+                      <th className="num">입고</th>
+                      <th className="num">잔량</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {(detailRow.colorLines || []).map(cl => (
                       <tr key={cl.color}>
-                        <td className="px-2 py-1 font-mono">{cl.color}</td>
-                        <td className="px-2 py-1 text-right">{formatNumber(cl.qty)}</td>
-                        <td className="px-2 py-1 text-right text-[var(--system-orange)]">{formatNumber(cl.advanceQty)}</td>
-                        <td className="px-2 py-1 text-right">{formatNumber(cl.receivedQty)}</td>
-                        <td className="px-2 py-1 text-right font-semibold">{formatNumber(cl.remaining)}</td>
-                        <td className="px-2 py-1 text-right">
+                        <td className="font-mono">{cl.color}</td>
+                        <td className="num">{formatNumber(cl.qty)}</td>
+                        <td className="num text-[var(--system-orange)]">{formatNumber(cl.advanceQty)}</td>
+                        <td className="num">{formatNumber(cl.receivedQty)}</td>
+                        <td className="num font-semibold">{formatNumber(cl.remaining)}</td>
+                        <td className="num">
                           {cl.remaining > 0 && (
                             <Button size="sm" variant="secondary" className="h-6 text-[11px]" onClick={() => openRecv(detailRow, cl.color)}>입고</Button>
                           )}

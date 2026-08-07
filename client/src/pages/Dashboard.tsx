@@ -514,24 +514,24 @@ export default function Dashboard() {
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-2">자재 요청 목록</p>
                 <div className="rounded-md border border-border overflow-x-auto">
-                  <table className="w-full min-w-[480px] text-xs">
+                  <table className="data-table w-full min-w-[480px] text-xs">
                     <thead>
                       <tr className="bg-muted border-b border-border">
-                        <th className="text-left px-3 py-1.5 text-muted-foreground font-medium">자재명</th>
-                        <th className="text-left px-3 py-1.5 text-muted-foreground font-medium">업체</th>
-                        <th className="text-left px-3 py-1.5 text-muted-foreground font-medium">컬러</th>
-                        <th className="text-right px-3 py-1.5 text-muted-foreground font-medium">수량</th>
-                        <th className="text-left px-3 py-1.5 text-muted-foreground font-medium">단위</th>
+                        <th className="text-muted-foreground font-medium">자재명</th>
+                        <th className="text-muted-foreground font-medium">업체</th>
+                        <th className="text-muted-foreground font-medium">컬러</th>
+                        <th className="num text-muted-foreground font-medium">수량</th>
+                        <th className="text-muted-foreground font-medium">단위</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {(selectedSample.materialRequests || []).map((req, i) => (
                         <tr key={i}>
-                          <td className="px-3 py-2 text-foreground font-medium">{req.itemName}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{req.vendor || <span className="text-muted-foreground">—</span>}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{req.color || <span className="text-muted-foreground">—</span>}</td>
-                          <td className="px-3 py-2 text-right text-foreground">{req.qty}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{req.unit}</td>
+                          <td className="text-foreground font-medium">{req.itemName}</td>
+                          <td className="text-muted-foreground">{req.vendor || <span className="text-muted-foreground">—</span>}</td>
+                          <td className="text-muted-foreground">{req.color || <span className="text-muted-foreground">—</span>}</td>
+                          <td className="num text-foreground">{req.qty}</td>
+                          <td className="text-muted-foreground">{req.unit}</td>
                         </tr>
                       ))}
                     </tbody>

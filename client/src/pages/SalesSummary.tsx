@@ -281,18 +281,18 @@ export default function SalesSummary() {
           <span className="text-xs text-muted-foreground">발주차수 = 누적 발주 횟수 (5번 발주면 5차) · 컬러별 수량 · 행 클릭 시 발주 상세</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[880px]">
+          <table className="data-table w-full text-sm min-w-[880px]">
             <thead>
               <tr className="border-b border-border bg-card text-xs text-muted-foreground">
-                <th className="w-8 px-2 py-2" />
-                <th className="text-left px-3 py-2">스타일번호</th>
-                <th className="text-left px-3 py-2">품명</th>
-                <th className="text-left px-3 py-2">시즌</th>
-                <th className="text-left px-3 py-2">바이어</th>
-                <th className="text-center px-3 py-2 whitespace-nowrap">발주차수</th>
-                <th className="text-right px-3 py-2 whitespace-nowrap">누적생산량</th>
-                <th className="text-left px-3 py-2 min-w-[280px]">컬러별 생산수량</th>
-                <th className="text-center px-3 py-2">최종발주</th>
+                <th className="w-8" />
+                <th>스타일번호</th>
+                <th>품명</th>
+                <th>시즌</th>
+                <th>바이어</th>
+                <th className="ctr whitespace-nowrap">발주차수</th>
+                <th className="num whitespace-nowrap">누적생산량</th>
+                <th className="min-w-[280px]">컬러별 생산수량</th>
+                <th className="ctr">최종발주</th>
               </tr>
             </thead>
             <tbody>
@@ -307,21 +307,21 @@ export default function SalesSummary() {
                       className={`border-t border-border hover:bg-[var(--fill-quaternary)] cursor-pointer align-top ${st.orderCount === 0 ? 'opacity-50' : ''}`}
                       onClick={() => st.orderCount > 0 && toggleExpand(item.id)}
                     >
-                      <td className="px-2 py-3 text-muted-foreground">
+                      <td className="text-muted-foreground">
                         {st.orderCount > 0 ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}
                       </td>
-                      <td className="px-3 py-3 font-mono text-xs text-primary whitespace-nowrap">{item.styleNo}</td>
-                      <td className="px-3 py-3">
+                      <td className="font-mono text-xs text-primary whitespace-nowrap">{item.styleNo}</td>
+                      <td>
                         <p className="font-medium text-foreground truncate max-w-[200px]" title={item.name}>{item.name}</p>
                         {item.nameEn && <p className="text-[11px] text-muted-foreground truncate max-w-[200px]">{item.nameEn}</p>}
                       </td>
-                      <td className="px-3 py-3 text-xs text-muted-foreground">{item.season || '—'}</td>
-                      <td className="px-3 py-3 text-xs">
+                      <td className="text-xs text-muted-foreground">{item.season || '—'}</td>
+                      <td className="text-xs">
                         {item.buyerId
                           ? (vendorMap.get(item.buyerId)?.code || vendorMap.get(item.buyerId)?.name || '—')
                           : '—'}
                       </td>
-                      <td className="px-3 py-3 text-center">
+                      <td className="ctr">
                         {st.orderCount > 0 ? (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 text-base font-bold tabular-nums text-primary">
                             {st.orderCount}차
@@ -330,7 +330,7 @@ export default function SalesSummary() {
                           <span className="text-xs text-muted-foreground">미발주</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-right">
+                      <td className="num">
                         {st.cumQty > 0 ? (
                           <div className="inline-flex flex-col items-end">
                             <span className="text-base font-bold tabular-nums text-foreground leading-none">{st.cumQty.toLocaleString()}</span>
@@ -338,7 +338,7 @@ export default function SalesSummary() {
                           </div>
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </td>
-                      <td className="px-3 py-3">
+                      <td>
                         {colorEntries.length > 0 ? (
                           <div className="space-y-1.5 min-w-[260px]">
                             {colorEntries.map(([c, q]) => {
@@ -362,7 +362,7 @@ export default function SalesSummary() {
                           </div>
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </td>
-                      <td className="px-3 py-3 text-center text-xs text-muted-foreground whitespace-nowrap">
+                      <td className="ctr text-xs text-muted-foreground whitespace-nowrap">
                         {st.lastOrderDate || '—'}
                       </td>
                     </tr>
@@ -371,26 +371,26 @@ export default function SalesSummary() {
                         <td colSpan={9} className="px-4 py-3">
                           <p className="text-[11px] font-semibold text-muted-foreground mb-2">발주 상세 (누적 {st.orderCount}차)</p>
                           <div className="rounded-md border border-border overflow-hidden bg-card">
-                            <table className="w-full text-xs">
+                            <table className="data-table w-full text-xs">
                               <thead>
                                 <tr className="bg-[var(--fill-quaternary)] text-muted-foreground">
-                                  <th className="text-left px-3 py-2">차수</th>
-                                  <th className="text-left px-3 py-2">발주번호</th>
-                                  <th className="text-left px-3 py-2">발주일</th>
-                                  <th className="text-left px-3 py-2">상태</th>
-                                  <th className="text-right px-3 py-2">수량</th>
-                                  <th className="text-left px-3 py-2">컬러별</th>
+                                  <th>차수</th>
+                                  <th>발주번호</th>
+                                  <th>발주일</th>
+                                  <th>상태</th>
+                                  <th className="num">수량</th>
+                                  <th>컬러별</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {st.rounds.map((r, idx) => (
                                   <tr key={`${item.id}-${r.orderId}`} className="border-t border-border">
-                                    <td className="px-3 py-2 font-semibold text-foreground">{idx + 1}차</td>
-                                    <td className="px-3 py-2 font-mono text-primary">{r.orderNo}</td>
-                                    <td className="px-3 py-2 text-muted-foreground">{r.orderDate || '—'}</td>
-                                    <td className="px-3 py-2 text-muted-foreground">{r.status || '—'}</td>
-                                    <td className="px-3 py-2 text-right font-mono font-semibold">{r.qty.toLocaleString()}</td>
-                                    <td className="px-3 py-2">
+                                    <td className="font-semibold text-foreground">{idx + 1}차</td>
+                                    <td className="font-mono text-primary">{r.orderNo}</td>
+                                    <td className="text-muted-foreground">{r.orderDate || '—'}</td>
+                                    <td className="text-muted-foreground">{r.status || '—'}</td>
+                                    <td className="num font-mono font-semibold">{r.qty.toLocaleString()}</td>
+                                    <td>
                                       <div className="flex flex-wrap gap-1.5">
                                         {(r.colorQtys || []).map(cq => (
                                           <span

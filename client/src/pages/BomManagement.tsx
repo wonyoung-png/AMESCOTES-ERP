@@ -1175,19 +1175,19 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
             </div>
           </div>
           <div className="overflow-x-auto rounded-md border border-border">
-            <table className="w-full text-xs">
+            <table className="data-table w-full text-xs">
               <thead>
                 <tr className="border-b border-border text-[13px] font-semibold text-muted-foreground">
-                  <th className="px-2 py-2 text-center w-8">No</th>
-                  <th className="px-2 py-2 text-left w-28">구분</th>
-                  <th className="px-2 py-2 text-left">품목</th>
-                  <th className="px-2 py-2 text-right w-16">소요량</th>
-                  <th className="px-2 py-2 text-right w-24">단가 (₩)</th>
-                  <th className="px-2 py-2 text-right w-24">공급가액</th>
-                  <th className="px-2 py-2 text-right w-20">세액</th>
-                  <th className="px-2 py-2 text-right w-24">합계금액</th>
-                  <th className="px-2 py-2 text-left w-20">비고</th>
-                  <th className="px-2 py-2 w-8"></th>
+                  <th className="ctr w-8">No</th>
+                  <th className="w-28">구분</th>
+                  <th>품목</th>
+                  <th className="num w-16">소요량</th>
+                  <th className="num w-24">단가 (₩)</th>
+                  <th className="num w-24">공급가액</th>
+                  <th className="num w-20">세액</th>
+                  <th className="num w-24">합계금액</th>
+                  <th className="w-20">비고</th>
+                  <th className="w-8"></th>
                 </tr>
               </thead>
               <tbody>
@@ -1201,13 +1201,13 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                     : '';
                   return (
                     <tr key={row.id} className={`border-b border-border ${rowBg}`}>
-                      <td className="px-2 py-1.5 text-center text-muted-foreground">{idx + 1}</td>
-                      <td className="px-1 py-1 min-w-[7rem]">
+                      <td className="ctr text-muted-foreground">{idx + 1}</td>
+                      <td className="min-w-[7rem]">
                         <Input value={row.category} onChange={e => updateRow(row.id, 'category', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-muted-foreground font-medium' : ''} ${marginRow ? 'text-primary font-semibold' : ''}`} />
                       </td>
-                      <td className="px-1 py-1"><Input value={row.itemName} onChange={e => updateRow(row.id, 'itemName', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-muted-foreground' : ''} ${marginRow ? 'text-primary' : ''}`} /></td>
-                      <td className="px-1 py-1"><Input type="number" value={parseFloat(row.qty.toFixed(2))} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${vendorRow ? 'text-muted-foreground font-semibold' : ''}`} /></td>
-                      <td className="px-1 py-1">
+                      <td><Input value={row.itemName} onChange={e => updateRow(row.id, 'itemName', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-muted-foreground' : ''} ${marginRow ? 'text-primary' : ''}`} /></td>
+                      <td><Input type="number" value={parseFloat(row.qty.toFixed(2))} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${vendorRow ? 'text-muted-foreground font-semibold' : ''}`} /></td>
+                      <td>
                         <div className="text-right">
                           {vendorRow ? (
                             <span className="text-xs text-muted-foreground px-1">—</span>
@@ -1221,7 +1221,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                           )}
                         </div>
                       </td>
-                      <td className="px-1 py-1">
+                      <td>
                         {vendorRow ? (
                           <span className="text-xs text-muted-foreground px-1 block text-right">—</span>
                         ) : (
@@ -1235,16 +1235,16 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                       </td>
                       <td className={`px-2 py-1.5 text-right ${marginRow ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>{vendorRow ? '—' : fmtKrw(row.taxAmt)}</td>
                       <td className={`px-2 py-1.5 text-right font-medium ${marginRow ? 'text-primary' : ''}`}>{vendorRow ? '—' : fmtKrw(ceil10(row.supplyAmt + row.taxAmt))}</td>
-                      <td className="px-1 py-1">{marginRow ? null : vendorRow ? <span className="text-xs text-muted-foreground font-medium px-1">업체제공</span> : <Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" placeholder="비고" />}</td>
-                      <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(r => r.id !== row.id))} className="text-muted-foreground hover:text-[var(--system-red)]"><X className="w-3 h-3" /></button></td>
+                      <td>{marginRow ? null : vendorRow ? <span className="text-xs text-muted-foreground font-medium px-1">업체제공</span> : <Input value={row.memo || ''} onChange={e => updateRow(row.id, 'memo', e.target.value)} className="h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0" placeholder="비고" />}</td>
+                      <td className="ctr"><button onClick={() => setRows(p => p.filter(r => r.id !== row.id))} className="text-muted-foreground hover:text-[var(--system-red)]"><X className="w-3 h-3" /></button></td>
                     </tr>
                   );
                 })}
                 <tr className="bg-[var(--fill-quaternary)] font-semibold border-t border-border">
                   <td colSpan={5} className="px-2 py-2 text-right text-sm">TOTAL</td>
-                  <td className="px-2 py-2 text-right text-sm">{fmtKrw(totalSupply)}</td>
-                  <td className="px-2 py-2 text-right text-sm">{fmtKrw(totalTax)}</td>
-                  <td className="px-2 py-2 text-right text-sm text-[#C9A96E]">{fmtKrw(grandTotal)}</td>
+                  <td className="num text-sm">{fmtKrw(totalSupply)}</td>
+                  <td className="num text-sm">{fmtKrw(totalTax)}</td>
+                  <td className="num text-sm text-[#C9A96E]">{fmtKrw(grandTotal)}</td>
                   <td colSpan={2}></td>
                 </tr>
               </tbody>
@@ -1266,7 +1266,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
               </div>
               <div className="greet">아래와 같이 견적합니다.</div>
               <div className="total-box"><span className="tl">합계금액 (공급가액 + 세액)</span><span className="ta">{fmtKrw(grandTotal)}</span></div>
-              <table>
+              <table className="data-table">
                 <thead><tr><th style={{width:'28px'}}>No</th><th style={{width:'80px'}}>구분</th><th>품목</th><th style={{width:'55px'}}>소요량</th><th style={{width:'85px'}}>단가</th><th style={{width:'85px'}}>공급가액</th><th style={{width:'75px'}}>세액</th><th style={{width:'85px'}}>합계금액</th><th style={{width:'75px'}}>비고</th></tr></thead>
                 <tbody>
                   {rows.map((row, idx) => (
@@ -1694,25 +1694,25 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
           </div>
           {/* 행 테이블 */}
           <div className="overflow-x-auto rounded-md border border-border">
-            <table className="w-full min-w-[560px]">
+            <table className="data-table w-full min-w-[560px]">
               <thead className={`bg-muted border-b border-border`}>
                 <tr>
-                  <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">부위</th>
+                  <th className="text-[11px] text-muted-foreground ctr">부위</th>
                   {calcType === 'SF' ? (
                     <>
-                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">가로 CM</th>
-                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">세로 CM</th>
-                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">가로(+0.5)</th>
-                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">세로(+0.5)</th>
+                      <th className="text-[11px] text-muted-foreground ctr">가로 CM</th>
+                      <th className="text-[11px] text-muted-foreground ctr">세로 CM</th>
+                      <th className="text-[11px] text-muted-foreground ctr">가로(+0.5)</th>
+                      <th className="text-[11px] text-muted-foreground ctr">세로(+0.5)</th>
                     </>
                   ) : (
                     <>
-                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">가로 CM</th>
-                      <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">세로 CM</th>
+                      <th className="text-[11px] text-muted-foreground ctr">가로 CM</th>
+                      <th className="text-[11px] text-muted-foreground ctr">세로 CM</th>
                     </>
                   )}
-                  <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">수량</th>
-                  <th className="text-[11px] text-muted-foreground py-1.5 px-2 text-center">{calcType === 'SF' ? 'NET(S/F)' : 'NET(YD)'}</th>
+                  <th className="text-[11px] text-muted-foreground ctr">수량</th>
+                  <th className="text-[11px] text-muted-foreground ctr">{calcType === 'SF' ? 'NET(S/F)' : 'NET(YD)'}</th>
                   <th className="w-6"></th>
                 </tr>
               </thead>
@@ -1723,18 +1723,18 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
                     : (width > 0 ? r.가로 * r.세로 * r.수량 / width / 91.44 : 0);
                   return (
                     <tr key={r.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                      <td className="px-1 py-1"><input className={inputCls} value={r.부위} onChange={e => update(r.id, '부위', e.target.value)} placeholder="바디" /></td>
-                      <td className="px-1 py-1"><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => update(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
-                      <td className="px-1 py-1"><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => update(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
+                      <td><input className={inputCls} value={r.부위} onChange={e => update(r.id, '부위', e.target.value)} placeholder="바디" /></td>
+                      <td><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => update(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
+                      <td><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => update(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
                       {calcType === 'SF' && (
                         <>
-                          <td className="px-1 py-1"><input className={inputRO} value={(r.가로 + 0.5).toFixed(1)} readOnly /></td>
-                          <td className="px-1 py-1"><input className={inputRO} value={(r.세로 + 0.5).toFixed(1)} readOnly /></td>
+                          <td><input className={inputRO} value={(r.가로 + 0.5).toFixed(1)} readOnly /></td>
+                          <td><input className={inputRO} value={(r.세로 + 0.5).toFixed(1)} readOnly /></td>
                         </>
                       )}
-                      <td className="px-1 py-1"><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => update(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
-                      <td className="px-1 py-1"><input className={inputRO + ` font-semibold text-${accent}-700`} value={rowNet.toFixed(3)} readOnly /></td>
-                      <td className="px-1 py-1 text-center"><button onClick={() => setRows(p => p.filter(x => x.id !== r.id))} className="text-muted-foreground hover:text-[var(--system-red)]">×</button></td>
+                      <td><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => update(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
+                      <td><input className={inputRO + ` font-semibold text-${accent}-700`} value={rowNet.toFixed(3)} readOnly /></td>
+                      <td className="ctr"><button onClick={() => setRows(p => p.filter(x => x.id !== r.id))} className="text-muted-foreground hover:text-[var(--system-red)]">×</button></td>
                     </tr>
                   );
                 })}
@@ -1882,7 +1882,7 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
       )}
     <tr className={`group transition-colors border-b border-border ${ringCls}`}>
       {/* 자재명 (부위 Select가 inline으로 포함됨) */}
-      <td className="px-1 py-1">
+      <td>
         <div className="flex items-center gap-1">
           <Select value={line.subPart || ''} onValueChange={v => onChange(line.id, 'subPart', v as BomSubPart)}>
             <SelectTrigger className={`${CELL_INPUT} border-border w-20 shrink-0`}>
@@ -1935,9 +1935,9 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
         </div>
       </td>
       {/* 규격 */}
-      <td className="px-1 py-1"><Input value={line.spec || ''} onChange={e => onChange(line.id, 'spec', e.target.value)} className={`${CELL_INPUT} border-border bg-card min-w-[60px]`} placeholder="규격" /></td>
+      <td><Input value={line.spec || ''} onChange={e => onChange(line.id, 'spec', e.target.value)} className={`${CELL_INPUT} border-border bg-card min-w-[60px]`} placeholder="규격" /></td>
       {/* 단위 */}
-      <td className="px-1 py-1">
+      <td>
         <div className="flex flex-col gap-0.5">
           <Select value={line.unit} onValueChange={v => { onChange(line.id, 'unit', v); if (v !== '직접입력') onChange(line.id, 'customUnit', ''); }}>
             <SelectTrigger className={`${CELL_INPUT} border-border w-20`}><SelectValue /></SelectTrigger>
@@ -1956,7 +1956,7 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
         </div>
       </td>
       {/* 단가 */}
-      <td className="px-1 py-1">
+      <td>
         <Input
           type="number"
           value={line.unitPriceCny || ''}
@@ -1967,11 +1967,11 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
         <div style={{fontSize:'10px', color:'#9CA3AF', textAlign:'right'}}>₩{Math.round(line.unitPriceCny * cnyKrw).toLocaleString()}</div>
       </td>
       {/* NET 소요량 */}
-      <td className="px-1 py-1"><Input type="number" step="any" value={netQtyStr} onChange={e => { setNetQtyStr(e.target.value); const n = parseFloat(e.target.value); if (!isNaN(n)) onChange(line.id, 'netQty', n); else onChange(line.id, 'netQty', 0); }} onBlur={e => { const n = parseFloat(e.target.value); const v = isNaN(n) ? 0 : n; onChange(line.id, 'netQty', v); setNetQtyStr(v !== 0 ? String(v) : ''); }} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder="0" /></td>
+      <td><Input type="number" step="any" value={netQtyStr} onChange={e => { setNetQtyStr(e.target.value); const n = parseFloat(e.target.value); if (!isNaN(n)) onChange(line.id, 'netQty', n); else onChange(line.id, 'netQty', 0); }} onBlur={e => { const n = parseFloat(e.target.value); const v = isNaN(n) ? 0 : n; onChange(line.id, 'netQty', v); setNetQtyStr(v !== 0 ? String(v) : ''); }} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder="0" /></td>
       {/* LOSS */}
-      <td className="px-1 py-1"><Input type="number" step="any" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className={`${CELL_INPUT} border-border bg-card text-right w-14`} placeholder="5" /></td>
+      <td><Input type="number" step="any" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className={`${CELL_INPUT} border-border bg-card text-right w-14`} placeholder="5" /></td>
       {/* 소요량 */}
-      <td className="px-1 py-1">
+      <td>
         <div className="flex items-center gap-1">
           <Input
             type="number"
@@ -1996,19 +1996,19 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
         </div>
       </td>
       {/* 제조금액 — 실무는 원화 기준이라 원화를 크게, 입력통화는 작게 */}
-      <td className="px-2 py-1 text-right tabular-nums">
+      <td className="num tabular-nums">
         <div style={{fontWeight:600}}>₩{Math.round(amt * cnyKrw).toLocaleString()}</div>
         <div style={{fontSize:'10px', color:'#9CA3AF'}}>{amt ? amt.toFixed(3) : '0'}</div>
       </td>
       {/* 공급 — 체크하면 본사 제공(업체명 입력), 안 하면 공장 완사입 */}
-      <td className="px-2 py-1 w-20">
+      <td className="w-20">
         <label className="flex items-center justify-center gap-1.5 cursor-pointer" title="체크하면 본사에서 사서 공장에 제공하는 자재">
           <input type="checkbox" checked={isHqProvided} onChange={e => handleHqChange(e.target.checked)} className="w-4 h-4 accent-primary" />
           {isHqProvided && <span className="text-xs font-medium text-primary">제공</span>}
         </label>
       </td>
       {/* 자재업체 (본사제공 시에만 입력 가능) */}
-      <td className="px-1 py-1">
+      <td>
         {isHqProvided ? (
           <VendorAutoComplete
             value={line.vendorName || ''}
@@ -2021,7 +2021,7 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
         )}
       </td>
       {/* 삭제 */}
-      <td className="px-1 py-1"><button onClick={() => onDelete(line.id)} className={`${ICON_BTN} opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-[var(--system-red)] hover:bg-[var(--system-red)]/10`}><Trash2 className="w-3.5 h-3.5" /></button></td>
+      <td><button onClick={() => onDelete(line.id)} className={`${ICON_BTN} opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-[var(--system-red)] hover:bg-[var(--system-red)]/10`}><Trash2 className="w-3.5 h-3.5" /></button></td>
     </tr>
     </>
   );
@@ -3961,20 +3961,20 @@ export default function BomManagement() {
                     </span>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[900px] text-xs">
+                    <table className="data-table w-full min-w-[900px] text-xs">
                       <thead>
                         <tr className="border-b border-border text-[11px] font-semibold text-muted-foreground">
-                          <th className="px-2 py-2 text-left">부위 | 자재명</th>
-                          <th className="px-2 py-2 text-left w-20">규격</th>
-                          <th className="px-2 py-2 text-center w-20">단위</th>
-                          <th className="px-2 py-2 text-right w-24">단가</th>
-                          <th className="px-2 py-2 text-right w-20">NET</th>
-                          <th className="px-2 py-2 text-right w-16">LOSS(%)</th>
-                          <th className="px-2 py-2 text-right w-24">소요량</th>
-                          <th className="px-2 py-2 text-right w-28">제조금액</th>
-                          <th className="px-2 py-2 text-center w-28">공급</th>
-                          <th className="px-2 py-2 text-left w-36">자재업체</th>
-                          <th className="px-2 py-2 w-8"></th>
+                          <th>부위 | 자재명</th>
+                          <th className="w-20">규격</th>
+                          <th className="ctr w-20">단위</th>
+                          <th className="num w-24">단가</th>
+                          <th className="num w-20">NET</th>
+                          <th className="num w-16">LOSS(%)</th>
+                          <th className="num w-24">소요량</th>
+                          <th className="num w-28">제조금액</th>
+                          <th className="ctr w-28">공급</th>
+                          <th className="w-36">자재업체</th>
+                          <th className="w-8"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -4047,7 +4047,7 @@ export default function BomManagement() {
                           const lineAmt = line.netQty * line.unitPrice;
                           return (
                             <tr key={line.id} className="group hover:bg-[var(--fill-quaternary)] transition-colors border-b border-border">
-                              <td className="px-1 py-1" colSpan={3}>
+                              <td colSpan={3}>
                                 <div className="flex items-center gap-1">
                                   <Select value={(line as PostProcessLine & { subPart?: string }).subPart || ''} onValueChange={v => updateColorPostLine(colorBom.color, line.id, 'subPart' as keyof PostProcessLine, v)}>
                                     <SelectTrigger className={`${CELL_INPUT} border-border w-20 shrink-0`}><SelectValue placeholder="-" /></SelectTrigger>
@@ -4059,16 +4059,16 @@ export default function BomManagement() {
                                   <Input value={line.name} onChange={e => updateColorPostLine(colorBom.color, line.id, 'name', e.target.value)} className={`${CELL_INPUT} border-border bg-card min-w-[80px]`} placeholder="후가공 품목명" />
                                 </div>
                               </td>
-                              <td className="px-1 py-1"><Input type="number" value={line.unitPrice || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'unitPrice', Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={`단가(${curSymbol})`} /></td>
-                              <td className="px-1 py-1"><Input type="number" value={line.netQty || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'netQty', Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder="수량" /></td>
-                              <td className="px-2 py-1 text-center text-xs text-muted-foreground">-</td>
-                              <td className="px-2 py-1 text-right text-xs text-muted-foreground tabular-nums">{fmt(line.netQty)}</td>
-                              <td className="px-2 py-1 text-right tabular-nums">
+                              <td><Input type="number" value={line.unitPrice || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'unitPrice', Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={`단가(${curSymbol})`} /></td>
+                              <td><Input type="number" value={line.netQty || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'netQty', Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder="수량" /></td>
+                              <td className="ctr text-xs text-muted-foreground">-</td>
+                              <td className="num text-xs text-muted-foreground tabular-nums">{fmt(line.netQty)}</td>
+                              <td className="num tabular-nums">
                                 <div style={{fontWeight:600}}>₩{Math.round(lineAmt * preRate).toLocaleString()}</div>
                                 <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round(lineAmt * preRate).toLocaleString()}</div>
                               </td>
                               <td></td><td></td>
-                              <td className="px-1 py-1"><button onClick={() => deleteColorPostLine(colorBom.color, line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-[var(--system-red)] p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                              <td><button onClick={() => deleteColorPostLine(colorBom.color, line.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-[var(--system-red)] p-0.5"><Trash2 className="w-3.5 h-3.5" /></button></td>
                             </tr>
                           );
                         })}
@@ -4081,16 +4081,16 @@ export default function BomManagement() {
                           </td>
                         </tr>
                         <tr className="bg-primary/5 border-b border-border">
-                          <td className="px-1 py-1" colSpan={3}>
+                          <td colSpan={3}>
                             <span className="text-[13px] text-muted-foreground px-2">임가공비 (NET)</span>
                           </td>
-                          <td className="px-1 py-1">
+                          <td>
                             <Input type="number" value={colorBom.processingFee || ''} onChange={e => updateColorProcessingFee(colorBom.color, Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={curSymbol} />
                           </td>
-                          <td className="px-1 py-1"><span className="text-xs text-muted-foreground px-2">1</span></td>
+                          <td><span className="text-xs text-muted-foreground px-2">1</span></td>
                           <td></td>
-                          <td className="px-2 py-1 text-right text-xs text-muted-foreground">1</td>
-                          <td className="px-2 py-1 text-right tabular-nums">
+                          <td className="num text-xs text-muted-foreground">1</td>
+                          <td className="num tabular-nums">
                             <div style={{fontWeight:600}}>₩{Math.round((colorBom.processingFee ?? 0) * preRate).toLocaleString()}</div>
                             <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round((colorBom.processingFee ?? 0) * preRate).toLocaleString()}</div>
                           </td>
@@ -4107,8 +4107,8 @@ export default function BomManagement() {
                     <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
                       <h2 className="text-sm font-semibold">사전 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— [{colorBom.color}] 기준</span></h2>
                     </div>
-                    <table className="w-full text-[13px]">
-                      <thead><tr className="bg-[var(--fill-tertiary)] text-[13px] font-semibold text-muted-foreground"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-muted-foreground">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
+                    <table className="data-table w-full text-[13px]">
+                      <thead><tr className="bg-[var(--fill-tertiary)] text-[13px] font-semibold text-muted-foreground"><th className="w-12">구분</th><th>항목</th><th className="text-muted-foreground">내용/비고</th><th className="num w-40">금액 (원)</th></tr></thead>
                       <tbody>
                         {[
                           { key: '원', label: '원부자재 합산', desc: `원자재 + 부자재 + 보강재 + 포장재 (${summary.preCur}, 본사/업체제공 포함)`, val: summary.totalMaterialKrw + summary.postProcessKrw, editable: false },
@@ -4117,10 +4117,10 @@ export default function BomManagement() {
                           { key: '재', label: '포장/검사비', desc: '포장 잡비, 검사 인건비', val: summary.packagingKrw, editable: true, field: 'packagingCostKrw' as keyof ExtBom },
                         ].map(row => (
                           <tr key={row.key} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                            <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">{row.key}</span></td>
-                            <td className="px-4 py-2 font-medium text-foreground">{row.label}</td>
-                            <td className="px-4 py-2 text-muted-foreground">{row.desc}</td>
-                            <td className="px-4 py-2 text-right font-semibold tabular-nums">
+                            <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">{row.key}</span></td>
+                            <td className="font-medium text-foreground">{row.label}</td>
+                            <td className="text-muted-foreground">{row.desc}</td>
+                            <td className="num font-semibold tabular-nums">
                               {row.editable && row.field ? (
                                 <Input type="number" value={(editBom[row.field] as number) || ''} onChange={e => updateField(row.field!, Number(e.target.value) as ExtBom[typeof row.field])} className={`${CELL_INPUT} border-border text-right w-36 ml-auto`} placeholder="0" />
                               ) : (
@@ -4130,9 +4130,9 @@ export default function BomManagement() {
                           </tr>
                         ))}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">패</span></td>
-                          <td className="px-4 py-2 font-medium text-foreground">패킹재</td>
-                          <td className="px-4 py-2 text-muted-foreground">
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">패</span></td>
+                          <td className="font-medium text-foreground">패킹재</td>
+                          <td className="text-muted-foreground">
                             <Select
                               value={editBom.packingItemId || '_none'}
                               onValueChange={selectPackingItem}
@@ -4155,14 +4155,14 @@ export default function BomManagement() {
                               <div className="text-[11px] text-primary mt-0.5">{editBom.packingItemStyleNo} 연동</div>
                             ) : null}
                           </td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums">
+                          <td className="num font-semibold tabular-nums">
                             <span className={summary.packingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(summary.packingKrw)}</span>
                           </td>
                         </tr>
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">마</span></td>
-                          <td className="px-4 py-2 font-medium text-foreground">생산마진</td>
-                          <td className="px-4 py-2 text-muted-foreground">
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">마</span></td>
+                          <td className="font-medium text-foreground">생산마진</td>
+                          <td className="text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <Input
                                 type="number"
@@ -4174,14 +4174,14 @@ export default function BomManagement() {
                               <span className="text-muted-foreground text-xs">%</span>
                             </div>
                           </td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums">
+                          <td className="num font-semibold tabular-nums">
                             <span className={summary.productionMarginKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(summary.productionMarginKrw)}</span>
                           </td>
                         </tr>
                         <tr className="bg-foreground text-background">
-                          <td className="px-4 py-3"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-background/15 text-[11px] font-semibold text-background">사</span></td>
-                          <td className="px-4 py-3 font-bold text-base" colSpan={2}>총 원 가 액</td>
-                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums">{fmtKrw(summary.totalCostKrw)}</td>
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-background/15 text-[11px] font-semibold text-background">사</span></td>
+                          <td className="font-bold text-base" colSpan={2}>총 원 가 액</td>
+                          <td className="num font-bold text-lg tabular-nums">{fmtKrw(summary.totalCostKrw)}</td>
                         </tr>
                         {(() => {
                           const linkedItem = items.find(i => i.id === editBom.styleId);
@@ -4194,9 +4194,9 @@ export default function BomManagement() {
                           return (
                             <>
                               <tr className="bg-primary/10 border-t border-primary/20">
-                                <td className="px-4 py-2.5 text-xs font-medium text-primary">연동</td>
-                                <td className="px-4 py-2.5 text-sm font-semibold text-primary" colSpan={2}>납품가 (품목 마스터 연동)</td>
-                                <td className="px-4 py-2.5 text-right font-mono font-bold text-primary">{fmtKrw(deliveryPrice)}</td>
+                                <td className="text-xs font-medium text-primary">연동</td>
+                                <td className="text-sm font-semibold text-primary" colSpan={2}>납품가 (품목 마스터 연동)</td>
+                                <td className="num font-mono font-bold text-primary">{fmtKrw(deliveryPrice)}</td>
                               </tr>
                               <tr>
                                 <td colSpan={4} className="px-4 py-2">
@@ -4237,30 +4237,30 @@ export default function BomManagement() {
                           <div className="px-5 py-3 border-b border-primary/10 bg-primary/5">
                             <h4 className="font-semibold text-sm text-primary">본사제공 자재 목록</h4>
                           </div>
-                          <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-xs">
+                          <div className="overflow-x-auto"><table className="data-table w-full min-w-[640px] text-xs">
                             <thead>
                               <tr className="bg-primary/5 text-[13px] font-semibold text-muted-foreground">
-                                <th className="px-3 py-2 text-left">부위</th>
-                                <th className="px-3 py-2 text-left">자재명</th>
-                                <th className="px-3 py-2 text-left">규격</th>
-                                <th className="px-3 py-2 text-left">단위</th>
-                                <th className="px-3 py-2 text-right">단가</th>
-                                <th className="px-3 py-2 text-right">소요량</th>
-                                <th className="px-3 py-2 text-right">금액(KRW)</th>
-                                <th className="px-3 py-2 text-left">자재업체</th>
+                                <th>부위</th>
+                                <th>자재명</th>
+                                <th>규격</th>
+                                <th>단위</th>
+                                <th className="num">단가</th>
+                                <th className="num">소요량</th>
+                                <th className="num">금액(KRW)</th>
+                                <th>자재업체</th>
                               </tr>
                             </thead>
                             <tbody>
                               {hqLines.map((l, i) => (
                                 <tr key={i} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                                  <td className="px-3 py-1.5 text-muted-foreground">{l.category}</td>
-                                  <td className="px-3 py-1.5 font-medium text-foreground">{l.materialName || l.itemName}</td>
-                                  <td className="px-3 py-1.5 text-muted-foreground">{l.spec || '-'}</td>
-                                  <td className="px-3 py-1.5 text-muted-foreground">{l.unit || '-'}</td>
-                                  <td className="px-3 py-1.5 text-right text-muted-foreground">{l.unitPriceCny}</td>
-                                  <td className="px-3 py-1.5 text-right text-muted-foreground">{calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate).toFixed(3)}</td>
-                                  <td className="px-3 py-1.5 text-right font-semibold text-[#C9A96E]">₩{Math.round(calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * toKrw).toLocaleString()}</td>
-                                  <td className="px-3 py-1.5 text-muted-foreground">{l.vendorName || '-'}</td>
+                                  <td className="text-muted-foreground">{l.category}</td>
+                                  <td className="font-medium text-foreground">{l.materialName || l.itemName}</td>
+                                  <td className="text-muted-foreground">{l.spec || '-'}</td>
+                                  <td className="text-muted-foreground">{l.unit || '-'}</td>
+                                  <td className="num text-muted-foreground">{l.unitPriceCny}</td>
+                                  <td className="num text-muted-foreground">{calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate).toFixed(3)}</td>
+                                  <td className="num font-semibold text-[#C9A96E]">₩{Math.round(calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * toKrw).toLocaleString()}</td>
+                                  <td className="text-muted-foreground">{l.vendorName || '-'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -4272,30 +4272,30 @@ export default function BomManagement() {
                           <div className="px-5 py-3 border-b border-border bg-[var(--fill-tertiary)]">
                             <h4 className="font-semibold text-sm text-muted-foreground">업체제공 자재 목록</h4>
                           </div>
-                          <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-xs">
+                          <div className="overflow-x-auto"><table className="data-table w-full min-w-[640px] text-xs">
                             <thead>
                               <tr className="bg-[var(--fill-tertiary)] text-[13px] font-semibold text-muted-foreground">
-                                <th className="px-3 py-2 text-left">부위</th>
-                                <th className="px-3 py-2 text-left">자재명</th>
-                                <th className="px-3 py-2 text-left">규격</th>
-                                <th className="px-3 py-2 text-left">단위</th>
-                                <th className="px-3 py-2 text-right">단가</th>
-                                <th className="px-3 py-2 text-right">소요량</th>
-                                <th className="px-3 py-2 text-right">금액(KRW)</th>
-                                <th className="px-3 py-2 text-left">자재업체</th>
+                                <th>부위</th>
+                                <th>자재명</th>
+                                <th>규격</th>
+                                <th>단위</th>
+                                <th className="num">단가</th>
+                                <th className="num">소요량</th>
+                                <th className="num">금액(KRW)</th>
+                                <th>자재업체</th>
                               </tr>
                             </thead>
                             <tbody>
                               {vendorLines.map((l, i) => (
                                 <tr key={i} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                                  <td className="px-3 py-1.5 text-muted-foreground">{l.category}</td>
-                                  <td className="px-3 py-1.5 font-medium text-foreground">{l.materialName || l.itemName}</td>
-                                  <td className="px-3 py-1.5 text-muted-foreground">{l.spec || '-'}</td>
-                                  <td className="px-3 py-1.5 text-muted-foreground">{l.unit || '-'}</td>
-                                  <td className="px-3 py-1.5 text-right text-muted-foreground">{l.unitPriceCny}</td>
-                                  <td className="px-3 py-1.5 text-right text-muted-foreground">{calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate).toFixed(3)}</td>
-                                  <td className="px-3 py-1.5 text-right font-semibold text-[#C9A96E]">₩{Math.round(calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * toKrw).toLocaleString()}</td>
-                                  <td className="px-3 py-1.5 text-muted-foreground">{l.vendorName || '-'}</td>
+                                  <td className="text-muted-foreground">{l.category}</td>
+                                  <td className="font-medium text-foreground">{l.materialName || l.itemName}</td>
+                                  <td className="text-muted-foreground">{l.spec || '-'}</td>
+                                  <td className="text-muted-foreground">{l.unit || '-'}</td>
+                                  <td className="num text-muted-foreground">{l.unitPriceCny}</td>
+                                  <td className="num text-muted-foreground">{calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate).toFixed(3)}</td>
+                                  <td className="num font-semibold text-[#C9A96E]">₩{Math.round(calcLineAmt(l.unitPriceCny, l.netQty, l.lossRate) * toKrw).toLocaleString()}</td>
+                                  <td className="text-muted-foreground">{l.vendorName || '-'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -4590,20 +4590,20 @@ export default function BomManagement() {
                       </div>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[900px] text-xs">
+                      <table className="data-table w-full min-w-[900px] text-xs">
                         <thead>
                           <tr className="border-b border-border text-[11px] font-semibold text-muted-foreground">
-                            <th className="px-2 py-2 text-left">부위 | 자재명</th>
-                            <th className="px-2 py-2 text-left w-20">규격</th>
-                            <th className="px-2 py-2 text-center w-20">단위</th>
-                            <th className="px-2 py-2 text-right w-24">단가</th>
-                            <th className="px-2 py-2 text-right w-20">NET</th>
-                            <th className="px-2 py-2 text-right w-16">LOSS(%)</th>
-                            <th className="px-2 py-2 text-right w-24">소요량</th>
-                            <th className="px-2 py-2 text-right w-28">제조금액</th>
-                            <th className="px-2 py-2 text-center w-28">공급</th>
-                            <th className="px-2 py-2 text-left w-36">자재업체</th>
-                            <th className="px-2 py-2 w-8"></th>
+                            <th>부위 | 자재명</th>
+                            <th className="w-20">규격</th>
+                            <th className="ctr w-20">단위</th>
+                            <th className="num w-24">단가</th>
+                            <th className="num w-20">NET</th>
+                            <th className="num w-16">LOSS(%)</th>
+                            <th className="num w-24">소요량</th>
+                            <th className="num w-28">제조금액</th>
+                            <th className="ctr w-28">공급</th>
+                            <th className="w-36">자재업체</th>
+                            <th className="w-8"></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -4676,23 +4676,23 @@ export default function BomManagement() {
                             </tr>
                             {!collapsedPostSections.has('후가공') && (postColorBom.postProcessLines ?? []).map(line => (
                               <tr key={line.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                                <td className="px-2 py-1" colSpan={2}>
+                                <td colSpan={2}>
                                   <Input value={line.name} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'name', e.target.value)} placeholder="후가공 작업명" className={`${CELL_INPUT} border-border w-full`} />
                                 </td>
-                                <td className="px-1 py-1"></td>
-                                <td className="px-1 py-1">
+                                <td></td>
+                                <td>
                                   <Input type="number" value={line.netQty || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'netQty', Number(e.target.value))} placeholder="NET" className={`${CELL_INPUT} border-border w-16 text-right`} />
                                 </td>
-                                <td className="px-1 py-1">
+                                <td>
                                   <Input type="number" value={line.unitPrice || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'unitPrice', Number(e.target.value))} placeholder="단가" className={`${CELL_INPUT} border-border w-20 text-right`} />
                                 </td>
-                                <td className="px-1 py-1"></td>
-                                <td className="px-2 py-1 text-right tabular-nums">
+                                <td></td>
+                                <td className="num tabular-nums">
                                   <div style={{fontWeight:600}}>₩{Math.round(line.netQty * line.unitPrice * postRate).toLocaleString()}</div>
                                   <div style={{fontSize:'10px', color:'#9CA3AF'}}>{(line.netQty * line.unitPrice).toFixed(3)}</div>
                                 </td>
                                 <td colSpan={3}></td>
-                                <td className="px-1 py-1 text-center">
+                                <td className="ctr">
                                   <button onClick={() => deletePostColorPostLine(postColorBom.color, line.id)} className="text-muted-foreground hover:text-[var(--system-red)]"><Trash2 className="w-3.5 h-3.5" /></button>
                                 </td>
                               </tr>
@@ -4706,16 +4706,16 @@ export default function BomManagement() {
                             </td>
                           </tr>
                           <tr className="bg-primary/5 border-b border-border">
-                            <td className="px-1 py-1" colSpan={3}>
+                            <td colSpan={3}>
                               <span className="text-[13px] text-muted-foreground px-2">임가공비 (NET)</span>
                             </td>
-                            <td className="px-1 py-1">
+                            <td>
                               <Input type="number" value={postColorBom.processingFee || ''} onChange={e => updateColorProcessingFee(postColorBom.color, Number(e.target.value), 'post')} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={curSymbol} />
                             </td>
-                            <td className="px-1 py-1"><span className="text-xs text-muted-foreground px-2">1</span></td>
+                            <td><span className="text-xs text-muted-foreground px-2">1</span></td>
                             <td></td>
-                            <td className="px-2 py-1 text-right text-xs text-muted-foreground">1</td>
-                            <td className="px-2 py-1 text-right tabular-nums">
+                            <td className="num text-xs text-muted-foreground">1</td>
+                            <td className="num tabular-nums">
                               <div style={{fontWeight:600}}>₩{Math.round((postColorBom.processingFee ?? 0) * postRate).toLocaleString()}</div>
                               <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round((postColorBom.processingFee ?? 0) * postRate).toLocaleString()}</div>
                             </td>
@@ -4750,36 +4750,36 @@ export default function BomManagement() {
                     <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
                       <h2 className="text-sm font-semibold">사후 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— [{activePostColorBom?.color}] 기준</span></h2>
                     </div>
-                    <table className="w-full text-[13px]">
-                      <thead><tr className="bg-[var(--fill-tertiary)] text-[13px] font-semibold text-muted-foreground"><th className="px-4 py-2 text-left w-12">구분</th><th className="px-4 py-2 text-left">항목</th><th className="px-4 py-2 text-left text-muted-foreground">내용/비고</th><th className="px-4 py-2 text-right w-40">금액 (원)</th></tr></thead>
+                    <table className="data-table w-full text-[13px]">
+                      <thead><tr className="bg-[var(--fill-tertiary)] text-[13px] font-semibold text-muted-foreground"><th className="w-12">구분</th><th>항목</th><th className="text-muted-foreground">내용/비고</th><th className="num w-40">금액 (원)</th></tr></thead>
                       <tbody>
                         {/* 1. 공장구매 자재 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">자</span></td>
-                          <td className="px-4 py-2 font-medium text-foreground">공장구매 자재</td>
-                          <td className="px-4 py-2 text-muted-foreground">본사제공 제외 ({postCur})</td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.factoryMaterialKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.factoryMaterialKrw)}</span></td>
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">자</span></td>
+                          <td className="font-medium text-foreground">공장구매 자재</td>
+                          <td className="text-muted-foreground">본사제공 제외 ({postCur})</td>
+                          <td className="num font-semibold tabular-nums"><span className={ps.factoryMaterialKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.factoryMaterialKrw)}</span></td>
                         </tr>
                         {/* 2. 본사제공 자재 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">본</span></td>
-                          <td className="px-4 py-2 font-medium text-foreground">본사제공 자재</td>
-                          <td className="px-4 py-2 text-muted-foreground">본사에서 공급</td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.hqMaterialKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.hqMaterialKrw)}</span></td>
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">본</span></td>
+                          <td className="font-medium text-foreground">본사제공 자재</td>
+                          <td className="text-muted-foreground">본사에서 공급</td>
+                          <td className="num font-semibold tabular-nums"><span className={ps.hqMaterialKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.hqMaterialKrw)}</span></td>
                         </tr>
                         {/* 3. 임가공비 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">공</span></td>
-                          <td className="px-4 py-2 font-medium text-foreground">임가공비</td>
-                          <td className="px-4 py-2 text-muted-foreground">NET ({postCur})</td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.processingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.processingKrw)}</span></td>
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">공</span></td>
+                          <td className="font-medium text-foreground">임가공비</td>
+                          <td className="text-muted-foreground">NET ({postCur})</td>
+                          <td className="num font-semibold tabular-nums"><span className={ps.processingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.processingKrw)}</span></td>
                         </tr>
                         {/* 4. 공장단가 (amber 강조) */}
                         <tr className="bg-primary/5 border-y border-primary/20">
-                          <td className="px-4 py-3 font-bold text-primary"><Factory className="w-4 h-4" /></td>
-                          <td className="px-4 py-3 font-bold text-foreground">공장단가</td>
-                          <td className="px-4 py-3 text-muted-foreground text-[11px]">공장구매자재 + 임가공 + 후가공 (관세 제외, 공장 결제금액)</td>
-                          <td className="px-4 py-3 text-right font-bold text-primary tabular-nums">
+                          <td className="font-bold text-primary"><Factory className="w-4 h-4" /></td>
+                          <td className="font-bold text-foreground">공장단가</td>
+                          <td className="text-muted-foreground text-[11px]">공장구매자재 + 임가공 + 후가공 (관세 제외, 공장 결제금액)</td>
+                          <td className="num font-bold text-primary tabular-nums">
                             {fmtKrw(ps.factoryUnitCostKrw)}
                             {postCur !== 'KRW' && ps.factoryUnitCostKrw > 0 && postUsdKrwSummary > 0 && (
                               <div className="text-[11px] text-muted-foreground font-normal mt-0.5">${(ps.factoryUnitCostKrw / postUsdKrwSummary).toFixed(2)}</div>
@@ -4789,38 +4789,38 @@ export default function BomManagement() {
                         {/* 5. 관세 (율 > 0일 때만) */}
                         {/* 관세율 - 직접 입력 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">관</span></td>
-                          <td className="px-4 py-2 font-medium text-foreground">
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">관</span></td>
+                          <td className="font-medium text-foreground">
                             관세
                             <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className={`inline-block ${CELL_INPUT} border-border text-right w-14 ml-1`} placeholder="%" />
                             <span className="text-xs text-muted-foreground ml-1">%</span>
                           </td>
-                          <td className="px-4 py-2 text-muted-foreground text-xs">공장단가 × 관세율</td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.customsKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.customsKrw)}</span></td>
+                          <td className="text-muted-foreground text-xs">공장단가 × 관세율</td>
+                          <td className="num font-semibold tabular-nums"><span className={ps.customsKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.customsKrw)}</span></td>
                         </tr>
                         {/* 물류비 - 직접 입력 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">물</span></td>
-                          <td className="px-4 py-2 font-medium text-foreground">물류비</td>
-                          <td className="px-4 py-2 text-muted-foreground">
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">물</span></td>
+                          <td className="font-medium text-foreground">물류비</td>
+                          <td className="text-muted-foreground">
                             <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className={`${CELL_INPUT} border-border text-right w-24`} placeholder="₩" />
                           </td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className="text-foreground">{fmtKrw(ps.logisticsKrw)}</span></td>
+                          <td className="num font-semibold tabular-nums"><span className="text-foreground">{fmtKrw(ps.logisticsKrw)}</span></td>
                         </tr>
                         {/* 포장/검사비 - 직접 입력 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">포</span></td>
-                          <td className="px-4 py-2 font-medium text-foreground">포장/검사비</td>
-                          <td className="px-4 py-2 text-muted-foreground">
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">포</span></td>
+                          <td className="font-medium text-foreground">포장/검사비</td>
+                          <td className="text-muted-foreground">
                             <Input type="number" value={editBom.packagingCostKrw || ''} onChange={e => updateField('packagingCostKrw', Number(e.target.value))} className={`${CELL_INPUT} border-border text-right w-24`} placeholder="₩" />
                           </td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums"><span className={ps.packagingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.packagingKrw)}</span></td>
+                          <td className="num font-semibold tabular-nums"><span className={ps.packagingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.packagingKrw)}</span></td>
                         </tr>
                         {/* 패킹재 — 품목마스터 PACK 선택 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">패</span></td>
-                          <td className="px-4 py-2 font-medium text-foreground">패킹재</td>
-                          <td className="px-4 py-2 text-muted-foreground">
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">패</span></td>
+                          <td className="font-medium text-foreground">패킹재</td>
+                          <td className="text-muted-foreground">
                             <Select
                               value={editBom.packingItemId || '_none'}
                               onValueChange={selectPackingItem}
@@ -4843,21 +4843,21 @@ export default function BomManagement() {
                               <div className="text-[11px] text-primary mt-0.5">{editBom.packingItemStyleNo} 연동</div>
                             ) : null}
                           </td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums">
+                          <td className="num font-semibold tabular-nums">
                             <span className={ps.packingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.packingKrw)}</span>
                           </td>
                         </tr>
                         {/* 9. 제품 총원가 (생산마진 전 실원가) */}
                         <tr className="bg-primary/5 border-y border-primary/20">
-                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-primary/10 text-[11px] font-semibold text-primary">제</span></td>
-                          <td className="px-4 py-2 font-semibold text-primary" colSpan={2}>제품 총원가 <span className="text-xs text-primary/70 font-normal">(생산마진 전 실원가)</span></td>
-                          <td className="px-4 py-2 text-right font-bold tabular-nums text-primary">{fmtKrw(ps.totalCostKrw)}</td>
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-primary/10 text-[11px] font-semibold text-primary">제</span></td>
+                          <td className="font-semibold text-primary" colSpan={2}>제품 총원가 <span className="text-xs text-primary/70 font-normal">(생산마진 전 실원가)</span></td>
+                          <td className="num font-bold tabular-nums text-primary">{fmtKrw(ps.totalCostKrw)}</td>
                         </tr>
                         {/* 10. 생산마진 - 직접 입력 가능 */}
                         <tr className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-4 py-2"><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">마</span></td>
-                          <td className="px-4 py-2 font-medium text-foreground">생산마진</td>
-                          <td className="px-4 py-2">
+                          <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">마</span></td>
+                          <td className="font-medium text-foreground">생산마진</td>
+                          <td>
                             <div className="flex items-center gap-1">
                               <Input
                                 type="number"
@@ -4869,22 +4869,22 @@ export default function BomManagement() {
                               <span className="text-muted-foreground text-xs">%</span>
                             </div>
                           </td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums">
+                          <td className="num font-semibold tabular-nums">
                             <span className={postProductionMarginKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(postProductionMarginKrw)}</span>
                           </td>
                         </tr>
                         {/* 11. 총원가액 */}
                         <tr className="bg-foreground text-background">
-                          <td className="px-4 py-3 font-bold"><Package className="w-4 h-4" /></td>
-                          <td className="px-4 py-3 font-bold text-base" colSpan={2}>{postMarginRate > 0 ? '총 원 가 액' : '제 품 원 가'}</td>
-                          <td className="px-4 py-3 text-right font-bold text-lg tabular-nums">{fmtKrw(finalCost)}</td>
+                          <td className="font-bold"><Package className="w-4 h-4" /></td>
+                          <td className="font-bold text-base" colSpan={2}>{postMarginRate > 0 ? '총 원 가 액' : '제 품 원 가'}</td>
+                          <td className="num font-bold text-lg tabular-nums">{fmtKrw(finalCost)}</td>
                         </tr>
                         {deliveryPrice > 0 && (
                           <>
                             <tr className="bg-primary/10 border-t border-primary/20">
-                              <td className="px-4 py-2.5 text-xs font-medium text-primary">연동</td>
-                              <td className="px-4 py-2.5 text-sm font-semibold text-primary" colSpan={2}>납품가 (품목 마스터 연동)</td>
-                              <td className="px-4 py-2.5 text-right font-mono font-bold text-primary">{fmtKrw(deliveryPrice)}</td>
+                              <td className="text-xs font-medium text-primary">연동</td>
+                              <td className="text-sm font-semibold text-primary" colSpan={2}>납품가 (품목 마스터 연동)</td>
+                              <td className="num font-mono font-bold text-primary">{fmtKrw(deliveryPrice)}</td>
                             </tr>
                             <tr>
                               <td colSpan={4} className="px-4 py-2">
@@ -5172,7 +5172,7 @@ export default function BomManagement() {
                       />
                       <span className="text-xs text-muted-foreground">최종 = Net × (1 + 로스율/100)</span>
                     </div>
-                    <div className="overflow-x-auto"><table className="w-full min-w-[640px]">
+                    <div className="overflow-x-auto"><table className="data-table w-full min-w-[640px]">
                       <thead className="bg-primary/5 border-b border-border">
                         <tr>
                           <th className={thCls} style={{width:'22%'}}>부위</th>
@@ -5248,7 +5248,7 @@ export default function BomManagement() {
                       </div>
                       <span className="text-xs text-muted-foreground">최종 = Net × (1 + 로스율/100)</span>
                     </div>
-                    <table className="w-full">
+                    <table className="data-table w-full">
                       <thead className="bg-[var(--fill-quaternary)] border-b border-border">
                         <tr>
                           <th className={thCls} style={{width:'36%'}}>부위</th>
@@ -5466,62 +5466,62 @@ export default function BomManagement() {
                       <div className="bg-stone-800 text-white px-5 py-3">
                         <h3 className="text-sm font-bold">사후원가 요약</h3>
                       </div>
-                      <table className="w-full text-xs">
+                      <table className="data-table w-full text-xs">
                         <thead>
                           <tr className="bg-[var(--fill-tertiary)] text-muted-foreground">
-                            <th className="px-4 py-2 text-left">항목</th>
-                            <th className="px-4 py-2 text-right">금액 (KRW)</th>
+                            <th>항목</th>
+                            <th className="num">금액 (KRW)</th>
                           </tr>
                         </thead>
                         <tbody>
                           <tr className="border-b border-border">
-                            <td className="px-4 py-2 text-muted-foreground">공장구매 자재</td>
-                            <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.factoryMaterialKrw)}</td>
+                            <td className="text-muted-foreground">공장구매 자재</td>
+                            <td className="num tabular-nums">{fmtKrw(psSheet.factoryMaterialKrw)}</td>
                           </tr>
                           <tr className="border-b border-border">
-                            <td className="px-4 py-2 text-muted-foreground">본사제공 자재</td>
-                            <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.hqMaterialKrw)}</td>
+                            <td className="text-muted-foreground">본사제공 자재</td>
+                            <td className="num tabular-nums">{fmtKrw(psSheet.hqMaterialKrw)}</td>
                           </tr>
                           <tr className="border-b border-border">
-                            <td className="px-4 py-2 text-muted-foreground">임가공비</td>
-                            <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.processingKrw)}</td>
+                            <td className="text-muted-foreground">임가공비</td>
+                            <td className="num tabular-nums">{fmtKrw(psSheet.processingKrw)}</td>
                           </tr>
                           <tr className="border-b border-primary/20 bg-primary/5">
-                            <td className="px-4 py-2.5 font-bold text-foreground">공장단가</td>
-                            <td className="px-4 py-2.5 text-right font-bold text-primary tabular-nums">{fmtKrw(psSheet.factoryUnitCostKrw)}</td>
+                            <td className="font-bold text-foreground">공장단가</td>
+                            <td className="num font-bold text-primary tabular-nums">{fmtKrw(psSheet.factoryUnitCostKrw)}</td>
                           </tr>
                           <tr className="border-b border-border">
-                            <td className="px-4 py-2 text-muted-foreground">관세 ({psSheet.customsRate}%)</td>
-                            <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.customsKrw)}</td>
+                            <td className="text-muted-foreground">관세 ({psSheet.customsRate}%)</td>
+                            <td className="num tabular-nums">{fmtKrw(psSheet.customsKrw)}</td>
                           </tr>
                           <tr className="border-b border-border">
-                            <td className="px-4 py-2 text-muted-foreground">물류비</td>
-                            <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.logisticsKrw)}</td>
+                            <td className="text-muted-foreground">물류비</td>
+                            <td className="num tabular-nums">{fmtKrw(psSheet.logisticsKrw)}</td>
                           </tr>
                           <tr className="border-b border-border">
-                            <td className="px-4 py-2 text-muted-foreground">포장/검사비</td>
-                            <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.packagingKrw)}</td>
+                            <td className="text-muted-foreground">포장/검사비</td>
+                            <td className="num tabular-nums">{fmtKrw(psSheet.packagingKrw)}</td>
                           </tr>
                           <tr className="border-b border-border">
-                            <td className="px-4 py-2 text-muted-foreground">
+                            <td className="text-muted-foreground">
                               패킹재
                               {editBom.packingItemStyleNo ? (
                                 <span className="text-[11px] text-primary ml-1">({editBom.packingItemStyleNo})</span>
                               ) : null}
                             </td>
-                            <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(psSheet.packingKrw)}</td>
+                            <td className="num tabular-nums">{fmtKrw(psSheet.packingKrw)}</td>
                           </tr>
                           <tr className="border-b border-primary/20 bg-primary/5">
-                            <td className="px-4 py-2.5 font-semibold text-primary">제품 총원가 <span className="text-[11px] font-normal text-primary/70">(생산마진 전)</span></td>
-                            <td className="px-4 py-2.5 text-right font-semibold text-primary tabular-nums">{fmtKrw(psSheet.totalCostKrw)}</td>
+                            <td className="font-semibold text-primary">제품 총원가 <span className="text-[11px] font-normal text-primary/70">(생산마진 전)</span></td>
+                            <td className="num font-semibold text-primary tabular-nums">{fmtKrw(psSheet.totalCostKrw)}</td>
                           </tr>
                           <tr className="border-b border-border">
-                            <td className="px-4 py-2 text-muted-foreground">생산마진 ({Math.round(postMarginRateSheet * 100)}%)</td>
-                            <td className="px-4 py-2 text-right tabular-nums">{fmtKrw(postProductionMarginKrwSheet)}</td>
+                            <td className="text-muted-foreground">생산마진 ({Math.round(postMarginRateSheet * 100)}%)</td>
+                            <td className="num tabular-nums">{fmtKrw(postProductionMarginKrwSheet)}</td>
                           </tr>
                           <tr className="bg-stone-800">
-                            <td className="px-4 py-3 font-bold text-white text-sm">{postMarginRateSheet > 0 ? '총 원 가 액' : '제 품 원 가'}</td>
-                            <td className="px-4 py-3 text-right font-bold text-lg text-[#C9A96E] tabular-nums">{fmtKrw(finalCostSheet)}</td>
+                            <td className="font-bold text-white text-sm">{postMarginRateSheet > 0 ? '총 원 가 액' : '제 품 원 가'}</td>
+                            <td className="num font-bold text-lg text-[#C9A96E] tabular-nums">{fmtKrw(finalCostSheet)}</td>
                           </tr>
                         </tbody>
                       </table>

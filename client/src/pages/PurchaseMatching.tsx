@@ -580,10 +580,10 @@ export default function PurchaseMatching() {
       </div>
 
       <div className="bg-card rounded-lg border border-border overflow-x-auto">
-        <table className="w-full min-w-[800px] text-sm">
+        <table className="data-table w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="w-10 px-3 py-3">
+              <th className="w-10">
                 <input
                   type="checkbox"
                   checked={filtered.length > 0 && filtered.every(p => selectedPurchaseIds.has(p.id))}
@@ -594,17 +594,17 @@ export default function PurchaseMatching() {
                   className="cursor-pointer"
                 />
               </th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">발주번호</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">품목명</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">공급업체</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">구매일</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">수량</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">단가</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">결제</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground w-28">상태</th>
-              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground w-20">전표</th>
-              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">발주번호</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">품목명</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">공급업체</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">구매일</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">수량</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">단가</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">결제</th>
+              <th className="text-[13px] font-semibold text-muted-foreground w-28">상태</th>
+              <th className="ctr text-[13px] font-semibold text-muted-foreground w-20">전표</th>
+              <th className="ctr text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
           <tbody>
@@ -632,7 +632,7 @@ export default function PurchaseMatching() {
                       className="border-b border-border bg-[var(--fill-quaternary)] cursor-pointer hover:bg-[var(--fill-tertiary)]"
                       onClick={() => toggleGroup(orderNo)}
                     >
-                      <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                      <td onClick={e => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={groupItems.length > 0 && groupItems.every(i => selectedPurchaseIds.has(i.id))}
@@ -713,7 +713,7 @@ export default function PurchaseMatching() {
                     {/* 그룹 내 자재 행들 */}
                     {isOpen && groupItems.map(p => (
                       <tr key={p.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${selectedPurchaseIds.has(p.id) ? 'bg-primary/5' : ''}`}>
-                        <td className="px-3 py-3">
+                        <td>
                           <input
                             type="checkbox"
                             checked={selectedPurchaseIds.has(p.id)}
@@ -721,15 +721,15 @@ export default function PurchaseMatching() {
                             className="cursor-pointer"
                           />
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.orderNo || '-'}</td>
-                        <td className="px-4 py-3 font-medium text-foreground">{p.itemName}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{p.vendorName || '-'}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{p.purchaseDate}</td>
-                        <td className="px-4 py-3 text-right font-mono">{formatNumber(p.qty)} {p.unit}</td>
-                        <td className="px-4 py-3 text-right font-mono text-muted-foreground">{formatNumber(p.unitPriceCny, 2)} {p.currency}</td>
-                        <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{formatKRW(p.amountKrw)}</td>
-                        <td className="px-4 py-3"><Badge variant="outline" className="text-xs">{p.paymentMethod}</Badge></td>
-                        <td className="px-4 py-3">
+                        <td className="font-mono text-xs text-muted-foreground">{p.orderNo || '-'}</td>
+                        <td className="font-medium text-foreground">{p.itemName}</td>
+                        <td className="text-muted-foreground">{p.vendorName || '-'}</td>
+                        <td className="text-muted-foreground">{p.purchaseDate}</td>
+                        <td className="num font-mono">{formatNumber(p.qty)} {p.unit}</td>
+                        <td className="num font-mono text-muted-foreground">{formatNumber(p.unitPriceCny, 2)} {p.currency}</td>
+                        <td className="num font-mono font-semibold text-foreground">{formatKRW(p.amountKrw)}</td>
+                        <td><Badge variant="outline" className="text-xs">{p.paymentMethod}</Badge></td>
+                        <td>
                           <div className="flex items-center gap-1.5">
                             <Select value={p.purchaseStatus} onValueChange={v => handleStatusChange(p.id, v)}>
                               <SelectTrigger className={`h-7 text-xs w-24 border ${STATUS_COLOR[p.purchaseStatus]}`}>
@@ -741,14 +741,14 @@ export default function PurchaseMatching() {
                             </Select>
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-center w-20">
+                        <td className="ctr w-20">
                           {p.statementNo ? (
                             <span title="지출결의 연결됨" className="inline-flex justify-center text-[var(--system-green)]"><FileText className="w-4 h-4" /></span>
                           ) : (
                             <span title="지출결의 미생성" className="text-muted-foreground text-sm">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="ctr">
                           <div className="flex items-center justify-center gap-1 flex-wrap">
                             <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(p)}>수정</Button>
                             {/* 지출전표 연결/생성/보기 버튼 (작업 2) */}
@@ -918,20 +918,20 @@ export default function PurchaseMatching() {
           ) : (
             <div className="space-y-4 py-2">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
+                <table className="data-table w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="border-b border-border bg-[var(--fill-quaternary)]">
-                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">자재명</th>
-                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">규격</th>
-                      <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">단위</th>
-                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">단가(CNY)</th>
-                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">소요수량</th>
-                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">보유재고</th>
-                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">발주수량</th>
-                      <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
-                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">담긴 발주</th>
-                      <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">구매처</th>
-                      <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">삭제</th>
+                      <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
+                      <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
+                      <th className="ctr text-[13px] font-semibold text-muted-foreground">단위</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground">단가(CNY)</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground">발주수량</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
+                      <th className="text-[13px] font-semibold text-muted-foreground">담긴 발주</th>
+                      <th className="text-[13px] font-semibold text-muted-foreground">구매처</th>
+                      <th className="ctr text-[13px] font-semibold text-muted-foreground">삭제</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -943,16 +943,16 @@ export default function PurchaseMatching() {
                       const amountKrw = Math.round(orderQty * unitPriceCny * settings.cnyKrw);
                       return (
                       <tr key={idx} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                        <td className="px-3 py-2 font-medium text-foreground">{item.materialName}</td>
-                        <td className="px-3 py-2 text-muted-foreground text-xs">{item.spec || '-'}</td>
-                        <td className="px-3 py-2 text-center text-muted-foreground">{item.unit}</td>
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
+                        <td className="font-medium text-foreground">{item.materialName}</td>
+                        <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
+                        <td className="ctr text-muted-foreground">{item.unit}</td>
+                        <td className="num font-mono text-muted-foreground text-xs">
                           {unitPriceCny > 0 ? formatNumber(unitPriceCny, 2) : <span className="text-muted-foreground">-</span>}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground text-sm">
+                        <td className="num font-mono text-muted-foreground text-sm">
                           {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="num">
                           <input
                             type="number"
                             step="0.001"
@@ -967,7 +967,7 @@ export default function PurchaseMatching() {
                             className="w-20 h-7 text-right font-mono text-sm border border-border rounded px-2 focus:outline-none focus:ring-1 focus:ring-ring"
                           />
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="num">
                           <input
                             type="number"
                             step="0.001"
@@ -986,10 +986,10 @@ export default function PurchaseMatching() {
                             }`}
                           />
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
+                        <td className="num font-mono text-xs text-muted-foreground">
                           {amountKrw > 0 ? formatKRW(amountKrw) : <span className="text-muted-foreground">-</span>}
                         </td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">
+                        <td className="text-xs text-muted-foreground">
                           {item.orders.map((o, i) => (
                             <span key={i}>
                               {i > 0 && <span className="mx-1 text-muted-foreground">+</span>}
@@ -998,8 +998,8 @@ export default function PurchaseMatching() {
                             </span>
                           ))}
                         </td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">{item.vendorName || <span className="text-muted-foreground">-</span>}</td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="text-xs text-muted-foreground">{item.vendorName || <span className="text-muted-foreground">-</span>}</td>
+                        <td className="ctr">
                           <button
                             className="text-muted-foreground hover:text-[var(--system-red)] transition-colors"
                             onClick={() => {
@@ -1087,20 +1087,20 @@ export default function PurchaseMatching() {
                       <Printer className="w-3 h-3 mr-1" />인쇄
                     </Button>
                   </div>
-                  <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm">
+                  <div className="overflow-x-auto"><table className="data-table w-full min-w-[720px] text-sm">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-8">No.</th>
-                        <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-10">이미지</th>
-                        <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">자재명</th>
-                        <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">규격</th>
-                        <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">단위</th>
-                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">단가(CNY)</th>
-                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">소요수량</th>
-                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">보유재고</th>
-                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">발주수량</th>
-                        <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
-                        <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">비고</th>
+                        <th className="ctr text-[13px] font-semibold text-muted-foreground w-8">No.</th>
+                        <th className="ctr text-[13px] font-semibold text-muted-foreground w-10">이미지</th>
+                        <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
+                        <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
+                        <th className="ctr text-[13px] font-semibold text-muted-foreground">단위</th>
+                        <th className="num text-[13px] font-semibold text-muted-foreground">단가(CNY)</th>
+                        <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
+                        <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
+                        <th className="num text-[13px] font-semibold text-muted-foreground">발주수량</th>
+                        <th className="num text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
+                        <th className="text-[13px] font-semibold text-muted-foreground">비고</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1109,33 +1109,33 @@ export default function PurchaseMatching() {
                         const amountKrw = Math.round(item.orderQty * unitPriceCny * settings.cnyKrw);
                         return (
                         <tr key={i} className="border-b border-border">
-                          <td className="px-3 py-2 text-center text-muted-foreground text-xs">{i + 1}</td>
-                          <td className="px-2 py-1 text-center">
+                          <td className="ctr text-muted-foreground text-xs">{i + 1}</td>
+                          <td className="ctr">
                             {item.imageUrl ? (
                               <img src={item.imageUrl} alt={item.materialName} className="w-14 h-14 object-cover rounded cursor-pointer border border-border hover:scale-110 transition-transform" onClick={() => window.open(item.imageUrl, '_blank')} />
                             ) : (
                               <Camera className="w-4 h-4 mx-auto text-muted-foreground" />
                             )}
                           </td>
-                          <td className="px-3 py-2 font-medium text-foreground">{item.materialName}</td>
-                          <td className="px-3 py-2 text-muted-foreground text-xs">{item.spec || '-'}</td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">{item.unit}</td>
-                          <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
+                          <td className="font-medium text-foreground">{item.materialName}</td>
+                          <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
+                          <td className="ctr text-muted-foreground">{item.unit}</td>
+                          <td className="num font-mono text-muted-foreground text-xs">
                             {unitPriceCny > 0 ? formatNumber(unitPriceCny, 2) : '-'}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
+                          <td className="num font-mono text-muted-foreground text-xs">
                             {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
+                          <td className="num font-mono text-muted-foreground text-xs">
                             {(item.stockQty ?? 0) % 1 === 0 ? (item.stockQty ?? 0).toLocaleString() : (item.stockQty ?? 0).toFixed(3)}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono font-semibold text-primary">
+                          <td className="num font-mono font-semibold text-primary">
                             {item.orderQty % 1 === 0 ? item.orderQty.toLocaleString() : item.orderQty.toFixed(3)}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
+                          <td className="num font-mono text-xs text-muted-foreground">
                             {amountKrw > 0 ? formatKRW(amountKrw) : '-'}
                           </td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">
+                          <td className="text-xs text-muted-foreground">
                             {item.orders.map((o, j) => (
                               <span key={j}>
                                 {j > 0 && ' + '}
@@ -1150,13 +1150,13 @@ export default function PurchaseMatching() {
                     <tfoot>
                       <tr className="bg-[var(--fill-quaternary)] border-t border-border">
                         <td colSpan={8} className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">합계 {items.length}종</td>
-                        <td className="px-3 py-2 text-right text-xs font-bold text-primary">
+                        <td className="num text-xs font-bold text-primary">
                           {items.reduce((s, i) => s + i.orderQty, 0).toFixed(0)}
                         </td>
-                        <td className="px-3 py-2 text-right text-xs font-bold text-foreground">
+                        <td className="num text-xs font-bold text-foreground">
                           {formatKRW(items.reduce((s, i) => s + Math.round(i.orderQty * (i.unitPriceCny ?? 0) * settings.cnyKrw), 0))}
                         </td>
-                        <td className="px-3 py-2"></td>
+                        <td></td>
                       </tr>
                     </tfoot>
                   </table></div>
@@ -1476,21 +1476,21 @@ export default function PurchaseMatching() {
               />
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-xs border-collapse">
+              <table className="data-table w-full min-w-[560px] text-xs border-collapse">
                 <thead>
                   <tr className="bg-[var(--fill-quaternary)] text-[13px] font-semibold text-muted-foreground">
-                    <th className="text-left px-2 py-2 border border-border">품목명</th>
-                    <th className="text-center px-2 py-2 border border-border w-20">수량</th>
-                    <th className="text-center px-2 py-2 border border-border w-28">단가({bulkEditItems[0]?.currency || 'CNY'})</th>
-                    <th className="text-right px-2 py-2 border border-border w-28">금액(KRW)</th>
-                    <th className="text-center px-2 py-2 border border-border w-28">상태</th>
+                    <th className="border border-border">품목명</th>
+                    <th className="ctr border border-border w-20">수량</th>
+                    <th className="ctr border border-border w-28">단가({bulkEditItems[0]?.currency || 'CNY'})</th>
+                    <th className="num border border-border w-28">금액(KRW)</th>
+                    <th className="ctr border border-border w-28">상태</th>
                   </tr>
                 </thead>
                 <tbody>
                   {bulkEditItems.map((item, idx) => (
                     <tr key={item.id} className="hover:bg-[var(--fill-quaternary)]">
-                      <td className="px-2 py-1 border border-border font-medium">{item.itemName}</td>
-                      <td className="px-1 py-1 border border-border">
+                      <td className="border border-border font-medium">{item.itemName}</td>
+                      <td className="border border-border">
                         <input
                           type="number"
                           value={item.qty}
@@ -1498,7 +1498,7 @@ export default function PurchaseMatching() {
                           className="w-full text-center border border-border rounded px-1 py-0.5 text-xs"
                         />
                       </td>
-                      <td className="px-1 py-1 border border-border">
+                      <td className="border border-border">
                         <input
                           type="number"
                           value={item.unitPriceCny}
@@ -1507,10 +1507,10 @@ export default function PurchaseMatching() {
                           step="0.01"
                         />
                       </td>
-                      <td className="px-2 py-1 border border-border text-right text-primary font-medium">
+                      <td className="border border-border num text-primary font-medium">
                         {formatKRW(item.amountKrw)}
                       </td>
-                      <td className="px-1 py-1 border border-border">
+                      <td className="border border-border">
                         <select
                           value={item.purchaseStatus}
                           onChange={e => updateBulkItem(idx, 'purchaseStatus', e.target.value)}
@@ -1711,21 +1711,21 @@ function ExpenseDetailInlineModal({
                 <Plus className="w-3.5 h-3.5" />항목 추가
               </Button>
             </div>
-            <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm">
+            <div className="overflow-x-auto"><table className="data-table w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="bg-[var(--fill-quaternary)] border-b border-border">
-                  <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">품목/내역</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">수량</th>
-                  <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-14">단위</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">단가</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">금액</th>
-                  <th className="w-8 px-2"></th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">품목/내역</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground w-16">수량</th>
+                  <th className="ctr text-[13px] font-semibold text-muted-foreground w-14">단위</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground w-24">단가</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground w-24">금액</th>
+                  <th className="w-8"></th>
                 </tr>
               </thead>
               <tbody>
                 {detailLines.map((line) => (
                   <tr key={line.id} className="border-b border-border">
-                    <td className="px-2 py-1.5">
+                    <td>
                       <input
                         value={line.description}
                         onChange={e => updateDetailLine(line.id, 'description', e.target.value)}
@@ -1733,7 +1733,7 @@ function ExpenseDetailInlineModal({
                         className="h-8 text-sm border border-border rounded px-2 w-full"
                       />
                     </td>
-                    <td className="px-2 py-1.5">
+                    <td>
                       <input
                         type="number"
                         value={line.qty}
@@ -1742,7 +1742,7 @@ function ExpenseDetailInlineModal({
                         min={0}
                       />
                     </td>
-                    <td className="px-2 py-1.5">
+                    <td>
                       <input
                         value={line.unit}
                         onChange={e => updateDetailLine(line.id, 'unit', e.target.value)}
@@ -1750,7 +1750,7 @@ function ExpenseDetailInlineModal({
                         placeholder="개"
                       />
                     </td>
-                    <td className="px-2 py-1.5">
+                    <td>
                       <input
                         type="number"
                         value={line.unitPrice}
@@ -1759,10 +1759,10 @@ function ExpenseDetailInlineModal({
                         min={0}
                       />
                     </td>
-                    <td className="px-3 py-1.5 text-right text-sm font-medium text-foreground">
+                    <td className="num text-sm font-medium text-foreground">
                       {formatKRW(line.amountKrw)}
                     </td>
-                    <td className="px-2 py-1.5">
+                    <td>
                       <button
                         className="text-muted-foreground hover:text-[var(--system-red)]"
                         onClick={() => removeDetailLine(line.id)}

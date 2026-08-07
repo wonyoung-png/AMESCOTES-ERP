@@ -280,24 +280,24 @@ export default function SettlementManagement() {
             <p className="text-xs text-muted-foreground text-center py-3">등록된 정산 내역이 없습니다</p>
           ) : (
             <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[560px]">
+            <table className="data-table w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-2 text-[13px] font-semibold text-muted-foreground">바이어</th>
-                  <th className="text-center py-2 text-[13px] font-semibold text-muted-foreground">거래건수</th>
-                  <th className="text-right py-2 text-[13px] font-semibold text-muted-foreground">총 청구금액</th>
-                  <th className="text-right py-2 text-[13px] font-semibold text-muted-foreground">수금금액</th>
-                  <th className="text-right py-2 text-[13px] font-semibold text-muted-foreground">미수금</th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">바이어</th>
+                  <th className="ctr text-[13px] font-semibold text-muted-foreground">거래건수</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground">총 청구금액</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground">수금금액</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground">미수금</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {buyerStats.map(b => (
                   <tr key={b.name} className="hover:bg-[var(--fill-quaternary)]">
-                    <td className="py-2 font-medium text-foreground">{b.name}</td>
-                    <td className="py-2 text-center text-muted-foreground">{b.count}건</td>
-                    <td className="py-2 text-right font-mono text-foreground">{formatKRW(b.total)}</td>
-                    <td className="py-2 text-right font-mono text-[var(--system-green)]">{formatKRW(b.collected)}</td>
-                    <td className="py-2 text-right font-mono font-semibold text-[var(--system-red)]">
+                    <td className="font-medium text-foreground">{b.name}</td>
+                    <td className="ctr text-muted-foreground">{b.count}건</td>
+                    <td className="num font-mono text-foreground">{formatKRW(b.total)}</td>
+                    <td className="num font-mono text-[var(--system-green)]">{formatKRW(b.collected)}</td>
+                    <td className="num font-mono font-semibold text-[var(--system-red)]">
                       {b.total - b.collected > 0 ? formatKRW(b.total - b.collected) : <span className="text-muted-foreground">-</span>}
                     </td>
                   </tr>
@@ -334,20 +334,20 @@ export default function SettlementManagement() {
       </div>
 
       <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <table className="hidden md:table w-full text-sm">
+        <table className="data-table hidden md:table w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">바이어</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">채널</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">명세서번호</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">발행일</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">만기일</th>
-              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">경과일</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">청구금액</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">수금금액</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">미수금</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">상태</th>
-              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">바이어</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">채널</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">명세서번호</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">발행일</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">만기일</th>
+              <th className="ctr text-[13px] font-semibold text-muted-foreground">경과일</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">청구금액</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">수금금액</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">미수금</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">상태</th>
+              <th className="ctr text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -362,12 +362,12 @@ export default function SettlementManagement() {
               const isOver7 = elapsed >= 7;
               return (
                 <tr key={s.id} className={`hover:bg-[var(--fill-quaternary)] ${isOver7 ? 'bg-destructive/5' : ''}`}>
-                  <td className="px-4 py-3 font-medium text-foreground">{s.buyerName}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{s.channel}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{s.invoiceNo || '-'}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{s.invoiceDate}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{s.dueDate}</td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="font-medium text-foreground">{s.buyerName}</td>
+                  <td className="text-muted-foreground">{s.channel}</td>
+                  <td className="font-mono text-xs text-muted-foreground">{s.invoiceNo || '-'}</td>
+                  <td className="text-muted-foreground">{s.invoiceDate}</td>
+                  <td className="text-muted-foreground">{s.dueDate}</td>
+                  <td className="ctr">
                     {s.status !== '완납' && elapsed > 0 ? (
                       <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${isOver7 ? 'bg-destructive/10 text-destructive' : 'bg-[var(--fill-quaternary)] text-[var(--system-orange)]'}`}>
                         D+{elapsed}일
@@ -378,16 +378,16 @@ export default function SettlementManagement() {
                       <span className="text-xs text-primary font-mono">{Math.abs(elapsed)}일 남음</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono text-foreground">{formatNumber(s.billedAmountKrw)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-[var(--system-green)]">{formatNumber(s.collectedAmountKrw)}</td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold text-[var(--system-red)]">{receivable > 0 ? formatNumber(receivable) : '-'}</td>
-                  <td className="px-4 py-3">
+                  <td className="num font-mono text-foreground">{formatNumber(s.billedAmountKrw)}</td>
+                  <td className="num font-mono text-[var(--system-green)]">{formatNumber(s.collectedAmountKrw)}</td>
+                  <td className="num font-mono font-semibold text-[var(--system-red)]">{receivable > 0 ? formatNumber(receivable) : '-'}</td>
+                  <td>
                     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${STATUS_COLOR[s.status]}`}>
                       {s.status === '완납' ? <CheckCircle className="w-3 h-3" /> : s.status === '위험' ? <AlertTriangle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                       {s.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="ctr">
                     <div className="flex items-center justify-center gap-1">
                       {s.status !== '완납' && (
                         <Button variant="ghost" size="sm" className="h-7 text-xs text-[var(--system-green)] px-2" onClick={() => handleCollect(s)}>

@@ -2194,7 +2194,7 @@ export default function ItemMaster() {
       {/* 테이블 */}
       <div className="bg-card rounded-lg border border-border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="text-sm table-fixed w-full" style={{ minWidth: 40 + 70 + ITEM_COLUMN_DEFS.filter(c => showCol(c.key)).reduce((s, c) => s + (colWidths[c.key] || 80), 0) }}>
+          <table className="data-table text-sm table-fixed w-full" style={{ minWidth: 40 + 70 + ITEM_COLUMN_DEFS.filter(c => showCol(c.key)).reduce((s, c) => s + (colWidths[c.key] || 80), 0) }}>
             <colgroup>
               <col style={{ width: 40 }} />
               {orderNodes(colOrder, colOrder.map(k =>
@@ -2204,7 +2204,7 @@ export default function ItemMaster() {
             </colgroup>
             <thead>
               <tr className="border-b border-border bg-[var(--fill-quaternary)]">
-                <th className="px-4 py-3" style={{ width: 40 }}>
+                <th style={{ width: 40 }}>
                   <input
                     type="checkbox"
                     checked={isAllSelected}
@@ -2353,7 +2353,7 @@ export default function ItemMaster() {
                   </th>
                   ),
                 ])}
-                <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">작업</th>
+                <th className="ctr text-[13px] font-semibold text-muted-foreground whitespace-nowrap">작업</th>
               </tr>
             </thead>
             <tbody>
@@ -2388,7 +2388,7 @@ export default function ItemMaster() {
                 const isChecked = selectedIds.has(item.id);
                 return (
                   <tr key={item.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${isChecked ? 'bg-primary/5' : ''}`}>
-                    <td className="px-4 py-3">
+                    <td>
                       <input
                         type="checkbox"
                         checked={isChecked}
@@ -2716,7 +2716,7 @@ export default function ItemMaster() {
                       </td>
                     ),
                     ])}
-                    <td className="px-4 py-3 text-center">
+                    <td className="ctr">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => openEdit(item)} className="p-1.5 rounded hover:bg-[var(--fill-tertiary)] text-muted-foreground">
                           <Pencil size={14} />
@@ -2815,28 +2815,28 @@ export default function ItemMaster() {
               </Select>
             </div>
             <div className="rounded-lg border border-border overflow-x-auto">
-              <table className="w-full min-w-[480px] text-sm">
+              <table className="data-table w-full min-w-[480px] text-sm">
                 <thead>
                   <tr className="bg-[var(--fill-quaternary)] border-b border-border">
-                    <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">시즌</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-muted-foreground">전체</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-muted-foreground">HB</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-muted-foreground">ACC</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-muted-foreground">SHOES</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-muted-foreground">BOM완료</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-medium text-[var(--system-red)]">BOM미작성</th>
+                    <th className="text-xs font-medium text-muted-foreground">시즌</th>
+                    <th className="ctr text-xs font-medium text-muted-foreground">전체</th>
+                    <th className="ctr text-xs font-medium text-muted-foreground">HB</th>
+                    <th className="ctr text-xs font-medium text-muted-foreground">ACC</th>
+                    <th className="ctr text-xs font-medium text-muted-foreground">SHOES</th>
+                    <th className="ctr text-xs font-medium text-muted-foreground">BOM완료</th>
+                    <th className="ctr text-xs font-medium text-[var(--system-red)]">BOM미작성</th>
                   </tr>
                 </thead>
                 <tbody>
                   {seasonStats.map(row => (
                     <tr key={row.season} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                      <td className="px-4 py-2.5 font-semibold text-foreground">{row.season}</td>
-                      <td className="px-3 py-2.5 text-center font-bold text-foreground">{row.total}</td>
-                      <td className="px-3 py-2.5 text-center text-foreground">{row.hb}</td>
-                      <td className="px-3 py-2.5 text-center text-foreground">{row.acc}</td>
-                      <td className="px-3 py-2.5 text-center text-foreground">{row.shoes}</td>
-                      <td className="px-3 py-2.5 text-center text-[var(--system-green)]">{row.hasBom}</td>
-                      <td className="px-3 py-2.5 text-center">
+                      <td className="font-semibold text-foreground">{row.season}</td>
+                      <td className="ctr font-bold text-foreground">{row.total}</td>
+                      <td className="ctr text-foreground">{row.hb}</td>
+                      <td className="ctr text-foreground">{row.acc}</td>
+                      <td className="ctr text-foreground">{row.shoes}</td>
+                      <td className="ctr text-[var(--system-green)]">{row.hasBom}</td>
+                      <td className="ctr">
                         {row.noBom > 0 ? (
                           <span className="inline-flex items-center gap-1 text-[var(--system-red)] font-medium">
                             <AlertCircle size={12} />{row.noBom}
@@ -3432,38 +3432,38 @@ export default function ItemMaster() {
           </div>
 
           <div className="flex-1 overflow-y-auto overflow-x-auto">
-            <table className="w-full min-w-[640px] text-xs">
+            <table className="data-table w-full min-w-[640px] text-xs">
               <thead className="sticky top-0 bg-[var(--fill-tertiary)]">
                 <tr>
-                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">상태</th>
-                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">스타일번호</th>
-                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">품목명</th>
-                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">거래처</th>
-                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">시즌</th>
-                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">카테</th>
-                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">컬러</th>
-                  <th className="px-2 py-1.5 text-left text-[13px] font-semibold text-muted-foreground">판매가</th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">상태</th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">스타일번호</th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">품목명</th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">거래처</th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">시즌</th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">카테</th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">컬러</th>
+                  <th className="text-[13px] font-semibold text-muted-foreground">판매가</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {excelPreviewItems.map((p, idx) => (
                   <tr key={idx} className={p.isDuplicate ? 'bg-[var(--fill-quaternary)] opacity-60' : 'bg-card'}>
-                    <td className="px-2 py-1.5">
+                    <td>
                       {p.isDuplicate
                         ? <span className="text-[var(--system-orange)] font-medium">중복</span>
                         : <span className="text-[var(--system-green)] font-medium">신규</span>}
                     </td>
-                    <td className="px-2 py-1.5 font-mono">{p.styleNo}</td>
-                    <td className="px-2 py-1.5 max-w-[200px] truncate">{p.name}</td>
-                    <td className="px-2 py-1.5">
+                    <td className="font-mono">{p.styleNo}</td>
+                    <td className="max-w-[200px] truncate">{p.name}</td>
+                    <td>
                       {p.buyerName
                         ? <span className={p.buyerId ? 'text-[var(--system-green)] font-medium' : 'text-[var(--system-orange)]'}>{p.buyerName}{!p.buyerId && ' 미매칭'}</span>
                         : <span className="text-muted-foreground">—</span>}
                     </td>
-                    <td className="px-2 py-1.5">{p.season}</td>
-                    <td className="px-2 py-1.5">{p.erpCategory}</td>
-                    <td className="px-2 py-1.5">{p.colors.join(', ')}</td>
-                    <td className="px-2 py-1.5">{p.salePriceKrw ? p.salePriceKrw.toLocaleString() : '-'}</td>
+                    <td>{p.season}</td>
+                    <td>{p.erpCategory}</td>
+                    <td>{p.colors.join(', ')}</td>
+                    <td>{p.salePriceKrw ? p.salePriceKrw.toLocaleString() : '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -3502,14 +3502,14 @@ export default function ItemMaster() {
             <p className="text-xs text-muted-foreground mt-0.5">각 스타일별로 공장 원가표 엑셀을 업로드하세요. KMSRP(확정판매가)는 변경되지 않습니다.</p>
           </DialogHeader>
           <div className="overflow-y-auto overflow-x-auto flex-1 mt-2">
-            <table className="w-full min-w-[640px] text-xs">
+            <table className="data-table w-full min-w-[640px] text-xs">
               <thead>
                 <tr className="bg-[var(--fill-tertiary)] text-muted-foreground">
-                  <th className="px-3 py-2 text-left font-medium">스타일번호</th>
-                  <th className="px-3 py-2 text-left font-medium">품명</th>
-                  <th className="px-3 py-2 text-left font-medium">적용 탭</th>
-                  <th className="px-3 py-2 text-left font-medium">파일 / 상태</th>
-                  <th className="px-3 py-2 text-center font-medium">업로드</th>
+                  <th className="font-medium">스타일번호</th>
+                  <th className="font-medium">품명</th>
+                  <th className="font-medium">적용 탭</th>
+                  <th className="font-medium">파일 / 상태</th>
+                  <th className="ctr font-medium">업로드</th>
                 </tr>
               </thead>
               <tbody>
@@ -3527,11 +3527,11 @@ export default function ItemMaster() {
                   })();
                   return (
                     <tr key={bi.item.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                      <td className="px-3 py-2 font-mono font-medium text-foreground">{bi.item.styleNo}</td>
-                      <td className="px-3 py-2 text-muted-foreground max-w-[180px] truncate">{bi.item.name}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{tabLabel}</td>
-                      <td className="px-3 py-2">{bi.fileName ? <span className="text-muted-foreground truncate max-w-[140px] block">{bi.fileName}</span> : null}<div className="mt-0.5">{statusEl}</div></td>
-                      <td className="px-3 py-2 text-center">
+                      <td className="font-mono font-medium text-foreground">{bi.item.styleNo}</td>
+                      <td className="text-muted-foreground max-w-[180px] truncate">{bi.item.name}</td>
+                      <td className="text-muted-foreground">{tabLabel}</td>
+                      <td>{bi.fileName ? <span className="text-muted-foreground truncate max-w-[140px] block">{bi.fileName}</span> : null}<div className="mt-0.5">{statusEl}</div></td>
+                      <td className="ctr">
                         {bi.status !== 'done' && bi.status !== 'saving' && (
                           <button
                             onClick={() => { setBatchCostActiveId(bi.item.id); setTimeout(() => batchCostFileRef.current?.click(), 0); }}

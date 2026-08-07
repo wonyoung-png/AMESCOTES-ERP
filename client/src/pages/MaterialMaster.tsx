@@ -386,10 +386,10 @@ export default function MaterialMaster() {
 
       {/* 테이블 */}
       <div className="bg-card rounded-lg border border-border overflow-x-auto">
-        <table className="w-full min-w-[820px] text-sm">
+        <table className="data-table w-full min-w-[820px] text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
-              <th className="px-3 py-3 w-10">
+              <th className="w-10">
                 <input
                   type="checkbox"
                   checked={isAllSelected}
@@ -398,16 +398,16 @@ export default function MaterialMaster() {
                   className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                 />
               </th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground w-14">이미지</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground w-32 whitespace-nowrap">품번</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">카테고리</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">브랜드</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">자재명</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">스펙</th>
-              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground">단가</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">단위</th>
+              <th className="text-[13px] font-semibold text-muted-foreground w-14">이미지</th>
+              <th className="text-[13px] font-semibold text-muted-foreground w-32 whitespace-nowrap">품번</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">카테고리</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">브랜드</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">스펙</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">단가</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">단위</th>
               
-              <th className="text-center px-3 py-3 text-[13px] font-semibold text-muted-foreground">편집</th>
+              <th className="ctr text-[13px] font-semibold text-muted-foreground">편집</th>
             </tr>
           </thead>
           <tbody>
@@ -422,7 +422,7 @@ export default function MaterialMaster() {
               const isChecked = selectedIds.has(m.id);
               return (
                 <tr key={m.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${isChecked ? 'bg-primary/5' : ''}`}>
-                  <td className="px-3 py-2.5">
+                  <td>
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -430,7 +430,7 @@ export default function MaterialMaster() {
                       className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                     />
                   </td>
-                  <td className="px-3 py-2.5 w-14">
+                  <td className="w-14">
                     {m.imageUrl ? (
                       <HoverZoomImage
                         src={m.imageUrl}
@@ -444,33 +444,33 @@ export default function MaterialMaster() {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 w-32">
+                  <td className="w-32">
                     <span className="font-mono text-xs bg-[var(--fill-tertiary)] px-2 py-0.5 rounded text-muted-foreground whitespace-nowrap">{m.itemCode || '—'}</span>
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td>
                     <span className={`text-xs px-2 py-0.5 rounded-full border ${CHIP}`}>{m.category}</span>
                     {m.subType && <p className="text-xs text-muted-foreground mt-0.5">{m.subType}</p>}
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td>
                     {(m.brand || COMMON_BRAND) === COMMON_BRAND
                       ? <span className="text-xs text-muted-foreground">{COMMON_BRAND}</span>
                       : <span className={`text-xs px-2 py-0.5 rounded-full border ${CHIP}`}>{m.brand}</span>}
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td>
                     <button type="button" onClick={() => setDetail(m)} className="text-left hover:underline">
                       <p className="font-medium text-foreground">{m.name}</p>
                       {m.nameEn && <p className="text-xs text-muted-foreground">{m.nameEn}</p>}
                     </button>
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.spec || '—'}</td>
-                  <td className="px-3 py-2.5 text-right font-mono text-xs text-foreground">
+                  <td className="text-xs text-muted-foreground">{m.spec || '—'}</td>
+                  <td className="num font-mono text-xs text-foreground">
                     {priceOf(m) != null
                       ? `${CURRENCY_SIGN[currencyOf(m)]}${Number(priceOf(m)).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                       : '—'}
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.unit}</td>
+                  <td className="text-xs text-muted-foreground">{m.unit}</td>
                   
-                  <td className="px-3 py-2.5">
+                  <td>
                     <div className="flex items-center justify-center gap-1">
                       <button onClick={() => setDetail(m)} title="상세보기" className="p-1.5 rounded hover:bg-[var(--fill-tertiary)] text-muted-foreground">
                         <Eye size={14} />

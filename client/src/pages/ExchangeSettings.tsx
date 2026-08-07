@@ -343,14 +343,14 @@ export default function ExchangeSettings() {
           <h2 className="font-semibold text-foreground">환율 변경 이력</h2>
         </div>
         <div className="overflow-x-auto">
-        <table className="w-full min-w-[560px] text-sm">
+        <table className="data-table w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
-              <th className="text-left px-5 py-3 text-[13px] font-semibold text-muted-foreground">날짜</th>
-              <th className="text-right px-5 py-3 text-[13px] font-semibold text-muted-foreground">USD/KRW</th>
-              <th className="text-right px-5 py-3 text-[13px] font-semibold text-muted-foreground">CNY/KRW</th>
-              <th className="text-left px-5 py-3 text-[13px] font-semibold text-muted-foreground">메모</th>
-              <th className="text-center px-5 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">날짜</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">USD/KRW</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">CNY/KRW</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">메모</th>
+              <th className="ctr text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
           <tbody>
@@ -358,14 +358,14 @@ export default function ExchangeSettings() {
               <tr><td colSpan={5} className="text-center py-8 text-muted-foreground text-sm">환율 이력이 없습니다</td></tr>
             ) : sortedHistory.map((h, i) => (
               <tr key={h.id} className={`border-b border-border ${i === 0 ? 'bg-primary/5' : 'hover:bg-[var(--fill-quaternary)]'}`}>
-                <td className="px-5 py-3 text-foreground">
+                <td className="text-foreground">
                   {h.date}
                   {i === 0 && <span className="ml-2 text-xs text-primary font-medium">현재 적용</span>}
                 </td>
-                <td className="px-5 py-3 text-right font-mono font-semibold text-foreground">{h.usdKrw.toLocaleString()}</td>
-                <td className="px-5 py-3 text-right font-mono font-semibold text-foreground">{h.cnyKrw.toLocaleString()}</td>
-                <td className="px-5 py-3 text-muted-foreground">{h.memo || '-'}</td>
-                <td className="px-5 py-3 text-center">
+                <td className="num font-mono font-semibold text-foreground">{h.usdKrw.toLocaleString()}</td>
+                <td className="num font-mono font-semibold text-foreground">{h.cnyKrw.toLocaleString()}</td>
+                <td className="text-muted-foreground">{h.memo || '-'}</td>
+                <td className="ctr">
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDeleteHistory(h.id)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
@@ -426,20 +426,20 @@ export default function ExchangeSettings() {
         {packKits.length > 0 && (
           <div className="mt-4 border border-border rounded-md overflow-hidden">
             <div className="bg-[var(--fill-quaternary)] px-3 py-2 text-xs font-semibold text-muted-foreground">PACKAGE 키트 원가 (자재마스터 BOM 합산)</div>
-            <table className="w-full text-sm">
+            <table className="data-table w-full text-sm">
               <thead className="bg-card text-xs text-muted-foreground">
                 <tr>
-                  <th className="text-left px-3 py-2">스타일</th>
-                  <th className="text-left px-3 py-2">구성</th>
-                  <th className="text-right px-3 py-2">키트원가</th>
+                  <th>스타일</th>
+                  <th>구성</th>
+                  <th className="num">키트원가</th>
                 </tr>
               </thead>
               <tbody>
                 {packKits.map(k => (
                   <tr key={k.id} className="border-t border-border">
-                    <td className="px-3 py-2 font-mono font-semibold text-foreground">{k.styleNo || k.packingSize}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{k.lines.length}개 자재</td>
-                    <td className="px-3 py-2 text-right font-semibold tabular-nums">₩{k.totalCostKrw.toLocaleString('ko-KR')}</td>
+                    <td className="font-mono font-semibold text-foreground">{k.styleNo || k.packingSize}</td>
+                    <td className="text-xs text-muted-foreground">{k.lines.length}개 자재</td>
+                    <td className="num font-semibold tabular-nums">₩{k.totalCostKrw.toLocaleString('ko-KR')}</td>
                   </tr>
                 ))}
               </tbody>

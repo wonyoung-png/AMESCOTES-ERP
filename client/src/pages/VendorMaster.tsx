@@ -859,10 +859,10 @@ export default function VendorMaster() {
 
       {/* 테이블 */}
       <div className="bg-card rounded-lg border border-border overflow-x-auto">
-        <table className="w-full min-w-[880px] text-sm">
+        <table className="data-table w-full min-w-[880px] text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
-              <th className="px-4 py-3 w-10">
+              <th className="w-10">
                 <input
                   type="checkbox"
                   checked={isAllSelected}
@@ -871,18 +871,18 @@ export default function VendorMaster() {
                   className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                 />
               </th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">거래처명</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">코드</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">유형</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">자재유형</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">담당자</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">연락처</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">결제조건</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">거래처명</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">코드</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">유형</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">자재유형</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">담당자</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">연락처</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">결제조건</th>
               {/* 공장 유형 필터 시 SWIFT CODE 컬럼 표시 */}
               {showSwiftCol && (
-                <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">SWIFT CODE</th>
+                <th className="text-[13px] font-semibold text-muted-foreground">SWIFT CODE</th>
               )}
-              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
+              <th className="ctr text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
           <tbody>
@@ -895,7 +895,7 @@ export default function VendorMaster() {
   const isChecked = selectedIds.has(v.id);
   return (
               <tr key={v.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${isChecked ? 'bg-primary/5' : ''}`}>
-                <td className="px-4 py-3">
+                <td>
                   <input
                     type="checkbox"
                     checked={isChecked}
@@ -903,7 +903,7 @@ export default function VendorMaster() {
                     className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                   />
                 </td>
-                <td className="px-4 py-3">
+                <td>
                   <div className="flex items-center gap-1.5">
                     <p className="font-medium text-foreground">{v.name}</p>
                     {v.type === '자재거래처' && !v.contactName && !v.contactEmail && !v.contactPhone && (
@@ -913,7 +913,7 @@ export default function VendorMaster() {
                   {v.nameEn && <p className="text-xs text-muted-foreground">{v.nameEn}</p>}
                   {v.nameCn && <p className="text-xs text-muted-foreground">{v.nameCn}</p>}
                 </td>
-                <td className="px-4 py-3">
+                <td>
                   <div className="flex flex-col gap-1">
                     {v.vendorCode && (
                       <span className="inline-block px-2 py-0.5 rounded bg-[var(--fill-tertiary)] border border-border text-foreground text-xs font-mono font-bold w-fit">
@@ -928,13 +928,13 @@ export default function VendorMaster() {
                     {!v.vendorCode && !v.code && <span className="text-muted-foreground text-xs">—</span>}
                   </div>
                 </td>
-                <td className="px-4 py-3">
+                <td>
                   <span className={`text-xs px-2 py-0.5 rounded-full border ${TYPE_COLOR[v.type] || 'bg-[var(--fill-quaternary)] text-muted-foreground border-border'}`}>
                     {v.type === '기타' && v.customType ? `기타 (${v.customType})` : v.type}
                   </span>
                 </td>
                 {/* 자재유형 (자재거래처만 표시) */}
-                <td className="px-4 py-3">
+                <td>
                   {v.type === '자재거래처' && (v.materialTypes || []).length > 0 ? (
                     <div className="flex flex-wrap gap-1">
                       {(v.materialTypes || []).map(mt => (
@@ -947,10 +947,10 @@ export default function VendorMaster() {
                     <span className="text-muted-foreground text-xs">—</span>
                   )}
                 </td>
-                <td className="px-4 py-3">
+                <td>
                   <p className="text-foreground">{v.contactName || '-'}</p>
                 </td>
-                <td className="px-4 py-3 text-muted-foreground text-xs">
+                <td className="text-muted-foreground text-xs">
                   {v.contactEmail && <p>{v.contactEmail}</p>}
                   {v.contactPhone && <p>{v.contactPhone}</p>}
                   {!v.contactEmail && !v.contactPhone && (
@@ -962,13 +962,13 @@ export default function VendorMaster() {
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-muted-foreground text-xs">
+                <td className="text-muted-foreground text-xs">
                   {v.billingType ? <p className="text-xs">{v.billingType}</p> : <span className="text-muted-foreground text-xs">—</span>}
                   {v.settlementCycle && <p>{v.settlementCycle}</p>}
                 </td>
                 {/* SWIFT CODE 컬럼 (공장 유형이 목록에 있을 때만 표시) */}
                 {showSwiftCol && (
-                  <td className="px-4 py-3 text-muted-foreground text-xs">
+                  <td className="text-muted-foreground text-xs">
                     {regionOf(v) === '해외' && v.bankInfo?.swiftCode ? (
                       <span className="font-mono text-foreground bg-[var(--fill-tertiary)] px-2 py-0.5 rounded text-xs border border-border">
                         {v.bankInfo.swiftCode}
@@ -976,7 +976,7 @@ export default function VendorMaster() {
                     ) : <span className="text-muted-foreground">—</span>}
                   </td>
                 )}
-                <td className="px-4 py-3 text-center">
+                <td className="ctr">
                   <div className="flex items-center justify-center gap-1">
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(v)}>
                       <Pencil className="w-3.5 h-3.5" />

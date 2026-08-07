@@ -316,7 +316,7 @@ export default function TradeStatement() {
             <p>이메일: ${vendor?.contactEmail || '-'}</p>
           </div>
         </div>
-        <table>
+        <table className="data-table">
           <thead>
             <tr>
               <th>품목/내역</th>
@@ -435,18 +435,18 @@ export default function TradeStatement() {
 
       {/* 테이블 (데스크탑) */}
       <div className="hidden md:block bg-card rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="data-table w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">전표번호</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">거래처</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">발행일</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">공급가액</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">부가세</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">합계</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">상태</th>
-              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">세금계산서</th>
-              <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">전표번호</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">거래처</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">발행일</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">공급가액</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">부가세</th>
+              <th className="num text-[13px] font-semibold text-muted-foreground">합계</th>
+              <th className="text-[13px] font-semibold text-muted-foreground">상태</th>
+              <th className="ctr text-[13px] font-semibold text-muted-foreground">세금계산서</th>
+              <th className="ctr text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -459,16 +459,16 @@ export default function TradeStatement() {
               const calc = calcStatement(s.lines);
               return (
                 <tr key={s.id} className="hover:bg-[var(--fill-quaternary)]">
-                  <td className="px-4 py-3 font-mono text-xs font-bold text-primary">{s.statementNo}</td>
-                  <td className="px-4 py-3">
+                  <td className="font-mono text-xs font-bold text-primary">{s.statementNo}</td>
+                  <td>
                     <p className="font-medium text-foreground">{s.vendorName}</p>
                     {s.vendorCode && <p className="text-xs text-muted-foreground">코드: {s.vendorCode}</p>}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs">{s.issueDate}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs text-foreground">{formatKRW(calc.taxableSupply + calc.exemptAmount)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">{formatKRW(calc.taxableVat)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs font-bold text-foreground">{formatKRW(calc.grandTotal)}</td>
-                  <td className="px-4 py-3">
+                  <td className="text-muted-foreground text-xs">{s.issueDate}</td>
+                  <td className="num font-mono text-xs text-foreground">{formatKRW(calc.taxableSupply + calc.exemptAmount)}</td>
+                  <td className="num font-mono text-xs text-muted-foreground">{formatKRW(calc.taxableVat)}</td>
+                  <td className="num font-mono text-xs font-bold text-foreground">{formatKRW(calc.grandTotal)}</td>
+                  <td>
                     <Select value={s.status} onValueChange={v => {
                       const newStatus = v as TradeStatementStatus;
                       store.updateTradeStatement(s.id, { status: newStatus });
@@ -517,7 +517,7 @@ export default function TradeStatement() {
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="ctr">
                     {s.taxInvoice?.issued ? (
                       <button
                         onClick={() => openTaxPreview(s)}
@@ -541,7 +541,7 @@ export default function TradeStatement() {
                       </Button>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="ctr">
                     <div className="flex items-center justify-center gap-1 flex-wrap">
                       <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setDetailStatement(s)}>
                         <Eye className="w-3.5 h-3.5 mr-1" />보기
@@ -784,23 +784,23 @@ export default function TradeStatement() {
                 </div>
               </div>
               <div className="rounded-md border border-border overflow-hidden">
-                <table className="w-full text-sm">
+                <table className="data-table w-full text-sm">
                   <tbody>
                     <tr className="border-b border-border">
-                      <td className="px-4 py-2.5 text-muted-foreground bg-muted w-40">공급가액</td>
-                      <td className="px-4 py-2.5 text-right font-mono font-bold text-foreground">
+                      <td className="text-muted-foreground bg-muted w-40">공급가액</td>
+                      <td className="num font-mono font-bold text-foreground">
                         {formatKRW(taxPreviewData.invoice.supplyAmount)}
                       </td>
                     </tr>
                     <tr className="border-b border-border">
-                      <td className="px-4 py-2.5 text-muted-foreground bg-muted">세액 (10%)</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">
+                      <td className="text-muted-foreground bg-muted">세액 (10%)</td>
+                      <td className="num font-mono text-muted-foreground">
                         {formatKRW(taxPreviewData.invoice.taxAmount)}
                       </td>
                     </tr>
                     <tr>
-                      <td className="px-4 py-2.5 font-bold text-foreground bg-muted">합계금액</td>
-                      <td className="px-4 py-2.5 text-right font-mono font-bold text-lg text-primary">
+                      <td className="font-bold text-foreground bg-muted">합계금액</td>
+                      <td className="num font-mono font-bold text-lg text-primary">
                         {formatKRW(taxPreviewData.invoice.totalAmount)}
                       </td>
                     </tr>
@@ -848,14 +848,14 @@ export default function TradeStatement() {
               </Select>
             </div>
             <div className="border border-border rounded-md overflow-x-auto">
-              <table className="w-full text-sm min-w-[560px]">
+              <table className="data-table w-full text-sm min-w-[560px]">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">발주번호</th>
-                    <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">스타일</th>
-                    <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground">수량</th>
-                    <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">바이어</th>
-                    <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground">선택</th>
+                    <th className="text-[13px] font-semibold text-muted-foreground">발주번호</th>
+                    <th className="text-[13px] font-semibold text-muted-foreground">스타일</th>
+                    <th className="num text-[13px] font-semibold text-muted-foreground">수량</th>
+                    <th className="text-[13px] font-semibold text-muted-foreground">바이어</th>
+                    <th className="ctr text-[13px] font-semibold text-muted-foreground">선택</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -870,14 +870,14 @@ export default function TradeStatement() {
                       const buyer = item?.buyerId ? vendors.find(v => v.id === item.buyerId) : null;
                       return (
                         <tr key={o.id} className="hover:bg-[var(--fill-quaternary)]">
-                          <td className="px-3 py-2 font-mono text-xs font-bold text-primary">{o.orderNo}</td>
-                          <td className="px-3 py-2">
+                          <td className="font-mono text-xs font-bold text-primary">{o.orderNo}</td>
+                          <td>
                             <p className="font-medium text-foreground">{o.styleNo}</p>
                             <p className="text-xs text-muted-foreground">{o.styleName}</p>
                           </td>
-                          <td className="px-3 py-2 text-right font-mono text-xs">{formatNumber(o.qty)}</td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">{buyer?.name ?? '-'}</td>
-                          <td className="px-3 py-2 text-center">
+                          <td className="num font-mono text-xs">{formatNumber(o.qty)}</td>
+                          <td className="text-xs text-muted-foreground">{buyer?.name ?? '-'}</td>
+                          <td className="ctr">
                             <Button
                               size="sm"
                               variant="secondary"
@@ -978,16 +978,16 @@ export default function TradeStatement() {
                 </Button>
               </div>
               <div className="rounded-md border border-border overflow-x-auto">
-                <table className="w-full text-xs min-w-[720px]">
+                <table className="data-table w-full text-xs min-w-[720px]">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-center px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-10">No</th>
-                      <th className="text-left px-4 py-2.5 text-[13px] font-semibold text-muted-foreground">품목/내역</th>
-                      <th className="text-center px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-20">수량</th>
-                      <th className="text-right px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-32">단가 (원)</th>
-                      <th className="text-right px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-32">공급가액</th>
-                      <th className="text-right px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-28">부가세</th>
-                      <th className="text-right px-3 py-2.5 text-[13px] font-semibold text-muted-foreground w-32">합계</th>
+                      <th className="ctr text-[13px] font-semibold text-muted-foreground w-10">No</th>
+                      <th className="text-[13px] font-semibold text-muted-foreground">품목/내역</th>
+                      <th className="ctr text-[13px] font-semibold text-muted-foreground w-20">수량</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground w-32">단가 (원)</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground w-32">공급가액</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground w-28">부가세</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground w-32">합계</th>
                       <th className="w-8"></th>
                     </tr>
                   </thead>
@@ -996,21 +996,21 @@ export default function TradeStatement() {
                       const calc = calcLine(line);
                       return (
                         <tr key={line.id}>
-                          <td className="px-2 py-1.5 text-center text-xs text-muted-foreground font-mono">{idx + 1}</td>
-                          <td className="px-2 py-1.5">
+                          <td className="ctr text-xs text-muted-foreground font-mono">{idx + 1}</td>
+                          <td>
                             <Input value={line.description} onChange={e => updateLine(idx, 'description', e.target.value)} placeholder="품목명 또는 내역" className="h-8 text-sm min-w-[220px]" />
                           </td>
-                          <td className="px-2 py-1.5">
+                          <td>
                             <Input type="number" min="1" value={line.qty} onChange={e => updateLine(idx, 'qty', parseInt(e.target.value) || 1)} className="h-8 text-sm text-center w-16" />
                           </td>
-                          <td className="px-2 py-1.5">
+                          <td>
                             <Input type="number" min="0" value={(!line.unitPrice || isNaN(line.unitPrice)) ? '' : line.unitPrice} onChange={e => updateLine(idx, 'unitPrice', parseFloat(e.target.value) || 0)} placeholder="0" className="h-8 text-sm text-right w-28" />
                           </td>
 
-                          <td className="px-2 py-1.5 text-right text-foreground font-mono">{formatKRW(calc.supply)}</td>
-                          <td className="px-2 py-1.5 text-right text-muted-foreground font-mono">{formatKRW(calc.tax)}</td>
-                          <td className="px-2 py-1.5 text-right text-foreground font-mono font-semibold">{formatKRW(calc.total)}</td>
-                          <td className="px-2 py-1.5 text-center">
+                          <td className="num text-foreground font-mono">{formatKRW(calc.supply)}</td>
+                          <td className="num text-muted-foreground font-mono">{formatKRW(calc.tax)}</td>
+                          <td className="num text-foreground font-mono font-semibold">{formatKRW(calc.total)}</td>
+                          <td className="ctr">
                             {lines.length > 1 && (
                               <button onClick={() => setLines(ls => ls.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-[var(--system-red)]">
                                 <X className="w-3.5 h-3.5" />
@@ -1187,16 +1187,16 @@ function TradeStatementDetailModal({
               </div>
             </div>
             <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[560px]">
+            <table className="data-table w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left px-3 py-2 text-[13px] font-semibold text-muted-foreground">품목/내역</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">수량</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-28">단가</th>
-                  <th className="text-center px-3 py-2 text-[13px] font-semibold text-muted-foreground w-16">세율</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">공급가</th>
-                  <th className="text-right px-3 py-2 text-[13px] font-semibold text-muted-foreground w-24">합계</th>
-                  {isEditing && <th className="w-8 px-2"></th>}
+                  <th className="text-[13px] font-semibold text-muted-foreground">품목/내역</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground w-16">수량</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground w-28">단가</th>
+                  <th className="ctr text-[13px] font-semibold text-muted-foreground w-16">세율</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground w-24">공급가</th>
+                  <th className="num text-[13px] font-semibold text-muted-foreground w-24">합계</th>
+                  {isEditing && <th className="w-8"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -1204,7 +1204,7 @@ function TradeStatementDetailModal({
                   const lCalc = calcLine(line);
                   return (
                     <tr key={line.id}>
-                      <td className="px-2 py-1.5">
+                      <td>
                         {isEditing ? (
                           <input
                             value={line.description}
@@ -1216,7 +1216,7 @@ function TradeStatementDetailModal({
                           <span className="text-foreground">{line.description}</span>
                         )}
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td>
                         {isEditing ? (
                           <input
                             type="number"
@@ -1229,7 +1229,7 @@ function TradeStatementDetailModal({
                           <span className="text-right block text-foreground">{formatNumber(line.qty)}</span>
                         )}
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td>
                         {isEditing ? (
                           <input
                             type="number"
@@ -1244,11 +1244,11 @@ function TradeStatementDetailModal({
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-1.5 text-center text-xs text-muted-foreground">{line.taxType}</td>
-                      <td className="px-3 py-1.5 text-right text-sm text-foreground font-mono">{formatKRW(lCalc.supply)}</td>
-                      <td className="px-3 py-1.5 text-right text-sm font-semibold text-foreground font-mono">{formatKRW(lCalc.total)}</td>
+                      <td className="ctr text-xs text-muted-foreground">{line.taxType}</td>
+                      <td className="num text-sm text-foreground font-mono">{formatKRW(lCalc.supply)}</td>
+                      <td className="num text-sm font-semibold text-foreground font-mono">{formatKRW(lCalc.total)}</td>
                       {isEditing && (
-                        <td className="px-2 py-1.5">
+                        <td>
                           <button
                             className="text-muted-foreground hover:text-[var(--system-red)]"
                             onClick={() => removeItem(line.id)}

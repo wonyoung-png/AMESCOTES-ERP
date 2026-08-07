@@ -144,15 +144,15 @@ export default function UserManagement() {
 
       {/* 데스크탑 — 표 */}
       <div className="hidden md:block bg-card border border-border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="data-table w-full text-sm">
           <thead>
             <tr className="text-[13px] font-semibold text-muted-foreground text-left">
-              <th className="px-4 py-3">이름</th>
-              <th className="px-4 py-3">이메일</th>
-              <th className="px-4 py-3">역할</th>
-              <th className="px-4 py-3">등록일</th>
-              <th className="px-4 py-3">활성</th>
-              <th className="px-4 py-3 text-right">비밀번호</th>
+              <th>이름</th>
+              <th>이메일</th>
+              <th>역할</th>
+              <th>등록일</th>
+              <th>활성</th>
+              <th className="num">비밀번호</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -163,25 +163,25 @@ export default function UserManagement() {
               const isAdminRow = isAdminEmail(u.email);
               return (
                 <tr key={u.id} className="hover:bg-[var(--fill-quaternary)]">
-                  <td className="px-4 py-3 font-medium text-foreground">
+                  <td className="font-medium text-foreground">
                     {u.name}
                     {isAdminRow && (
                       <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded-[6px] bg-primary text-primary-foreground">관리자</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
-                  <td className="px-4 py-3">
+                  <td className="text-muted-foreground">{u.email}</td>
+                  <td>
                     <span className="text-[13px] px-2 py-0.5 rounded-[6px] bg-[var(--fill-tertiary)] text-foreground">{u.role}</span>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{u.created_at?.slice(0, 10)}</td>
-                  <td className="px-4 py-3">
+                  <td className="text-muted-foreground">{u.created_at?.slice(0, 10)}</td>
+                  <td>
                     <Switch
                       checked={u.is_active}
                       disabled={isAdminRow}
                       onCheckedChange={() => handleToggleActive(u)}
                     />
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="num">
                     <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setResetTarget(u)}>
                       <KeyRound className="w-3.5 h-3.5" />재설정
                     </Button>
