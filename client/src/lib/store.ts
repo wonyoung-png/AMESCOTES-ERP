@@ -1400,8 +1400,9 @@ export const store = {
   // Purchase Items
   getPurchaseItems: () => getAll<PurchaseItem>(KEYS.purchaseItems),
   setPurchaseItems: (v: PurchaseItem[]) => setAll(KEYS.purchaseItems, v),
-  addPurchaseItem: (v: PurchaseItem) => { const a = getAll<PurchaseItem>(KEYS.purchaseItems); a.push(v); setAll(KEYS.purchaseItems, a); },
-  updatePurchaseItem: (id: string, u: Partial<PurchaseItem>) => { const a = getAll<PurchaseItem>(KEYS.purchaseItems); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.purchaseItems, a); } },
+  // 자재구매는 브라우저에만 남아 다른 PC 에서 안 보이던 문제 → 서버에도 함께 저장
+  addPurchaseItem: (v: PurchaseItem) => { const a = getAll<PurchaseItem>(KEYS.purchaseItems); a.push(v); setAll(KEYS.purchaseItems, a); sbUpsert('purchase_items', v); },
+  updatePurchaseItem: (id: string, u: Partial<PurchaseItem>) => { const a = getAll<PurchaseItem>(KEYS.purchaseItems); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.purchaseItems, a); sbUpsert('purchase_items', a[i]); } },
   deletePurchaseItem: (id: string) => setAll(KEYS.purchaseItems, getAll<PurchaseItem>(KEYS.purchaseItems).filter(x => x.id !== id)),
 
   // Vendors

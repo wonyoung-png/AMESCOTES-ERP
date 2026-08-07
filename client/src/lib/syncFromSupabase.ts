@@ -193,6 +193,14 @@ const TABLE_KEY_MAP: { table: string; key: string; converter?: (row: Record<stri
   { table: 'samples',           key: 'ames_samples' },
   { table: 'boms',              key: 'ames_boms', converter: convertBomRow },
   { table: 'production_orders', key: 'ames_orders' },
+  // ── Phase1 (미지급·입출고·불량차감·자재구매) ──
+  // 쓰기는 phase1.ts 가 이미 서버로 보내는데 읽기가 없어, 다른 PC·다른 브라우저에서
+  // 같은 내역이 안 보이고 캐시를 지우면 사라졌다. 시작 시 서버본을 내려받아 맞춘다.
+  { table: 'payables',          key: 'ames_payables' },
+  { table: 'receipt_logs',      key: 'ames_receipt_logs' },
+  { table: 'defect_carryovers', key: 'ames_defect_carryovers' },
+  { table: 'purchase_items',    key: 'ames_purchases' },
+  { table: 'projects',          key: 'ames_projects' },
 ];
 
 export async function syncFromSupabase(): Promise<void> {

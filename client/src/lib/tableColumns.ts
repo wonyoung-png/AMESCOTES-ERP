@@ -48,6 +48,11 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
               'stock_qty', 'memo',
               'order_status', 'order_date', 'order_qty', 'order_vendor_name',
               'created_at', 'updated_at'],
+  // 자재구매 — 운영 DB 컬럼과 1:1 (없는 컬럼을 보내면 PostgREST 가 통째로 거부한다)
+  purchase_items: ['id', 'order_id', 'order_no', 'project_no', 'purchase_date', 'item_name',
+                   'qty', 'unit', 'unit_price_cny', 'currency', 'applied_rate', 'amount_krw',
+                   'vendor_id', 'vendor_name', 'payment_method', 'purchase_status',
+                   'statement_no', 'memo', 'created_at'],
 };
 
 /** camelCase → snake_case (최상위 키만) */
