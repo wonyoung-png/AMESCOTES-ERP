@@ -1,14 +1,19 @@
 // AMESCOTES ERP — 납기 관리
 import { useQuery } from '@tanstack/react-query';
-import { fetchOrders } from '@/lib/supabaseQueries';
+import { fetchOrders, upsertOrder } from '@/lib/supabaseQueries';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Package } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
-import { store, calcDDay, dDayColor, dDayLabel, formatNumber, type ProductionOrder, type MilestoneStage, type OrderMilestone } from '@/lib/store';
+import { store, calcDDay, dDayColor, dDayLabel, formatNumber, type ProductionOrder, type MilestoneStage, type OrderMilestone, type OrderStatus } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CalendarClock, List, Calendar, BarChart3, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLocation } from 'wouter';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const MILESTONE_LABELS: Partial<Record<MilestoneStage, string>> = {
   '샘플1차': '샘플1차',
@@ -29,6 +34,28 @@ export default function DeadlineManagement() {
   const [view, setView] = useState('list');
 
   const refresh = () => refetchOrders();
+
+  const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
+  const [statusTarget, setStatusTarget] = useState<ProductionOrder | null>(null);
+  const ORDER_STATUSES: OrderStatus[] = ['발주생성', '생산중', '생산완료', '입고완료'];
+
+  /** 납기 화면에서 바로 발주 상태를 바꾼다 (생산발주 탭과 같은 값) */
+  const changeStatus = async (order: ProductionOrder, status: OrderStatus) => {
+    try {
+      await upsertOrder({ ...order, status, updatedAt: new Date().toISOString() });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success(`${order.orderNo} → ${status}`);
+    } catch (e) {
+      toast.error(`상태 변경 실패: ${(e as Error).message}`);
+    }
+  };
+
+  /** 작업지시서를 생산발주 화면에서 열도록 발주번호를 넘긴다 */
+  const openWorkOrder = (order: ProductionOrder) => {
+    localStorage.setItem('ames_open_work_order', order.id);
+    navigate('/orders');
+  };
 
   const handleCompleteMilestone = (orderId: string, milestones: OrderMilestone[]) => {
     const today = new Date().toISOString().split('T')[0];
@@ -74,29 +101,29 @@ export default function DeadlineManagement() {
   const calendarDays = useMemo(() => {
     const firstDay = new Date(calYear, calMonth, 1).getDay();
     const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-    const days: { day: number; events: { orderNo: string; milestone: string; color: string }[] }[] = [];
+    const days: { day: number; events: { orderId: string; orderNo: string; milestone: string; color: string; status: string }[] }[] = [];
     for (let i = 0; i < firstDay; i++) days.push({ day: 0, events: [] });
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const events: { orderNo: string; milestone: string; color: string }[] = [];
+      const events: { orderId: string; orderNo: string; milestone: string; color: string; status: string }[] = [];
       orders.forEach(o => {
         const ms = o.milestones || [];
         ms.forEach(m => {
           if (m.plannedDate === dateStr || m.actualDate === dateStr) {
             const dd = calcDDay(m.plannedDate!);
             const color = dd < 0 ? 'bg-[var(--system-red)]' : dd <= 7 ? 'bg-[var(--system-orange)]' : 'bg-[var(--system-green)]';
-            events.push({ orderNo: o.orderNo, milestone: MILESTONE_LABELS[m.stage] || m.stage, color });
+            events.push({ orderId: o.id, orderNo: o.orderNo, milestone: MILESTONE_LABELS[m.stage] || m.stage, color, status: o.status });
           }
         });
         // 마일스톤을 아직 안 잡은 발주도 발주일·납기일은 달력에 보여준다
         if (ms.length === 0) {
           if (o.orderDate === dateStr) {
-            events.push({ orderNo: o.orderNo, milestone: '발주', color: 'bg-[var(--system-green)]' });
+            events.push({ orderId: o.id, orderNo: o.orderNo, milestone: '발주', color: 'bg-[var(--system-green)]', status: o.status });
           }
           if (o.deliveryDate === dateStr) {
             const dd = calcDDay(o.deliveryDate);
             const color = dd < 0 ? 'bg-[var(--system-red)]' : dd <= 7 ? 'bg-[var(--system-orange)]' : 'bg-primary';
-            events.push({ orderNo: o.orderNo, milestone: '납기', color });
+            events.push({ orderId: o.id, orderNo: o.orderNo, milestone: '납기', color, status: o.status });
           }
         }
       });
@@ -145,7 +172,16 @@ export default function DeadlineManagement() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm font-semibold">{order.orderNo}</span>
-                      <Badge variant="outline" className="text-xs">{order.status}</Badge>
+                      <Select value={order.status} onValueChange={v => changeStatus(order, v as OrderStatus)}>
+                        <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {ORDER_STATUSES.map(st => <SelectItem key={st} value={st} className="text-xs">{st}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1"
+                        onClick={() => openWorkOrder(order)}>
+                        <Package className="w-3.5 h-3.5" />작업지시서
+                      </Button>
                     </div>
                     <p className="text-sm text-muted-foreground">{item?.name || order.styleName} · {formatNumber(order.qty)}pcs</p>
                     {nextMilestone && (
@@ -212,9 +248,15 @@ export default function DeadlineManagement() {
                         </span>
                         <div className="mt-1 space-y-0.5">
                           {cell.events.slice(0, 3).map((ev, j) => (
-                            <div key={j} className={`text-[11px] px-1 py-0.5 rounded text-white truncate ${ev.color}`}>
+                            <button
+                              key={j}
+                              type="button"
+                              onClick={() => setStatusTarget((orders as ProductionOrder[]).find(o => o.id === ev.orderId) || null)}
+                              title={`${ev.orderNo} · ${ev.milestone} · ${ev.status} — 클릭해 상태 변경`}
+                              className={`w-full text-left text-[11px] px-1 py-0.5 rounded text-white truncate ${ev.color} hover:opacity-80`}
+                            >
                               {ev.orderNo.split('-')[0].slice(-4)}-{ev.milestone.slice(0, 2)}
-                            </div>
+                            </button>
                           ))}
                           {cell.events.length > 3 && <span className="text-[11px] text-muted-foreground">+{cell.events.length - 3}</span>}
                         </div>
@@ -230,6 +272,36 @@ export default function DeadlineManagement() {
 
         {/* Timeline/Gantt View */}
       </Tabs>
+
+      {/* 캘린더에서 일정을 누르면 발주 상태를 바로 바꾼다 */}
+      <Dialog open={!!statusTarget} onOpenChange={o => { if (!o) setStatusTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{statusTarget?.orderNo}</DialogTitle></DialogHeader>
+          {statusTarget && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {statusTarget.styleName} · {formatNumber(statusTarget.qty)}pcs
+                {statusTarget.deliveryDate && ` · 납기 ${statusTarget.deliveryDate}`}
+              </p>
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">발주 상태</p>
+                <Select
+                  value={statusTarget.status}
+                  onValueChange={v => { changeStatus(statusTarget, v as OrderStatus); setStatusTarget(null); }}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ORDER_STATUSES.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button variant="outline" className="w-full gap-1.5" onClick={() => openWorkOrder(statusTarget)}>
+                <Package className="w-4 h-4" />작업지시서 보기
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

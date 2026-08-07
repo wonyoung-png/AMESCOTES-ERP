@@ -118,6 +118,14 @@ export default function ProductionOrders() {
   // 작업지시서 모달 상태
   const [workOrderModal, setWorkOrderModal] = useState(false);
   const [workOrderTarget, setWorkOrderTarget] = useState<ProductionOrder | null>(null);
+  // 납기관리에서 '작업지시서'를 누르고 넘어온 경우 해당 발주의 작업지시서를 바로 연다
+  useEffect(() => {
+    const id = localStorage.getItem('ames_open_work_order');
+    if (!id || orders.length === 0) return;
+    const target = (orders as ProductionOrder[]).find(o => o.id === id);
+    localStorage.removeItem('ames_open_work_order');
+    if (target) setWorkOrderTarget(target);
+  }, [orders]);
   const [workOrderNote, setWorkOrderNote] = useState('');
   const [workOrderWithBom, setWorkOrderWithBom] = useState(false);
   // 작업지시서 본사제공 자재 수령 체크란
