@@ -14,6 +14,7 @@ import {
 import { seedLumenPackingData, hasPackageKitItems, isLegacyPackConsumable } from '@/lib/seedLumenPacking';
 import { seedLumen27ssRrp, hasLumen27ssItems } from '@/lib/seedLumen27ssRrp';
 import { parseExcelBomSheet } from '@/lib/bomExcelParser';
+import { generateStyleNo, CATEGORY_CODE_MAP } from '@/lib/styleNo';
 import { resizeImage } from '@/lib/utils';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -53,46 +54,12 @@ const PACKING_SIZES: PackingSize[] = ['SS', 'S', 'M', 'L', 'XL'];
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 
 // 카테고리 → 제품유형코드 매핑
-const CATEGORY_CODE_MAP: Partial<Record<Category, string>> = {
-  '숄더백': 'HB', '토트백': 'HB', '크로스백': 'HB', '클러치': 'HB', '백팩': 'BP',
-  '파우치': 'SL', '키링': 'SL', '지갑': 'SL',
-  '스니커즈': 'SH', '힐': 'SH', '로퍼': 'SH', '부츠': 'SH', '샌들': 'SH',
-  '택배박스': 'PK', '내부박스': 'PK', '더스트백': 'PK', '쇼핑백': 'PK', '노루지': 'PK', '소모품': 'PK',
-  '기타': 'ETC',
-};
-
 const ERP_CAT_COLOR: Record<ErpCategory, string> = {
   'HB':   'bg-[var(--fill-tertiary)] text-foreground border-border',
   'ACC':  'bg-[var(--fill-tertiary)] text-foreground border-border',
   'SHOES':'bg-[var(--fill-tertiary)] text-foreground border-border',
   'PACK':'bg-[var(--fill-tertiary)] text-foreground border-border',
 };
-
-function generateStyleNo(
-  brandCode: string,
-  registDate: Date,
-  category: Category,
-  existingItems: Item[],
-  currentItemId?: string,
-  erpCategory?: ErpCategory
-): string {
-  const yy = String(registDate.getFullYear()).slice(2);
-  const mm = String(registDate.getMonth() + 1).padStart(2, '0');
-  // erpCategory별 타입코드 강제 적용
-  let typeCode = CATEGORY_CODE_MAP[category] || 'HB';
-  if (erpCategory === 'ACC') typeCode = 'AC';
-  else if (erpCategory === 'SHOES') typeCode = 'SH';
-  else if (erpCategory === 'PACK') typeCode = 'PK';
-  else if (erpCategory === 'HB') typeCode = CATEGORY_CODE_MAP[category] || 'HB';
-  const prefix = `${brandCode.toUpperCase()}${yy}${mm}${typeCode}`;
-  const existing = existingItems.filter(it => it.styleNo.startsWith(prefix) && it.id !== currentItemId);
-  let maxSeq = 0;
-  for (const it of existing) {
-    const seq = parseInt(it.styleNo.slice(prefix.length), 10);
-    if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
-  }
-  return `${prefix}${String(maxSeq + 1).padStart(2, '0')}`;
-}
 
 const emptyItem: Partial<Item> = {
   styleNo: '', name: '', nameEn: '', season: '26SS', category: '숄더백',

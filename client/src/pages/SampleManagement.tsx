@@ -10,7 +10,8 @@ import {
   type SampleMaterialRequest, type SampleDocument,
   type Item, type TradeStatement, type TradeStatementLine,
 } from '@/lib/store';
-import { fetchSamples, upsertSample as upsertSampleSB, deleteSample as deleteSampleSB, fetchItems, fetchVendors } from '@/lib/supabaseQueries';
+import { fetchSamples, upsertSample as upsertSampleSB, deleteSample as deleteSampleSB, fetchItems, fetchVendors, upsertItem as upsertItemSB } from '@/lib/supabaseQueries';
+import { generateStyleNo } from '@/lib/styleNo';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,31 +65,29 @@ const BILLING_COLOR: Record<SampleBillingStatus, string> = {
   '수금완료': 'bg-[var(--fill-tertiary)] text-[var(--system-green)] border-border',
 };
 
-// TEMP 품목 자동생성 헬퍼
-function createTempItem(styleName: string, season: Season): Item {
+// 샘플 접수 시 품목 자동생성 — 품목마스터와 같은 스타일번호 규칙을 쓴다
+// (TEMP 번호를 따로 붙였다가 승인 후 다시 등록하던 흐름을 없앴다)
+function createLinkedItem(
+  styleName: string,
+  season: Season,
+  buyerCode: string,
+  existingItems: Item[],
+): Item {
   const now = new Date();
-  const yy = String(now.getFullYear()).slice(2);
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const seq = String(Math.floor(Math.random() * 99) + 1).padStart(2, '0');
-  const styleNo = `TEMP${yy}${mm}${seq}`;
   return {
     id: genId(),
-    styleNo,
+    styleNo: generateStyleNo(buyerCode || 'ATL', now, '숄더백', existingItems, undefined, 'HB'),
     name: styleName,
     nameEn: '',
     season,
     category: '숄더백',
     erpCategory: 'HB',
-    itemStatus: 'TEMP',
+    itemStatus: 'ACTIVE',
     materialType: '완제품',
     material: '',
     salePriceKrw: 0,
     hasBom: false,
-    colors: [
-      { name: '블랙', leatherColor: 'BLK' },
-      { name: '브라운', leatherColor: 'BRN' },
-      { name: '샌드베이지', leatherColor: 'SB' },
-    ],
+    colors: [],
     createdAt: now.toISOString(),
   };
 }
@@ -445,15 +444,21 @@ export default function SampleManagement() {
     let styleNo = form.styleNo;
     let styleName = form.styleName;
 
-    // TEMP 품목 자동생성
+    // 품목 자동생성 — 품목마스터와 동일한 정식 스타일번호를 바로 부여한다
     if (createTempMode) {
       if (!tempStyleName.trim()) { toast.error('품명을 입력해주세요'); return; }
-      const tempItem = createTempItem(tempStyleName.trim(), form.season || '26SS');
-      upsertSampleSB(tempItem as any).catch(() => {});
-      styleId = tempItem.id;
-      styleNo = tempItem.styleNo;
-      styleName = tempItem.name;
-      toast.success(`TEMP 품목 ${tempItem.styleNo} 자동생성 완료`);
+      const buyer = vendors.find((v: any) => v.id === form.buyerId);
+      const newItem = createLinkedItem(
+        tempStyleName.trim(),
+        form.season || '26SS',
+        (buyer as any)?.code || 'ATL',
+        items as Item[],
+      );
+      upsertItemSB(newItem as any).catch((e: Error) => toast.error(`품목 생성 실패: ${e.message}`));
+      styleId = newItem.id;
+      styleNo = newItem.styleNo;
+      styleName = newItem.name;
+      toast.success(`품목 ${newItem.styleNo} 자동생성 — 품목 마스터에 등록됐습니다`);
       queryClient.invalidateQueries({ queryKey: ['items'] });
     }
 
@@ -688,7 +693,7 @@ export default function SampleManagement() {
     setDetailSample(updated);
   };
 
-  // 샘플 승인 처리 — TEMP 품목은 TEMP 상태 그대로 유지
+  // 샘플 승인 처리 — 품목은 접수 시 이미 정식 스타일번호로 만들어져 있다
   // 승인 후 담당자가 정확한 스타일번호로 품목 마스터에 직접 등록해야 함
   // ── 다음 차수 샘플 (수정 요청) ──
   const [nextRoundTarget, setNextRoundTarget] = useState<Sample | null>(null);
@@ -747,10 +752,9 @@ export default function SampleManagement() {
 
   const handleApprove = (s: Sample) => {
     upsertSampleSB({ ...s, stage: '최종승인', approvedBy: '관리자' }).then(() => refresh()).catch(() => {});
-    // ⚠️ 자동 ACTIVE 전환 제거: 승인은 샘플 단계만 "최종승인"으로 변경
-    // TEMP 품목은 TEMP 상태 그대로 유지 (정식 스타일번호 등록 후 ACTIVE 처리)
+    // 승인은 샘플 단계만 "최종승인"으로 변경 (품목은 접수 때 이미 등록됨)
     refresh();
-    toast.success(`${s.styleNo} 최종 승인 완료 — "품목등록" 버튼으로 정식 스타일번호를 등록해주세요`);
+    toast.success(`${s.styleNo} 최종 승인 완료`);
   };
 
   // 품목 등록 (최종승인 샘플에서 품목 마스터로 이동 + prefill)
@@ -809,7 +813,7 @@ export default function SampleManagement() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-foreground">샘플 관리</h1>
-          <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">샘플 접수 · 차수별 메모 · 자재 체크리스트 · TEMP 품목 자동생성</p>
+          <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">샘플 접수 · 차수별 수정요청 · 자재 체크리스트 · 품목 자동생성</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleBillAll} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
@@ -1439,7 +1443,7 @@ export default function SampleManagement() {
           <DialogHeader><DialogTitle>{editId ? '샘플 수정' : '샘플 접수'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
 
-            {/* TEMP 품목 자동생성 토글 */}
+            {/* 품목 자동생성 토글 — 정식 스타일번호를 바로 부여한다 */}
             {!editId && (
               <div className="p-3 bg-primary/5 border border-primary/20 rounded-md">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1448,8 +1452,8 @@ export default function SampleManagement() {
                     onChange={e => setCreateTempMode(e.target.checked)}
                     className="accent-primary"
                   />
-                  <span className="text-sm font-medium text-primary">TEMP 품목 자동생성</span>
-                  <span className="text-xs text-muted-foreground">(아직 품목이 없는 신규 샘플)</span>
+                  <span className="text-sm font-medium text-primary">품목 자동생성</span>
+                  <span className="text-xs text-muted-foreground">(품목마스터에 정식 스타일번호로 함께 등록)</span>
                 </label>
                 {createTempMode && (
                   <div className="mt-2 space-y-1.5">
@@ -1482,7 +1486,7 @@ export default function SampleManagement() {
               {/* 스타일 선택 (TEMP 자동생성이 아닐 때) */}
               {!createTempMode && (
                 <div className="col-span-2 space-y-2">
-                  <Label>기존 스타일에서 이미지 불러오기 <span className="text-muted-foreground font-normal text-xs">(선택사항 — 컬러 추가 등)</span></Label>
+                  <Label>기존 스타일 연결 <span className="text-muted-foreground font-normal text-xs">(선택사항 — 컬러 추가 샘플)</span></Label>
                   <Select value={form.styleId || 'none'} onValueChange={v => {
                     if (v === 'none') { setForm(f => ({ ...f, styleId: undefined })); return; }
                     const item = items.find(i => i.id === v);
@@ -1501,11 +1505,10 @@ export default function SampleManagement() {
                         styleNo: newStyleNo,
                         styleName: item.name,
                         buyerId: item.buyerId || f.buyerId,
-                        imageUrls: item.imageUrl ? [item.imageUrl] : (f.imageUrls || []),
-                      }));
+                      }));  // 이미지는 품목 등록에서만 관리한다 (여기서 끌어오지 않음)
                     }
                   }}>
-                    <SelectTrigger className="text-xs h-8"><SelectValue placeholder="스타일 선택 → 번호/품명 자동입력 + 이미지 불러오기" /></SelectTrigger>
+                    <SelectTrigger className="text-xs h-8"><SelectValue placeholder="스타일 선택 → 번호·품명 자동입력" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">선택 안 함</SelectItem>
                       {items
