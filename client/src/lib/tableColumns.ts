@@ -39,7 +39,9 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
                       'brand_batch_id', 'shipped_qty', 'is_employee_purchase', 'milestones',
                       'created_at', 'updated_at'],
   materials: ['id', 'item_code', 'name', 'name_en', 'spec', 'unit', 'unit_price', 'unit_price_cny', 'unit_price_krw',
-              'currency', 'vendor_id', 'category', 'stock_qty', 'memo',
+              'unit_price_usd', 'price_currency', 'brand', 'image_url',
+              'currency', 'vendor_id', 'category', 'sub_type', 'plating_color', 'mold_cost', 'season',
+              'stock_qty', 'memo',
               'order_status', 'order_date', 'order_qty', 'order_vendor_name',
               'created_at', 'updated_at'],
 };
