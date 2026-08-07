@@ -23,7 +23,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera, MoreHorizontal } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera, MoreHorizontal, ChevronRight, ChevronDown, Layers } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 const ORDER_STATUSES: OrderStatus[] = ['발주생성', '생산중', '생산완료', '입고완료'];
@@ -69,6 +69,9 @@ export default function ProductionOrders() {
   const [sortBy, setSortBy] = usePersistedState('orders.sortBy', 'createdAt'); // 'createdAt' | 'deliveryDate' | 'orderNo'
   const [filterExpense, setFilterExpense] = usePersistedState('orders.filterExpense', 'all'); // 'all' | 'done' | 'none'
   const [filterUrgent, setFilterUrgent] = usePersistedState('orders.filterUrgent', false);
+  const [filterPo, setFilterPo] = usePersistedState('orders.filterPo', 'all');
+  const [groupByPo, setGroupByPo] = usePersistedState('orders.groupByPo', false);
+  const [openPoGroups, setOpenPoGroups] = useState<Set<string>>(new Set());
 
   // 다른 화면(미지급 등)에서 ?order=발주번호 로 들어오면 그 발주 상세를 바로 연다
   const [deepLinked, setDeepLinked] = useState(false);
@@ -378,11 +381,17 @@ export default function ProductionOrders() {
     if (filterUrgent) {
       list = list.filter(o => o.deliveryDate && calcDDay(o.deliveryDate) <= 7 && o.status !== '입고완료');
     }
-    if (search) list = list.filter(o =>
-      o.orderNo.toLowerCase().includes(search.toLowerCase()) ||
-      o.styleNo.toLowerCase().includes(search.toLowerCase()) ||
-      o.styleName.toLowerCase().includes(search.toLowerCase())
-    );
+    if (search) {
+      const q = search.toLowerCase();
+      // 발주번호 · 스타일 · 품명에 더해 발주서 묶음번호(PO-YYMMDD-NN)로도 찾는다
+      list = list.filter(o =>
+        o.orderNo.toLowerCase().includes(q) ||
+        o.styleNo.toLowerCase().includes(q) ||
+        o.styleName.toLowerCase().includes(q) ||
+        (o.poBatchNo || '').toLowerCase().includes(q)
+      );
+    }
+    if (filterPo !== 'all') list = list.filter(o => o.poBatchNo === filterPo);
     // 공장 필터
     if (filterFactory !== 'all') list = list.filter(o => o.vendorId === filterFactory || o.vendorName === filterFactory);
     // 스타일 필터
@@ -400,7 +409,48 @@ export default function ProductionOrders() {
     if (sortBy === 'deliveryDate') return list.sort((a, b) => (a.deliveryDate || '9999').localeCompare(b.deliveryDate || '9999'));
     if (sortBy === 'orderNo') return list.sort((a, b) => a.orderNo.localeCompare(b.orderNo));
     return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [orders, filterStatus, filterSeason, filterBuyer, filterFactory, filterStyle, filterDeadline, filterExpense, sortBy, filterUrgent, items, search]);
+  }, [orders, filterStatus, filterSeason, filterBuyer, filterFactory, filterStyle, filterDeadline, filterExpense, sortBy, filterUrgent, items, search, filterPo]);
+
+  /** 발주서 묶음 목록 (필터 드롭다운용) — 최근 발주서가 위로 */
+  const poBatchOptions = useMemo(
+    () => Array.from(new Set((orders as ProductionOrder[]).map(o => o.poBatchNo).filter((b): b is string => !!b)))
+      .sort((a, b) => b.localeCompare(a)),
+    [orders],
+  );
+
+  /** 같은 발주서(PO)끼리 묶는다. 묶음번호가 없는 건은 그대로 한 줄로 둔다 */
+  const poGroups = useMemo(() => {
+    const map = new Map<string, ProductionOrder[]>();
+    filtered.forEach(o => {
+      const key = o.poBatchNo || `single:${o.id}`;
+      const cur = map.get(key);
+      if (cur) cur.push(o); else map.set(key, [o]);
+    });
+    return Array.from(map.entries()).map(([key, list]) => ({
+      key,
+      batchNo: list[0].poBatchNo || null,
+      orders: list,
+    }));
+  }, [filtered]);
+
+  type OrderRow = { kind: 'po'; group: (typeof poGroups)[number] } | { kind: 'order'; order: ProductionOrder };
+  const displayRows = useMemo<OrderRow[]>(() => {
+    if (!groupByPo) return filtered.map(o => ({ kind: 'order', order: o }));
+    const rows: OrderRow[] = [];
+    poGroups.forEach(g => {
+      // 묶음이 아닌 단건은 요약줄 없이 그대로 보여준다
+      if (!g.batchNo) { rows.push({ kind: 'order', order: g.orders[0] }); return; }
+      rows.push({ kind: 'po', group: g });
+      if (openPoGroups.has(g.key)) g.orders.forEach(o => rows.push({ kind: 'order', order: o }));
+    });
+    return rows;
+  }, [groupByPo, filtered, poGroups, openPoGroups]);
+
+  const togglePoGroup = (key: string) => setOpenPoGroups(prev => {
+    const n = new Set(prev);
+    n.has(key) ? n.delete(key) : n.add(key);
+    return n;
+  });
 
   const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const isAllSelected = filtered.length > 0 && filtered.every(o => selectedIds.has(o.id));
@@ -1334,7 +1384,7 @@ export default function ProductionOrders() {
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="발주번호 / 스타일 검색" className="pl-9 h-9" />
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="발주번호 · PO번호 · 스타일 검색" className="pl-9 h-9" />
         </div>
         <Select value={filterSeason} onValueChange={setFilterSeason}>
           <SelectTrigger className="w-28 h-9"><SelectValue placeholder="시즌" /></SelectTrigger>
@@ -1377,6 +1427,14 @@ export default function ProductionOrders() {
             <SelectItem value="overdue">납기 초과</SelectItem>
           </SelectContent>
         </Select>
+        {/* 발주서 묶음 필터 */}
+        <Select value={filterPo} onValueChange={setFilterPo}>
+          <SelectTrigger className="w-40 h-9"><SelectValue placeholder="발주서" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">전체 발주서</SelectItem>
+            {poBatchOptions.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+          </SelectContent>
+        </Select>
         {/* 정렬 */}
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="w-32 h-9"><SelectValue placeholder="정렬" /></SelectTrigger>
@@ -1386,6 +1444,16 @@ export default function ProductionOrders() {
             <SelectItem value="orderNo">발주번호순</SelectItem>
           </SelectContent>
         </Select>
+        {/* 발주서 단위로 접어 보기 */}
+        <Button
+          variant={groupByPo ? 'default' : 'outline'}
+          size="sm"
+          className="h-9 gap-1.5"
+          onClick={() => setGroupByPo(!groupByPo)}
+        >
+          <Layers className="w-4 h-4" />
+          발주서 묶음
+        </Button>
         {selectedIds.size > 0 && (
           <Button
             variant="destructive"
@@ -1429,7 +1497,38 @@ export default function ProductionOrders() {
                 <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">등록된 발주가 없습니다</p>
               </td></tr>
-            ) : filtered.map(o => {
+            ) : displayRows.map(row => {
+              if (row.kind === 'po') {
+                // 발주서 1장 요약 — 펼치면 스타일별 발주가 아래에 붙는다
+                const g = row.group;
+                const open = openPoGroups.has(g.key);
+                const totalQty = g.orders.reduce((sum, x) => sum + (x.qty || 0), 0);
+                const totalAmt = g.orders.reduce((sum, x) => sum + (x.factoryUnitPriceKrw || 0) * (x.qty || 0), 0);
+                return (
+                  <tr key={g.key} className="border-b border-border bg-[var(--fill-quaternary)]">
+                    <td colSpan={15} className="px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => togglePoGroup(g.key)}
+                          className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-primary">
+                          {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          <span className="font-mono">{g.batchNo}</span>
+                        </button>
+                        <span className="text-xs text-muted-foreground">{g.orders[0].vendorName || '공장 미지정'}</span>
+                        <span className="text-xs text-muted-foreground">{g.orders[0].orderDate || ''}</span>
+                        <span className="text-xs text-muted-foreground">{g.orders.length}스타일 · {formatNumber(totalQty)} PCS</span>
+                        <span className="ml-auto flex items-center gap-3">
+                          <span className="text-sm font-mono font-medium text-foreground">{formatKRW(totalAmt)}</span>
+                          <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs"
+                            onClick={() => setBatchSheet({ batchNo: g.batchNo!, orders: g.orders })}>
+                            <FileText className="w-3.5 h-3.5" />발주서
+                          </Button>
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+              const o = row.order;
               const totalAmtKrw = (o.factoryUnitPriceKrw || 0) * o.qty;
               // BOM 실제 존재 여부: 발주 메타 + 품목 hasBom + Supabase bom 목록
               const itemForOrder = items.find(i => i.styleNo === o.styleNo || i.id === o.styleId);
