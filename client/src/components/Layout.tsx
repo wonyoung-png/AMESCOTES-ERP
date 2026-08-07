@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Network,
   GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight,
-  LineChart, Globe, BookOpen, Percent, Image as ImageIcon,
+  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp,
 } from 'lucide-react';
 
 interface NavItem {
@@ -116,6 +116,7 @@ const PMS_URL = 'https://daily.54-116-241-64.sslip.io/app/';
 const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
   { group: '데이터 & 점검', label: '일일점검', icon: <BarChart3 size={17} /> },
   { group: '데이터 & 점검', label: '채널별 매출', icon: <LineChart size={17} /> },
+  { group: '데이터 & 점검', label: '상품 성과', icon: <TrendingUp size={17} /> },
   { group: '데이터 & 점검', label: '주문관리', icon: <Truck size={17} /> },
   { group: '데이터 & 점검', label: '국가별 주간', icon: <Globe size={17} /> },
   { group: '데이터 & 점검', label: '주간·일회성', icon: <FileSpreadsheet size={17} /> },
@@ -129,6 +130,8 @@ const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
   { group: '콘텐츠 제작', label: '이미지 생성', icon: <ImageIcon size={17} /> },
   { group: '브랜드 인텔리전스', label: '브랜드 분석', icon: <Building2 size={17} /> },
   { group: '분석 & 진단', label: '매출분석', icon: <BarChart3 size={17} /> },
+  { group: '분석 & 진단', label: '마케팅 대시보드', icon: <Percent size={17} /> },
+  { group: '분석 & 진단', label: '채널 대조', icon: <ClipboardCheck size={17} /> },
   { group: '실행 & 일정', label: '할인 캠페인', icon: <Percent size={17} /> },
   { group: '실행 & 일정', label: '배송비 분석', icon: <Truck size={17} /> },
   { group: '실행 & 일정', label: '사이트 진단', icon: <Globe size={17} /> },
