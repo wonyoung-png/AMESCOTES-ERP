@@ -59,19 +59,21 @@
      이 블록(라이트)은 동일 시스템의 토큰 스왑 결과물 — 레이아웃·간격·radius 동일 */
   --radius: 0.75rem; /* 카드·팝오버 12px (BGROW §4 — 12 초과 금지) */
 
-  --bg-canvas: #f4f1ec;
+  /* 중립 램프 — 배경이 따뜻한 종이톤이라 글자·선도 같은 온도로 맞춘다.
+     순수 회색(#111/#6b6b6b)을 베이지 위에 얹으면 탁해 보이던 문제 해결. */
+  --bg-canvas: #f5f2ed;
   --bg-surface: #ffffff;
-  --bg-surface-2: #faf9f7;
-  --bg-subtle: #f1efea;
-  --separator: #e8e5e0;
-  --separator-strong: #d6d2cb;
-  --label-primary: #111111;
-  --label-secondary: #6b6b6b;
-  --label-tertiary: #9a9a9a;
-  --fill-primary: rgba(0, 0, 0, 0.1);
-  --fill-secondary: rgba(0, 0, 0, 0.07);
-  --fill-tertiary: rgba(0, 0, 0, 0.05);
-  --fill-quaternary: rgba(0, 0, 0, 0.03);
+  --bg-surface-2: #faf8f5;
+  --bg-subtle: #efece6;
+  --separator: #e6e1d9;
+  --separator-strong: #d3ccc1;
+  --label-primary: #1a1815;
+  --label-secondary: #6b6560;
+  --label-tertiary: #9c958c;
+  --fill-primary: rgba(26, 24, 21, 0.10);
+  --fill-secondary: rgba(26, 24, 21, 0.065);
+  --fill-tertiary: rgba(26, 24, 21, 0.045);
+  --fill-quaternary: rgba(26, 24, 21, 0.028);
 
   --accent-mint: #3dffa2;
   --accent-mint-weak: rgba(61, 255, 162, 0.18);
@@ -81,18 +83,19 @@
   --status-medium-bg: #fff1de; --status-medium-fg: #9a6212;
   --status-low-bg: #f1eaff; --status-low-fg: #6b3fbf;
 
-  --system-blue: #007aff;
-  --system-green: #2e9e5b;
-  --system-red: #c4303f;
-  --system-orange: #9a6212;
+  /* 상태색 — iOS 기본값(#007aff) 대신 종이톤 위에서 튀지 않게 채도를 낮춘 값 */
+  --system-blue: #3a5ccc;
+  --system-green: #2f7a55;
+  --system-red: #b3413a;
+  --system-orange: #a8712a;
   --system-yellow: #ffcc00;
   --system-indigo: #5856d6;
   --system-teal: #30b0c7;
   --system-gray: #8e8e93;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 1px 2px rgba(26, 24, 21, 0.05);
+  --shadow-md: 0 4px 12px rgba(26, 24, 21, 0.07);
+  --shadow-lg: 0 8px 24px rgba(26, 24, 21, 0.09);
 
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
@@ -108,7 +111,7 @@
   --card-foreground: var(--label-primary);
   --popover: var(--bg-surface);
   --popover-foreground: var(--label-primary);
-  --primary: #111111;
+  --primary: #1a1815;
   --primary-foreground: #ffffff;
   --secondary: var(--bg-subtle);
   --secondary-foreground: var(--label-primary);
@@ -120,7 +123,7 @@
   --destructive-foreground: #ffffff;
   --border: var(--separator);
   --input: var(--separator);
-  --ring: #111111;
+  --ring: #1a1815;
   --chart-1: #111111;
   --chart-2: #6b6b6b;
   --chart-3: #9a9a9a;
@@ -364,3 +367,25 @@
   }
   #cost-sheet-modal-wrap { background: none !important; padding: 0 !important; display: block !important; }
 }
+
+/* ─────────────────────────────────────────────
+   표 정렬 규칙 (전역) — .data-table 을 붙이면 열·행이 자동으로 맞는다.
+   선택자가 .클래스+요소 라 Tailwind 유틸(px-4 등)보다 우선한다.
+   숫자 열은 th·td 양쪽에 .num 을 주면 헤더까지 같이 우측 정렬된다.
+   ───────────────────────────────────────────── */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th,
+.data-table td { padding: 0.5rem 0.75rem; vertical-align: middle; }
+.data-table thead th {
+  text-align: left; white-space: nowrap;
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em;
+  color: var(--label-secondary); background: var(--bg-subtle);
+  border-bottom: 1px solid var(--separator);
+}
+.data-table tbody td { font-size: 13px; border-bottom: 1px solid var(--separator); }
+.data-table tbody tr:last-child td { border-bottom: 0; }
+/* 숫자·금액 — 자릿수 정렬 */
+.data-table :is(th, td).num { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table :is(th, td).ctr { text-align: center; }
+/* 액션 버튼이 들어가는 열은 내용이 커도 행 높이를 흔들지 않게 */
+.data-table :is(th, td).act { text-align: right; white-space: nowrap; }
