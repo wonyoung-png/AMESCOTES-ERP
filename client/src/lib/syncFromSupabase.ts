@@ -3,6 +3,7 @@
 
 import { supabase } from './supabase';
 import { syncPhase1FromSupabase } from './phase1';
+import { filterForTable, toSnakeCase } from './tableColumns';
 
 // snake_case → camelCase 변환 (shallow, 최상위 키만)
 function toCamelCase(obj: Record<string, any>): Record<string, any> {
@@ -193,15 +194,10 @@ const TABLE_KEY_MAP: { table: string; key: string; converter?: (row: Record<stri
   { table: 'samples',           key: 'ames_samples' },
   { table: 'boms',              key: 'ames_boms', converter: convertBomRow },
   { table: 'production_orders', key: 'ames_orders' },
-  // ── Phase1 (미지급·입출고·불량차감·자재구매) ──
-  // 쓰기는 phase1.ts 가 이미 서버로 보내는데 읽기가 없어, 다른 PC·다른 브라우저에서
-  // 같은 내역이 안 보이고 캐시를 지우면 사라졌다. 시작 시 서버본을 내려받아 맞춘다.
-  { table: 'payables',          key: 'ames_payables' },
-  { table: 'receipt_logs',      key: 'ames_receipt_logs' },
-  { table: 'defect_carryovers', key: 'ames_defect_carryovers' },
-  { table: 'purchase_items',    key: 'ames_purchases' },
-  { table: 'projects',          key: 'ames_projects' },
 ];
+// 미지급·입출고·불량차감·발주손익은 syncPhase1FromSupabase() 가 이미 내려받는다.
+// 자재구매(purchase_items)만 빠져 있었는데, 이건 통째로 덮어쓰면 서버에 없던
+// 로컬 전용 구매건이 지워지므로 아래 mergePurchaseItems 로 따로 병합한다.
 
 export async function syncFromSupabase(): Promise<void> {
   // items를 먼저 처리해서 boms 변환 시 styleId 매핑 가능하게
@@ -329,8 +325,44 @@ export async function syncFromSupabase(): Promise<void> {
 
   try {
     await syncPhase1FromSupabase();
+    await mergePurchaseItems();
     console.log('[syncFromSupabase] Phase1 테이블 동기화 완료');
   } catch (e) {
     console.warn('[syncFromSupabase] Phase1 동기화 스킵 (테이블 미생성 시 migration 실행):', e);
+  }
+}
+
+/** 자재구매 — 서버본과 로컬본을 id 기준으로 합치고, 서버에 없던 로컬 건은 올려준다.
+ *  (통째로 교체하면 서버 저장이 없던 시절에 만든 구매건이 사라진다) */
+async function mergePurchaseItems(): Promise<void> {
+  const KEY = 'ames_purchases';
+  try {
+    const { data, error } = await supabase.from('purchase_items').select('*');
+    if (error) { console.warn('[syncFromSupabase] purchase_items 조회 실패:', error.message); return; }
+
+    const localRaw = localStorage.getItem(KEY);
+    const local: Array<Record<string, any>> = localRaw ? JSON.parse(localRaw) : [];
+    const remote = (data || []).map(r => toCamelCase(r as Record<string, any>));
+
+    const byId = new Map<string, Record<string, any>>();
+    local.forEach(r => { if (r?.id) byId.set(r.id, r); });
+    const localOnly = local.filter(r => r?.id && !(data || []).some((d: any) => d.id === r.id));
+    remote.forEach(r => { if (r?.id) byId.set(r.id, r); });   // 같은 id 는 서버본이 기준
+
+    localStorage.setItem(KEY, JSON.stringify([...byId.values()]));
+
+    // 서버에 없던 로컬 건을 올린다 — 다음 접속부터는 다른 PC 에서도 보인다
+    for (const row of localOnly) {
+      try {
+        await supabase.from('purchase_items').upsert(filterForTable('purchase_items', toSnakeCase(row)));
+      } catch (e) {
+        console.warn('[syncFromSupabase] purchase_items 업로드 실패:', String(e));
+      }
+    }
+    if (localOnly.length > 0) {
+      console.info(`[syncFromSupabase] 자재구매 로컬 전용 ${localOnly.length}건 서버로 올림`);
+    }
+  } catch (e) {
+    console.warn('[syncFromSupabase] purchase_items 병합 실패:', String(e));
   }
 }
