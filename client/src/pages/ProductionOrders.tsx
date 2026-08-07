@@ -23,7 +23,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera, MoreHorizontal } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 const ORDER_STATUSES: OrderStatus[] = ['발주생성', '생산중', '생산완료', '입고완료'];
@@ -131,6 +131,11 @@ export default function ProductionOrders() {
   // 작업지시서 모달 상태
   const [workOrderModal, setWorkOrderModal] = useState(false);
   const [workOrderTarget, setWorkOrderTarget] = useState<ProductionOrder | null>(null);
+  // 사후 불량 — 납품 후 뒤늦게 발견된 불량. 원본을 고치지 않고 차감 이력으로 쌓는다
+  const [postDefectTarget, setPostDefectTarget] = useState<ProductionOrder | null>(null);
+  const [postDefectForm, setPostDefectForm] = useState({ qty: '', reason: '', foundDate: new Date().toISOString().split('T')[0] });
+  // 발주서(PO) 출력 — 작업지시서와 별개 문서
+  const [poTarget, setPoTarget] = useState<ProductionOrder | null>(null);
   // 납기관리에서 '작업지시서'를 누르고 넘어온 경우 해당 발주의 작업지시서를 바로 연다
   useEffect(() => {
     const id = localStorage.getItem('ames_open_work_order');
@@ -978,6 +983,33 @@ export default function ProductionOrders() {
       .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
   };
 
+  const savePostDefect = async () => {
+    const order = postDefectTarget;
+    if (!order) return;
+    const qty = Number(postDefectForm.qty);
+    if (!qty || qty <= 0) { toast.error('불량 수량을 입력하세요'); return; }
+    if (!postDefectForm.reason.trim()) { toast.error('사유를 입력하세요'); return; }
+    const entry = {
+      id: genId(),
+      qty,
+      reason: postDefectForm.reason.trim(),
+      foundDate: postDefectForm.foundDate,
+    };
+    try {
+      await upsertOrder({
+        ...order,
+        postDefects: [...(order.postDefects || []), entry],
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success(`사후 불량 ${qty}개 등록 — 다음 명세표에서 차감됩니다`);
+      setPostDefectTarget(null);
+      setPostDefectForm({ qty: '', reason: '', foundDate: new Date().toISOString().split('T')[0] });
+      refresh();
+    } catch (e) {
+      toast.error(`저장 실패: ${(e as Error).message}`);
+    }
+  };
+
   const handleStatusChange = (id: string, status: OrderStatus) => {
     if (status === '입고완료') {
       const order = orders.find(o => o.id === id);
@@ -1060,10 +1092,11 @@ export default function ProductionOrders() {
     if (!buyer) { toast.error('바이어 정보가 없습니다. 품목의 바이어를 먼저 설정해주세요'); return; }
 
     const today = new Date().toISOString().split('T')[0];
-    // 청구 수량 = 실제 입고분 - 불량. 불량만큼 결제를 덜 하도록 명세표에서 빼준다
-    const billQty = order.receivedQty !== undefined
-      ? Math.max(0, (order.receivedQty || 0) - (order.defectQty || 0))
-      : order.qty;
+    // 청구 수량 = 실제 입고분 - 입고불량 - 아직 정산 안 된 사후불량
+    const pendingPostDefect = (order.postDefects || []).filter(d => !d.settledAt).reduce((s2, d) => s2 + d.qty, 0);
+    const billQty = Math.max(0, (order.receivedQty !== undefined
+      ? (order.receivedQty || 0) - (order.defectQty || 0)
+      : order.qty) - pendingPostDefect);
     const rawColorQtys = order.colorQtys && order.colorQtys.length > 0 ? order.colorQtys : [{ color: '기본', qty: order.qty }];
     const orderedTotal = rawColorQtys.reduce((s, c) => s + c.qty, 0) || order.qty || 1;
     // 컬러별로 청구 수량을 발주 비율대로 나눈다 (마지막 컬러가 잔여를 흡수)
@@ -1089,10 +1122,22 @@ export default function ProductionOrders() {
         unitPrice,
         taxType: '과세' as const,
         taxRate: 0.1,
-        memo: order.defectQty
-          ? `발주번호 ${order.orderNo} · 불량 ${order.defectQty}개 차감`
-          : `발주번호 ${order.orderNo}`,
+        memo: [
+          `발주번호 ${order.orderNo}`,
+          order.defectQty ? `불량 ${order.defectQty}개 차감` : '',
+          pendingPostDefect ? `사후불량 ${pendingPostDefect}개 차감` : '',
+        ].filter(Boolean).join(' · '),
       }));
+
+      // 이번 명세표에 반영한 사후불량은 정산 완료로 표시해 다음에 또 빠지지 않게 한다
+      if (pendingPostDefect > 0) {
+        const today2 = today;
+        upsertOrder({
+          ...order,
+          postDefects: (order.postDefects || []).map(d => d.settledAt ? d : { ...d, settledAt: today2 }),
+          updatedAt: new Date().toISOString(),
+        }).catch(() => {});
+      }
 
       const newStatement: TradeStatement = {
         id: genId(),
@@ -1373,16 +1418,18 @@ export default function ProductionOrders() {
               <th className="w-10 px-3 py-3">
                 <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} className="cursor-pointer" />
               </th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">발주번호</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">스타일</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">브랜드</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">시즌</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">컬러</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">수량</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">발주일</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">발주번호</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">스타일</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">브랜드</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">컬러</th>
+              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">발주</th>
+              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">입고</th>
+              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">불량</th>
+              <th className="text-right px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">청구</th>
               <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">공장 / 공장단가</th>
               <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">총 발주금액</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">발주일</th>
-              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">납기일</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">납기일</th>
               <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">상태</th>
               <th className="text-center px-4 py-3 text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
@@ -1415,6 +1462,11 @@ export default function ProductionOrders() {
                   <td className="w-10 px-3 py-3 text-center">
                     <input type="checkbox" checked={selectedIds.has(o.id)} onChange={() => toggleSelect(o.id)} className="cursor-pointer" />
                   </td>
+                  <td className="px-3 py-3 text-xs whitespace-nowrap">
+                    {o.orderDate
+                      ? <span className="font-mono text-muted-foreground">{o.orderDate}</span>
+                      : <span className="text-muted-foreground">-</span>}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono font-semibold text-foreground">{o.orderNo}</span>
@@ -1433,9 +1485,8 @@ export default function ProductionOrders() {
                   <td className="px-4 py-3">
                     <span className="text-xs text-muted-foreground font-medium">{getBrandName(o) || <span className="text-muted-foreground">-</span>}</span>
                   </td>
-                  <td className="px-4 py-3"><Badge variant="outline" className="text-xs">{o.season}</Badge></td>
-                  {/* 컬러 — 수량과 분리해 열을 맞춘다 */}
-                  <td className="px-4 py-3 align-top">
+                  {/* 컬러 — 컬러명만. 수량은 오른쪽 수량 열들이 담당한다 */}
+                  <td className="px-3 py-3 align-top">
                     {(o.colorQtys || []).length > 0 ? (
                       <div className="flex flex-col gap-0.5">
                         {(o.colorQtys || []).map((cq, i) => (
@@ -1446,22 +1497,48 @@ export default function ProductionOrders() {
                       </div>
                     ) : <span className="text-xs text-muted-foreground">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-right align-top">
-                    <p className="font-mono text-foreground">{formatNumber(o.qty)}</p>
-                    {o.receivedQty !== undefined && (() => {
-                      // 부분입고면 미입고 잔량을, 불량이 있으면 정산 차감 대상 수량을 같이 보여준다
-                      const short = (o.qty || 0) - (o.receivedQty || 0);
-                      const good = (o.receivedQty || 0) - (o.defectQty || 0);
-                      return (
-                        <div className="text-[11px] mt-1 space-y-0.5 whitespace-nowrap">
-                          <p className="text-[var(--system-green)]">입고 {formatNumber(o.receivedQty)}</p>
-                          {short > 0 && <p className="text-[var(--system-orange)]">미입고 {formatNumber(short)}</p>}
-                          {!!o.defectQty && <p className="text-[var(--system-red)]">불량 {formatNumber(o.defectQty)}</p>}
-                          {!!o.defectQty && <p className="text-muted-foreground">정산 {formatNumber(good)}</p>}
-                        </div>
-                      );
-                    })()}
-                  </td>
+                  {(() => {
+                    // 발주 → 입고 → 불량 → 청구. 한 열에 뭉쳐 보이던 값을 각 열로 분리한다
+                    const received = o.receivedQty;
+                    const postDefect = (o.postDefects || []).filter(d => !d.settledAt).reduce((sum, d) => sum + d.qty, 0);
+                    const defect = (o.defectQty || 0) + postDefect;
+                    const billable = received === undefined ? null : Math.max(0, received - defect);
+                    const short = received === undefined ? 0 : (o.qty || 0) - received;
+                    return (
+                      <>
+                        <td className="px-3 py-3 text-right align-top font-mono text-foreground whitespace-nowrap">
+                          {formatNumber(o.qty)}
+                        </td>
+                        <td className="px-3 py-3 text-right align-top whitespace-nowrap">
+                          {received === undefined ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <>
+                              <span className="font-mono text-[var(--system-green)]">{formatNumber(received)}</span>
+                              {short > 0 && (
+                                <p className="text-[11px] text-[var(--system-orange)]">미입고 {formatNumber(short)}</p>
+                              )}
+                            </>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right align-top whitespace-nowrap">
+                          {defect > 0 ? (
+                            <>
+                              <span className="font-mono text-[var(--system-red)]">{formatNumber(defect)}</span>
+                              {postDefect > 0 && (
+                                <p className="text-[11px] text-[var(--system-red)]">사후 {formatNumber(postDefect)}</p>
+                              )}
+                            </>
+                          ) : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-3 py-3 text-right align-top whitespace-nowrap">
+                          {billable === null
+                            ? <span className="text-muted-foreground">—</span>
+                            : <span className="font-mono font-medium text-foreground">{formatNumber(billable)}</span>}
+                        </td>
+                      </>
+                    );
+                  })()}
                   <td className="px-4 py-3">
                     <p className="text-foreground font-medium">{o.vendorName}</p>
                     {displayFactoryKrw > 0 ? (
@@ -1477,11 +1554,6 @@ export default function ProductionOrders() {
                       ? <span className="font-mono text-foreground font-medium">{formatKRW(totalAmtKrw)}</span>
                       : <span className="text-muted-foreground">-</span>
                     }
-                  </td>
-                  <td className="px-4 py-3 text-xs">
-                    {o.orderDate ? (
-                      <span className="font-mono text-muted-foreground">{o.orderDate}</span>
-                    ) : <span className="text-muted-foreground">-</span>}
                   </td>
                   <td className="px-4 py-3 text-xs">
                     {o.deliveryDate ? (
@@ -1503,69 +1575,63 @@ export default function ProductionOrders() {
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex flex-col gap-1 items-end">
-                      {/* 첫 번째 행: 명세표 + 전표 드롭다운 */}
-                      <div className="flex gap-1">
-                        {o.tradeStatementId ? (
-                          <Button variant="outline" size="sm" className="h-7 text-xs px-2 text-muted-foreground cursor-not-allowed" disabled>
-                            명세완료
+                  <td className="px-3 py-3">
+                    {/* 작업 — 자주 쓰는 문서 2개만 노출, 나머지는 더보기로 */}
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="작업지시서"
+                        onClick={() => openWorkOrderModal(o)}>
+                        <Package className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="발주서"
+                        onClick={() => setPoTarget(o)}>
+                        <FileText className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="상세"
+                        onClick={() => setShowDetail(o)}>
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="더보기">
+                            <MoreHorizontal className="w-3.5 h-3.5" />
                           </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => openBillingModal(o)}
-                          >
-                            <FileText className="w-3 h-3 mr-1" />명세표 발행
-                          </Button>
-                        )}
-                        {o.status === '입고완료' && (
-                          (o as any).expenseId ? (
-                            <Button variant="outline" size="sm" className="h-7 text-xs px-2 text-muted-foreground cursor-not-allowed" disabled>
-                              전표완료
-                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          {o.tradeStatementId ? (
+                            <DropdownMenuItem disabled className="text-xs">명세표 발행됨</DropdownMenuItem>
                           ) : (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-7 text-xs px-2">
-                                  전표 ▾
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openBillingModal(o)}>
+                              명세표 발행
+                            </DropdownMenuItem>
+                          )}
+                          {o.status === '입고완료' && (
+                            (o as any).expenseId ? (
+                              <DropdownMenuItem disabled className="text-xs">전표 작성됨</DropdownMenuItem>
+                            ) : (
+                              <>
                                 <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openLinkExpenseForOrder(o)}>
-                                  기존결의 연결
+                                  기존 결의 연결
                                 </DropdownMenuItem>
                                 <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openExpenseModal(o)}>
                                   지출결의 생성
                                 </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )
-                        )}
-                      </div>
-                      {/* 두 번째 행: 작업지시서 + 아이콘 버튼들 */}
-                      <div className="flex gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => openWorkOrderModal(o)}
-                          title="작업지시서 출력"
-                        >
-                          <Package className="w-3 h-3 mr-1" />작업지시서
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowDetail(o)}>
-                          <Eye className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-primary" onClick={() => openEdit(o)} title="발주 수정">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(o.id)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
+                              </>
+                            )
+                          )}
+                          {o.status === '입고완료' && (
+                            <DropdownMenuItem className="text-xs cursor-pointer text-[var(--system-red)]"
+                              onClick={() => setPostDefectTarget(o)}>
+                              사후 불량 등록
+                              {(o.postDefects || []).filter(d => !d.settledAt).length > 0 &&
+                                ` (${(o.postDefects || []).filter(d => !d.settledAt).reduce((s2, d) => s2 + d.qty, 0)})`}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openEdit(o)}>발주 수정</DropdownMenuItem>
+                          <DropdownMenuItem className="text-xs cursor-pointer text-[var(--system-red)]" onClick={() => handleDelete(o.id)}>
+                            삭제
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </td>
                 </tr>
@@ -3031,6 +3097,137 @@ export default function ProductionOrders() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ── 사후 불량 등록 ── */}
+      <Dialog open={!!postDefectTarget} onOpenChange={o => { if (!o) setPostDefectTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>사후 불량 — {postDefectTarget?.orderNo}</DialogTitle></DialogHeader>
+          {postDefectTarget && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                납품 후 발견된 불량입니다. 원래 입고 수량은 그대로 두고 차감 이력만 남기며,
+                다음 명세표 발행 때 이 수량만큼 청구에서 빠집니다.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>불량 수량 *</Label>
+                  <Input type="number" value={postDefectForm.qty}
+                    onChange={e => setPostDefectForm(f => ({ ...f, qty: e.target.value }))} placeholder="0" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>발견일</Label>
+                  <Input type="date" value={postDefectForm.foundDate}
+                    onChange={e => setPostDefectForm(f => ({ ...f, foundDate: e.target.value }))} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>사유 *</Label>
+                <Input value={postDefectForm.reason}
+                  onChange={e => setPostDefectForm(f => ({ ...f, reason: e.target.value }))}
+                  placeholder="예: 봉제 터짐 · 가죽 스크래치" />
+              </div>
+
+              {(postDefectTarget.postDefects || []).length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">등록된 사후 불량</p>
+                  <div className="border border-border rounded-md divide-y divide-border max-h-40 overflow-y-auto">
+                    {(postDefectTarget.postDefects || []).map(d => (
+                      <div key={d.id} className="flex items-center justify-between px-3 py-1.5 text-xs">
+                        <span className="truncate">{d.foundDate} · {d.reason}</span>
+                        <span className="shrink-0 ml-2">
+                          <span className="text-[var(--system-red)] font-medium">{d.qty}개</span>
+                          {d.settledAt
+                            ? <span className="ml-1 text-muted-foreground">정산됨</span>
+                            : <span className="ml-1 text-[var(--system-orange)]">미정산</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPostDefectTarget(null)}>취소</Button>
+            <Button onClick={savePostDefect}>등록</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 발주서(PO) — 공장 결제 근거. 작업지시서와 별개 문서 ── */}
+      <Dialog open={!!poTarget} onOpenChange={o => { if (!o) setPoTarget(null); }}>
+        <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>발주서 — {poTarget?.orderNo}</DialogTitle></DialogHeader>
+          {poTarget && (() => {
+            const it = items.find(i => i.id === poTarget.styleId || i.styleNo === poTarget.styleNo);
+            const unit = poTarget.factoryUnitPriceKrw || 0;
+            const rows = (poTarget.colorQtys || []).length > 0
+              ? poTarget.colorQtys!
+              : [{ color: '기본', qty: poTarget.qty }];
+            const total = rows.reduce((sum, r) => sum + r.qty * unit, 0);
+            return (
+              <div className="p-4 space-y-4 text-sm bg-white text-neutral-900 rounded">
+                <h2 className="text-center text-lg font-bold tracking-widest border-b-2 border-neutral-800 pb-2">발 주 서</h2>
+                <table className="w-full text-xs border-collapse">
+                  <tbody>
+                    <tr>
+                      <td className="border border-neutral-300 bg-neutral-100 px-2 py-1.5 font-semibold w-24">발주번호</td>
+                      <td className="border border-neutral-300 px-2 py-1.5 font-mono">{poTarget.orderNo}</td>
+                      <td className="border border-neutral-300 bg-neutral-100 px-2 py-1.5 font-semibold w-24">발주일</td>
+                      <td className="border border-neutral-300 px-2 py-1.5">{poTarget.orderDate}</td>
+                    </tr>
+                    <tr>
+                      <td className="border border-neutral-300 bg-neutral-100 px-2 py-1.5 font-semibold">공장</td>
+                      <td className="border border-neutral-300 px-2 py-1.5">{poTarget.vendorName || '—'}</td>
+                      <td className="border border-neutral-300 bg-neutral-100 px-2 py-1.5 font-semibold">납기일</td>
+                      <td className="border border-neutral-300 px-2 py-1.5 font-semibold text-red-600">{poTarget.deliveryDate || '—'}</td>
+                    </tr>
+                    <tr>
+                      <td className="border border-neutral-300 bg-neutral-100 px-2 py-1.5 font-semibold">스타일</td>
+                      <td className="border border-neutral-300 px-2 py-1.5" colSpan={3}>
+                        {poTarget.styleNo} — {poTarget.styleName}{it?.buyerStyleNo ? ` (바이어 품번 ${it.buyerStyleNo})` : ''}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-neutral-100">
+                      <th className="border border-neutral-300 px-2 py-1.5 text-left">컬러</th>
+                      <th className="border border-neutral-300 px-2 py-1.5 text-right">수량</th>
+                      <th className="border border-neutral-300 px-2 py-1.5 text-right">단가</th>
+                      <th className="border border-neutral-300 px-2 py-1.5 text-right">금액</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, i) => (
+                      <tr key={i}>
+                        <td className="border border-neutral-300 px-2 py-1.5">{r.color}</td>
+                        <td className="border border-neutral-300 px-2 py-1.5 text-right font-mono">{formatNumber(r.qty)}</td>
+                        <td className="border border-neutral-300 px-2 py-1.5 text-right font-mono">{formatKRW(unit)}</td>
+                        <td className="border border-neutral-300 px-2 py-1.5 text-right font-mono">{formatKRW(r.qty * unit)}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-neutral-50 font-semibold">
+                      <td className="border border-neutral-300 px-2 py-1.5">합계</td>
+                      <td className="border border-neutral-300 px-2 py-1.5 text-right font-mono">{formatNumber(rows.reduce((s2, r) => s2 + r.qty, 0))}</td>
+                      <td className="border border-neutral-300 px-2 py-1.5"></td>
+                      <td className="border border-neutral-300 px-2 py-1.5 text-right font-mono">{formatKRW(total)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {poTarget.memo && <p className="text-xs text-neutral-600">비고: {poTarget.memo}</p>}
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPoTarget(null)}>닫기</Button>
+            <Button onClick={() => window.print()}>인쇄</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── 작업지시서 모달 (가로 A4 실제 양식) ── */}
       {workOrderTarget && (

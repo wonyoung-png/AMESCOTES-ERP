@@ -38,7 +38,7 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
                       'order_no', 'vendor_name', 'factory_unit_price_krw', 'factory_unit_price_cny',
                       'factory_currency', 'color_qtys', 'delivery_date', 'style_id', 'revision',
                       'is_reorder', 'season', 'bom_id', 'bom_type', 'hq_supply_items',
-                      'nego_history', 'received_qty', 'defect_qty', 'defect_note', 'received_date',
+                      'nego_history', 'received_qty', 'defect_qty', 'post_defects', 'defect_note', 'received_date',
                       'trade_statement_id', 'expense_id', 'project_no', 'workspace', 'production_origin',
                       'brand_batch_id', 'shipped_qty', 'is_employee_purchase', 'milestones',
                       'created_at', 'updated_at'],

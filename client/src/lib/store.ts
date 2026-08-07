@@ -364,7 +364,9 @@ export interface ProductionOrder {
   bomType?: 'post' | 'pre' | 'manual'; // BOM 연동 유형 (사후원가/사전원가/수동입력)
   // 입고 정보
   receivedQty?: number;           // 실제 입고 수량
-  defectQty?: number;             // 불량 수량
+  defectQty?: number;
+  /** 사후 불량 — 납품 후 뒤늦게 발견된 불량. 원본 입고수량은 건드리지 않고 이력으로 쌓는다 */
+  postDefects?: { id: string; qty: number; reason: string; foundDate: string; settledAt?: string }[];             // 불량 수량
   defectNote?: string;            // 불량 비고
   receivedDate?: string;          // 입고일
   // Phase 1 — project_no · 워크스페이스
