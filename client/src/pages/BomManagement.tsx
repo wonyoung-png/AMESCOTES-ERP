@@ -2298,6 +2298,8 @@ export default function BomManagement() {
 
     // [FIX] items가 아직 로드되지 않은 경우 대기 (items 의존성 추가로 해결)
     if (items.length === 0) return;
+    // 편집 중이면 서버 데이터가 늦게 도착해도 덮어쓰지 않는다
+    if (isDirty) return;
 
     // [FIX] rawId가 UUID가 아닌 styleNo일 수 있음 (ItemMaster에서 prefill 시 styleNo 저장)
     // items.id(UUID)로 먼저 찾고, 없으면 styleNo로 fallback 타입 변환
@@ -2405,7 +2407,10 @@ export default function BomManagement() {
     // 사후원가만 있는 BOM(품목등록에서 사후로 올린 경우)은 사후원가 탭으로 열어준다
     if (colors.length === 0 && postColors.length > 0) setMainTab('post');
     else if (colors.length > 0) setMainTab('pre');
-  }, [selectedStyleId, items]); // [FIX] items 의존성 추가: items 로드 후 styleNo→UUID 변환 시 재실행
+    // [FIX] extBoms 의존성 추가: 방금 등록한 BOM처럼 서버 데이터가 늦게 도착하는 경우
+    // (선택 시점엔 비어 있어 빈 BOM으로 열리고 이후 갱신되지 않던 문제)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStyleId, items, extBoms]);
 
   // URL 파라미터로 컬러 탭 자동 활성화 (품목 마스터 BOM 바로가기 연동)
   useEffect(() => {
