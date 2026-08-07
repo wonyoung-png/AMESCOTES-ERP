@@ -629,21 +629,53 @@ export default function ProductionOrders() {
   const [stylePickerSearch, setStylePickerSearch] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkSearch, setBulkSearch] = useState('');
+  const [bulkBrand, setBulkBrand] = useState('all');
+  const [bulkSeason, setBulkSeason] = useState('all');
+  const [bulkCat, setBulkCat] = useState('all');
   const [bulkRows, setBulkRows] = useState<Record<string, {
     colorQtys: { color: string; qty: string }[];
     orderDate: string; deliveryDate: string; vendorId: string;
   }>>({});
 
+  /** 발주 등록 목록에서 쓰는 브랜드명 (브랜드 우선, 없으면 회사명) */
+  const brandOfItem = (i: Item) => {
+    const b: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
+    return b?.brands?.[0] || b?.nameEn || b?.name || '';
+  };
+
+  const bulkBrandOptions = useMemo(
+    () => Array.from(new Set((items as Item[]).map(brandOfItem).filter(Boolean))).sort(),
+    [items, allVendors],
+  );
+  const bulkSeasonOptions = useMemo(
+    () => Array.from(new Set((items as Item[]).map(i => i.season).filter(Boolean))).sort(),
+    [items],
+  );
+  const bulkCatOptions = useMemo(
+    () => Array.from(new Set((items as Item[]).map(i => i.erpCategory).filter(Boolean))).sort(),
+    [items],
+  );
+
   const bulkCandidates = useMemo(() => {
     const q = bulkSearch.trim().toLowerCase();
-    return (items as Item[]).filter(i => {
-      if (!q) return true;
-      const buyer: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
-      const brands = [buyer?.name, buyer?.companyName, buyer?.nameEn, ...((buyer?.brands as string[]) || [])];
-      return [i.styleNo, (i as any).buyerStyleNo, i.name, i.nameEn, ...brands]
-        .some(f => (f || '').toLowerCase().includes(q));
-    });
-  }, [items, allVendors, bulkSearch]);
+    return (items as Item[])
+      .filter(i => {
+        if (bulkBrand !== 'all' && brandOfItem(i) !== bulkBrand) return false;
+        if (bulkSeason !== 'all' && i.season !== bulkSeason) return false;
+        if (bulkCat !== 'all' && i.erpCategory !== bulkCat) return false;
+        if (!q) return true;
+        const buyer: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
+        const brands = [buyer?.name, buyer?.companyName, buyer?.nameEn, ...((buyer?.brands as string[]) || [])];
+        return [i.styleNo, (i as any).buyerStyleNo, i.name, i.nameEn, ...brands]
+          .some(f => (f || '').toLowerCase().includes(q));
+      })
+      // 브랜드 → 스타일번호 순으로 정렬해 같은 브랜드가 붙어 보이게 한다
+      .sort((a, b) => {
+        const ba = brandOfItem(a), bb = brandOfItem(b);
+        if (ba !== bb) return ba.localeCompare(bb);
+        return (a.styleNo || '').localeCompare(b.styleNo || '');
+      });
+  }, [items, allVendors, bulkSearch, bulkBrand, bulkSeason, bulkCat]);
 
   const toggleBulkRow = (item: Item) => {
     setBulkRows(prev => {
@@ -1806,18 +1838,44 @@ export default function ProductionOrders() {
             <DialogTitle>발주 등록 <span className="text-xs font-normal text-muted-foreground ml-1">여러 스타일을 한 번에 담아 컬러별 수량을 넣습니다</span></DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                value={bulkSearch}
-                onChange={e => setBulkSearch(e.target.value)}
-                placeholder="브랜드명 · 스타일번호 · 품명으로 검색"
-                className="pl-9 h-9"
-              />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[220px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={bulkSearch}
+                  onChange={e => setBulkSearch(e.target.value)}
+                  placeholder="브랜드명 · 스타일번호 · 품명으로 검색"
+                  className="pl-9 h-9"
+                />
+              </div>
+              <select value={bulkBrand} onChange={e => setBulkBrand(e.target.value)}
+                className="h-9 text-xs border border-border rounded-md bg-card px-2">
+                <option value="all">전체 브랜드</option>
+                {bulkBrandOptions.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+              <select value={bulkSeason} onChange={e => setBulkSeason(e.target.value)}
+                className="h-9 text-xs border border-border rounded-md bg-card px-2">
+                <option value="all">전체 시즌</option>
+                {bulkSeasonOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              <select value={bulkCat} onChange={e => setBulkCat(e.target.value)}
+                className="h-9 text-xs border border-border rounded-md bg-card px-2">
+                <option value="all">전체 카테고리</option>
+                {bulkCatOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
             </div>
 
-            {/* 스타일 목록 — 이미지 · 스타일번호 · 품명 */}
-            <div className="border border-border rounded-md max-h-64 overflow-y-auto divide-y divide-border">
+            {/* 스타일 목록 — 브랜드 · 스타일번호 · 품명 · 시즌 */}
+            <div className="border border-border rounded-md overflow-hidden">
+            <div className="flex items-center gap-3 px-3 py-1.5 bg-[var(--fill-quaternary)] border-b border-border text-[11px] text-muted-foreground">
+              <span className="w-4 shrink-0" />
+              <span className="w-9 shrink-0" />
+              <span className="w-28 shrink-0">브랜드</span>
+              <span className="w-36 shrink-0">스타일번호</span>
+              <span className="flex-1 min-w-0">품명</span>
+              <span className="w-14 shrink-0 text-right">시즌</span>
+            </div>
+            <div className="max-h-64 overflow-y-auto divide-y divide-border">
               {bulkCandidates.length === 0 && (
                 <p className="p-6 text-center text-xs text-muted-foreground">일치하는 스타일이 없습니다</p>
               )}
@@ -1838,16 +1896,14 @@ export default function ProductionOrders() {
                     ) : (
                       <div className="w-9 h-9 rounded bg-[var(--fill-tertiary)] border border-border" />
                     )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">
-                        {brand && <span className="text-muted-foreground">{brand} · </span>}
-                        {i.styleNo}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">{i.name}</p>
-                    </div>
+                    <span className="w-28 shrink-0 truncate text-xs text-muted-foreground">{brand || '—'}</span>
+                    <span className="w-36 shrink-0 truncate text-sm font-mono">{i.styleNo}</span>
+                    <span className="flex-1 min-w-0 truncate text-sm">{i.name}</span>
+                    <span className="w-14 shrink-0 text-right text-[11px] text-muted-foreground">{i.season || ''}</span>
                   </button>
                 );
               })}
+            </div>
             </div>
 
             {/* 선택된 스타일 — 스타일마다 카드 1장. 컬러별 수량을 넣는다 */}
