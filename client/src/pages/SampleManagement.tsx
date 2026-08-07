@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import {
   Plus, Search, Trash2, Camera, FileText,
   ClipboardCheck, Eye, PackagePlus, FileSpreadsheet, File, Paperclip,
+  List, CalendarDays, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
 // 자재 업체 목록은 store의 자재거래처에서 동적으로 불러옴 (하드코딩 제거)
@@ -339,6 +340,38 @@ export default function SampleManagement() {
     const inProgress = samples.filter(s => s.stage !== '최종승인' && s.stage !== '반려').length;
     return { total: samples.length, approved, inProgress, unclaimed: unclaimed.length, totalUnclaimedKrw };
   }, [samples, settings.cnyKrw]);
+
+  // ── 캘린더 뷰 ──
+  const [view, setView] = useState<'list' | 'calendar'>('list');
+  const todayD = new Date();
+  const [calYear, setCalYear] = useState(todayD.getFullYear());
+  const [calMonth, setCalMonth] = useState(todayD.getMonth());
+
+  /**
+   * 샘플 일정 캘린더 — 의뢰일(접수)과 목표완료일을 한 달력에 얹는다.
+   * 목표완료일이 지났는데 최종승인이 아니면 지연으로 표시.
+   */
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(calYear, calMonth, 1).getDay();
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    const iso = (d: number) => `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const todayIso = new Date().toISOString().split('T')[0];
+    const cells: { day: number; events: { id: string; label: string; kind: 'req' | 'due'; late: boolean }[] }[] = [];
+    for (let i = 0; i < firstDay; i++) cells.push({ day: 0, events: [] });
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = iso(d);
+      const events: { id: string; label: string; kind: 'req' | 'due'; late: boolean }[] = [];
+      (filtered as Sample[]).forEach(sm => {
+        const label = `${sm.styleNo} ${sm.stage}`;
+        if (sm.requestDate === ds) events.push({ id: sm.id + '-r', label, kind: 'req', late: false });
+        if (sm.expectedDate === ds) {
+          events.push({ id: sm.id + '-d', label, kind: 'due', late: ds < todayIso && sm.stage !== '최종승인' });
+        }
+      });
+      cells.push({ day: d, events });
+    }
+    return cells;
+  }, [filtered, calYear, calMonth]);
 
   /** 운영은 브랜드명 기준 — 브랜드가 있으면 브랜드명, 없으면 회사명 */
   const buyerLabel = (v?: { name?: string; brands?: string[]; nameEn?: string } | null) => {
@@ -1033,8 +1066,76 @@ export default function SampleManagement() {
         </div>
       )}
 
+      {/* 리스트 / 캘린더 전환 */}
+      <div className="flex items-center gap-1 bg-[var(--fill-tertiary)] p-1 rounded-lg w-fit">
+        {([['list', '리스트'], ['calendar', '캘린더']] as const).map(([v, label]) => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              view === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {v === 'list' ? <List size={14} /> : <CalendarDays size={14} />}{label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'calendar' && (
+        <div className="bg-card rounded-lg border border-border p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button onClick={() => { const m = calMonth - 1; if (m < 0) { setCalMonth(11); setCalYear(calYear - 1); } else setCalMonth(m); }}
+                className="p-1.5 rounded-md hover:bg-[var(--fill-quaternary)] text-muted-foreground"><ChevronLeft size={16} /></button>
+              <span className="text-sm font-semibold text-foreground w-32 text-center">{calYear}년 {calMonth + 1}월</span>
+              <button onClick={() => { const m = calMonth + 1; if (m > 11) { setCalMonth(0); setCalYear(calYear + 1); } else setCalMonth(m); }}
+                className="p-1.5 rounded-md hover:bg-[var(--fill-quaternary)] text-muted-foreground"><ChevronRight size={16} /></button>
+              <button onClick={() => { const n = new Date(); setCalYear(n.getFullYear()); setCalMonth(n.getMonth()); }}
+                className="ml-1 px-2 py-1 rounded-md text-xs border border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]">오늘</button>
+            </div>
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[var(--system-green)]" />의뢰</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary" />목표완료</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[var(--system-red)]" />지연</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden">
+            {['일', '월', '화', '수', '목', '금', '토'].map(d => (
+              <div key={d} className="bg-[var(--fill-quaternary)] py-1.5 text-center text-[11px] font-semibold text-muted-foreground">{d}</div>
+            ))}
+            {calendarDays.map((c, i) => (
+              <div key={i} className="bg-card min-h-[92px] p-1.5 align-top">
+                {c.day > 0 && (
+                  <>
+                    <p className="text-[11px] text-muted-foreground mb-1">{c.day}</p>
+                    <div className="space-y-0.5">
+                      {c.events.slice(0, 3).map(ev => (
+                        <div key={ev.id}
+                          className={`text-[10px] px-1 py-0.5 rounded truncate ${
+                            ev.late ? 'bg-[var(--system-red)]/15 text-[var(--system-red)]'
+                              : ev.kind === 'req' ? 'bg-[var(--system-green)]/15 text-[var(--system-green)]'
+                              : 'bg-primary/10 text-primary'
+                          }`}
+                          title={ev.label}
+                        >
+                          {ev.label}
+                        </div>
+                      ))}
+                      {c.events.length > 3 && (
+                        <p className="text-[10px] text-muted-foreground">+{c.events.length - 3}건</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 테이블 (데스크탑) */}
-      <div className="hidden md:block bg-card rounded-lg border border-border overflow-hidden">
+      <div className={`${view === 'calendar' ? 'hidden' : 'hidden md:block'} bg-card rounded-lg border border-border overflow-hidden`}>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
