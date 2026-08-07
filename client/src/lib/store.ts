@@ -374,6 +374,8 @@ export interface ProductionOrder {
   workspace?: 'OEM' | 'LUMEN' | 'AETALOOF';
   productionOrigin?: 'domestic' | 'china';
   brandBatchId?: string;
+  /** 발주 묶음 번호 — 일괄 발주 1회 = 묶음 1개. 공장 발주서는 이 단위로 1장 나간다 */
+  poBatchNo?: string;
   shippedQty?: number;
   isEmployeePurchase?: boolean;
   // 리오더 네고 이력

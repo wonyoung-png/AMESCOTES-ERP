@@ -129,6 +129,7 @@ export default function ProductionOrders() {
   const [linkStatementId, setLinkStatementId] = useState('');
 
   // 작업지시서 모달 상태
+  const [batchSheet, setBatchSheet] = useState<{ batchNo: string; orders: ProductionOrder[] } | null>(null);
   const [workOrderModal, setWorkOrderModal] = useState(false);
   const [workOrderTarget, setWorkOrderTarget] = useState<ProductionOrder | null>(null);
   // 사후 불량 — 납품 후 뒤늦게 발견된 불량. 원본을 고치지 않고 차감 이력으로 쌓는다
@@ -660,6 +661,18 @@ export default function ProductionOrders() {
     });
   };
 
+  /** 묶음번호: PO-YYMMDD-NN (같은 날 순번) */
+  const nextPoBatchNo = (existing: ProductionOrder[]) => {
+    const d = new Date();
+    const ymd = `${String(d.getFullYear() % 100).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const head = `PO-${ymd}-`;
+    const used = existing
+      .map(o => o.poBatchNo)
+      .filter((b): b is string => !!b && b.startsWith(head))
+      .map(b => parseInt(b.slice(head.length), 10) || 0);
+    return `${head}${String((used.length ? Math.max(...used) : 0) + 1).padStart(2, '0')}`;
+  };
+
   /** 선택한 스타일마다 발주서를 따로 만든다 (작업지시서도 발주 단위라 자동으로 분리됨) */
   const saveBulkOrders = async () => {
     const picked = Object.entries(bulkRows);
@@ -669,7 +682,10 @@ export default function ProductionOrders() {
     const noColor = picked.find(([, r]) => r.colorQtys.some(c => Number(c.qty) > 0 && !c.color.trim()));
     if (noColor) { toast.error('컬러명을 입력하세요 — 컬러 없이 수량만 넣으면 발주할 수 없습니다'); return; }
 
+    // 이번 일괄 발주 = 묶음 1개. 공장에 나가는 발주서는 이 묶음 단위로 1장.
+    const batchNo = nextPoBatchNo(orders as ProductionOrder[]);
     const known = [...(orders as any[])];
+    const created: ProductionOrder[] = [];
     let ok = 0;
     for (const [itemId, row] of picked) {
       const item = (items as Item[]).find(i => i.id === itemId);
@@ -693,6 +709,7 @@ export default function ProductionOrders() {
         orderDate: row.orderDate,
         deliveryDate: row.deliveryDate || undefined,
         status: '발주생성',
+        poBatchNo: batchNo,
         attachments: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -700,17 +717,19 @@ export default function ProductionOrders() {
       try {
         await upsertOrder(order);
         known.push(order as any);
+        created.push(order);
         ok += 1;
       } catch (e) {
         toast.error(`${item.styleNo} 발주 실패: ${(e as Error).message}`);
       }
     }
     if (ok > 0) {
-      toast.success(`발주 ${ok}건 등록 — 스타일별로 각각 생성되었습니다`);
+      toast.success(`발주 ${ok}건 등록 · 묶음 ${batchNo}`);
       setBulkRows({});
       setBulkSearch('');
       setBulkOpen(false);
       refresh();
+      setBatchSheet({ batchNo, orders: created });   // 공장 발주서(묶음 1장) 바로 열기
     }
   };
 
@@ -1471,6 +1490,20 @@ export default function ProductionOrders() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono font-semibold text-foreground">{o.orderNo}</span>
                       {o.isReorder && <Badge variant="outline" className="text-[11px] h-4 text-primary border-primary/20">리오더</Badge>}
+                      {o.poBatchNo && (
+                        <button
+                          type="button"
+                          title="같은 묶음 발주서 보기"
+                          onClick={() => setBatchSheet({
+                            batchNo: o.poBatchNo!,
+                            orders: (orders as ProductionOrder[]).filter(x => x.poBatchNo === o.poBatchNo),
+                          })}
+                          className="text-[11px] h-4 px-1.5 rounded border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                        >
+                          {o.poBatchNo}
+                        </button>
+                      )}
+                      {(o as any).expenseId && <Badge variant="outline" className="text-[11px] h-4 text-[var(--system-green)] border-transparent bg-[var(--system-green)]/10">전표완료</Badge>}
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -3797,6 +3830,99 @@ export default function ProductionOrders() {
               </>
             )}
             <Button variant="outline" onClick={() => setCartModal(false)}>닫기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 공장 발주서 (묶음 1장) ── 스타일 여러 개를 한 장에 담아 공장에 보낸다.
+             작업지시서는 스타일별로 따로 뽑는다 (아래 버튼). ── */}
+      <Dialog open={!!batchSheet} onOpenChange={o => { if (!o) setBatchSheet(null); }}>
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="w-4 h-4" />발주서 — {batchSheet?.batchNo}
+            </DialogTitle>
+          </DialogHeader>
+          {batchSheet && (() => {
+            const list = batchSheet.orders;
+            const vendorNames = Array.from(new Set(list.map(o => o.vendorName).filter(Boolean)));
+            const totalQty = list.reduce((s, o) => s + (o.qty || 0), 0);
+            const totalAmt = list.reduce((s, o) => s + (o.qty || 0) * (o.factoryUnitPriceKrw || 0), 0);
+            const dates = list.map(o => o.deliveryDate).filter(Boolean).sort();
+            return (
+              <div className="space-y-4 py-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                  <div><p className="text-xs text-muted-foreground">공장</p><p className="font-semibold">{vendorNames.join(', ') || '미지정'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">발주일</p><p className="font-semibold">{list[0]?.orderDate || '—'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">납기</p><p className="font-semibold">{dates.length ? (dates[0] === dates[dates.length - 1] ? dates[0] : `${dates[0]} ~ ${dates[dates.length - 1]}`) : '—'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">스타일</p><p className="font-semibold tabular-nums">{list.length}개 · {totalQty.toLocaleString()} PCS</p></div>
+                </div>
+
+                {vendorNames.length > 1 && (
+                  <p className="text-xs text-[var(--system-orange)]">공장이 {vendorNames.length}곳입니다 — 공장별로 나눠서 인쇄하세요.</p>
+                )}
+
+                <div className="border border-border rounded-md overflow-x-auto">
+                  <table className="data-table min-w-[760px]">
+                    <thead>
+                      <tr>
+                        <th className="num" style={{ width: 40 }}>No.</th>
+                        <th>발주번호</th>
+                        <th>스타일</th>
+                        <th>품명</th>
+                        <th>컬러별 수량</th>
+                        <th className="num">총수량</th>
+                        <th className="num">단가</th>
+                        <th className="num">금액</th>
+                        <th>납기</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.map((o, i) => (
+                        <tr key={o.id}>
+                          <td className="num text-muted-foreground">{i + 1}</td>
+                          <td className="font-mono text-xs">{o.orderNo}</td>
+                          <td className="font-medium">{o.styleNo}</td>
+                          <td className="text-muted-foreground">{o.styleName}</td>
+                          <td className="text-xs">
+                            {(o.colorQtys || []).length
+                              ? (o.colorQtys || []).map(c => `${c.color} ${c.qty.toLocaleString()}`).join(' · ')
+                              : '—'}
+                          </td>
+                          <td className="num">{(o.qty || 0).toLocaleString()}</td>
+                          <td className="num">{o.factoryUnitPriceKrw ? formatKRW(o.factoryUnitPriceKrw) : '—'}</td>
+                          <td className="num">{o.factoryUnitPriceKrw ? formatKRW((o.qty || 0) * o.factoryUnitPriceKrw) : '—'}</td>
+                          <td className="text-xs">{o.deliveryDate || '—'}</td>
+                        </tr>
+                      ))}
+                      <tr>
+                        <td colSpan={5} className="font-semibold">합계</td>
+                        <td className="num font-semibold">{totalQty.toLocaleString()}</td>
+                        <td className="num">—</td>
+                        <td className="num font-semibold">{totalAmt > 0 ? formatKRW(totalAmt) : '—'}</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">작업지시서는 스타일별로 따로 나갑니다</p>
+                  <div className="flex flex-wrap gap-2">
+                    {list.map(o => (
+                      <Button key={o.id} size="sm" variant="outline" className="h-8 text-xs"
+                        onClick={() => { setBatchSheet(null); openWorkOrderModal(o); }}>
+                        <FileText className="w-3.5 h-3.5 mr-1.5" />{o.styleNo} 작업지시서
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBatchSheet(null)}>닫기</Button>
+            <Button onClick={() => window.print()}><Printer className="w-4 h-4 mr-1.5" />발주서 인쇄</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

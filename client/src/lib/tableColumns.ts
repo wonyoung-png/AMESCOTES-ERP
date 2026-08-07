@@ -40,7 +40,7 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
                       'is_reorder', 'season', 'bom_id', 'bom_type', 'hq_supply_items',
                       'nego_history', 'received_qty', 'defect_qty', 'post_defects', 'defect_note', 'received_date',
                       'trade_statement_id', 'expense_id', 'project_no', 'workspace', 'production_origin',
-                      'brand_batch_id', 'shipped_qty', 'is_employee_purchase', 'milestones',
+                      'brand_batch_id', 'po_batch_no', 'shipped_qty', 'is_employee_purchase', 'milestones',
                       'created_at', 'updated_at'],
   materials: ['id', 'item_code', 'name', 'name_en', 'spec', 'unit', 'unit_price', 'unit_price_cny', 'unit_price_krw',
               'unit_price_usd', 'price_currency', 'brand', 'image_url',
