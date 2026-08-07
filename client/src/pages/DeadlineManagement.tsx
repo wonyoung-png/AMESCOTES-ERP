@@ -39,6 +39,13 @@ export default function DeadlineManagement() {
   const [, navigate] = useLocation();
   const [statusTarget, setStatusTarget] = useState<ProductionOrder | null>(null);
   const ORDER_STATUSES: OrderStatus[] = ['발주생성', '생산중', '생산완료', '입고완료'];
+  /** 상태를 색으로 구분해 캘린더에서 바로 알아보게 한다 */
+  const STATUS_COLOR: Record<string, string> = {
+    '발주생성': 'bg-[var(--fill-secondary)] !text-foreground',
+    '생산중': 'bg-[var(--system-orange)]',
+    '생산완료': 'bg-primary',
+    '입고완료': 'bg-[var(--system-green)]',
+  };
 
   /** 납기 화면에서 바로 발주 상태를 바꾼다 (생산발주 탭과 같은 값) */
   const changeStatus = async (order: ProductionOrder, status: OrderStatus) => {
@@ -110,20 +117,16 @@ export default function DeadlineManagement() {
         const ms = o.milestones || [];
         ms.forEach(m => {
           if (m.plannedDate === dateStr || m.actualDate === dateStr) {
-            const dd = calcDDay(m.plannedDate!);
-            const color = dd < 0 ? 'bg-[var(--system-red)]' : dd <= 7 ? 'bg-[var(--system-orange)]' : 'bg-[var(--system-green)]';
-            events.push({ orderId: o.id, orderNo: o.orderNo, milestone: MILESTONE_LABELS[m.stage] || m.stage, color, status: o.status });
+            events.push({ orderId: o.id, orderNo: o.orderNo, milestone: MILESTONE_LABELS[m.stage] || m.stage, color: STATUS_COLOR[o.status], status: o.status });
           }
         });
         // 마일스톤을 아직 안 잡은 발주도 발주일·납기일은 달력에 보여준다
         if (ms.length === 0) {
           if (o.orderDate === dateStr) {
-            events.push({ orderId: o.id, orderNo: o.orderNo, milestone: '발주', color: 'bg-[var(--system-green)]', status: o.status });
+            events.push({ orderId: o.id, orderNo: o.orderNo, milestone: '발주', color: STATUS_COLOR[o.status], status: o.status });
           }
           if (o.deliveryDate === dateStr) {
-            const dd = calcDDay(o.deliveryDate);
-            const color = dd < 0 ? 'bg-[var(--system-red)]' : dd <= 7 ? 'bg-[var(--system-orange)]' : 'bg-primary';
-            events.push({ orderId: o.id, orderNo: o.orderNo, milestone: '납기', color, status: o.status });
+            events.push({ orderId: o.id, orderNo: o.orderNo, milestone: '납기', color: STATUS_COLOR[o.status], status: o.status });
           }
         }
       });
@@ -235,6 +238,13 @@ export default function DeadlineManagement() {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
+              <div className="flex items-center gap-3 mb-2 text-[11px] text-muted-foreground">
+                {ORDER_STATUSES.map(st => (
+                  <span key={st} className="flex items-center gap-1">
+                    <span className={`w-2.5 h-2.5 rounded-sm ${STATUS_COLOR[st]}`} />{st}
+                  </span>
+                ))}
+              </div>
               <div className="grid grid-cols-7 gap-px bg-border rounded overflow-hidden min-w-[560px]">
                 {['일', '월', '화', '수', '목', '금', '토'].map(d => (
                   <div key={d} className="bg-muted/50 text-center py-2 text-xs font-medium text-muted-foreground">{d}</div>

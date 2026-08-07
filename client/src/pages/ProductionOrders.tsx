@@ -1323,12 +1323,6 @@ export default function ProductionOrders() {
             {buyers.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
           </SelectContent>
         </Select>
-        <button
-          onClick={() => setFilterUrgent(v => !v)}
-          className={`h-9 px-3 rounded-md border text-xs font-medium transition-colors ${filterUrgent ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/30 text-[var(--system-red)]' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}
-        >
-          납기임박
-        </button>
         {/* 공장 필터 */}
         <Select value={filterFactory} onValueChange={setFilterFactory}>
           <SelectTrigger className="w-32 h-9"><SelectValue placeholder="공장" /></SelectTrigger>
@@ -1339,7 +1333,7 @@ export default function ProductionOrders() {
         </Select>
         {/* 납기일 필터 */}
         <Select value={filterDeadline} onValueChange={setFilterDeadline}>
-          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="납기일 필터" /></SelectTrigger>
+          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="납기" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">전체 납기</SelectItem>
             <SelectItem value="d20">20일 이내</SelectItem>
@@ -1347,15 +1341,6 @@ export default function ProductionOrders() {
             <SelectItem value="d7">7일 이내</SelectItem>
             <SelectItem value="d3">3일 이내</SelectItem>
             <SelectItem value="overdue">납기 초과</SelectItem>
-          </SelectContent>
-        </Select>
-        {/* 전표 필터 */}
-        <Select value={filterExpense} onValueChange={setFilterExpense}>
-          <SelectTrigger className="w-32 h-9"><SelectValue placeholder="전표" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체</SelectItem>
-            <SelectItem value="done">전표완료</SelectItem>
-            <SelectItem value="none">미작성</SelectItem>
           </SelectContent>
         </Select>
         {/* 정렬 */}
@@ -1392,7 +1377,8 @@ export default function ProductionOrders() {
               <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">스타일</th>
               <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">브랜드</th>
               <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">시즌</th>
-              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">수량</th>
+              <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">컬러</th>
+              <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground whitespace-nowrap">수량</th>
               <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">공장 / 공장단가</th>
               <th className="text-right px-4 py-3 text-[13px] font-semibold text-muted-foreground">총 발주금액</th>
               <th className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground">발주일</th>
@@ -1433,7 +1419,6 @@ export default function ProductionOrders() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono font-semibold text-foreground">{o.orderNo}</span>
                       {o.isReorder && <Badge variant="outline" className="text-[11px] h-4 text-primary border-primary/20">리오더</Badge>}
-                      {(o as any).expenseId && <Badge variant="outline" className="text-[11px] h-4 text-[var(--system-green)] border-transparent bg-[var(--system-green)]/10">전표완료</Badge>}
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -1449,32 +1434,31 @@ export default function ProductionOrders() {
                     <span className="text-xs text-muted-foreground font-medium">{getBrandName(o) || <span className="text-muted-foreground">-</span>}</span>
                   </td>
                   <td className="px-4 py-3"><Badge variant="outline" className="text-xs">{o.season}</Badge></td>
-                  <td className="px-4 py-3 text-right">
-                    <p className="font-mono text-foreground">{formatNumber(o.qty)}</p>
-                    {(o.colorQtys || []).length > 0 && (
-                      <div className="flex flex-wrap gap-1 justify-end mt-1">
+                  {/* 컬러 — 수량과 분리해 열을 맞춘다 */}
+                  <td className="px-4 py-3 align-top">
+                    {(o.colorQtys || []).length > 0 ? (
+                      <div className="flex flex-col gap-0.5">
                         {(o.colorQtys || []).map((cq, i) => (
-                          <span
-                            key={i}
-                            className={`text-[11px] px-1.5 py-0.5 rounded cursor-default ${cq.memo ? 'bg-[var(--system-orange)]/10 text-[var(--system-orange)] border border-transparent' : 'bg-[var(--fill-tertiary)] text-muted-foreground'}`}
-                            title={cq.memo ? `${cq.memo}` : undefined}
-                          >
-                            {cq.color} {cq.qty}
+                          <span key={i} className="text-[11px] text-muted-foreground whitespace-nowrap" title={cq.memo || undefined}>
+                            {cq.color} <span className="font-mono text-foreground">{formatNumber(cq.qty)}</span>
                           </span>
                         ))}
                       </div>
-                    )}
+                    ) : <span className="text-xs text-muted-foreground">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right align-top">
+                    <p className="font-mono text-foreground">{formatNumber(o.qty)}</p>
                     {o.receivedQty !== undefined && (() => {
                       // 부분입고면 미입고 잔량을, 불량이 있으면 정산 차감 대상 수량을 같이 보여준다
                       const short = (o.qty || 0) - (o.receivedQty || 0);
                       const good = (o.receivedQty || 0) - (o.defectQty || 0);
                       return (
-                        <p className="text-[11px] mt-0.5 space-x-1">
-                          <span className="text-[var(--system-green)]">입고 {formatNumber(o.receivedQty)}</span>
-                          {short > 0 && <span className="text-[var(--system-orange)]">미입고 {formatNumber(short)}</span>}
-                          {!!o.defectQty && <span className="text-[var(--system-red)]">불량 {formatNumber(o.defectQty)}</span>}
-                          {!!o.defectQty && <span className="text-muted-foreground">정산 {formatNumber(good)}</span>}
-                        </p>
+                        <div className="text-[11px] mt-1 space-y-0.5 whitespace-nowrap">
+                          <p className="text-[var(--system-green)]">입고 {formatNumber(o.receivedQty)}</p>
+                          {short > 0 && <p className="text-[var(--system-orange)]">미입고 {formatNumber(short)}</p>}
+                          {!!o.defectQty && <p className="text-[var(--system-red)]">불량 {formatNumber(o.defectQty)}</p>}
+                          {!!o.defectQty && <p className="text-muted-foreground">정산 {formatNumber(good)}</p>}
+                        </div>
                       );
                     })()}
                   </td>
