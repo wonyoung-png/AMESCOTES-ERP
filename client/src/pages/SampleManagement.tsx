@@ -302,8 +302,8 @@ export default function SampleManagement() {
         case 'requestDate_asc':
           return (a.requestDate || '').localeCompare(b.requestDate || '');
         case 'buyer_asc': {
-          const nameA = vendors.find(v => v.id === a.buyerId)?.name || '';
-          const nameB = vendors.find(v => v.id === b.buyerId)?.name || '';
+          const nameA = buyerLabelById(a.buyerId);
+          const nameB = buyerLabelById(b.buyerId);
           return nameA.localeCompare(nameB, 'ko');
         }
         case 'stage_asc':
@@ -339,6 +339,14 @@ export default function SampleManagement() {
     const inProgress = samples.filter(s => s.stage !== '최종승인' && s.stage !== '반려').length;
     return { total: samples.length, approved, inProgress, unclaimed: unclaimed.length, totalUnclaimedKrw };
   }, [samples, settings.cnyKrw]);
+
+  /** 운영은 브랜드명 기준 — 브랜드가 있으면 브랜드명, 없으면 회사명 */
+  const buyerLabel = (v?: { name?: string; brands?: string[]; nameEn?: string } | null) => {
+    if (!v) return '';
+    const brand = v.brands?.[0] || v.nameEn;
+    return brand || v.name || '';
+  };
+  const buyerLabelById = (id?: string) => buyerLabel(vendors.find((x: any) => x.id === id) as any);
 
   const openNew = () => {
     // 같은 스타일번호로 새 샘플 접수 시 기존 최대 차수 + 1로 자동 설정 (스타일 선택 시 처리)
@@ -870,7 +878,7 @@ export default function SampleManagement() {
             <SelectTrigger className="w-28 h-8 text-xs"><SelectValue placeholder="바이어" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">전체 바이어</SelectItem>
-              {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+              {vendors.map(v => <SelectItem key={v.id} value={v.id}>{buyerLabel(v as any)}</SelectItem>)}
             </SelectContent>
           </Select>
           {/* 시즌 필터 */}
@@ -971,7 +979,7 @@ export default function SampleManagement() {
           <SelectTrigger className="w-32 h-9"><SelectValue placeholder="바이어" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">전체 바이어</SelectItem>
-            {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+            {vendors.map(v => <SelectItem key={v.id} value={v.id}>{buyerLabel(v as any)}</SelectItem>)}
           </SelectContent>
         </Select>
         {/* 담당자 필터 */}
@@ -1084,7 +1092,7 @@ export default function SampleManagement() {
                   <td className="px-4 py-3">
                     {s.buyerId ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fill-tertiary)] text-foreground border border-border">
-                        {vendors.find(v => v.id === s.buyerId)?.name || '-'}
+                        {buyerLabelById(s.buyerId) || '-'}
                       </span>
                     ) : <span className="text-muted-foreground text-xs">-</span>}
                   </td>
@@ -1251,7 +1259,7 @@ export default function SampleManagement() {
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     {s.buyerId && (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--fill-tertiary)] text-foreground border border-border">
-                        {vendors.find(v => v.id === s.buyerId)?.name || '-'}
+                        {buyerLabelById(s.buyerId) || '-'}
                       </span>
                     )}
                     <Badge variant="outline" className="text-[11px]">{s.season}</Badge>
@@ -1365,7 +1373,7 @@ export default function SampleManagement() {
                   <SelectTrigger><SelectValue placeholder="바이어 선택 (선택사항)" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">미지정</SelectItem>
-                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{buyerLabel(v as any)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -1495,10 +1503,6 @@ export default function SampleManagement() {
               <div className="space-y-1.5">
                 <Label>목표 완료일</Label>
                 <Input type="date" value={form.expectedDate || ''} onChange={e => setForm(f => ({ ...f, expectedDate: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>샘플 단가 (원)</Label>
-                <Input type="number" step="100" value={form.sampleUnitPrice ?? ''} onChange={e => setForm(f => ({ ...f, sampleUnitPrice: parseFloat(e.target.value) || undefined }))} placeholder="예: 35000" />
               </div>
               <div className="space-y-1.5 col-span-2">
                 <Label>비고</Label>
@@ -2072,7 +2076,7 @@ export default function SampleManagement() {
                   });
                 return (
                   <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">이번 달 전표 ({thisMonth}) — 바이어: {vendors.find(v => v.id === billingTarget.buyerId)?.name || '미지정'}</p>
+                    <p className="text-xs text-muted-foreground">이번 달 전표 ({thisMonth}) — 바이어: {buyerLabelById(billingTarget.buyerId) || '미지정'}</p>
                     {buyerStatements.length === 0 ? (
                       <p className="text-xs text-muted-foreground py-3 text-center">해당 조건의 전표가 없습니다. 신규 생성을 선택하세요.</p>
                     ) : (
@@ -2097,7 +2101,7 @@ export default function SampleManagement() {
               {billingMode === 'new' && (
                 <div className="p-3 bg-primary/5 rounded-md text-xs text-muted-foreground">
                   <p className="font-medium mb-1 text-foreground">생성될 거래명세표</p>
-                  <p>바이어: {vendors.find(v => v.id === billingTarget.buyerId)?.name || '미지정'}</p>
+                  <p>바이어: {buyerLabelById(billingTarget.buyerId) || '미지정'}</p>
                   <p>품목: {billingTarget.styleNo} — {billingTarget.styleName}</p>
                   <p>금액: {(billingTarget.costKrw || Math.round((billingTarget.costCny || 0) * settings.cnyKrw)).toLocaleString()}원</p>
                 </div>
