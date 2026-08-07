@@ -1,6 +1,18 @@
 // Phase 1 제조 ERP — project_no, 입고·출고, 미지급, 브랜드 발주·R3
 import { supabase } from './supabase';
+import { toast } from 'sonner';
 import type { ColorQty } from './store';
+
+/** 서버 저장 실패를 드러낸다.
+ *  이전에는 .catch(() => {}) 로 삼켜서, 컬럼 하나가 없어도 화면엔 저장된 것처럼 보이고
+ *  실제로는 그 브라우저에만 남아 있었다. 실패하면 반드시 눈에 띄어야 한다. */
+function reportSyncFail(what: string) {
+  return (e: unknown) => {
+    const msg = (e as { message?: string })?.message || String(e);
+    console.error(`[phase1] ${what} 서버 저장 실패`, e);
+    toast.error(`${what} 서버 저장 실패 — 이 브라우저에만 남았습니다: ${msg}`);
+  };
+}
 
 export type Workspace = 'OEM' | 'LUMEN' | 'AETALOOF';
 export type ProductionOrigin = 'domestic' | 'china';
@@ -416,7 +428,7 @@ export function ensureProject(projectNo: string, workspace: Workspace, title?: s
   };
   all.push(p);
   setAll(KEYS.projects, all);
-  syncProjectToSupabase(p).catch(() => {});
+  syncProjectToSupabase(p).catch(reportSyncFail('발주 손익'));
   return p;
 }
 
@@ -522,7 +534,7 @@ export const phase1 = {
     const a = getAll<ReceiptLog>(KEYS.receiptLogs);
     a.push(log);
     setAll(KEYS.receiptLogs, a);
-    syncReceiptLog(log).catch(() => {});
+    syncReceiptLog(log).catch(reportSyncFail('입고·출고'));
     return log;
   },
 
@@ -532,7 +544,7 @@ export const phase1 = {
     const a = getAll<DefectCarryover>(KEYS.defectCarryovers);
     a.push(row);
     setAll(KEYS.defectCarryovers, a);
-    syncDefect(row).catch(() => {});
+    syncDefect(row).catch(reportSyncFail('불량 차감'));
     return row;
   },
   applyDefectCarryover: (id: string, statementId: string) => {
@@ -556,7 +568,7 @@ export const phase1 = {
     const a = getAll<Payable>(KEYS.payables);
     a.push(row);
     setAll(KEYS.payables, a);
-    syncPayable(row).catch(() => {});
+    syncPayable(row).catch(reportSyncFail('미지급'));
     return row;
   },
   recordPayablePayment: (id: string, amount: number) => {
@@ -568,7 +580,7 @@ export const phase1 = {
       paid >= a[i].amountKrw ? 'paid' : paid > 0 ? 'partial' : 'pending';
     a[i] = { ...a[i], paidAmountKrw: paid, status };
     setAll(KEYS.payables, a);
-    syncPayable(a[i]).catch(() => {});
+    syncPayable(a[i]).catch(reportSyncFail('미지급'));
   },
 
   /** 자재구매 → 지출결의 (Expense 대신 Payable). 동일 purchaseItem 중복 방지 */
@@ -668,7 +680,7 @@ export const phase1 = {
     const a = getAll<BrandOrderBatch>(KEYS.brandBatches);
     a.push(batch);
     setAll(KEYS.brandBatches, a);
-    syncBrandBatch(batch).catch(() => {});
+    syncBrandBatch(batch).catch(reportSyncFail('브랜드 발주'));
     return batch;
   },
 
@@ -678,7 +690,7 @@ export const phase1 = {
     if (i < 0) return;
     a[i] = { ...a[i], ...u, updatedAt: new Date().toISOString() };
     setAll(KEYS.brandBatches, a);
-    syncBrandBatch(a[i]).catch(() => {});
+    syncBrandBatch(a[i]).catch(reportSyncFail('브랜드 발주'));
   },
 
   addBrandLine: (batchId: string, line: Omit<BrandOrderLine, 'id' | 'batchId'>) => {
@@ -686,7 +698,7 @@ export const phase1 = {
     const a = getAll<BrandOrderLine>(KEYS.brandLines);
     a.push(row);
     setAll(KEYS.brandLines, a);
-    syncBrandLine(row).catch(() => {});
+    syncBrandLine(row).catch(reportSyncFail('브랜드 발주 라인'));
     return row;
   },
   deleteBrandLine: (id: string) => {
@@ -727,7 +739,7 @@ export const phase1 = {
     const a = getAll<ApprovalLog>(KEYS.approvalLogs);
     a.push(log);
     setAll(KEYS.approvalLogs, a);
-    syncApprovalLog(log).catch(() => {});
+    syncApprovalLog(log).catch(reportSyncFail('승인 이력'));
     return log;
   },
 
@@ -1556,6 +1568,9 @@ export async function syncPhase1FromSupabase() {
         defectNote: r.defect_note,
         receivedDate: r.received_date,
         memo: r.memo,
+        destination: r.destination,
+        color: r.color,
+        isAdvance: r.is_advance,
         createdAt: r.created_at,
       }),
     },
@@ -1592,6 +1607,9 @@ export async function syncPhase1FromSupabase() {
         dueDate: r.due_date,
         status: r.status,
         memo: r.memo,
+        payeeType: r.payee_type,
+        orderId: r.order_id,
+        receiptLogIds: r.receipt_log_ids || [],
         createdAt: r.created_at,
       }),
     },

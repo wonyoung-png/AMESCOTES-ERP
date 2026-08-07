@@ -30,6 +30,7 @@ const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 const ORDER_STATUSES: OrderStatus[] = ['발주생성', '생산중', '생산완료', '입고완료'];
 
 const STATUS_COLOR: Record<OrderStatus, string> = {
+  '초안': 'bg-[var(--system-orange)]/10 text-[var(--system-orange)] border-[var(--system-orange)]/30',
   '발주생성': 'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
   '생산중': 'bg-[var(--fill-tertiary)] text-foreground border-transparent',
   '생산완료': 'bg-primary/10 text-primary border-transparent',
@@ -732,9 +733,11 @@ export default function ProductionOrders() {
     if (!o.vendorId) { toast.error('공장을 먼저 지정하세요 — 행에서 수정으로 들어가세요'); return; }
     const orderNo = nextOrderNo(o.styleNo, orders as any[]);
     try {
+      const revision = parseInt((orderNo.match(/-R(\d+)$/) || [])[1] || '1', 10);
       await upsertOrder({
         ...o, orderNo, status: '발주생성',
-        revision: parseInt((orderNo.match(/-R(\d+)$/) || [])[1] || '1', 10),
+        revision,
+        isReorder: revision >= 2,   // 같은 스타일 재발주면 -R2 이상이 붙는다
         updatedAt: new Date().toISOString(),
       });
       toast.success(`발주 확정 — ${orderNo}`);
@@ -1702,8 +1705,11 @@ export default function ProductionOrders() {
                     ) : <span className="text-muted-foreground">-</span>}
                   </td>
                   <td>
-                    <Select value={o.status} onValueChange={v => handleStatusChange(o.id, v as OrderStatus)}>
-                      <SelectTrigger className={`h-7 text-xs w-28 border ${STATUS_COLOR[o.status]}`}>
+                    <Select value={o.status} disabled={o.status === '초안'}
+                      onValueChange={v => handleStatusChange(o.id, v as OrderStatus)}>
+                      <SelectTrigger
+                        title={o.status === '초안' ? '초안은 [확정] 후에 상태를 바꿀 수 있습니다' : undefined}
+                        className={`h-7 text-xs w-28 border ${STATUS_COLOR[o.status] || ''} ${o.status === '초안' ? 'opacity-60' : ''}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

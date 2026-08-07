@@ -21,6 +21,8 @@ export default function QuickEntry() {
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
 
   const [mode, setMode] = useState<Mode>('menu');
+  /** 0·음수·NaN 을 모두 거른다 */
+  const posNum = (v: string) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
   const [saving, setSaving] = useState(false);
 
   const factories = useMemo(
@@ -54,18 +56,21 @@ export default function QuickEntry() {
 
   const saveDraftOrder = async () => {
     if (!pickedItem) { toast.error('스타일을 고르세요'); return; }
-    if (!Number(qty)) { toast.error('수량을 넣으세요'); return; }
+    const qtyNum = posNum(qty);
+    if (!qtyNum) { toast.error('수량은 1 이상으로 넣으세요'); return; }
     setSaving(true);
     const factory = factories.find(f => f.id === factoryId);
+    const draftId = genId();
     const draft = {
-      id: genId(),
-      orderNo: `임시-${pickedItem.styleNo}-${new Date().toISOString().slice(5, 10).replace('-', '')}`,
+      id: draftId,
+      // 같은 스타일을 하루에 여러 번 저장해도 번호가 겹치지 않게 id 꼬리를 붙인다
+      orderNo: `임시-${pickedItem.styleNo}-${draftId.slice(-6)}`,
       workspace: 'OEM',
       styleId: pickedItem.id,
       styleNo: pickedItem.styleNo,
       styleName: pickedItem.name,
       season: pickedItem.season,
-      qty: Number(qty),
+      qty: qtyNum,
       colorQtys: [],
       vendorId: factoryId || '',
       vendorName: factory?.name || '',
@@ -96,33 +101,55 @@ export default function QuickEntry() {
   const [logQty, setLogQty] = useState('');
   const [logNote, setLogNote] = useState('');
 
-  const saveReceive = () => {
-    if (!logOrderNo.trim() || !Number(logQty)) { toast.error('발주번호와 수량을 넣으세요'); return; }
+  const saveReceive = async () => {
+    const n = posNum(logQty);
+    if (!logOrderNo.trim() || !n) { toast.error('발주번호와 수량(1 이상)을 넣으세요'); return; }
     const target = (orders as ProductionOrder[]).find(o => o.orderNo === logOrderNo.trim());
+    if (!target) { toast.error('없는 발주번호입니다 — 정확히 입력하세요'); return; }
+    const today = new Date().toISOString().split('T')[0];
     phase1.addReceiptLog({
-      orderId: target?.id || '',
-      orderNo: logOrderNo.trim(),
+      orderId: target.id,
+      orderNo: target.orderNo,
       logType: 'inbound',
-      qty: Number(logQty),
+      qty: n,
       defectQty: 0,
-      receivedDate: new Date().toISOString().split('T')[0],
+      receivedDate: today,
       memo: logNote || undefined,
       destination: 'korea',
     });
-    toast.success('입고 기록됨');
+    // 발주 쪽 집계도 같이 올린다 — 안 하면 청구가 전량 기준으로 잡힌다
+    const received = (target.receivedQty || 0) + n;
+    try {
+      await upsertOrder({
+        ...target,
+        receivedQty: received,
+        receivedDate: today,
+        status: received >= (target.qty || 0) ? '입고완료' : target.status,
+        updatedAt: new Date().toISOString(),
+      });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    } catch (e) {
+      toast.error(`발주 갱신 실패: ${(e as Error).message}`);
+    }
+    toast.success(`입고 ${n.toLocaleString()} 기록 — 누적 ${received.toLocaleString()}/${(target.qty || 0).toLocaleString()}`);
     setLogOrderNo(''); setLogQty(''); setLogNote(''); setMode('menu');
   };
 
   const saveDefect = () => {
-    if (!logOrderNo.trim() || !Number(logQty)) { toast.error('발주번호와 금액을 넣으세요'); return; }
+    const amt = posNum(logQty);
+    if (!logOrderNo.trim() || !amt) { toast.error('발주번호와 금액(1 이상)을 넣으세요'); return; }
     const order = (orders as ProductionOrder[]).find(o => o.orderNo === logOrderNo.trim());
+    if (!order) { toast.error('없는 발주번호입니다 — 정확히 입력하세요'); return; }
     phase1.addDefectCarryover({
-      orderNo: logOrderNo.trim(),
-      vendorId: order?.vendorId || '',
-      vendorName: order?.vendorName || '',
-      amountKrw: Number(logQty),
+      styleNo: order.styleNo,
+      orderNo: order.orderNo,
+      projectNo: order.projectNo,
+      vendorId: order.vendorId || '',
+      vendorName: order.vendorName || '',
+      amountKrw: amt,
       reason: logNote || '입고 불량',
-    } as any);
+      defectDate: new Date().toISOString().split('T')[0],
+    });
     toast.success('불량 차감 기록됨');
     setLogOrderNo(''); setLogQty(''); setLogNote(''); setMode('menu');
   };
