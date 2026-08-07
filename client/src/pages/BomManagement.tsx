@@ -2385,21 +2385,26 @@ export default function BomManagement() {
 
     // 사전원가 컬러 탭 자동 활성화
     const colors = loadedBom.colorBoms || [];
+    const postColors = loadedBom.postColorBoms || [];
     if (colors.length > 0) {
       setActivePreColor(colors[0].color);
-    } else {
-      // 빈 BOM이면 컬러 추가 모달 열기
+    } else if (postColors.length === 0) {
+      // 사전·사후 모두 비어 있을 때만 컬러 추가 모달을 띄운다
       setActivePreColor('');
       setAddColorForTab('pre');
       setShowAddColorModal(true);
+    } else {
+      setActivePreColor('');
     }
     // 사후원가 컬러 탭 자동 활성화
-    const postColors = loadedBom.postColorBoms || [];
     if (postColors.length > 0) {
       setActivePostColor(postColors[0].color);
     } else {
       setActivePostColor('');
     }
+    // 사후원가만 있는 BOM(품목등록에서 사후로 올린 경우)은 사후원가 탭으로 열어준다
+    if (colors.length === 0 && postColors.length > 0) setMainTab('post');
+    else if (colors.length > 0) setMainTab('pre');
   }, [selectedStyleId, items]); // [FIX] items 의존성 추가: items 로드 후 styleNo→UUID 변환 시 재실행
 
   // URL 파라미터로 컬러 탭 자동 활성화 (품목 마스터 BOM 바로가기 연동)

@@ -1602,6 +1602,9 @@ export default function ItemMaster() {
     if (!costSheetData) return;
     const { materials, processingFee, exchangeRateCny, postProcessLines } = costSheetData;
     const withIds = (ls: any[]) => ls.map(l => ({ ...l, id: genId() }));
+    // 컬러가 없으면 BOM에 컬러 탭이 안 생겨 화면이 빈 것처럼 보인다 → '기본' 컬러를 자동으로 넣는다
+    const colorNames = normalizeColors(item.colors || []).map(c => c.name);
+    const colors = colorNames.length ? colorNames : ['기본'];
     const existing = (boms as any[]).find(b => b.styleId === item.id || b.styleNo === item.styleNo);
     const base = existing || {
       id: genId(), styleId: item.id, styleNo: item.styleNo, styleName: item.name,
@@ -1618,7 +1621,7 @@ export default function ItemMaster() {
           processingFee: processingFee || 0,
           preProcessingFee: processingFee || 0,
           postProcessLines: withIds(postProcessLines),
-          colorBoms: [{ color: '기본', lines: withIds(materials), postProcessLines: withIds(postProcessLines), processingFee: processingFee || 0 }],
+          colorBoms: colors.map(color => ({ color, lines: withIds(materials), postProcessLines: withIds(postProcessLines), processingFee: processingFee || 0 })),
           exchangeRateCny: exchangeRateCny || base.exchangeRateCny,
           snapshotCnyKrw: exchangeRateCny || base.snapshotCnyKrw,
         }
@@ -1627,7 +1630,7 @@ export default function ItemMaster() {
           postMaterials: withIds(materials),
           postProcessingFee: processingFee || 0,
           postProcessLines: withIds(postProcessLines),
-          postColorBoms: [{ color: '기본', lines: withIds(materials), postProcessLines: withIds(postProcessLines), processingFee: processingFee || 0 }],
+          postColorBoms: colors.map(color => ({ color, lines: withIds(materials), postProcessLines: withIds(postProcessLines), processingFee: processingFee || 0 })),
           exchangeRateCny: exchangeRateCny || base.exchangeRateCny,
           snapshotCnyKrw: exchangeRateCny || base.snapshotCnyKrw,
         };
@@ -1636,6 +1639,11 @@ export default function ItemMaster() {
     if (factoryUnitCostKrw > 0) bom.pnl = { ...(bom.pnl || {}), factoryUnitCostKrw };
     await upsertBom(bom);
     if (totalCostKrw > 0) await updateItemCostData(item.id, totalCostKrw);
+    if (!colorNames.length) {
+      // 품목에도 '기본' 컬러를 남겨 BOM 화면의 컬러 탭과 어긋나지 않게 한다
+      await upsertItem({ ...item, colors: [{ name: '기본' }], hasBom: true } as any);
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+    }
     queryClient.invalidateQueries({ queryKey: ['boms'] });
     toast.success(`${costSheetMode === 'pre' ? '사전' : '사후'}원가 반영 — 원가 ${formatKRW(totalCostKrw)}`);
   };
@@ -3123,7 +3131,10 @@ export default function ItemMaster() {
                   {costSheetName} — 자재 {costSheetData.materials.length}건 · 저장하면 {costSheetMode === 'pre' ? '사전' : '사후'}원가로 BOM에 반영됩니다
                 </p>
               ) : (
-                <p className="text-[11px] text-muted-foreground">엑셀을 올리면 BOM 페이지로 가지 않고 저장 시 원가가 자동 계산됩니다.</p>
+                <p className="text-[11px] text-muted-foreground">
+                  엑셀을 올리면 BOM 페이지로 가지 않고 저장 시 원가가 자동 계산됩니다.
+                  컬러를 안 넣으면 '기본' 컬러로 등록됩니다.
+                </p>
               )}
             </div>
 
