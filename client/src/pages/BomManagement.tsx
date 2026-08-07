@@ -1955,28 +1955,19 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
           )}
         </div>
       </td>
-      {/* 제조금액 (USD + KRW 통합) */}
+      {/* 제조금액 — 실무는 원화 기준이라 원화를 크게, 입력통화는 작게 */}
       <td className="px-2 py-1 text-right tabular-nums">
-        <div style={{fontWeight:600}}>${((amt * cnyKrw) / (usdKrw || 1380)).toFixed(2)}</div>
-        <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round(amt * cnyKrw).toLocaleString()}</div>
+        <div style={{fontWeight:600}}>₩{Math.round(amt * cnyKrw).toLocaleString()}</div>
+        <div style={{fontSize:'10px', color:'#9CA3AF'}}>{amt ? amt.toFixed(3) : '0'}</div>
       </td>
-      {/* 공급 상태 + 체크박스 (본사/업체/공장) */}
-      <td className="px-2 py-1 w-28">
-        <div className="flex flex-col items-center gap-1.5">
-          {/* 공급 상태 텍스트 */}
-          <span className={`text-sm font-semibold ${supplyLabel.cls}`}>{supplyLabel.text}</span>
-          {/* 체크박스 2개 */}
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1 cursor-pointer" title="본사제공">
-              <input type="checkbox" checked={isHqProvided} onChange={e => handleHqChange(e.target.checked)} className="w-4 h-4 accent-primary" />
-              <span className="text-xs text-primary font-medium">본사</span>
-            </label>
-            <label className="flex items-center gap-1 cursor-pointer" title="업체제공">
-              <input type="checkbox" checked={isVendorProvided} onChange={e => handleVendorChange(e.target.checked)} className="w-4 h-4 accent-primary" />
-              <span className="text-xs text-muted-foreground font-medium">업체</span>
-            </label>
-          </div>
-        </div>
+      {/* 공급 — 기본은 공장 구매. 우리가 사서 보낼 때만 '본사 사입' 체크 */}
+      <td className="px-2 py-1 w-24">
+        <label className="flex items-center justify-center gap-1.5 cursor-pointer" title="본사에서 사입해 공장에 보내는 자재">
+          <input type="checkbox" checked={isHqProvided} onChange={e => handleHqChange(e.target.checked)} className="w-4 h-4 accent-primary" />
+          <span className={`text-xs font-medium ${isHqProvided ? 'text-primary' : 'text-muted-foreground'}`}>
+            {isHqProvided ? '본사 사입' : '공장'}
+          </span>
+        </label>
       </td>
       {/* 자재업체 (본사제공 시에만 입력 가능) */}
       <td className="px-1 py-1">
@@ -3473,7 +3464,6 @@ export default function BomManagement() {
                   <Badge key={i} variant="outline" className="text-[11px] font-normal text-muted-foreground border-border">{v}</Badge>
                 ))}
               </div>
-              <div><label className="text-xs text-muted-foreground mb-1 block font-medium">라인명</label><Input value={editBom.lineName || ''} onChange={e => updateField('lineName', e.target.value)} className="h-8 text-xs border-border" placeholder="라인명" /></div>
               {/* 제품이미지 업로드 (품목 imageUrl 폴백) */}
               <div className="col-span-2">
                 <label className="text-xs text-muted-foreground mb-1 block font-medium">포토 구성 (제품사진 - 클릭 또는 Ctrl+V)</label>
@@ -3514,7 +3504,6 @@ export default function BomManagement() {
                 </div>
               </div>
               <div><label className="text-xs text-muted-foreground mb-1 block font-medium">환율 (CNY→KRW)</label><Input type="number" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 text-xs border-border text-right" /></div>
-              <div><label className="text-xs text-muted-foreground mb-1 block font-medium">생산마진율 (%)</label><Input type="number" value={Math.round((editBom.productionMarginRate ?? 0.16) * 100)} onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)} className="h-8 text-xs border-border text-right" /></div>
             </>
           )}
         </div>
@@ -3562,7 +3551,6 @@ export default function BomManagement() {
                   <Badge className="text-[11px] py-0 h-4 bg-[var(--system-green)]/10 text-[var(--system-green)] border-[var(--system-green)]/30">{(editBom.colorBoms || []).length}컬러</Badge>
                 )}
               </div>
-              <span className="text-[11px] font-mono opacity-40 leading-tight">boms · pre_materials · color_boms</span>
             </button>
             <button
               onClick={() => setMainTab('post')}
@@ -3579,7 +3567,6 @@ export default function BomManagement() {
                   <Badge className="text-[11px] py-0 h-4 bg-primary/10 text-primary border-primary/20">{(editBom.postColorBoms || []).length}컬러</Badge>
                 )}
               </div>
-              <span className="text-[11px] font-mono opacity-40 leading-tight">boms · post_materials · post_color_boms</span>
             </button>
             <button
               onClick={() => setMainTab('yardage')}
@@ -3590,7 +3577,6 @@ export default function BomManagement() {
               }`}
             >
               <span className="text-sm font-bold">소요량 계산</span>
-              <span className="text-[11px] font-mono opacity-40 leading-tight">boms (계산 전용)</span>
             </button>
           </div>
           )}
@@ -3799,44 +3785,46 @@ export default function BomManagement() {
                     {/* 제조국 선택 */}
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block font-medium">제조국</label>
-                      <div className="flex gap-1">
-                        {COUNTRY_OPTIONS.map(country => (
-                          <button
-                            key={country}
-                            onClick={() => {
-                              updateField('preManufacturingCountry', country);
-                              if (country === '중국') updateField('preCurrency', 'CNY');
-                              else if (country === '한국') updateField('preCurrency', 'KRW');
-                            }}
-                            className={`px-3 py-1.5 text-xs rounded-md border font-medium transition-colors ${
-                              editBom.preManufacturingCountry === country
-                                ? 'bg-primary text-primary-foreground border-primary'
-                                : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
-                            }`}
-                          >
-                            {country}
-                          </button>
-                        ))}
+                      <div className="flex gap-1 items-center">
+                        <Select
+                          value={COUNTRY_OPTIONS.includes((editBom.preManufacturingCountry || '중국') as any)
+                            ? (editBom.preManufacturingCountry || '중국') : '기타'}
+                          onValueChange={v => {
+                            if (v === '기타') { updateField('preManufacturingCountry', ''); return; }
+                            updateField('preManufacturingCountry', v);
+                            if (v === '중국') updateField('preCurrency', 'CNY');
+                            else if (v === '한국') updateField('preCurrency', 'KRW');
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {COUNTRY_OPTIONS.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        {/* 기타 선택 시 국가명 직접 입력 */}
+                        {!COUNTRY_OPTIONS.includes((editBom.preManufacturingCountry || '중국') as any) && (
+                          <Input
+                            value={editBom.preManufacturingCountry || ''}
+                            onChange={e => updateField('preManufacturingCountry', e.target.value)}
+                            placeholder="국가명 입력"
+                            className="h-8 text-xs w-32"
+                          />
+                        )}
                       </div>
                     </div>
                     {/* 통화 선택 */}
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block font-medium">입력 통화</label>
-                      <div className="flex gap-1">
-                        {CURRENCY_OPTIONS.map(cur => (
-                          <button
-                            key={cur}
-                            onClick={() => updateField('preCurrency', cur)}
-                            className={`px-3 py-1.5 text-xs rounded-md border font-medium transition-colors ${
-                              (editBom.preCurrency || 'CNY') === cur
-                                ? 'bg-primary text-primary-foreground border-primary'
-                                : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
-                            }`}
-                          >
-                            {cur === 'CNY' ? '¥ CNY' : cur === 'USD' ? '$ USD' : '₩ KRW'}
-                          </button>
-                        ))}
-                      </div>
+                      <Select value={editBom.preCurrency || 'CNY'} onValueChange={v => updateField('preCurrency', v)}>
+                        <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {CURRENCY_OPTIONS.map(cur => (
+                            <SelectItem key={cur} value={cur} className="text-xs">
+                              {cur === 'CNY' ? '¥ CNY' : cur === 'USD' ? '$ USD' : '₩ KRW'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     {/* 환율 CNY */}
                     {(editBom.preCurrency || 'CNY') !== 'KRW' && (
@@ -3963,8 +3951,8 @@ export default function BomManagement() {
                                     <div className="flex items-center gap-3">
                                       {catTotal > 0 && (
                                         <span className="text-xs text-muted-foreground">
-                                          소계: <span className="font-semibold text-foreground">{fmt(catTotal)} {curSymbol}</span>
-                                          {preCur !== 'KRW' && <> = <span className="font-semibold text-[#C9A96E]">{fmtKrw(catTotal * preRate)}</span></>}
+                                          소계: <span className="font-semibold text-[#C9A96E]">{fmtKrw(catTotal * preRate)}</span>
+                                          {preCur !== 'KRW' && <span className="ml-1 opacity-60">({fmt(catTotal)} {curSymbol})</span>}
                                         </span>
                                       )}
                                       <button onClick={() => addColorBomLine(colorBom.color, cat)} className={GHOST_ADD_BTN}>
@@ -4028,7 +4016,7 @@ export default function BomManagement() {
                               <td className="px-2 py-1 text-center text-xs text-muted-foreground">-</td>
                               <td className="px-2 py-1 text-right text-xs text-muted-foreground tabular-nums">{fmt(line.netQty)}</td>
                               <td className="px-2 py-1 text-right tabular-nums">
-                                <div style={{fontWeight:600}}>${((lineAmt * preRate) / (preUsdKrw || 1380)).toFixed(2)}</div>
+                                <div style={{fontWeight:600}}>₩{Math.round(lineAmt * preRate).toLocaleString()}</div>
                                 <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round(lineAmt * preRate).toLocaleString()}</div>
                               </td>
                               <td></td><td></td>
@@ -4055,7 +4043,7 @@ export default function BomManagement() {
                           <td></td>
                           <td className="px-2 py-1 text-right text-xs text-muted-foreground">1</td>
                           <td className="px-2 py-1 text-right tabular-nums">
-                            <div style={{fontWeight:600}}>${(((colorBom.processingFee ?? 0) * preRate) / (preUsdKrw || 1380)).toFixed(2)}</div>
+                            <div style={{fontWeight:600}}>₩{Math.round((colorBom.processingFee ?? 0) * preRate).toLocaleString()}</div>
                             <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round((colorBom.processingFee ?? 0) * preRate).toLocaleString()}</div>
                           </td>
                           <td colSpan={3}></td>
@@ -4383,44 +4371,46 @@ export default function BomManagement() {
                   {/* 제조국 선택 */}
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block font-medium">제조국</label>
-                    <div className="flex gap-1">
-                      {COUNTRY_OPTIONS.map(country => (
-                        <button
-                          key={country}
-                          onClick={() => {
-                            updateField('manufacturingCountry', country);
-                            if (country === '중국') updateField('currency', 'CNY');
-                            else if (country === '한국') updateField('currency', 'KRW');
-                          }}
-                          className={`px-3 py-1.5 text-xs rounded-md border font-medium transition-colors ${
-                            editBom.manufacturingCountry === country
-                              ? 'bg-primary text-primary-foreground border-primary'
-                              : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
-                          }`}
-                        >
-                          {country}
-                        </button>
-                      ))}
+                    <div className="flex gap-1 items-center">
+                      <Select
+                        value={COUNTRY_OPTIONS.includes((editBom.manufacturingCountry || '중국') as any)
+                          ? (editBom.manufacturingCountry || '중국') : '기타'}
+                        onValueChange={v => {
+                          if (v === '기타') { updateField('manufacturingCountry', ''); return; }
+                          updateField('manufacturingCountry', v);
+                          if (v === '중국') updateField('currency', 'CNY');
+                          else if (v === '한국') updateField('currency', 'KRW');
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {COUNTRY_OPTIONS.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {/* 기타 선택 시 국가명 직접 입력 */}
+                      {!COUNTRY_OPTIONS.includes((editBom.manufacturingCountry || '중국') as any) && (
+                        <Input
+                          value={editBom.manufacturingCountry || ''}
+                          onChange={e => updateField('manufacturingCountry', e.target.value)}
+                          placeholder="국가명 입력"
+                          className="h-8 text-xs w-32"
+                        />
+                      )}
                     </div>
                   </div>
                   {/* 통화 선택 (3가지) */}
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block font-medium">입력 통화</label>
-                    <div className="flex gap-1">
-                      {CURRENCY_OPTIONS.map(cur => (
-                        <button
-                          key={cur}
-                          onClick={() => updateField('currency', cur)}
-                          className={`px-3 py-1.5 text-xs rounded-md border font-medium transition-colors ${
-                            (editBom.currency || 'CNY') === cur
-                              ? 'bg-primary text-primary-foreground border-primary'
-                              : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
-                          }`}
-                        >
-                          {cur === 'CNY' ? '¥ CNY' : cur === 'USD' ? '$ USD' : '₩ KRW'}
-                        </button>
-                      ))}
-                    </div>
+                    <Select value={editBom.currency || 'CNY'} onValueChange={v => updateField('currency', v)}>
+                      <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CURRENCY_OPTIONS.map(cur => (
+                          <SelectItem key={cur} value={cur} className="text-xs">
+                            {cur === 'CNY' ? '¥ CNY' : cur === 'USD' ? '$ USD' : '₩ KRW'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   {/* 환율 — CNY */}
                   {(editBom.currency || 'CNY') !== 'KRW' && (
@@ -4578,8 +4568,8 @@ export default function BomManagement() {
                                       <div className="flex items-center gap-3">
                                         {catTotal > 0 && (
                                           <span className="text-xs text-muted-foreground">
-                                            소계: <span className="font-semibold text-foreground">{fmt(catTotal)} {curSymbol}</span>
-                                            {postCur !== 'KRW' && <> = <span className="font-semibold text-[#C9A96E]">{fmtKrw(catTotal * postRate)}</span></>}
+                                            소계: <span className="font-semibold text-[#C9A96E]">{fmtKrw(catTotal * postRate)}</span>
+                                            {postCur !== 'KRW' && <span className="ml-1 opacity-60">({fmt(catTotal)} {curSymbol})</span>}
                                           </span>
                                         )}
                                         <button onClick={() => addPostColorBomLine(postColorBom.color, cat)} className={GHOST_ADD_BTN}>
@@ -4637,8 +4627,8 @@ export default function BomManagement() {
                                 </td>
                                 <td className="px-1 py-1"></td>
                                 <td className="px-2 py-1 text-right tabular-nums">
-                                  <div style={{fontWeight:600}}>${((line.netQty * line.unitPrice * postRate) / (postUsdKrw || 1380)).toFixed(2)}</div>
-                                  <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round(line.netQty * line.unitPrice * postRate).toLocaleString()}</div>
+                                  <div style={{fontWeight:600}}>₩{Math.round(line.netQty * line.unitPrice * postRate).toLocaleString()}</div>
+                                  <div style={{fontSize:'10px', color:'#9CA3AF'}}>{(line.netQty * line.unitPrice).toFixed(3)}</div>
                                 </td>
                                 <td colSpan={3}></td>
                                 <td className="px-1 py-1 text-center">
@@ -4665,7 +4655,7 @@ export default function BomManagement() {
                             <td></td>
                             <td className="px-2 py-1 text-right text-xs text-muted-foreground">1</td>
                             <td className="px-2 py-1 text-right tabular-nums">
-                              <div style={{fontWeight:600}}>${(((postColorBom.processingFee ?? 0) * postRate) / (postUsdKrw || 1380)).toFixed(2)}</div>
+                              <div style={{fontWeight:600}}>₩{Math.round((postColorBom.processingFee ?? 0) * postRate).toLocaleString()}</div>
                               <div style={{fontSize:'10px', color:'#9CA3AF'}}>₩{Math.round((postColorBom.processingFee ?? 0) * postRate).toLocaleString()}</div>
                             </td>
                             <td colSpan={3}></td>
