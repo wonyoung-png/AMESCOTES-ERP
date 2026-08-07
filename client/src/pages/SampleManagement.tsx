@@ -649,6 +649,61 @@ export default function SampleManagement() {
 
   // 샘플 승인 처리 — TEMP 품목은 TEMP 상태 그대로 유지
   // 승인 후 담당자가 정확한 스타일번호로 품목 마스터에 직접 등록해야 함
+  // ── 다음 차수 샘플 (수정 요청) ──
+  const [nextRoundTarget, setNextRoundTarget] = useState<Sample | null>(null);
+  const [nextRoundNote, setNextRoundNote] = useState('');
+  const [nextRoundAssignee, setNextRoundAssignee] = useState('');
+  const [nextRoundFiles, setNextRoundFiles] = useState<{ name: string; url: string }[]>([]);
+
+  const openNextRound = (s: Sample) => {
+    setNextRoundTarget(s);
+    setNextRoundNote('');
+    setNextRoundAssignee(s.assignee || '');
+    setNextRoundFiles([]);
+  };
+
+  /** 업체에서 온 수정 요청(이미지·PDF·엑셀)을 그대로 담아 다음 차수 샘플을 만든다 */
+  const createNextRound = async () => {
+    const src = nextRoundTarget;
+    if (!src) return;
+    const today = new Date().toISOString().split('T')[0];
+    const prevRound = src.round || parseInt(String(src.stage).replace(/[^0-9]/g, ''), 10) || 1;
+    const nextRound = prevRound + 1;
+    const note: SampleRevisionNote = { round: nextRound as any, date: today, note: nextRoundNote.trim() || '수정 요청' };
+
+    const images = nextRoundFiles.filter(f => f.url.startsWith('data:image'));
+    const docs = nextRoundFiles.filter(f => !f.url.startsWith('data:image'));
+
+    const child: Sample = {
+      ...src,
+      id: genId(),
+      stage: `${nextRound}차` as SampleStage,
+      round: nextRound as any,
+      assignee: nextRoundAssignee || src.assignee,
+      requestDate: today,
+      expectedDate: undefined,
+      approvedDate: undefined,
+      approvedBy: undefined,
+      receivedDate: undefined,
+      billingStatus: '미청구',
+      billingDate: undefined,
+      billingStatementId: undefined,
+      revisionNote: note.note,
+      revisionHistory: [...(src.revisionHistory || []), note],
+      imageUrls: images.map(f => f.url),
+      documents: docs.map(f => ({ id: genId(), name: f.name, url: f.url, uploadedAt: today })) as any,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      await upsertSampleSB(child);
+      setNextRoundTarget(null);
+      refresh();
+      toast.success(`${nextRound}차 샘플 등록 — 담당자 ${child.assignee || '미지정'} · 수정요청 ${nextRoundFiles.length}건 첨부`);
+    } catch (e) {
+      toast.error(`다음 차수 생성 실패: ${(e as Error).message}`);
+    }
+  };
+
   const handleApprove = (s: Sample) => {
     upsertSampleSB({ ...s, stage: '최종승인', approvedBy: '관리자' }).then(() => refresh()).catch(() => {});
     // ⚠️ 자동 ACTIVE 전환 제거: 승인은 샘플 단계만 "최종승인"으로 변경
@@ -1109,8 +1164,12 @@ export default function SampleManagement() {
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(s)}>수정</Button>
                       {s.stage !== '최종승인' && (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-[var(--system-green)] hover:text-[var(--system-green)]"
-                          onClick={() => handleApprove(s)}>승인</Button>
+                        <>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-primary hover:text-primary"
+                            onClick={() => openNextRound(s)}>다음 차수</Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-[var(--system-green)] hover:text-[var(--system-green)]"
+                            onClick={() => handleApprove(s)}>승인</Button>
+                        </>
                       )}
                       {s.stage === '최종승인' && (() => {
                         // 품목 등록 여부 확인:
@@ -1388,13 +1447,23 @@ export default function SampleManagement() {
                   <SelectContent>{SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>단계</Label>
-                <Select value={form.stage || '1차'} onValueChange={v => setForm(f => ({ ...f, stage: v as SampleStage }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+              {/* 단계 — 신규 등록은 항상 1차. 2차 이후는 목록의 '다음 차수' 버튼으로 만든다 */}
+              {editId ? (
+                <div className="space-y-1.5">
+                  <Label>단계</Label>
+                  <Select value={form.stage || '1차'} onValueChange={v => setForm(f => ({ ...f, stage: v as SampleStage }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label>단계</Label>
+                  <div className="h-9 flex items-center px-3 rounded-md border border-border bg-[var(--fill-tertiary)] text-sm text-muted-foreground">
+                    1차 (신규는 항상 1차)
+                  </div>
+                </div>
+              )}
               {/* 작업방식 (단계 바로 다음) */}
               <div className="space-y-1.5">
                 <Label>작업방식 <span className="text-muted-foreground text-xs">(선택)</span></Label>
@@ -1898,6 +1967,71 @@ export default function SampleManagement() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 다음 차수 (수정 요청) 모달 ── */}
+      <Dialog open={!!nextRoundTarget} onOpenChange={o => { if (!o) setNextRoundTarget(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              다음 차수 등록 — {nextRoundTarget?.styleNo}
+            </DialogTitle>
+          </DialogHeader>
+          {nextRoundTarget && (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                {nextRoundTarget.stage} → <span className="text-foreground font-medium">
+                  {((nextRoundTarget.round || parseInt(String(nextRoundTarget.stage).replace(/[^0-9]/g, ''), 10) || 1) + 1)}차
+                </span> 로 새 샘플이 만들어집니다. 스타일·바이어·시즌은 그대로 복사됩니다.
+              </p>
+
+              <div className="space-y-1.5">
+                <Label>수정 요청 내용</Label>
+                <Input value={nextRoundNote} onChange={e => setNextRoundNote(e.target.value)}
+                  placeholder="예: 손잡이 길이 2cm 단축, 금장 → 은장" />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>작업담당자 <span className="text-muted-foreground text-xs font-normal">(이 사람에게 전달됩니다)</span></Label>
+                <Input value={nextRoundAssignee} onChange={e => setNextRoundAssignee(e.target.value)} placeholder="담당자명" />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>업체 수정 요청 파일 <span className="text-muted-foreground text-xs font-normal">(이미지 · PDF · 엑셀)</span></Label>
+                <input
+                  type="file" multiple accept="image/*,.pdf,.xlsx,.xls"
+                  className="block w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-border file:bg-card file:text-xs"
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files || []);
+                    const read = (f: File) => new Promise<{ name: string; url: string }>(res => {
+                      const r = new FileReader();
+                      r.onload = ev => res({ name: f.name, url: String(ev.target?.result || '') });
+                      r.readAsDataURL(f);
+                    });
+                    const loaded = await Promise.all(files.map(read));
+                    setNextRoundFiles(prev => [...prev, ...loaded]);
+                    e.target.value = '';
+                  }}
+                />
+                {nextRoundFiles.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    {nextRoundFiles.map((f, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-[var(--fill-quaternary)] border border-border">
+                        <span className="truncate">{f.name}</span>
+                        <button type="button" className="text-muted-foreground hover:text-[var(--system-red)]"
+                          onClick={() => setNextRoundFiles(prev => prev.filter((_, x) => x !== i))}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNextRoundTarget(null)}>취소</Button>
+            <Button onClick={createNextRound}>다음 차수 등록</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
