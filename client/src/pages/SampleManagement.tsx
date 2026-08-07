@@ -1259,7 +1259,7 @@ export default function SampleManagement() {
                     )}
                     {!s.memo && checkCount === 0 && <span className="text-muted-foreground">—</span>}
                   </td>
-                  <td className="num font-mono text-foreground text-xs">{formatKRW(s.costKrw || Math.round((s.costCny || 0) * settings.cnyKrw))}</td>
+                  <td className="nw num font-mono text-foreground text-xs">{formatKRW(s.costKrw || Math.round((s.costCny || 0) * settings.cnyKrw))}</td>
                   <td>
                     {s.billingStatus === '미청구' ? (
                       <button
@@ -1891,7 +1891,7 @@ export default function SampleManagement() {
                             <th className="text-[13px] font-semibold text-muted-foreground">업체</th>
                             <th className="text-[13px] font-semibold text-muted-foreground">컬러</th>
                             <th className="num text-[13px] font-semibold text-muted-foreground">수량</th>
-                            <th className="text-[13px] font-semibold text-muted-foreground">단위</th>
+                            <th className="nw text-[13px] font-semibold text-muted-foreground">단위</th>
                             <th className="ctr text-[13px] font-semibold text-muted-foreground">이미지</th>
                           </tr>
                         </thead>

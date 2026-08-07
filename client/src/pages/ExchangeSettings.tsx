@@ -346,7 +346,7 @@ export default function ExchangeSettings() {
         <table className="data-table w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-b border-border bg-[var(--fill-quaternary)]">
-              <th className="text-[13px] font-semibold text-muted-foreground">날짜</th>
+              <th className="nw text-[13px] font-semibold text-muted-foreground">날짜</th>
               <th className="num text-[13px] font-semibold text-muted-foreground">USD/KRW</th>
               <th className="num text-[13px] font-semibold text-muted-foreground">CNY/KRW</th>
               <th className="text-[13px] font-semibold text-muted-foreground">메모</th>
@@ -362,8 +362,8 @@ export default function ExchangeSettings() {
                   {h.date}
                   {i === 0 && <span className="ml-2 text-xs text-primary font-medium">현재 적용</span>}
                 </td>
-                <td className="num font-mono font-semibold text-foreground">{h.usdKrw.toLocaleString()}</td>
-                <td className="num font-mono font-semibold text-foreground">{h.cnyKrw.toLocaleString()}</td>
+                <td className="nw num font-mono font-semibold text-foreground">{h.usdKrw.toLocaleString()}</td>
+                <td className="nw num font-mono font-semibold text-foreground">{h.cnyKrw.toLocaleString()}</td>
                 <td className="text-muted-foreground">{h.memo || '-'}</td>
                 <td className="ctr">
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDeleteHistory(h.id)}>
@@ -437,7 +437,7 @@ export default function ExchangeSettings() {
               <tbody>
                 {packKits.map(k => (
                   <tr key={k.id} className="border-t border-border">
-                    <td className="font-mono font-semibold text-foreground">{k.styleNo || k.packingSize}</td>
+                    <td className="nw font-mono font-semibold text-foreground">{k.styleNo || k.packingSize}</td>
                     <td className="text-xs text-muted-foreground">{k.lines.length}개 자재</td>
                     <td className="num font-semibold tabular-nums">₩{k.totalCostKrw.toLocaleString('ko-KR')}</td>
                   </tr>

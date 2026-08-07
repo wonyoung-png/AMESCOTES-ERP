@@ -295,9 +295,9 @@ export default function SettlementManagement() {
                   <tr key={b.name} className="hover:bg-[var(--fill-quaternary)]">
                     <td className="font-medium text-foreground">{b.name}</td>
                     <td className="ctr text-muted-foreground">{b.count}건</td>
-                    <td className="num font-mono text-foreground">{formatKRW(b.total)}</td>
-                    <td className="num font-mono text-[var(--system-green)]">{formatKRW(b.collected)}</td>
-                    <td className="num font-mono font-semibold text-[var(--system-red)]">
+                    <td className="nw num font-mono text-foreground">{formatKRW(b.total)}</td>
+                    <td className="nw num font-mono text-[var(--system-green)]">{formatKRW(b.collected)}</td>
+                    <td className="nw num font-mono font-semibold text-[var(--system-red)]">
                       {b.total - b.collected > 0 ? formatKRW(b.total - b.collected) : <span className="text-muted-foreground">-</span>}
                     </td>
                   </tr>
@@ -346,7 +346,7 @@ export default function SettlementManagement() {
               <th className="num text-[13px] font-semibold text-muted-foreground">청구금액</th>
               <th className="num text-[13px] font-semibold text-muted-foreground">수금금액</th>
               <th className="num text-[13px] font-semibold text-muted-foreground">미수금</th>
-              <th className="text-[13px] font-semibold text-muted-foreground">상태</th>
+              <th className="nw text-[13px] font-semibold text-muted-foreground">상태</th>
               <th className="ctr text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
@@ -364,7 +364,7 @@ export default function SettlementManagement() {
                 <tr key={s.id} className={`hover:bg-[var(--fill-quaternary)] ${isOver7 ? 'bg-destructive/5' : ''}`}>
                   <td className="font-medium text-foreground">{s.buyerName}</td>
                   <td className="text-muted-foreground">{s.channel}</td>
-                  <td className="font-mono text-xs text-muted-foreground">{s.invoiceNo || '-'}</td>
+                  <td className="nw font-mono text-xs text-muted-foreground">{s.invoiceNo || '-'}</td>
                   <td className="text-muted-foreground">{s.invoiceDate}</td>
                   <td className="text-muted-foreground">{s.dueDate}</td>
                   <td className="ctr">
@@ -378,9 +378,9 @@ export default function SettlementManagement() {
                       <span className="text-xs text-primary font-mono">{Math.abs(elapsed)}일 남음</span>
                     )}
                   </td>
-                  <td className="num font-mono text-foreground">{formatNumber(s.billedAmountKrw)}</td>
-                  <td className="num font-mono text-[var(--system-green)]">{formatNumber(s.collectedAmountKrw)}</td>
-                  <td className="num font-mono font-semibold text-[var(--system-red)]">{receivable > 0 ? formatNumber(receivable) : '-'}</td>
+                  <td className="nw num font-mono text-foreground">{formatNumber(s.billedAmountKrw)}</td>
+                  <td className="nw num font-mono text-[var(--system-green)]">{formatNumber(s.collectedAmountKrw)}</td>
+                  <td className="nw num font-mono font-semibold text-[var(--system-red)]">{receivable > 0 ? formatNumber(receivable) : '-'}</td>
                   <td>
                     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${STATUS_COLOR[s.status]}`}>
                       {s.status === '완납' ? <CheckCircle className="w-3 h-3" /> : s.status === '위험' ? <AlertTriangle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}

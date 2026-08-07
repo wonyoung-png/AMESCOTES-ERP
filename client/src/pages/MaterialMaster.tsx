@@ -399,13 +399,13 @@ export default function MaterialMaster() {
                 />
               </th>
               <th className="text-[13px] font-semibold text-muted-foreground w-14">이미지</th>
-              <th className="text-[13px] font-semibold text-muted-foreground w-32 whitespace-nowrap">품번</th>
+              <th className="nw text-[13px] font-semibold text-muted-foreground w-32 whitespace-nowrap">품번</th>
               <th className="text-[13px] font-semibold text-muted-foreground">카테고리</th>
               <th className="text-[13px] font-semibold text-muted-foreground">브랜드</th>
               <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
               <th className="text-[13px] font-semibold text-muted-foreground">스펙</th>
               <th className="num text-[13px] font-semibold text-muted-foreground">단가</th>
-              <th className="text-[13px] font-semibold text-muted-foreground">단위</th>
+              <th className="nw text-[13px] font-semibold text-muted-foreground">단위</th>
               
               <th className="ctr text-[13px] font-semibold text-muted-foreground">편집</th>
             </tr>
@@ -463,7 +463,7 @@ export default function MaterialMaster() {
                     </button>
                   </td>
                   <td className="text-xs text-muted-foreground">{m.spec || '—'}</td>
-                  <td className="num font-mono text-xs text-foreground">
+                  <td className="nw num font-mono text-xs text-foreground">
                     {priceOf(m) != null
                       ? `${CURRENCY_SIGN[currencyOf(m)]}${Number(priceOf(m)).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                       : '—'}

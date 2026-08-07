@@ -133,11 +133,11 @@ export default function PayablesManagement() {
             <tr>
               <th>거래처</th>
               <th>결제경로</th>
-              <th>발주번호</th>
+              <th className="nw">발주번호</th>
               <th className="num">금액</th>
               <th className="num">지급액</th>
               <th className="num">잔액</th>
-              <th>상태</th>
+              <th className="nw">상태</th>
               <th className="act">지급처리</th>
             </tr>
           </thead>
@@ -154,7 +154,7 @@ export default function PayablesManagement() {
                     <span className="text-[11px] text-muted-foreground">—</span>
                   )}
                 </td>
-                <td className="font-mono text-xs text-muted-foreground">{p.projectNo || '—'}</td>
+                <td className="nw font-mono text-xs text-muted-foreground">{p.projectNo || '—'}</td>
                 <td className="num">{formatKRW(p.amountKrw)}</td>
                 <td className="num text-[var(--system-green)]">{p.paidAmountKrw > 0 ? formatKRW(p.paidAmountKrw) : '—'}</td>
                 <td className="num font-semibold">{formatKRW(p.amountKrw - p.paidAmountKrw)}</td>
@@ -193,11 +193,11 @@ export default function PayablesManagement() {
         <table className="data-table min-w-[560px]">
           <thead>
             <tr>
-              <th>발주번호</th>
+              <th className="nw">발주번호</th>
               <th>거래처</th>
               <th className="num">차감액</th>
               <th>사유</th>
-              <th>상태</th>
+              <th className="nw">상태</th>
             </tr>
           </thead>
           <tbody>

@@ -150,7 +150,7 @@ export default function UserManagement() {
               <th>이름</th>
               <th>이메일</th>
               <th>역할</th>
-              <th>등록일</th>
+              <th className="nw">등록일</th>
               <th>활성</th>
               <th className="num">비밀번호</th>
             </tr>

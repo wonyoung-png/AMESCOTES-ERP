@@ -389,6 +389,11 @@
 .data-table :is(th, td).ctr { text-align: center; }
 /* 액션 버튼이 들어가는 열은 내용이 커도 행 높이를 흔들지 않게 */
 .data-table :is(th, td).act { text-align: right; white-space: nowrap; }
+/* 한글은 글자 단위로 쪼개지 않는다 — '커브 호 보 백' 처럼 깨지던 문제 */
+.data-table td { word-break: keep-all; overflow-wrap: normal; }
+/* 코드·번호·날짜는 절대 줄바꿈하지 않는다 */
+.data-table :is(th, td).nw { white-space: nowrap; }
+.data-table :is(th, td).num { white-space: nowrap; }
 
 /* ─────────────────────────────────────────────
    A4 인쇄 규격 — 공장에 보내는 서류(발주서·작업지시서·거래명세표)

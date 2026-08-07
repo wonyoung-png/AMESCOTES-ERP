@@ -521,7 +521,7 @@ export default function Dashboard() {
                         <th className="text-muted-foreground font-medium">업체</th>
                         <th className="text-muted-foreground font-medium">컬러</th>
                         <th className="num text-muted-foreground font-medium">수량</th>
-                        <th className="text-muted-foreground font-medium">단위</th>
+                        <th className="nw text-muted-foreground font-medium">단위</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">

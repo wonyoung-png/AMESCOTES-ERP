@@ -3966,7 +3966,7 @@ export default function BomManagement() {
                         <tr className="border-b border-border text-[11px] font-semibold text-muted-foreground">
                           <th>부위 | 자재명</th>
                           <th className="w-20">규격</th>
-                          <th className="ctr w-20">단위</th>
+                          <th className="nw ctr w-20">단위</th>
                           <th className="num w-24">단가</th>
                           <th className="num w-20">NET</th>
                           <th className="num w-16">LOSS(%)</th>
@@ -4196,7 +4196,7 @@ export default function BomManagement() {
                               <tr className="bg-primary/10 border-t border-primary/20">
                                 <td className="text-xs font-medium text-primary">연동</td>
                                 <td className="text-sm font-semibold text-primary" colSpan={2}>납품가 (품목 마스터 연동)</td>
-                                <td className="num font-mono font-bold text-primary">{fmtKrw(deliveryPrice)}</td>
+                                <td className="nw num font-mono font-bold text-primary">{fmtKrw(deliveryPrice)}</td>
                               </tr>
                               <tr>
                                 <td colSpan={4} className="px-4 py-2">
@@ -4243,7 +4243,7 @@ export default function BomManagement() {
                                 <th>부위</th>
                                 <th>자재명</th>
                                 <th>규격</th>
-                                <th>단위</th>
+                                <th className="nw">단위</th>
                                 <th className="num">단가</th>
                                 <th className="num">소요량</th>
                                 <th className="num">금액(KRW)</th>
@@ -4278,7 +4278,7 @@ export default function BomManagement() {
                                 <th>부위</th>
                                 <th>자재명</th>
                                 <th>규격</th>
-                                <th>단위</th>
+                                <th className="nw">단위</th>
                                 <th className="num">단가</th>
                                 <th className="num">소요량</th>
                                 <th className="num">금액(KRW)</th>
@@ -4595,7 +4595,7 @@ export default function BomManagement() {
                           <tr className="border-b border-border text-[11px] font-semibold text-muted-foreground">
                             <th>부위 | 자재명</th>
                             <th className="w-20">규격</th>
-                            <th className="ctr w-20">단위</th>
+                            <th className="nw ctr w-20">단위</th>
                             <th className="num w-24">단가</th>
                             <th className="num w-20">NET</th>
                             <th className="num w-16">LOSS(%)</th>
@@ -4884,7 +4884,7 @@ export default function BomManagement() {
                             <tr className="bg-primary/10 border-t border-primary/20">
                               <td className="text-xs font-medium text-primary">연동</td>
                               <td className="text-sm font-semibold text-primary" colSpan={2}>납품가 (품목 마스터 연동)</td>
-                              <td className="num font-mono font-bold text-primary">{fmtKrw(deliveryPrice)}</td>
+                              <td className="nw num font-mono font-bold text-primary">{fmtKrw(deliveryPrice)}</td>
                             </tr>
                             <tr>
                               <td colSpan={4} className="px-4 py-2">

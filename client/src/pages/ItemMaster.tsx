@@ -2818,7 +2818,7 @@ export default function ItemMaster() {
               <table className="data-table w-full min-w-[480px] text-sm">
                 <thead>
                   <tr className="bg-[var(--fill-quaternary)] border-b border-border">
-                    <th className="text-xs font-medium text-muted-foreground">시즌</th>
+                    <th className="nw text-xs font-medium text-muted-foreground">시즌</th>
                     <th className="ctr text-xs font-medium text-muted-foreground">전체</th>
                     <th className="ctr text-xs font-medium text-muted-foreground">HB</th>
                     <th className="ctr text-xs font-medium text-muted-foreground">ACC</th>
@@ -3435,11 +3435,11 @@ export default function ItemMaster() {
             <table className="data-table w-full min-w-[640px] text-xs">
               <thead className="sticky top-0 bg-[var(--fill-tertiary)]">
                 <tr>
-                  <th className="text-[13px] font-semibold text-muted-foreground">상태</th>
-                  <th className="text-[13px] font-semibold text-muted-foreground">스타일번호</th>
+                  <th className="nw text-[13px] font-semibold text-muted-foreground">상태</th>
+                  <th className="nw text-[13px] font-semibold text-muted-foreground">스타일번호</th>
                   <th className="text-[13px] font-semibold text-muted-foreground">품목명</th>
                   <th className="text-[13px] font-semibold text-muted-foreground">거래처</th>
-                  <th className="text-[13px] font-semibold text-muted-foreground">시즌</th>
+                  <th className="nw text-[13px] font-semibold text-muted-foreground">시즌</th>
                   <th className="text-[13px] font-semibold text-muted-foreground">카테</th>
                   <th className="text-[13px] font-semibold text-muted-foreground">컬러</th>
                   <th className="text-[13px] font-semibold text-muted-foreground">판매가</th>
@@ -3453,7 +3453,7 @@ export default function ItemMaster() {
                         ? <span className="text-[var(--system-orange)] font-medium">중복</span>
                         : <span className="text-[var(--system-green)] font-medium">신규</span>}
                     </td>
-                    <td className="font-mono">{p.styleNo}</td>
+                    <td className="nw font-mono">{p.styleNo}</td>
                     <td className="max-w-[200px] truncate">{p.name}</td>
                     <td>
                       {p.buyerName
@@ -3505,7 +3505,7 @@ export default function ItemMaster() {
             <table className="data-table w-full min-w-[640px] text-xs">
               <thead>
                 <tr className="bg-[var(--fill-tertiary)] text-muted-foreground">
-                  <th className="font-medium">스타일번호</th>
+                  <th className="nw font-medium">스타일번호</th>
                   <th className="font-medium">품명</th>
                   <th className="font-medium">적용 탭</th>
                   <th className="font-medium">파일 / 상태</th>
@@ -3527,7 +3527,7 @@ export default function ItemMaster() {
                   })();
                   return (
                     <tr key={bi.item.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                      <td className="font-mono font-medium text-foreground">{bi.item.styleNo}</td>
+                      <td className="nw font-mono font-medium text-foreground">{bi.item.styleNo}</td>
                       <td className="text-muted-foreground max-w-[180px] truncate">{bi.item.name}</td>
                       <td className="text-muted-foreground">{tabLabel}</td>
                       <td>{bi.fileName ? <span className="text-muted-foreground truncate max-w-[140px] block">{bi.fileName}</span> : null}<div className="mt-0.5">{statusEl}</div></td>

@@ -550,7 +550,7 @@ export default function CostComparison() {
                     스타일번호 <SortIndicator col="styleNo" />
                   </th>
                   <th>품목명</th>
-                  <th className="ctr w-20">시즌</th>
+                  <th className="nw ctr w-20">시즌</th>
                   <th className="ctr w-20">유형</th>
                   <th
                     className="px-3 py-2.5 text-right cursor-pointer hover:bg-[var(--fill-quaternary)] select-none w-32"
@@ -586,7 +586,7 @@ export default function CostComparison() {
                   return (
                     <tr key={row.bomId} className="hover:bg-[var(--fill-quaternary)] transition-colors">
                       <td className="ctr text-muted-foreground w-8">{idx + 1}</td>
-                      <td className="font-mono font-semibold text-foreground">
+                      <td className="nw font-mono font-semibold text-foreground">
                         {row.styleNo}
                       </td>
                       <td className="text-foreground">
@@ -605,10 +605,10 @@ export default function CostComparison() {
                           <Badge className="text-[11px] py-0 h-4 bg-[var(--fill-quaternary)] text-muted-foreground border-transparent">-</Badge>
                         )}
                       </td>
-                      <td className="num font-mono">
+                      <td className="nw num font-mono">
                         <EditableCostCell bomId={row.bomId} field="pre" value={row.preCost} />
                       </td>
-                      <td className="num font-mono">
+                      <td className="nw num font-mono">
                         {/* 사후원가 클릭 → BOM 사후원가 탭으로 이동 */}
                         <div
                           className="flex items-center justify-end gap-1.5 group cursor-pointer rounded px-1 py-0.5 hover:bg-[var(--fill-quaternary)] transition-colors"
@@ -623,10 +623,10 @@ export default function CostComparison() {
                           <span className="opacity-0 group-hover:opacity-100 text-primary text-xs">↗</span>
                         </div>
                       </td>
-                      <td className="num font-mono">
+                      <td className="nw num font-mono">
                         <EditableCostCell bomId={row.bomId} field="salePrice" value={row.salePrice} />
                       </td>
-                      <td className="ctr font-mono">
+                      <td className="nw ctr font-mono">
                         {row.multiplier !== null ? (
                           <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
                             row.multiplier >= 2.5
@@ -639,7 +639,7 @@ export default function CostComparison() {
                           <span className="text-muted-foreground text-xs">-</span>
                         )}
                       </td>
-                      <td className="num font-mono">
+                      <td className="nw num font-mono">
                         {row.diffAmt !== null ? (
                           <span className={`font-semibold ${row.diffAmt > 0 ? 'text-[var(--system-red)]' : row.diffAmt < 0 ? 'text-[var(--system-green)]' : 'text-muted-foreground'}`}>
                             {row.diffAmt > 0 ? '+' : ''}{fmtKrw(row.diffAmt)}

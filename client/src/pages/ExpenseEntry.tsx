@@ -182,10 +182,10 @@ function ExpenseDetailModal({
             <table className="data-table w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-[13px] font-semibold text-muted-foreground">스타일번호</th>
+                  <th className="nw text-[13px] font-semibold text-muted-foreground">스타일번호</th>
                   <th className="text-[13px] font-semibold text-muted-foreground">품명</th>
                   <th className="num text-[13px] font-semibold text-muted-foreground w-16">수량</th>
-                  <th className="ctr text-[13px] font-semibold text-muted-foreground w-14">단위</th>
+                  <th className="nw ctr text-[13px] font-semibold text-muted-foreground w-14">단위</th>
                   <th className="num text-[13px] font-semibold text-muted-foreground w-24">단가(원)</th>
                   <th className="num text-[13px] font-semibold text-muted-foreground w-24">금액(원)</th>
                   <th className="w-8"></th>
@@ -390,7 +390,7 @@ function printExpenseTradeStatement(expense: Expense) {
           <tr>
             <th>품목/내역</th>
             <th>수량</th>
-            <th>단위</th>
+            <th className="nw">단위</th>
             <th>단가</th>
             <th>금액</th>
           </tr>
@@ -561,12 +561,12 @@ export default function ExpenseEntry() {
           <table className="data-table w-full text-sm min-w-[800px]">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-[13px] font-semibold text-muted-foreground">날짜</th>
+                <th className="nw text-[13px] font-semibold text-muted-foreground">날짜</th>
                 <th className="text-[13px] font-semibold text-muted-foreground">결제</th>
                 <th className="text-[13px] font-semibold text-muted-foreground">카테고리</th>
                 <th className="text-[13px] font-semibold text-muted-foreground">내용</th>
                 <th className="text-[13px] font-semibold text-muted-foreground">항목수</th>
-                <th className="text-[13px] font-semibold text-muted-foreground">발주번호</th>
+                <th className="nw text-[13px] font-semibold text-muted-foreground">발주번호</th>
                 <th className="text-[13px] font-semibold text-muted-foreground">거래처</th>
                 <th className="ctr text-[13px] font-semibold text-muted-foreground">세금계산서</th>
                 <th className="num text-[13px] font-semibold text-muted-foreground">금액</th>
@@ -691,7 +691,7 @@ export default function ExpenseEntry() {
                   <tr className="border-b border-border">
                     <th className="text-[13px] font-semibold text-muted-foreground w-1/3">품목명</th>
                     <th className="num text-[13px] font-semibold text-muted-foreground w-16">수량</th>
-                    <th className="ctr text-[13px] font-semibold text-muted-foreground w-16">단위</th>
+                    <th className="nw ctr text-[13px] font-semibold text-muted-foreground w-16">단위</th>
                     <th className="num text-[13px] font-semibold text-muted-foreground w-28">단가(KRW)</th>
                     <th className="num text-[13px] font-semibold text-muted-foreground w-28">금액</th>
                     <th className="w-8"></th>

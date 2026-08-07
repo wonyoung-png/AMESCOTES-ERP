@@ -190,7 +190,7 @@ export default function ChinaWarehouse() {
               </tr>
             ) : filteredBalances.map(b => (
               <tr key={`${b.styleNo}-${b.color}`} className="hover:bg-[var(--fill-quaternary)]">
-                <td className="font-mono text-xs text-primary">{b.styleNo}</td>
+                <td className="nw font-mono text-xs text-primary">{b.styleNo}</td>
                 <td>{b.styleName}</td>
                 <td><Badge variant="outline" className="text-[11px]">{b.color}</Badge></td>
                 <td className="num text-foreground">{formatNumber(b.inboundQty)}</td>

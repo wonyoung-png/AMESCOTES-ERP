@@ -431,14 +431,14 @@ export default function BrandOrders() {
               <table className="data-table w-full text-sm min-w-[720px]">
                 <thead className="text-[13px] font-semibold text-muted-foreground">
                   <tr>
-                    <th>차수</th>
+                    <th className="nw">차수</th>
                     <th>컬러</th>
-                    <th>발주일</th>
+                    <th className="nw">발주일</th>
                     <th className="num">발주</th>
                     <th className="num">선입</th>
                     <th className="num">입고</th>
                     <th className="num">잔량</th>
-                    <th>상태</th>
+                    <th className="nw">상태</th>
                     <th>액션</th>
                   </tr>
                 </thead>
@@ -629,7 +629,7 @@ export default function BrandOrders() {
                         const cqs = l.colorQtys?.length ? l.colorQtys : [{ color: '(미지정)', qty: l.qty }];
                         return cqs.map((cq, i) => (
                           <tr key={`${l.id}-${cq.color}-${i}`} className="hover:bg-[var(--fill-quaternary)]">
-                            <td className="font-mono text-xs">{i === 0 ? l.styleNo : ''}</td>
+                            <td className="nw font-mono text-xs">{i === 0 ? l.styleNo : ''}</td>
                             <td className="text-xs">{cq.color}</td>
                             <td className="num">{cq.qty}</td>
                             <td>{i === 0 ? (l.factoryName || '—') : ''}</td>
@@ -763,7 +763,7 @@ export default function BrandOrders() {
                   <tbody className="divide-y divide-border">
                     {(detailRow.colorLines || []).map(cl => (
                       <tr key={cl.color}>
-                        <td className="font-mono">{cl.color}</td>
+                        <td className="nw font-mono">{cl.color}</td>
                         <td className="num">{formatNumber(cl.qty)}</td>
                         <td className="num text-[var(--system-orange)]">{formatNumber(cl.advanceQty)}</td>
                         <td className="num">{formatNumber(cl.receivedQty)}</td>

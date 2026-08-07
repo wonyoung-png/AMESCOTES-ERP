@@ -285,9 +285,9 @@ export default function SalesSummary() {
             <thead>
               <tr className="border-b border-border bg-card text-xs text-muted-foreground">
                 <th className="w-8" />
-                <th>스타일번호</th>
+                <th className="nw">스타일번호</th>
                 <th>품명</th>
-                <th>시즌</th>
+                <th className="nw">시즌</th>
                 <th>바이어</th>
                 <th className="ctr whitespace-nowrap">발주차수</th>
                 <th className="num whitespace-nowrap">누적생산량</th>
@@ -310,7 +310,7 @@ export default function SalesSummary() {
                       <td className="text-muted-foreground">
                         {st.orderCount > 0 ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}
                       </td>
-                      <td className="font-mono text-xs text-primary whitespace-nowrap">{item.styleNo}</td>
+                      <td className="nw font-mono text-xs text-primary whitespace-nowrap">{item.styleNo}</td>
                       <td>
                         <p className="font-medium text-foreground truncate max-w-[200px]" title={item.name}>{item.name}</p>
                         {item.nameEn && <p className="text-[11px] text-muted-foreground truncate max-w-[200px]">{item.nameEn}</p>}
@@ -374,10 +374,10 @@ export default function SalesSummary() {
                             <table className="data-table w-full text-xs">
                               <thead>
                                 <tr className="bg-[var(--fill-quaternary)] text-muted-foreground">
-                                  <th>차수</th>
-                                  <th>발주번호</th>
-                                  <th>발주일</th>
-                                  <th>상태</th>
+                                  <th className="nw">차수</th>
+                                  <th className="nw">발주번호</th>
+                                  <th className="nw">발주일</th>
+                                  <th className="nw">상태</th>
                                   <th className="num">수량</th>
                                   <th>컬러별</th>
                                 </tr>
@@ -386,10 +386,10 @@ export default function SalesSummary() {
                                 {st.rounds.map((r, idx) => (
                                   <tr key={`${item.id}-${r.orderId}`} className="border-t border-border">
                                     <td className="font-semibold text-foreground">{idx + 1}차</td>
-                                    <td className="font-mono text-primary">{r.orderNo}</td>
+                                    <td className="nw font-mono text-primary">{r.orderNo}</td>
                                     <td className="text-muted-foreground">{r.orderDate || '—'}</td>
                                     <td className="text-muted-foreground">{r.status || '—'}</td>
-                                    <td className="num font-mono font-semibold">{r.qty.toLocaleString()}</td>
+                                    <td className="nw num font-mono font-semibold">{r.qty.toLocaleString()}</td>
                                     <td>
                                       <div className="flex flex-wrap gap-1.5">
                                         {(r.colorQtys || []).map(cq => (

@@ -1381,8 +1381,8 @@ export default function ProductionOrders() {
                     <td className="ctr">
                       <span className={f.inProgress > 0 ? 'text-[var(--system-orange)] font-medium' : 'text-muted-foreground'}>{f.inProgress}건</span>
                     </td>
-                    <td className="num font-mono text-foreground">{f.totalQty.toLocaleString()} PCS</td>
-                    <td className="num font-mono text-foreground">
+                    <td className="nw num font-mono text-foreground">{f.totalQty.toLocaleString()} PCS</td>
+                    <td className="nw num font-mono text-foreground">
                       {f.totalAmountKrw > 0 ? formatKRW(f.totalAmountKrw) : '-'}
                     </td>
                   </tr>
@@ -1488,8 +1488,8 @@ export default function ProductionOrders() {
               <th className="w-10">
                 <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} className="cursor-pointer" />
               </th>
-              <th className="text-[13px] font-semibold text-muted-foreground whitespace-nowrap">발주일</th>
-              <th className="text-[13px] font-semibold text-muted-foreground">발주번호</th>
+              <th className="nw text-[13px] font-semibold text-muted-foreground whitespace-nowrap">발주일</th>
+              <th className="nw text-[13px] font-semibold text-muted-foreground">발주번호</th>
               <th className="text-[13px] font-semibold text-muted-foreground">스타일</th>
               <th className="text-[13px] font-semibold text-muted-foreground">브랜드</th>
               <th className="text-[13px] font-semibold text-muted-foreground">컬러</th>
@@ -1499,8 +1499,8 @@ export default function ProductionOrders() {
               <th className="num text-[13px] font-semibold text-muted-foreground whitespace-nowrap">청구</th>
               <th className="text-[13px] font-semibold text-muted-foreground">공장 / 공장단가</th>
               <th className="num text-[13px] font-semibold text-muted-foreground">총 발주금액</th>
-              <th className="text-[13px] font-semibold text-muted-foreground whitespace-nowrap">납기일</th>
-              <th className="text-[13px] font-semibold text-muted-foreground">상태</th>
+              <th className="nw text-[13px] font-semibold text-muted-foreground whitespace-nowrap">납기일</th>
+              <th className="nw text-[13px] font-semibold text-muted-foreground">상태</th>
               <th className="ctr text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
           </thead>
@@ -1621,7 +1621,7 @@ export default function ProductionOrders() {
                     const short = received === undefined ? 0 : (o.qty || 0) - received;
                     return (
                       <>
-                        <td className="num align-top font-mono text-foreground whitespace-nowrap">
+                        <td className="nw num align-top font-mono text-foreground whitespace-nowrap">
                           {formatNumber(o.qty)}
                         </td>
                         <td className="num align-top whitespace-nowrap">
@@ -2529,7 +2529,7 @@ export default function ProductionOrders() {
                                         <tr>
                                           <th className="font-semibold text-muted-foreground">자재명</th>
                                           <th className="num font-semibold text-muted-foreground">소요량</th>
-                                          <th className="ctr font-semibold text-muted-foreground">단위</th>
+                                          <th className="nw ctr font-semibold text-muted-foreground">단위</th>
                                           <th className="font-semibold text-muted-foreground">구매업체</th>
                                           <th className="font-semibold text-muted-foreground">구매상태</th>
                                         </tr>
@@ -3049,7 +3049,7 @@ export default function ProductionOrders() {
                   <tbody>
                     <tr>
                       <td className="border border-neutral-300 bg-neutral-100 font-semibold w-24">발주번호</td>
-                      <td className="border border-neutral-300 font-mono">{poTarget.orderNo}</td>
+                      <td className="nw border border-neutral-300 font-mono">{poTarget.orderNo}</td>
                       <td className="border border-neutral-300 bg-neutral-100 font-semibold w-24">발주일</td>
                       <td className="border border-neutral-300">{poTarget.orderDate}</td>
                     </tr>
@@ -3081,16 +3081,16 @@ export default function ProductionOrders() {
                     {rows.map((r, i) => (
                       <tr key={i}>
                         <td className="border border-neutral-300">{r.color}</td>
-                        <td className="border border-neutral-300 num font-mono">{formatNumber(r.qty)}</td>
-                        <td className="border border-neutral-300 num font-mono">{formatKRW(unit)}</td>
-                        <td className="border border-neutral-300 num font-mono">{formatKRW(r.qty * unit)}</td>
+                        <td className="nw border border-neutral-300 num font-mono">{formatNumber(r.qty)}</td>
+                        <td className="nw border border-neutral-300 num font-mono">{formatKRW(unit)}</td>
+                        <td className="nw border border-neutral-300 num font-mono">{formatKRW(r.qty * unit)}</td>
                       </tr>
                     ))}
                     <tr className="bg-neutral-50 font-semibold">
                       <td className="border border-neutral-300">합계</td>
-                      <td className="border border-neutral-300 num font-mono">{formatNumber(rows.reduce((s2, r) => s2 + r.qty, 0))}</td>
+                      <td className="nw border border-neutral-300 num font-mono">{formatNumber(rows.reduce((s2, r) => s2 + r.qty, 0))}</td>
                       <td className="border border-neutral-300"></td>
-                      <td className="border border-neutral-300 num font-mono">{formatKRW(total)}</td>
+                      <td className="nw border border-neutral-300 num font-mono">{formatKRW(total)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -3578,7 +3578,7 @@ export default function ProductionOrders() {
                     <tr className="border-b border-border bg-[var(--fill-quaternary)]">
                       <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
                       <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
-                      <th className="ctr text-[13px] font-semibold text-muted-foreground">단위</th>
+                      <th className="nw ctr text-[13px] font-semibold text-muted-foreground">단위</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">발주수량</th>
@@ -3597,7 +3597,7 @@ export default function ProductionOrders() {
                         <td className="font-medium text-foreground">{item.materialName}</td>
                         <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
                         <td className="ctr text-muted-foreground">{item.unit}</td>
-                        <td className="num font-mono text-muted-foreground text-sm">
+                        <td className="nw num font-mono text-muted-foreground text-sm">
                           {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                         </td>
                         <td className="num">
@@ -3696,7 +3696,7 @@ export default function ProductionOrders() {
       {/* ── 공장 발주서 (묶음 1장) ── 스타일 여러 개를 한 장에 담아 공장에 보낸다.
              작업지시서는 스타일별로 따로 뽑는다 (아래 버튼). ── */}
       <Dialog open={!!batchSheet} onOpenChange={o => { if (!o) setBatchSheet(null); }}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[96vw] sm:h-auto sm:max-w-5xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Printer className="w-4 h-4" />발주서 — {batchSheet?.batchNo}
@@ -3725,23 +3725,23 @@ export default function ProductionOrders() {
                   <table className="data-table min-w-[760px]">
                     <thead>
                       <tr>
-                        <th className="num" style={{ width: 40 }}>No.</th>
-                        <th>발주번호</th>
-                        <th>스타일</th>
-                        <th>품명</th>
+                        <th className="num" style={{ width: 36 }}>No.</th>
+                        <th className="nw nw" style={{ width: 128 }}>발주번호</th>
+                        <th className="nw" style={{ width: 112 }}>스타일</th>
+                        <th style={{ width: 96 }}>품명</th>
                         <th>컬러별 수량</th>
-                        <th className="num">총수량</th>
-                        <th className="num">단가</th>
-                        <th className="num">금액</th>
-                        <th>납기</th>
+                        <th className="num" style={{ width: 72 }}>총수량</th>
+                        <th className="num" style={{ width: 88 }}>단가</th>
+                        <th className="num" style={{ width: 108 }}>금액</th>
+                        <th className="nw nw" style={{ width: 92 }}>납기</th>
                       </tr>
                     </thead>
                     <tbody>
                       {list.map((o, i) => (
                         <tr key={o.id}>
                           <td className="num text-muted-foreground">{i + 1}</td>
-                          <td className="font-mono text-xs">{o.orderNo}</td>
-                          <td className="font-medium">{o.styleNo}</td>
+                          <td className="nw font-mono text-xs">{o.orderNo}</td>
+                          <td className="nw font-medium">{o.styleNo}</td>
                           <td className="text-muted-foreground">{o.styleName}</td>
                           <td className="text-xs">
                             {(o.colorQtys || []).length
@@ -3751,13 +3751,13 @@ export default function ProductionOrders() {
                           <td className="num">{(o.qty || 0).toLocaleString()}</td>
                           <td className="num">{o.factoryUnitPriceKrw ? formatKRW(o.factoryUnitPriceKrw) : '—'}</td>
                           <td className="num">{o.factoryUnitPriceKrw ? formatKRW((o.qty || 0) * o.factoryUnitPriceKrw) : '—'}</td>
-                          <td className="text-xs">{o.deliveryDate || '—'}</td>
+                          <td className="nw text-xs">{o.deliveryDate || <span className="text-[var(--system-orange)]">미정</span>}</td>
                         </tr>
                       ))}
                       <tr>
                         <td colSpan={5} className="font-semibold">합계</td>
                         <td className="num font-semibold">{totalQty.toLocaleString()}</td>
-                        <td className="num">—</td>
+                        <td></td>
                         <td className="num font-semibold">{totalAmt > 0 ? formatKRW(totalAmt) : '—'}</td>
                         <td></td>
                       </tr>
@@ -3849,7 +3849,7 @@ export default function ProductionOrders() {
                         <th className="ctr text-[13px] font-semibold text-muted-foreground w-10">이미지</th>
                         <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
                         <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
-                        <th className="ctr text-[13px] font-semibold text-muted-foreground">단위</th>
+                        <th className="nw ctr text-[13px] font-semibold text-muted-foreground">단위</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">발주수량</th>
@@ -3870,13 +3870,13 @@ export default function ProductionOrders() {
                           <td className="font-medium text-foreground">{item.materialName}</td>
                           <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
                           <td className="ctr text-muted-foreground">{item.unit}</td>
-                          <td className="num font-mono text-muted-foreground text-xs">
+                          <td className="nw num font-mono text-muted-foreground text-xs">
                             {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                           </td>
-                          <td className="num font-mono text-muted-foreground text-xs">
+                          <td className="nw num font-mono text-muted-foreground text-xs">
                             {(item.stockQty ?? 0) % 1 === 0 ? (item.stockQty ?? 0).toLocaleString() : (item.stockQty ?? 0).toFixed(3)}
                           </td>
-                          <td className="num font-mono font-semibold text-primary">
+                          <td className="nw num font-mono font-semibold text-primary">
                             {item.orderQty % 1 === 0 ? item.orderQty.toLocaleString() : item.orderQty.toFixed(3)}
                           </td>
                           <td className="text-xs text-muted-foreground">

@@ -594,7 +594,7 @@ export default function PurchaseMatching() {
                   className="cursor-pointer"
                 />
               </th>
-              <th className="text-[13px] font-semibold text-muted-foreground">발주번호</th>
+              <th className="nw text-[13px] font-semibold text-muted-foreground">발주번호</th>
               <th className="text-[13px] font-semibold text-muted-foreground">품목명</th>
               <th className="text-[13px] font-semibold text-muted-foreground">공급업체</th>
               <th className="text-[13px] font-semibold text-muted-foreground">구매일</th>
@@ -602,7 +602,7 @@ export default function PurchaseMatching() {
               <th className="num text-[13px] font-semibold text-muted-foreground">단가</th>
               <th className="num text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
               <th className="text-[13px] font-semibold text-muted-foreground">결제</th>
-              <th className="text-[13px] font-semibold text-muted-foreground w-28">상태</th>
+              <th className="nw text-[13px] font-semibold text-muted-foreground w-28">상태</th>
               <th className="ctr text-[13px] font-semibold text-muted-foreground w-20">전표</th>
               <th className="ctr text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
@@ -721,13 +721,13 @@ export default function PurchaseMatching() {
                             className="cursor-pointer"
                           />
                         </td>
-                        <td className="font-mono text-xs text-muted-foreground">{p.orderNo || '-'}</td>
+                        <td className="nw font-mono text-xs text-muted-foreground">{p.orderNo || '-'}</td>
                         <td className="font-medium text-foreground">{p.itemName}</td>
                         <td className="text-muted-foreground">{p.vendorName || '-'}</td>
                         <td className="text-muted-foreground">{p.purchaseDate}</td>
-                        <td className="num font-mono">{formatNumber(p.qty)} {p.unit}</td>
-                        <td className="num font-mono text-muted-foreground">{formatNumber(p.unitPriceCny, 2)} {p.currency}</td>
-                        <td className="num font-mono font-semibold text-foreground">{formatKRW(p.amountKrw)}</td>
+                        <td className="nw num font-mono">{formatNumber(p.qty)} {p.unit}</td>
+                        <td className="nw num font-mono text-muted-foreground">{formatNumber(p.unitPriceCny, 2)} {p.currency}</td>
+                        <td className="nw num font-mono font-semibold text-foreground">{formatKRW(p.amountKrw)}</td>
                         <td><Badge variant="outline" className="text-xs">{p.paymentMethod}</Badge></td>
                         <td>
                           <div className="flex items-center gap-1.5">
@@ -923,7 +923,7 @@ export default function PurchaseMatching() {
                     <tr className="border-b border-border bg-[var(--fill-quaternary)]">
                       <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
                       <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
-                      <th className="ctr text-[13px] font-semibold text-muted-foreground">단위</th>
+                      <th className="nw ctr text-[13px] font-semibold text-muted-foreground">단위</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">단가(CNY)</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
@@ -946,10 +946,10 @@ export default function PurchaseMatching() {
                         <td className="font-medium text-foreground">{item.materialName}</td>
                         <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
                         <td className="ctr text-muted-foreground">{item.unit}</td>
-                        <td className="num font-mono text-muted-foreground text-xs">
+                        <td className="nw num font-mono text-muted-foreground text-xs">
                           {unitPriceCny > 0 ? formatNumber(unitPriceCny, 2) : <span className="text-muted-foreground">-</span>}
                         </td>
-                        <td className="num font-mono text-muted-foreground text-sm">
+                        <td className="nw num font-mono text-muted-foreground text-sm">
                           {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                         </td>
                         <td className="num">
@@ -986,7 +986,7 @@ export default function PurchaseMatching() {
                             }`}
                           />
                         </td>
-                        <td className="num font-mono text-xs text-muted-foreground">
+                        <td className="nw num font-mono text-xs text-muted-foreground">
                           {amountKrw > 0 ? formatKRW(amountKrw) : <span className="text-muted-foreground">-</span>}
                         </td>
                         <td className="text-xs text-muted-foreground">
@@ -1094,7 +1094,7 @@ export default function PurchaseMatching() {
                         <th className="ctr text-[13px] font-semibold text-muted-foreground w-10">이미지</th>
                         <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
                         <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
-                        <th className="ctr text-[13px] font-semibold text-muted-foreground">단위</th>
+                        <th className="nw ctr text-[13px] font-semibold text-muted-foreground">단위</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">단가(CNY)</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
@@ -1120,19 +1120,19 @@ export default function PurchaseMatching() {
                           <td className="font-medium text-foreground">{item.materialName}</td>
                           <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
                           <td className="ctr text-muted-foreground">{item.unit}</td>
-                          <td className="num font-mono text-muted-foreground text-xs">
+                          <td className="nw num font-mono text-muted-foreground text-xs">
                             {unitPriceCny > 0 ? formatNumber(unitPriceCny, 2) : '-'}
                           </td>
-                          <td className="num font-mono text-muted-foreground text-xs">
+                          <td className="nw num font-mono text-muted-foreground text-xs">
                             {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                           </td>
-                          <td className="num font-mono text-muted-foreground text-xs">
+                          <td className="nw num font-mono text-muted-foreground text-xs">
                             {(item.stockQty ?? 0) % 1 === 0 ? (item.stockQty ?? 0).toLocaleString() : (item.stockQty ?? 0).toFixed(3)}
                           </td>
-                          <td className="num font-mono font-semibold text-primary">
+                          <td className="nw num font-mono font-semibold text-primary">
                             {item.orderQty % 1 === 0 ? item.orderQty.toLocaleString() : item.orderQty.toFixed(3)}
                           </td>
-                          <td className="num font-mono text-xs text-muted-foreground">
+                          <td className="nw num font-mono text-xs text-muted-foreground">
                             {amountKrw > 0 ? formatKRW(amountKrw) : '-'}
                           </td>
                           <td className="text-xs text-muted-foreground">
@@ -1483,7 +1483,7 @@ export default function PurchaseMatching() {
                     <th className="ctr border border-border w-20">수량</th>
                     <th className="ctr border border-border w-28">단가({bulkEditItems[0]?.currency || 'CNY'})</th>
                     <th className="num border border-border w-28">금액(KRW)</th>
-                    <th className="ctr border border-border w-28">상태</th>
+                    <th className="nw ctr border border-border w-28">상태</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1716,7 +1716,7 @@ function ExpenseDetailInlineModal({
                 <tr className="bg-[var(--fill-quaternary)] border-b border-border">
                   <th className="text-[13px] font-semibold text-muted-foreground">품목/내역</th>
                   <th className="num text-[13px] font-semibold text-muted-foreground w-16">수량</th>
-                  <th className="ctr text-[13px] font-semibold text-muted-foreground w-14">단위</th>
+                  <th className="nw ctr text-[13px] font-semibold text-muted-foreground w-14">단위</th>
                   <th className="num text-[13px] font-semibold text-muted-foreground w-24">단가</th>
                   <th className="num text-[13px] font-semibold text-muted-foreground w-24">금액</th>
                   <th className="w-8"></th>

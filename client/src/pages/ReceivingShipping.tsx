@@ -117,7 +117,7 @@ export default function ReceivingShipping() {
         <table className="data-table w-full text-sm min-w-[640px]">
           <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
-              <th>발주번호</th>
+              <th className="nw">발주번호</th>
               <th className="num">발주</th>
               <th className="num">입고</th>
               <th className="num">출고</th>
@@ -128,7 +128,7 @@ export default function ReceivingShipping() {
           <tbody className="divide-y divide-border">
             {filtered.map(o => (
               <tr key={o.id} className="hover:bg-[var(--fill-quaternary)]">
-                <td className="font-mono text-xs">{o.orderNo}</td>
+                <td className="nw font-mono text-xs">{o.orderNo}</td>
                 <td className="num">{formatNumber(o.qty)}</td>
                 <td className="num text-[var(--system-green)]">{formatNumber(o.receivedQty)}</td>
                 <td className="num text-primary">{formatNumber(o.shippedQty)}</td>

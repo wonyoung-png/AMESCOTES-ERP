@@ -444,7 +444,7 @@ export default function TradeStatement() {
               <th className="num text-[13px] font-semibold text-muted-foreground">공급가액</th>
               <th className="num text-[13px] font-semibold text-muted-foreground">부가세</th>
               <th className="num text-[13px] font-semibold text-muted-foreground">합계</th>
-              <th className="text-[13px] font-semibold text-muted-foreground">상태</th>
+              <th className="nw text-[13px] font-semibold text-muted-foreground">상태</th>
               <th className="ctr text-[13px] font-semibold text-muted-foreground">세금계산서</th>
               <th className="ctr text-[13px] font-semibold text-muted-foreground">작업</th>
             </tr>
@@ -459,15 +459,15 @@ export default function TradeStatement() {
               const calc = calcStatement(s.lines);
               return (
                 <tr key={s.id} className="hover:bg-[var(--fill-quaternary)]">
-                  <td className="font-mono text-xs font-bold text-primary">{s.statementNo}</td>
+                  <td className="nw font-mono text-xs font-bold text-primary">{s.statementNo}</td>
                   <td>
                     <p className="font-medium text-foreground">{s.vendorName}</p>
                     {s.vendorCode && <p className="text-xs text-muted-foreground">코드: {s.vendorCode}</p>}
                   </td>
                   <td className="text-muted-foreground text-xs">{s.issueDate}</td>
-                  <td className="num font-mono text-xs text-foreground">{formatKRW(calc.taxableSupply + calc.exemptAmount)}</td>
-                  <td className="num font-mono text-xs text-muted-foreground">{formatKRW(calc.taxableVat)}</td>
-                  <td className="num font-mono text-xs font-bold text-foreground">{formatKRW(calc.grandTotal)}</td>
+                  <td className="nw num font-mono text-xs text-foreground">{formatKRW(calc.taxableSupply + calc.exemptAmount)}</td>
+                  <td className="nw num font-mono text-xs text-muted-foreground">{formatKRW(calc.taxableVat)}</td>
+                  <td className="nw num font-mono text-xs font-bold text-foreground">{formatKRW(calc.grandTotal)}</td>
                   <td>
                     <Select value={s.status} onValueChange={v => {
                       const newStatus = v as TradeStatementStatus;
@@ -788,19 +788,19 @@ export default function TradeStatement() {
                   <tbody>
                     <tr className="border-b border-border">
                       <td className="text-muted-foreground bg-muted w-40">공급가액</td>
-                      <td className="num font-mono font-bold text-foreground">
+                      <td className="nw num font-mono font-bold text-foreground">
                         {formatKRW(taxPreviewData.invoice.supplyAmount)}
                       </td>
                     </tr>
                     <tr className="border-b border-border">
                       <td className="text-muted-foreground bg-muted">세액 (10%)</td>
-                      <td className="num font-mono text-muted-foreground">
+                      <td className="nw num font-mono text-muted-foreground">
                         {formatKRW(taxPreviewData.invoice.taxAmount)}
                       </td>
                     </tr>
                     <tr>
                       <td className="font-bold text-foreground bg-muted">합계금액</td>
-                      <td className="num font-mono font-bold text-lg text-primary">
+                      <td className="nw num font-mono font-bold text-lg text-primary">
                         {formatKRW(taxPreviewData.invoice.totalAmount)}
                       </td>
                     </tr>
@@ -851,7 +851,7 @@ export default function TradeStatement() {
               <table className="data-table w-full text-sm min-w-[560px]">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-[13px] font-semibold text-muted-foreground">발주번호</th>
+                    <th className="nw text-[13px] font-semibold text-muted-foreground">발주번호</th>
                     <th className="text-[13px] font-semibold text-muted-foreground">스타일</th>
                     <th className="num text-[13px] font-semibold text-muted-foreground">수량</th>
                     <th className="text-[13px] font-semibold text-muted-foreground">바이어</th>
@@ -870,12 +870,12 @@ export default function TradeStatement() {
                       const buyer = item?.buyerId ? vendors.find(v => v.id === item.buyerId) : null;
                       return (
                         <tr key={o.id} className="hover:bg-[var(--fill-quaternary)]">
-                          <td className="font-mono text-xs font-bold text-primary">{o.orderNo}</td>
+                          <td className="nw font-mono text-xs font-bold text-primary">{o.orderNo}</td>
                           <td>
                             <p className="font-medium text-foreground">{o.styleNo}</p>
                             <p className="text-xs text-muted-foreground">{o.styleName}</p>
                           </td>
-                          <td className="num font-mono text-xs">{formatNumber(o.qty)}</td>
+                          <td className="nw num font-mono text-xs">{formatNumber(o.qty)}</td>
                           <td className="text-xs text-muted-foreground">{buyer?.name ?? '-'}</td>
                           <td className="ctr">
                             <Button
@@ -996,7 +996,7 @@ export default function TradeStatement() {
                       const calc = calcLine(line);
                       return (
                         <tr key={line.id}>
-                          <td className="ctr text-xs text-muted-foreground font-mono">{idx + 1}</td>
+                          <td className="nw ctr text-xs text-muted-foreground font-mono">{idx + 1}</td>
                           <td>
                             <Input value={line.description} onChange={e => updateLine(idx, 'description', e.target.value)} placeholder="품목명 또는 내역" className="h-8 text-sm min-w-[220px]" />
                           </td>
@@ -1007,9 +1007,9 @@ export default function TradeStatement() {
                             <Input type="number" min="0" value={(!line.unitPrice || isNaN(line.unitPrice)) ? '' : line.unitPrice} onChange={e => updateLine(idx, 'unitPrice', parseFloat(e.target.value) || 0)} placeholder="0" className="h-8 text-sm text-right w-28" />
                           </td>
 
-                          <td className="num text-foreground font-mono">{formatKRW(calc.supply)}</td>
-                          <td className="num text-muted-foreground font-mono">{formatKRW(calc.tax)}</td>
-                          <td className="num text-foreground font-mono font-semibold">{formatKRW(calc.total)}</td>
+                          <td className="nw num text-foreground font-mono">{formatKRW(calc.supply)}</td>
+                          <td className="nw num text-muted-foreground font-mono">{formatKRW(calc.tax)}</td>
+                          <td className="nw num text-foreground font-mono font-semibold">{formatKRW(calc.total)}</td>
                           <td className="ctr">
                             {lines.length > 1 && (
                               <button onClick={() => setLines(ls => ls.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-[var(--system-red)]">
@@ -1245,8 +1245,8 @@ function TradeStatementDetailModal({
                         )}
                       </td>
                       <td className="ctr text-xs text-muted-foreground">{line.taxType}</td>
-                      <td className="num text-sm text-foreground font-mono">{formatKRW(lCalc.supply)}</td>
-                      <td className="num text-sm font-semibold text-foreground font-mono">{formatKRW(lCalc.total)}</td>
+                      <td className="nw num text-sm text-foreground font-mono">{formatKRW(lCalc.supply)}</td>
+                      <td className="nw num text-sm font-semibold text-foreground font-mono">{formatKRW(lCalc.total)}</td>
                       {isEditing && (
                         <td>
                           <button

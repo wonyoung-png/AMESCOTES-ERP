@@ -82,7 +82,7 @@ export default function ProjectPL() {
             <table className="data-table w-full text-sm min-w-[560px]">
               <thead className="text-[13px] font-semibold text-muted-foreground">
                 <tr>
-                  <th>발주번호</th>
+                  <th className="nw">발주번호</th>
                   <th>품목</th>
                   <th className="num">수량</th>
                   <th className="num">단가</th>
@@ -92,7 +92,7 @@ export default function ProjectPL() {
               <tbody className="divide-y divide-border">
                 {projOrders.map(o => (
                   <tr key={o.id} className="hover:bg-[var(--fill-quaternary)]">
-                    <td className="font-mono text-xs">{o.orderNo}</td>
+                    <td className="nw font-mono text-xs">{o.orderNo}</td>
                     <td>{o.styleName || o.styleNo}</td>
                     <td className="num">{o.qty}</td>
                     <td className="num">{formatKRW(o.factoryUnitPriceKrw || 0)}</td>
@@ -134,7 +134,7 @@ export default function ProjectPL() {
                     </tr>
                   ) : (pl.byStyleColor || []).map((row, i) => (
                     <tr key={`${row.orderNo}-${row.color}-${i}`} className="hover:bg-[var(--fill-quaternary)]">
-                      <td className="font-mono text-xs">{row.orderNo}</td>
+                      <td className="nw font-mono text-xs">{row.orderNo}</td>
                       <td>
                         <span className="font-mono text-xs text-muted-foreground">{row.styleNo}</span>
                         {row.styleName ? <span className="block text-xs">{row.styleName}</span> : null}
