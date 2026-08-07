@@ -654,6 +654,22 @@ export async function upsertSample(sample: Record<string, any>) {
     material_requests: sample.materialRequests,
     documents: sample.documents,
     memo: sample.memo,
+    style_id: sample.styleId,
+    location: sample.location,
+    round: sample.round,
+    round_name: sample.roundName,
+    color: sample.color,
+    received_date: sample.receivedDate,
+    revision_note: sample.revisionNote,
+    revision_history: sample.revisionHistory,
+    sample_unit_price: sample.sampleUnitPrice,
+    cost_cny: sample.costCny,
+    approved_by: sample.approvedBy,
+    material_checklist: sample.materialChecklist,
+    billing_status: sample.billingStatus,
+    billing_statement_id: sample.billingStatementId,
+    billing_date: sample.billingDate,
+    collected_date: sample.collectedDate,
   });
   const { error } = await supabase.from('samples').upsert(row);
   if (error) throw error;

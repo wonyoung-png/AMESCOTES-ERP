@@ -235,3 +235,27 @@ alter table vendors
 -- ─── 브랜드 다중 등록 · 바이어 지정 품번 (2026-08-07) ───
 alter table vendors add column if not exists brands text[];   -- 한 회사가 여러 브랜드 운영
 alter table items   add column if not exists buyer_style_no text;  -- 바이어가 지정한 품번
+
+-- ─── 자재/샘플 누락 컬럼 (2026-08-07) ───
+alter table materials
+  add column if not exists mold_cost_amount numeric,
+  add column if not exists mold_cost_currency text,
+  add column if not exists plating_prices jsonb;   -- 도금 컬러별 단가
+
+alter table samples
+  add column if not exists style_id text,
+  add column if not exists location text,
+  add column if not exists round integer,
+  add column if not exists round_name text,
+  add column if not exists color text,
+  add column if not exists received_date date,
+  add column if not exists revision_note text,
+  add column if not exists revision_history jsonb,
+  add column if not exists sample_unit_price numeric,
+  add column if not exists cost_cny numeric,
+  add column if not exists approved_by text,
+  add column if not exists material_checklist jsonb,
+  add column if not exists billing_status text default '미청구',
+  add column if not exists billing_statement_id text,
+  add column if not exists billing_date date,
+  add column if not exists collected_date date;
