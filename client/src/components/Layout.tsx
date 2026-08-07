@@ -9,7 +9,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Workspace } from '@/lib/phase1';
 import {
-  BarChart3, Package, ClipboardList, FlaskConical, Factory,
+  BarChart3, Zap, Package, ClipboardList, FlaskConical, Factory,
   ShoppingCart, Building2, FileText, Receipt, Settings,
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Network,
@@ -45,6 +45,7 @@ const navGroups: NavGroup[] = [
     label: '',
     items: [
       { path: '/', label: '대시보드', icon: <BarChart3 size={17} />, table: '생산 현황' },
+      { path: '/quick', label: '간편등록', icon: <Zap size={17} />, table: '밖에서 빠르게 · 초안 저장' },
       { path: '/workflow', label: '워크플로우', icon: <GitBranch size={17} />, table: '클릭 → 탭 이동' },
     ],
   },

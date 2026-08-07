@@ -727,6 +727,23 @@ export default function ProductionOrders() {
     });
   };
 
+  /** 간편등록으로 들어온 초안을 정식 발주로 확정 — 이때 발주번호가 붙는다 */
+  const confirmDraft = async (o: ProductionOrder) => {
+    if (!o.vendorId) { toast.error('공장을 먼저 지정하세요 — 행에서 수정으로 들어가세요'); return; }
+    const orderNo = nextOrderNo(o.styleNo, orders as any[]);
+    try {
+      await upsertOrder({
+        ...o, orderNo, status: '발주생성',
+        revision: parseInt((orderNo.match(/-R(\d+)$/) || [])[1] || '1', 10),
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success(`발주 확정 — ${orderNo}`);
+      refresh();
+    } catch (e) {
+      toast.error(`확정 실패: ${(e as Error).message}`);
+    }
+  };
+
   /** 묶음번호: PO-YYMMDD-NN (같은 날 순번) */
   const nextPoBatchNo = (existing: ProductionOrder[]) => {
     const d = new Date();
@@ -1257,7 +1274,8 @@ export default function ProductionOrders() {
   const [showFactoryView, setShowFactoryView] = useState(false);
 
   const stats = useMemo(() => ({
-    total: orders.length,
+    total: orders.filter((o: ProductionOrder) => o.status !== '초안').length,
+    drafts: orders.filter((o: ProductionOrder) => o.status === '초안').length,
     inProgress: orders.filter(o => o.status === '생산중').length,
     reorders: orders.filter(o => o.isReorder).length,
     urgent: orders.filter(o => o.deliveryDate && calcDDay(o.deliveryDate) <= 7 && o.status !== '입고완료').length,
@@ -1571,6 +1589,9 @@ export default function ProductionOrders() {
                   <td>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono font-semibold text-foreground">{o.orderNo}</span>
+                      {o.status === '초안' && (
+                        <Badge variant="outline" className="text-[11px] h-4 text-[var(--system-orange)] border-[var(--system-orange)]/30 bg-[var(--system-orange)]/10">초안</Badge>
+                      )}
                       {o.isReorder && <Badge variant="outline" className="text-[11px] h-4 text-primary border-primary/20">리오더</Badge>}
                       {o.poBatchNo && (
                         <button
@@ -1693,6 +1714,10 @@ export default function ProductionOrders() {
                   <td>
                     {/* 작업 — 자주 쓰는 문서 2개만 노출, 나머지는 더보기로 */}
                     <div className="flex items-center justify-end gap-1">
+                      {o.status === '초안' && (
+                        <Button size="sm" className="h-7 text-xs px-2 mr-1" title="정식 발주번호를 붙여 확정"
+                          onClick={() => confirmDraft(o)}>확정</Button>
+                      )}
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="작업지시서"
                         onClick={() => openWorkOrderModal(o)}>
                         <Package className="w-3.5 h-3.5" />
