@@ -60,6 +60,9 @@ interface EditingCell { bomId: string; field: EditField; }
 export default function CostComparison() {
   const [, navigate] = useLocation();
   const [search, setSearch] = useState('');
+  const [filterSeason, setFilterSeason] = useState('전체');
+  const [filterCat, setFilterCat] = useState('전체');
+  const [filterBrand, setFilterBrand] = useState('전체');
   const [filterMode, setFilterMode] = useState<'all' | 'simple' | 'both' | 'nopre' | 'nopost'>('all');
   const [sortBy, setSortBy] = useState<'styleNo' | 'diff' | 'preCost' | 'postCost'>('styleNo');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -164,6 +167,21 @@ export default function CostComparison() {
     });
   }, [rawBoms, items, vendors]);
 
+  // 필터 선택지 — 실제 데이터에 있는 값만 보여준다
+  const seasonOptions = useMemo(
+    () => Array.from(new Set(costRows.map(r => r.season).filter(Boolean))).sort(),
+    [costRows],
+  );
+  const catOptions = useMemo(
+    () => Array.from(new Set(costRows.map(r => r.erpCategory).filter(Boolean))).sort(),
+    [costRows],
+  );
+  const brandOptions = useMemo(
+    () => Array.from(new Set((vendors as any[]).filter(v => v.type === '바이어')
+      .flatMap(v => (v.brands?.length ? v.brands : [v.nameEn || v.name])).filter(Boolean))).sort(),
+    [vendors],
+  );
+
   // 검색 & 필터 & 정렬
   const filtered = useMemo(() => {
     let rows = costRows;
@@ -178,6 +196,10 @@ export default function CostComparison() {
         r.brandText.toLowerCase().includes(q)
       );
     }
+
+    if (filterSeason !== '전체') rows = rows.filter(r => r.season === filterSeason);
+    if (filterCat !== '전체') rows = rows.filter(r => r.erpCategory === filterCat);
+    if (filterBrand !== '전체') rows = rows.filter(r => r.brandText.includes(filterBrand));
 
     // 모드 필터
     if (filterMode === 'simple') rows = rows.filter(r => r.isSimple);
@@ -198,7 +220,7 @@ export default function CostComparison() {
     });
 
     return rows;
-  }, [costRows, search, filterMode, sortBy, sortDir]);
+  }, [costRows, search, filterMode, filterSeason, filterCat, filterBrand, sortBy, sortDir]);
 
   // 통계
   const stats = useMemo(() => {
@@ -447,6 +469,21 @@ export default function CostComparison() {
               className="pl-8 h-8 text-xs"
             />
           </div>
+          <select value={filterBrand} onChange={e => setFilterBrand(e.target.value)}
+            className="h-8 text-xs border border-border rounded-md bg-card px-2">
+            <option value="전체">전체 브랜드</option>
+            {brandOptions.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+          <select value={filterSeason} onChange={e => setFilterSeason(e.target.value)}
+            className="h-8 text-xs border border-border rounded-md bg-card px-2">
+            <option value="전체">전체 시즌</option>
+            {seasonOptions.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+          <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
+            className="h-8 text-xs border border-border rounded-md bg-card px-2">
+            <option value="전체">전체 카테고리</option>
+            {catOptions.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
           <div className="flex gap-1 flex-wrap">
             {([
               { key: 'all', label: '전체' },

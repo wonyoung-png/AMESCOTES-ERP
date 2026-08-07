@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -597,6 +598,8 @@ export default function ProductionOrders() {
   };
 
   // ── 일괄 발주 등록 (스타일 여러 개 → 스타일별 발주서 각각 생성) ──
+  const [stylePickerOpen, setStylePickerOpen] = useState(false);
+  const [stylePickerSearch, setStylePickerSearch] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkSearch, setBulkSearch] = useState('');
   const [bulkRows, setBulkRows] = useState<Record<string, { qty: string; orderDate: string; deliveryDate: string; vendorId: string }>>({});
@@ -1573,6 +1576,72 @@ export default function ProductionOrders() {
         })}
       </div>
 
+      {/* ─── 스타일 선택 사이드 패널 (오른쪽에서 슬라이드) ─── */}
+      <Sheet open={stylePickerOpen} onOpenChange={setStylePickerOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
+          <SheetHeader className="px-4 pt-4 pb-2">
+            <SheetTitle className="text-base">스타일 선택</SheetTitle>
+          </SheetHeader>
+          <div className="px-4 pb-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                autoFocus
+                value={stylePickerSearch}
+                onChange={e => setStylePickerSearch(e.target.value)}
+                placeholder="브랜드명 · 스타일번호 · 품명"
+                className="pl-9 h-9"
+              />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto divide-y divide-border border-t border-border">
+            {(() => {
+              const q = stylePickerSearch.trim().toLowerCase();
+              const list = (items as Item[]).filter(i => {
+                if (!q) return true;
+                const buyer: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
+                const brands = [buyer?.name, buyer?.companyName, buyer?.nameEn, ...((buyer?.brands as string[]) || [])];
+                return [i.styleNo, (i as any).buyerStyleNo, i.name, i.nameEn, ...brands]
+                  .some(f => (f || '').toLowerCase().includes(q));
+              }).slice(0, 300);
+              if (list.length === 0) {
+                return <p className="p-8 text-center text-sm text-muted-foreground">일치하는 스타일이 없습니다</p>;
+              }
+              return list.map(i => {
+                const buyer: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
+                const brand = buyer?.brands?.[0] || buyer?.nameEn || buyer?.name || '';
+                return (
+                  <button
+                    key={i.id}
+                    type="button"
+                    onClick={() => { handleStyleSelect(i.id); setStylePickerOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--fill-quaternary)] ${
+                      form.styleId === i.id ? 'bg-primary/5' : ''
+                    }`}
+                  >
+                    {i.imageUrl ? (
+                      <img src={i.imageUrl} alt="" className="w-10 h-10 rounded object-cover border border-border shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-[var(--fill-tertiary)] border border-border shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">
+                        {brand && <span className="text-muted-foreground">{brand} · </span>}
+                        {i.styleNo}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{i.name}</p>
+                    </div>
+                    {i.season && (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--fill-tertiary)] text-muted-foreground shrink-0">{i.season}</span>
+                    )}
+                  </button>
+                );
+              });
+            })()}
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* ─── 일괄 발주 등록 ─── */}
       <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
@@ -1703,12 +1772,19 @@ export default function ProductionOrders() {
                 <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">1</span>
                 <Label className="text-sm font-semibold">스타일 선택</Label>
               </div>
-              <Select value={form.styleId || ''} onValueChange={handleStyleSelect} disabled={isEditMode}>
-                <SelectTrigger className={isEditMode ? 'bg-[var(--fill-quaternary)] text-muted-foreground' : ''}><SelectValue placeholder="품목 마스터에서 선택" /></SelectTrigger>
-                <SelectContent>
-                  {items.map(i => <SelectItem key={i.id} value={i.id}>{i.styleNo} — {i.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <button
+                type="button"
+                disabled={isEditMode}
+                onClick={() => { setStylePickerSearch(''); setStylePickerOpen(true); }}
+                className={`w-full h-9 px-3 text-sm border border-border rounded-md flex items-center justify-between gap-2 ${
+                  isEditMode ? 'bg-[var(--fill-quaternary)] text-muted-foreground cursor-not-allowed' : 'bg-card hover:border-primary/40'
+                }`}
+              >
+                <span className={form.styleId ? 'truncate' : 'text-muted-foreground'}>
+                  {form.styleId ? `${form.styleNo} — ${form.styleName}` : '품목 마스터에서 선택'}
+                </span>
+                <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              </button>
               {isEditMode && <p className="text-xs text-muted-foreground">※ 수정 모드에서는 스타일 변경 불가 (납기일, 수량, 공장단가, 메모 수정 가능)</p>}
               {form.styleId && (() => {
                 const existingOrdersForStyle = (orders as ProductionOrder[]).filter(o => o.styleNo === form.styleNo && (!isEditMode || o.id !== editOrderId));
