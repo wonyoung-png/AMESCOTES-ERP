@@ -1,5 +1,6 @@
 // 미지급 · 불량 차감 이월
 import { useMemo, useState } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { phase1 } from '@/lib/phase1';
 import { store, formatKRW } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -23,9 +24,9 @@ export default function PayablesManagement() {
   const [payAmount, setPayAmount] = useState<Record<string, number>>({});
 
   // ── 필터 ── 거래처·상태·검색. 요약 카드와 목록이 같은 기준으로 움직인다.
-  const [fVendor, setFVendor] = useState('all');
-  const [fStatus, setFStatus] = useState('all');
-  const [fSearch, setFSearch] = useState('');
+  const [fVendor, setFVendor] = usePersistedState('payables.vendor', 'all');
+  const [fStatus, setFStatus] = usePersistedState('payables.status', 'all');
+  const [fSearch, setFSearch] = usePersistedState('payables.search', '');
 
   const payableVendors = useMemo(
     () => Array.from(new Set(payables.map(p => p.vendorName).filter(Boolean))),
@@ -142,6 +143,11 @@ export default function PayablesManagement() {
             </tr>
           </thead>
           <tbody>
+            {shownPayables.length === 0 && (
+              <tr><td colSpan={8} className="text-center py-10 text-muted-foreground text-sm">
+                {filterOn ? '조건에 맞는 미지급이 없습니다' : '미지급이 없습니다 — 공장 결제가 남으면 여기에 쌓입니다'}
+              </td></tr>
+            )}
             {shownPayables.map(p => (
               <tr key={p.id} className="hover:bg-[var(--fill-quaternary)]">
                 <td className="font-medium">{p.vendorName}</td>
@@ -201,6 +207,11 @@ export default function PayablesManagement() {
             </tr>
           </thead>
           <tbody>
+            {shownDefects.length === 0 && (
+              <tr><td colSpan={5} className="text-center py-10 text-muted-foreground text-sm">
+                {filterOn ? '조건에 맞는 차감이 없습니다' : '불량 차감 이월이 없습니다'}
+              </td></tr>
+            )}
             {shownDefects.map(d => (
               <tr key={d.id} className="hover:bg-[var(--fill-quaternary)]">
                 <td>

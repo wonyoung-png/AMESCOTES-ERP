@@ -1,5 +1,6 @@
 // 입고 · OEM출고 · 3PL출고 — receipt_logs 기반 부분입고
 import { useMemo, useState } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, formatNumber } from '@/lib/store';
 import { phase1, type ReceiptLogType } from '@/lib/phase1';
@@ -21,7 +22,8 @@ const LOG_LABELS: Record<ReceiptLogType, string> = {
 export default function ReceivingShipping() {
   const queryClient = useQueryClient();
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
-  const [filter, setFilter] = useState<'all' | 'pending' | 'partial' | 'done'>('all');
+  const [filter, setFilter] = usePersistedState<'all' | 'pending' | 'partial' | 'done'>('receiving.filter', 'all');
+  const [search, setSearch] = usePersistedState('receiving.search', '');
   const [logFilter, setLogFilter] = useState<ReceiptLogType | 'all'>('all');
   const [modal, setModal] = useState<{ orderId: string; logType: ReceiptLogType } | null>(null);
   const [form, setForm] = useState({ qty: 0, defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '' });
@@ -34,11 +36,21 @@ export default function ReceivingShipping() {
   }), [orders, tick]);
 
   const filtered = useMemo(() => enriched.filter(o => {
+    if (o.status === '초안') return false;   // 확정 전 발주는 입고 대상이 아니다
+    const t = search.trim().toLowerCase();
+    if (t && !`${o.orderNo} ${o.styleNo} ${o.styleName} ${o.vendorName || ''}`.toLowerCase().includes(t)) return false;
     if (filter === 'pending') return o.remaining > 0 && o.receivedQty === 0;
     if (filter === 'partial') return o.receivedQty > 0 && o.remaining > 0;
     if (filter === 'done') return o.remaining <= 0;
     return true;
-  }), [enriched, filter]);
+  }), [enriched, filter, search]);
+
+  const stats = useMemo(() => ({
+    pending: enriched.filter(o => o.status !== '초안' && o.remaining > 0 && o.receivedQty === 0).length,
+    partial: enriched.filter(o => o.receivedQty > 0 && o.remaining > 0).length,
+    remainQty: enriched.filter(o => o.status !== '초안').reduce((s2, o) => s2 + Math.max(0, o.remaining), 0),
+    defectQty: enriched.reduce((s2, o) => s2 + (o.defectQty || 0), 0),
+  }), [enriched]);
 
   const allLogs = useMemo(() => {
     const logs = phase1.getReceiptLogs().sort((a, b) => b.receivedDate.localeCompare(a.receivedDate));
@@ -57,6 +69,13 @@ export default function ReceivingShipping() {
     if (!modal || form.qty <= 0) { toast.error('수량을 입력하세요'); return; }
     const o = orders.find(x => x.id === modal.orderId);
     if (!o) return;
+    const cur = phase1.getOrderReceiptSummary(o.id, o.qty);
+    const already = modal.logType === 'inbound' ? cur.receivedQty : cur.shippedQty;
+    if (already + form.qty > o.qty) {
+      toast.error(`발주수량을 넘습니다 — 남은 수량 ${formatNumber(Math.max(0, o.qty - already))}개`);
+      return;
+    }
+    if (form.defectQty > form.qty) { toast.error('불량수량이 입고수량보다 많습니다'); return; }
     phase1.addReceiptLog({
       orderId: o.id,
       orderNo: o.orderNo,
@@ -104,13 +123,35 @@ export default function ReceivingShipping() {
         <p className="text-sm text-muted-foreground">부분입고 · OEM 직출고 · 3PL 입고 (receipt_logs)</p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-card rounded-lg border p-4">
+          <p className="text-xs text-muted-foreground">미입고</p>
+          <p className="text-2xl font-bold tabular-nums">{stats.pending}<span className="text-sm font-normal text-muted-foreground ml-1">건</span></p>
+        </div>
+        <div className="bg-card rounded-lg border p-4">
+          <p className="text-xs text-muted-foreground">부분입고</p>
+          <p className="text-2xl font-bold tabular-nums text-[var(--system-orange)]">{stats.partial}<span className="text-sm font-normal text-muted-foreground ml-1">건</span></p>
+        </div>
+        <div className="bg-card rounded-lg border p-4">
+          <p className="text-xs text-muted-foreground">미입고 수량</p>
+          <p className="text-2xl font-bold tabular-nums">{formatNumber(stats.remainQty)}</p>
+        </div>
+        <div className="bg-card rounded-lg border p-4">
+          <p className="text-xs text-muted-foreground">불량 누계</p>
+          <p className={`text-2xl font-bold tabular-nums ${stats.defectQty > 0 ? 'text-[var(--system-red)]' : ''}`}>{formatNumber(stats.defectQty)}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="발주번호 · 스타일 · 공장 검색" className="h-9 w-full sm:w-72" />
         {(['all', 'pending', 'partial', 'done'] as const).map(f => (
           <Button key={f} size="sm" variant={filter === f ? 'secondary' : 'outline'}
             onClick={() => setFilter(f)}>
             {f === 'all' ? '전체' : f === 'pending' ? '미입고' : f === 'partial' ? '부분입고' : '완료'}
           </Button>
         ))}
+        <span className="ml-auto text-xs text-muted-foreground tabular-nums">{filtered.length}건</span>
       </div>
 
       <div className="bg-card rounded-lg border border-border overflow-x-auto">
@@ -118,6 +159,7 @@ export default function ReceivingShipping() {
           <thead className="text-[13px] font-semibold text-muted-foreground">
             <tr>
               <th className="nw">발주번호</th>
+              <th>스타일</th>
               <th className="num">발주</th>
               <th className="num">입고</th>
               <th className="num">출고</th>
@@ -126,9 +168,19 @@ export default function ReceivingShipping() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
+            {filtered.length === 0 && (
+              <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">
+                <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">{search || filter !== 'all' ? '조건에 맞는 발주가 없습니다' : '입고 대상 발주가 없습니다 — 생산발주에서 먼저 등록하세요'}</p>
+              </td></tr>
+            )}
             {filtered.map(o => (
               <tr key={o.id} className="hover:bg-[var(--fill-quaternary)]">
                 <td className="nw font-mono text-xs">{o.orderNo}</td>
+                <td>
+                  <p className="font-medium">{o.styleNo}</p>
+                  <p className="text-xs text-muted-foreground">{o.styleName}{o.vendorName ? ` · ${o.vendorName}` : ''}</p>
+                </td>
                 <td className="num">{formatNumber(o.qty)}</td>
                 <td className="num text-[var(--system-green)]">{formatNumber(o.receivedQty)}</td>
                 <td className="num text-primary">{formatNumber(o.shippedQty)}</td>
