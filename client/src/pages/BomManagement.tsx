@@ -12,7 +12,7 @@ import { useLocation, useSearch } from 'wouter';
 import { calcQty, calcLineAmt, ceil10, calcPostSummary, calcActualMultiple, type PostSummary } from '@/lib/costing';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  store, genId, normalizeColors,
+  store, genId, normalizeColors, MATERIAL_CATEGORIES,
   type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material, type Vendor,
 } from '@/lib/store';
 import { fetchBoms, upsertBom, deleteBom as deleteBomSB, fetchItems, fetchVendors, fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
@@ -1304,8 +1304,8 @@ function MaterialSearchPopover({ onSelect, defaultName, defaultCategory, default
   const [filterCat, setFilterCat] = useState('all');
   // 자재 마스터에 없는 자재는 여기서 바로 등록한다 (페이지 이동 없음)
   const [creating, setCreating] = useState(false);
-  const [newMat, setNewMat] = useState<{ name: string; spec: string; unit: string; category: string; price: string }>(
-    { name: '', spec: '', unit: 'EA', category: '원자재', price: '' },
+  const [newMat, setNewMat] = useState<{ name: string; spec: string; unit: string; category: string; price: string; vendorName: string }>(
+    { name: '', spec: '', unit: 'EA', category: '가죽', price: '', vendorName: '' },
   );
   const queryClient = useQueryClient();
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
@@ -1332,7 +1332,7 @@ function MaterialSearchPopover({ onSelect, defaultName, defaultCategory, default
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="자재명 검색..." className="h-7 text-xs" />
           <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="w-full h-7 text-xs border border-border rounded px-2">
             <option value="all">전체 카테고리</option>
-            {BOM_SECTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+            {MATERIAL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <div className="max-h-48 overflow-y-auto space-y-0.5">
             {filtered.length === 0 ? (
@@ -1361,8 +1361,9 @@ function MaterialSearchPopover({ onSelect, defaultName, defaultCategory, default
                   name: search || defaultName || '',
                   spec: '',
                   unit: defaultUnit || 'EA',
-                  category: defaultCategory || '원자재',
+                  category: defaultCategory || '가죽',
                   price: '',
+                  vendorName: '',
                 });
               }}
               className="w-full mt-1 py-1.5 rounded-md border border-dashed border-primary/40 text-xs text-primary hover:bg-primary/10"
@@ -1383,10 +1384,11 @@ function MaterialSearchPopover({ onSelect, defaultName, defaultCategory, default
                   onChange={e => setNewMat(v => ({ ...v, category: e.target.value }))}
                   className="h-7 text-xs border border-border rounded px-1 flex-1"
                 >
-                  {BOM_SECTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                  {MATERIAL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <Input type="number" value={newMat.price} onChange={e => setNewMat(v => ({ ...v, price: e.target.value }))} placeholder="단가" className="h-7 text-xs w-20" />
               </div>
+              <Input value={newMat.vendorName} onChange={e => setNewMat(v => ({ ...v, vendorName: e.target.value }))} placeholder="공급업체 (선택)" className="h-7 text-xs" />
               <div className="flex gap-1.5 justify-end pt-0.5">
                 <button type="button" onClick={() => setCreating(false)} className="text-xs px-2 py-1 text-muted-foreground hover:text-foreground">취소</button>
                 <button
@@ -1401,6 +1403,7 @@ function MaterialSearchPopover({ onSelect, defaultName, defaultCategory, default
                       unit: newMat.unit.trim() || 'EA',
                       category: newMat.category,
                       unitPriceCny: newMat.price ? Number(newMat.price) : undefined,
+                      vendorName: newMat.vendorName.trim() || undefined,
                       createdAt: new Date().toISOString(),
                     };
                     try {
@@ -2040,13 +2043,11 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
         <div style={{fontWeight:600}}>₩{Math.round(amt * cnyKrw).toLocaleString()}</div>
         <div style={{fontSize:'10px', color:'#9CA3AF'}}>{amt ? amt.toFixed(3) : '0'}</div>
       </td>
-      {/* 공급 — 체크하면 본사 제공, 안 하면 공장 완사입 */}
-      <td className="px-2 py-1 w-24">
-        <label className="flex items-center justify-center gap-1.5 cursor-pointer" title="체크: 본사에서 사서 공장에 제공 / 미체크: 공장 완사입">
+      {/* 공급 — 체크하면 본사 제공(업체명 입력), 안 하면 공장 완사입 */}
+      <td className="px-2 py-1 w-20">
+        <label className="flex items-center justify-center gap-1.5 cursor-pointer" title="체크하면 본사에서 사서 공장에 제공하는 자재">
           <input type="checkbox" checked={isHqProvided} onChange={e => handleHqChange(e.target.checked)} className="w-4 h-4 accent-primary" />
-          <span className={`text-xs font-medium ${isHqProvided ? 'text-primary' : 'text-muted-foreground'}`}>
-            {isHqProvided ? '제공' : '공장 완사입'}
-          </span>
+          {isHqProvided && <span className="text-xs font-medium text-primary">제공</span>}
         </label>
       </td>
       {/* 자재업체 (본사제공 시에만 입력 가능) */}
