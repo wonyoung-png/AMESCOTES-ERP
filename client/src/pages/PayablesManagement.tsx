@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { Link } from 'wouter';
 
 export default function PayablesManagement() {
   const [, tick] = useState(0);
@@ -202,7 +203,13 @@ export default function PayablesManagement() {
           <tbody>
             {shownDefects.map(d => (
               <tr key={d.id} className="hover:bg-[var(--fill-quaternary)]">
-                <td className="font-mono text-xs text-muted-foreground">{d.orderNo}</td>
+                <td>
+                  <Link href={`/orders?order=${encodeURIComponent(d.orderNo)}`}
+                    className="font-mono text-xs underline underline-offset-2 decoration-border hover:decoration-foreground hover:text-foreground text-muted-foreground"
+                    title="발주 상세 열기">
+                    {d.orderNo}
+                  </Link>
+                </td>
                 <td className="font-medium">{d.vendorName}</td>
                 <td className="num text-[var(--system-red)]">{formatKRW(d.amountKrw)}</td>
                 <td className="text-muted-foreground">{d.reason}</td>

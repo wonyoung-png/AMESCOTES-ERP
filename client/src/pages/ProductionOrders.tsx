@@ -69,6 +69,19 @@ export default function ProductionOrders() {
   const [sortBy, setSortBy] = usePersistedState('orders.sortBy', 'createdAt'); // 'createdAt' | 'deliveryDate' | 'orderNo'
   const [filterExpense, setFilterExpense] = usePersistedState('orders.filterExpense', 'all'); // 'all' | 'done' | 'none'
   const [filterUrgent, setFilterUrgent] = usePersistedState('orders.filterUrgent', false);
+
+  // 다른 화면(미지급 등)에서 ?order=발주번호 로 들어오면 그 발주 상세를 바로 연다
+  const [deepLinked, setDeepLinked] = useState(false);
+  useEffect(() => {
+    if (deepLinked || (orders as ProductionOrder[]).length === 0) return;
+    const wanted = new URLSearchParams(window.location.search).get('order');
+    if (!wanted) return;
+    const hit = (orders as ProductionOrder[]).find(o => o.orderNo === wanted);
+    setDeepLinked(true);
+    setSearch(wanted);
+    if (hit) setShowDetail(hit);
+    else toast.error(`발주번호 ${wanted} 를 찾을 수 없습니다`);
+  }, [orders, deepLinked]);
   const [showModal, setShowModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editOrderId, setEditOrderId] = useState<string | null>(null);
