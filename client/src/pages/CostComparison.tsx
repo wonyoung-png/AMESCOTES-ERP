@@ -7,6 +7,8 @@ import { useState, useMemo, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchBoms, fetchItems, fetchVendors } from '@/lib/supabaseQueries';
+import { CATEGORY_CODE_MAP } from '@/lib/styleNo';
+import type { Category } from '@/lib/store';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +32,7 @@ interface CostRow {
   hasDetailedBom: boolean;
   bomId: string;
   brandText: string;   // 바이어 회사명 + 브랜드명들 (검색 전용)
+  subCategory: string; // 세부 카테고리 (숄더백·토트백 …)
 }
 
 // ─── 포맷 헬퍼 ────────────────────────────────────────────────────────────
@@ -62,6 +65,7 @@ export default function CostComparison() {
   const [search, setSearch] = useState('');
   const [filterSeason, setFilterSeason] = useState('전체');
   const [filterCat, setFilterCat] = useState('전체');
+  const [filterSubCat, setFilterSubCat] = useState('전체');
   const [filterBrand, setFilterBrand] = useState('전체');
   const [filterMode, setFilterMode] = useState<'all' | 'simple' | 'both' | 'nopre' | 'nopost'>('all');
   const [sortBy, setSortBy] = useState<'styleNo' | 'diff' | 'preCost' | 'postCost'>('styleNo');
@@ -163,6 +167,8 @@ export default function CostComparison() {
         hasDetailedBom,
         bomId: bom.id,
         brandText,
+        subCategory: item?.category
+          || (CATEGORY_CODE_MAP[(bom.erp_category || '') as Category] ? bom.erp_category : ''),
       } as CostRow;
     });
   }, [rawBoms, items, vendors]);
@@ -172,10 +178,28 @@ export default function CostComparison() {
     () => Array.from(new Set(costRows.map(r => r.season).filter(Boolean))).sort(),
     [costRows],
   );
-  const catOptions = useMemo(
-    () => Array.from(new Set(costRows.map(r => r.erpCategory).filter(Boolean))).sort(),
-    [costRows],
-  );
+  // 대분류는 4종으로 고정 (HANDBAG 같은 옛 표기는 HB로 묶는다)
+  const normCat = (c?: string) => {
+    const raw = (c || '').trim();
+    const v = raw.toUpperCase();
+    if (v.startsWith('HB') || v.startsWith('HAND') || v === 'BP') return 'HB';
+    if (v.startsWith('SLG') || v.startsWith('ACC') || v === 'SL') return 'SLG';
+    if (v.startsWith('SHOE') || v === 'SH') return 'SHOES';
+    if (v.startsWith('PACK') || v === 'PK') return 'PACK';
+    // erpCategory 자리에 세부명(숄더백·지갑 …)이 들어온 옛 데이터도 대분류로 묶는다
+    const code = CATEGORY_CODE_MAP[raw as Category];
+    if (code === 'HB' || code === 'BP') return 'HB';
+    if (code === 'SL') return 'SLG';
+    if (code === 'SH') return 'SHOES';
+    if (code === 'PK') return 'PACK';
+    return '';
+  };
+  const catOptions = ['HB', 'SLG', 'SHOES', 'PACK'];
+  // 대분류를 고르면 그 안의 세부 카테고리만 보여준다
+  const subCatOptions = useMemo(() => Array.from(new Set(
+    costRows.filter(r => filterCat === '전체' || normCat(r.erpCategory) === filterCat)
+      .map(r => r.subCategory).filter(Boolean),
+  )).sort(), [costRows, filterCat]);
   const brandOptions = useMemo(
     () => Array.from(new Set((vendors as any[]).filter(v => v.type === '바이어')
       .flatMap(v => (v.brands?.length ? v.brands : [v.nameEn || v.name])).filter(Boolean))).sort(),
@@ -198,7 +222,8 @@ export default function CostComparison() {
     }
 
     if (filterSeason !== '전체') rows = rows.filter(r => r.season === filterSeason);
-    if (filterCat !== '전체') rows = rows.filter(r => r.erpCategory === filterCat);
+    if (filterCat !== '전체') rows = rows.filter(r => normCat(r.erpCategory) === filterCat);
+    if (filterSubCat !== '전체') rows = rows.filter(r => r.subCategory === filterSubCat);
     if (filterBrand !== '전체') rows = rows.filter(r => r.brandText.includes(filterBrand));
 
     // 모드 필터
@@ -220,7 +245,7 @@ export default function CostComparison() {
     });
 
     return rows;
-  }, [costRows, search, filterMode, filterSeason, filterCat, filterBrand, sortBy, sortDir]);
+  }, [costRows, search, filterMode, filterSeason, filterCat, filterSubCat, filterBrand, sortBy, sortDir]);
 
   // 통계
   const stats = useMemo(() => {
@@ -479,32 +504,29 @@ export default function CostComparison() {
             <option value="전체">전체 시즌</option>
             {seasonOptions.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
-          <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
+          <select value={filterCat} onChange={e => { setFilterCat(e.target.value); setFilterSubCat('전체'); }}
             className="h-8 text-xs border border-border rounded-md bg-card px-2">
             <option value="전체">전체 카테고리</option>
             {catOptions.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
-          <div className="flex gap-1 flex-wrap">
-            {([
-              { key: 'all', label: '전체' },
-              { key: 'both', label: '양쪽 입력' },
-              { key: 'simple', label: '간단 원가' },
-              { key: 'nopre', label: '사전원가 없음' },
-              { key: 'nopost', label: '사후원가 없음' },
-            ] as const).map(f => (
-              <button
-                key={f.key}
-                onClick={() => setFilterMode(f.key)}
-                className={`px-3 py-1 text-xs rounded-full border font-medium transition-colors ${
-                  filterMode === f.key
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-card text-muted-foreground border-border hover:bg-[var(--fill-quaternary)]'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+          {filterCat !== '전체' && subCatOptions.length > 0 && (
+            <select value={filterSubCat} onChange={e => setFilterSubCat(e.target.value)}
+              className="h-8 text-xs border border-border rounded-md bg-card px-2">
+              <option value="전체">세부 전체</option>
+              {subCatOptions.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          )}
+          <select
+            value={filterMode}
+            onChange={e => setFilterMode(e.target.value as typeof filterMode)}
+            className="h-8 text-xs border border-border rounded-md bg-card px-2"
+          >
+            <option value="all">전체 상태</option>
+            <option value="both">양쪽 입력</option>
+            <option value="simple">간단 원가</option>
+            <option value="nopre">사전원가 없음</option>
+            <option value="nopost">사후원가 없음</option>
+          </select>
           <span className="text-xs text-muted-foreground">{filtered.length}개</span>
         </div>
       </div>

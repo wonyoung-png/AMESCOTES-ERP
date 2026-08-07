@@ -602,7 +602,10 @@ export default function ProductionOrders() {
   const [stylePickerSearch, setStylePickerSearch] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkSearch, setBulkSearch] = useState('');
-  const [bulkRows, setBulkRows] = useState<Record<string, { qty: string; orderDate: string; deliveryDate: string; vendorId: string }>>({});
+  const [bulkRows, setBulkRows] = useState<Record<string, {
+    colorQtys: { color: string; qty: string }[];
+    orderDate: string; deliveryDate: string; vendorId: string;
+  }>>({});
 
   const bulkCandidates = useMemo(() => {
     const q = bulkSearch.trim().toLowerCase();
@@ -619,7 +622,15 @@ export default function ProductionOrders() {
     setBulkRows(prev => {
       if (prev[item.id]) { const { [item.id]: _drop, ...rest } = prev; return rest; }
       const today = new Date().toISOString().split('T')[0];
-      return { ...prev, [item.id]: { qty: '', orderDate: today, deliveryDate: '', vendorId: '' } };
+      // 품목에 등록된 컬러를 미리 깔아준다 — 컬러 없이 수량만 넣는 건 의미가 없다
+      const colors = normalizeColors(item.colors || []).map(c => ({ color: c.name, qty: '' }));
+      return {
+        ...prev,
+        [item.id]: {
+          colorQtys: colors.length ? colors : [{ color: '', qty: '' }],
+          orderDate: today, deliveryDate: '', vendorId: '',
+        },
+      };
     });
   };
 
@@ -627,8 +638,10 @@ export default function ProductionOrders() {
   const saveBulkOrders = async () => {
     const picked = Object.entries(bulkRows);
     if (picked.length === 0) { toast.error('스타일을 선택해주세요'); return; }
-    const bad = picked.find(([, r]) => !Number(r.qty));
+    const bad = picked.find(([, r]) => r.colorQtys.every(c => !Number(c.qty)));
     if (bad) { toast.error('수량을 입력하지 않은 스타일이 있습니다'); return; }
+    const noColor = picked.find(([, r]) => r.colorQtys.some(c => Number(c.qty) > 0 && !c.color.trim()));
+    if (noColor) { toast.error('컬러명을 입력하세요 — 컬러 없이 수량만 넣으면 발주할 수 없습니다'); return; }
 
     const known = [...(orders as any[])];
     let ok = 0;
@@ -647,7 +660,8 @@ export default function ProductionOrders() {
         season: item.season,
         revision: parseInt((orderNo.match(/-R(\d+)$/) || [])[1] || '1', 10),
         isReorder: /-R([2-9]|\d{2,})$/.test(orderNo),
-        qty: Number(row.qty),
+        qty: row.colorQtys.reduce((sum, c) => sum + (Number(c.qty) || 0), 0),
+        colorQtys: row.colorQtys.filter(c => Number(c.qty) > 0).map(c => ({ color: c.color.trim(), qty: Number(c.qty) })),
         vendorId: row.vendorId || '',
         vendorName: (vendor as any)?.name || '',
         orderDate: row.orderDate,
@@ -1183,10 +1197,10 @@ export default function ProductionOrders() {
           >
             공장별 현황
           </button>
-          <Button variant="outline" onClick={() => setBulkOpen(true)} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
-            <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />일괄 발주
-          </Button>
-          <Button onClick={() => openNew()} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
+          <Button
+            onClick={() => { setBulkRows({}); setBulkSearch(''); setBulkOpen(true); }}
+            className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4"
+          >
             <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />발주 등록
           </Button>
         </div>
@@ -1620,11 +1634,12 @@ export default function ProductionOrders() {
                   <button
                     key={i.id}
                     type="button"
-                    onClick={() => { handleStyleSelect(i.id); setStylePickerOpen(false); }}
+                    onClick={() => toggleBulkRow(i)}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--fill-quaternary)] ${
-                      form.styleId === i.id ? 'bg-primary/5' : ''
+                      bulkRows[i.id] ? 'bg-primary/5' : ''
                     }`}
                   >
+                    <input type="checkbox" readOnly checked={!!bulkRows[i.id]} className="w-4 h-4 accent-primary shrink-0" />
                     {i.imageUrl ? (
                       <img src={i.imageUrl} alt="" className="w-10 h-10 rounded object-cover border border-border shrink-0" />
                     ) : (
@@ -1645,6 +1660,11 @@ export default function ProductionOrders() {
               });
             })()}
           </div>
+          <div className="border-t border-border p-3">
+            <Button className="w-full" onClick={() => setStylePickerOpen(false)}>
+              {Object.keys(bulkRows).length > 0 ? `${Object.keys(bulkRows).length}건 담기` : '닫기'}
+            </Button>
+          </div>
         </SheetContent>
       </Sheet>
 
@@ -1652,7 +1672,7 @@ export default function ProductionOrders() {
       <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-4xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>일괄 발주 등록</DialogTitle>
+            <DialogTitle>발주 등록 <span className="text-xs font-normal text-muted-foreground ml-1">여러 스타일을 한 번에 담아 컬러별 수량을 넣습니다</span></DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="relative">
@@ -1699,69 +1719,114 @@ export default function ProductionOrders() {
               })}
             </div>
 
-            {/* 선택된 스타일 — 스타일별 수량 · 발주일 · 납기일 · 공장 */}
+            {/* 선택된 스타일 — 스타일마다 카드 1장. 컬러별 수량을 넣는다 */}
             {Object.keys(bulkRows).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">
-                  선택 {Object.keys(bulkRows).length}건 — 스타일마다 발주서가 따로 만들어집니다
-                </p>
-                <div className="border border-border rounded-md overflow-x-auto">
-                  <table className="w-full text-xs min-w-[720px]">
-                    <thead>
-                      <tr className="bg-[var(--fill-quaternary)] border-b border-border">
-                        <th className="text-left px-2 py-2">스타일</th>
-                        <th className="text-left px-2 py-2 w-24">수량 *</th>
-                        <th className="text-left px-2 py-2 w-36">발주일</th>
-                        <th className="text-left px-2 py-2 w-36">납기일</th>
-                        <th className="text-left px-2 py-2 w-40">공장</th>
-                        <th className="w-8"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(bulkRows).map(([id, row]) => {
-                        const it = (items as Item[]).find(x => x.id === id);
-                        const upd = (patch: Partial<typeof row>) =>
-                          setBulkRows(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }));
-                        return (
-                          <tr key={id} className="border-b border-border last:border-0">
-                            <td className="px-2 py-1.5">
-                              <p className="font-medium truncate">{it?.styleNo}</p>
-                              <p className="text-muted-foreground truncate">{it?.name}</p>
-                            </td>
-                            <td className="px-2 py-1.5">
-                              <Input type="number" value={row.qty} onChange={e => upd({ qty: e.target.value })} className="h-8 text-xs" placeholder="0" />
-                            </td>
-                            <td className="px-2 py-1.5">
-                              <Input type="date" value={row.orderDate} onChange={e => upd({ orderDate: e.target.value })} className="h-8 text-xs" />
-                            </td>
-                            <td className="px-2 py-1.5">
-                              <Input type="date" value={row.deliveryDate} onChange={e => upd({ deliveryDate: e.target.value })} className="h-8 text-xs" />
-                            </td>
-                            <td className="px-2 py-1.5">
-                              <Select value={row.vendorId || 'none'} onValueChange={v => upd({ vendorId: v === 'none' ? '' : v })}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="선택" /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">미지정</SelectItem>
-                                  {factories.map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </td>
-                            <td className="px-2 py-1.5 text-center">
-                              <button type="button" onClick={() => toggleBulkRow(it as Item)}
-                                className="text-muted-foreground hover:text-[var(--system-red)]">×</button>
-                            </td>
-                          </tr>
-                        );
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    선택 {Object.keys(bulkRows).length}건 — 스타일마다 발주서·작업지시서가 따로 만들어집니다
+                  </p>
+                  {/* 첫 카드의 공장·날짜를 나머지에 그대로 복사 */}
+                  {Object.keys(bulkRows).length > 1 && (
+                    <button
+                      type="button"
+                      className="text-[11px] text-primary hover:underline"
+                      onClick={() => setBulkRows(prev => {
+                        const ids = Object.keys(prev);
+                        const first = prev[ids[0]];
+                        const next = { ...prev };
+                        ids.slice(1).forEach(id => {
+                          next[id] = { ...next[id], vendorId: first.vendorId, orderDate: first.orderDate, deliveryDate: first.deliveryDate };
+                        });
+                        return next;
                       })}
-                    </tbody>
-                  </table>
+                    >첫 카드의 공장·날짜를 전체 적용</button>
+                  )}
                 </div>
+
+                {Object.entries(bulkRows).map(([id, row]) => {
+                  const it = (items as Item[]).find(x => x.id === id);
+                  const upd = (patch: Partial<typeof row>) =>
+                    setBulkRows(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+                  const updColor = (idx: number, patch: Partial<{ color: string; qty: string }>) =>
+                    upd({ colorQtys: row.colorQtys.map((c, i) => (i === idx ? { ...c, ...patch } : c)) });
+                  const total = row.colorQtys.reduce((sum, c) => sum + (Number(c.qty) || 0), 0);
+                  return (
+                    <div key={id} className="border border-border rounded-md p-3 space-y-2.5 bg-card">
+                      <div className="flex items-center gap-2">
+                        {it?.imageUrl
+                          ? <img src={it.imageUrl} alt="" className="w-9 h-9 rounded object-cover border border-border" />
+                          : <div className="w-9 h-9 rounded bg-[var(--fill-tertiary)] border border-border" />}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{it?.styleNo}</p>
+                          <p className="text-xs text-muted-foreground truncate">{it?.name}</p>
+                        </div>
+                        <span className="text-xs text-muted-foreground">합계 <b className="text-foreground">{total.toLocaleString()}</b></span>
+                        <button type="button" onClick={() => toggleBulkRow(it as Item)}
+                          className="text-muted-foreground hover:text-[var(--system-red)] px-1">×</button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] text-muted-foreground">공장</Label>
+                          <Select value={row.vendorId || 'none'} onValueChange={v => upd({ vendorId: v === 'none' ? '' : v })}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="선택" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">미지정</SelectItem>
+                              {factories.map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[11px] text-muted-foreground">발주일</Label>
+                          <Input type="date" value={row.orderDate} onChange={e => upd({ orderDate: e.target.value })} className="h-8 text-xs" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[11px] text-muted-foreground">납기일</Label>
+                          <Input type="date" value={row.deliveryDate} onChange={e => upd({ deliveryDate: e.target.value })} className="h-8 text-xs" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground">컬러별 수량 *</Label>
+                        {row.colorQtys.map((c, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Input
+                              value={c.color}
+                              onChange={e => updColor(idx, { color: e.target.value })}
+                              placeholder="컬러명"
+                              className="h-8 text-xs flex-1"
+                            />
+                            <Input
+                              type="number"
+                              value={c.qty}
+                              onChange={e => updColor(idx, { qty: e.target.value })}
+                              placeholder="수량"
+                              className="h-8 text-xs w-24"
+                            />
+                            {row.colorQtys.length > 1 && (
+                              <button type="button" onClick={() => upd({ colorQtys: row.colorQtys.filter((_, i) => i !== idx) })}
+                                className="text-muted-foreground hover:text-[var(--system-red)] px-1">×</button>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => upd({ colorQtys: [...row.colorQtys, { color: '', qty: '' }] })}
+                          className="text-[11px] text-primary hover:underline"
+                        >+ 컬러 추가</button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkOpen(false)}>취소</Button>
-            <Button onClick={saveBulkOrders}>발주 {Object.keys(bulkRows).length}건 등록</Button>
+            <Button onClick={saveBulkOrders} disabled={Object.keys(bulkRows).length === 0}>
+              발주 {Object.keys(bulkRows).length}건 등록
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

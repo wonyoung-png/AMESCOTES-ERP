@@ -205,7 +205,7 @@ function StylePicker({
           <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)]" align="start">
+      <PopoverContent className="p-0 w-[min(680px,90vw)]" align="start">
         <div className="p-2 border-b border-border">
           <Input
             autoFocus
@@ -214,6 +214,13 @@ function StylePicker({
             placeholder="브랜드명 · 스타일번호 · 품명"
             className="h-8 text-xs"
           />
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border text-[11px] text-muted-foreground bg-[var(--fill-quaternary)]">
+          <span className="w-24 shrink-0">브랜드</span>
+          <span className="w-32 shrink-0">스타일번호</span>
+          <span className="flex-1 min-w-0">품명</span>
+          <span className="w-10 shrink-0 text-right">BOM</span>
+          <span className="w-16 shrink-0 text-right">원가</span>
         </div>
         <div className="max-h-72 overflow-y-auto py-1">
           {shown.length === 0 && (
@@ -228,12 +235,15 @@ function StylePicker({
                 item.id === selectedId ? 'bg-[var(--fill-quaternary)] font-medium' : ''
               }`}
             >
-              <span className="truncate flex-1">
-                {buyerName && <span className="text-muted-foreground">{buyerName} · </span>}
-                {item.styleNo} — {item.name}
+              <span className="w-24 shrink-0 truncate text-muted-foreground">{buyerName || '—'}</span>
+              <span className="w-32 shrink-0 truncate font-mono">{item.styleNo}</span>
+              <span className="flex-1 min-w-0 truncate">{item.name}</span>
+              <span className="w-10 shrink-0 text-right">
+                {item.hasBom && <Badge variant="outline" className="text-[11px] py-0 h-4 border-[var(--system-green)]/30 text-[var(--system-green)]">BOM</Badge>}
               </span>
-              {item.hasBom && <Badge variant="outline" className="text-[11px] py-0 h-4 border-[var(--system-green)]/30 text-[var(--system-green)]">BOM</Badge>}
-              {item.hasBom && bomCost > 0 && <span className="text-[11px] text-primary font-medium shrink-0">{fmtKrw(bomCost)}</span>}
+              <span className="w-16 shrink-0 text-right text-[11px] text-primary font-medium">
+                {item.hasBom && bomCost > 0 ? fmtKrw(bomCost) : ''}
+              </span>
             </button>
           ))}
           {options.length > shown.length && (
@@ -2342,7 +2352,10 @@ export default function BomManagement() {
       })
       .map(item => ({
         item,
-        buyerName: buyers.find(b => b.id === item.buyerId)?.name || '',
+        buyerName: (() => {
+          const b: any = buyers.find(v => v.id === item.buyerId);
+          return b?.brands?.[0] || b?.nameEn || b?.name || '';
+        })(),
         bomCost: item.hasBom ? store.getBomTotalCost(item.styleNo) : 0,
       }));
   }, [items, buyers, debouncedStyleSearch, extBoms]);

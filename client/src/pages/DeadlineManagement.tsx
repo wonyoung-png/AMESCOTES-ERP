@@ -80,13 +80,25 @@ export default function DeadlineManagement() {
       const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const events: { orderNo: string; milestone: string; color: string }[] = [];
       orders.forEach(o => {
-        (o.milestones || []).forEach(m => {
+        const ms = o.milestones || [];
+        ms.forEach(m => {
           if (m.plannedDate === dateStr || m.actualDate === dateStr) {
             const dd = calcDDay(m.plannedDate!);
-            const color = dd < 0 ? 'bg-[var(--system-red)]' : dd <= 3 ? 'bg-[var(--system-orange)]' : dd <= 7 ? 'bg-[var(--system-orange)]' : 'bg-[var(--system-green)]';
+            const color = dd < 0 ? 'bg-[var(--system-red)]' : dd <= 7 ? 'bg-[var(--system-orange)]' : 'bg-[var(--system-green)]';
             events.push({ orderNo: o.orderNo, milestone: MILESTONE_LABELS[m.stage] || m.stage, color });
           }
         });
+        // 마일스톤을 아직 안 잡은 발주도 발주일·납기일은 달력에 보여준다
+        if (ms.length === 0) {
+          if (o.orderDate === dateStr) {
+            events.push({ orderNo: o.orderNo, milestone: '발주', color: 'bg-[var(--system-green)]' });
+          }
+          if (o.deliveryDate === dateStr) {
+            const dd = calcDDay(o.deliveryDate);
+            const color = dd < 0 ? 'bg-[var(--system-red)]' : dd <= 7 ? 'bg-[var(--system-orange)]' : 'bg-primary';
+            events.push({ orderNo: o.orderNo, milestone: '납기', color });
+          }
+        }
       });
       days.push({ day: d, events });
     }
@@ -106,7 +118,6 @@ export default function DeadlineManagement() {
         <TabsList>
           <TabsTrigger value="list" className="gap-1"><List size={14} />리스트</TabsTrigger>
           <TabsTrigger value="calendar" className="gap-1"><Calendar size={14} />캘린더</TabsTrigger>
-          <TabsTrigger value="timeline" className="gap-1"><BarChart3 size={14} />타임라인</TabsTrigger>
         </TabsList>
 
         {/* List View */}
@@ -218,63 +229,6 @@ export default function DeadlineManagement() {
         </TabsContent>
 
         {/* Timeline/Gantt View */}
-        <TabsContent value="timeline" className="mt-4">
-          <Card className="border-border overflow-hidden">
-            <CardContent className="p-4">
-              <div className="space-y-3">
-                {orders.filter(o => o.status !== '입고완료').map(order => {
-                  const milestones = order.milestones || [];
-                  const allDates = milestones
-                    .flatMap(m => [m.plannedDate, m.actualDate])
-                    .filter((d): d is string => !!d)
-                    .map(d => new Date(d).getTime());
-                  const minDate = Math.min(...allDates, Date.now());
-                  const maxDate = Math.max(...allDates, Date.now());
-                  const range = maxDate - minDate || 1;
-                  const todayPos = ((Date.now() - minDate) / range) * 100;
-
-                  return (
-                    <div key={order.id} className="flex items-center gap-3">
-                      <div className="w-32 shrink-0">
-                        <p className="font-mono text-xs font-medium truncate">{order.orderNo}</p>
-                        <p className="text-[11px] text-muted-foreground">{order.status}</p>
-                      </div>
-                      <div className="flex-1 relative h-6 bg-muted/50 rounded">
-                        {/* Today marker */}
-                        <div className="absolute top-0 bottom-0 w-px bg-[var(--system-red)] z-10" style={{ left: `${Math.min(todayPos, 100)}%` }} />
-                        {/* Milestone dots */}
-                        {milestones.map((m, i) => {
-                          const date = m.actualDate || m.plannedDate;
-                          if (!date) return null;
-                          const pos = ((new Date(date).getTime() - minDate) / range) * 100;
-                          return (
-                            <div key={i}
-                              className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-background ${m.actualDate ? 'bg-[var(--system-green)]' : 'bg-primary'}`}
-                              style={{ left: `${Math.min(pos, 98)}%` }}
-                              title={`${MILESTONE_LABELS[m.stage] || m.stage}: ${date}`}
-                            />
-                          );
-                        })}
-                        {/* Progress bar */}
-                        {milestones.length > 0 && (() => {
-                          const completed = milestones.filter(m => m.actualDate).length;
-                          const total = milestones.length;
-                          const pct = (completed / total) * 100;
-                          return <div className="absolute top-0 left-0 bottom-0 bg-status-normal opacity-25 rounded-l" style={{ width: `${pct}%` }} />;
-                        })()}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[var(--system-green)]" />완료</span>
-                <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-primary" />예정</span>
-                <span className="flex items-center gap-1"><div className="w-3 h-px bg-[var(--system-red)]" />오늘</span>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );

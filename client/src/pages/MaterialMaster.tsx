@@ -398,8 +398,8 @@ export default function MaterialMaster() {
                   className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                 />
               </th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">이미지</th>
-              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">품번</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground w-14">이미지</th>
+              <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground w-32 whitespace-nowrap">품번</th>
               <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">카테고리</th>
               <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">브랜드</th>
               <th className="text-left px-3 py-3 text-[13px] font-semibold text-muted-foreground">자재명</th>
@@ -430,7 +430,7 @@ export default function MaterialMaster() {
                       className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                     />
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-2.5 w-14">
                     {m.imageUrl ? (
                       <HoverZoomImage
                         src={m.imageUrl}
@@ -444,8 +444,8 @@ export default function MaterialMaster() {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 w-16">
-                    <span className="font-mono text-xs bg-[var(--fill-tertiary)] px-2 py-0.5 rounded text-muted-foreground">{m.itemCode || '—'}</span>
+                  <td className="px-3 py-2.5 w-32">
+                    <span className="font-mono text-xs bg-[var(--fill-tertiary)] px-2 py-0.5 rounded text-muted-foreground whitespace-nowrap">{m.itemCode || '—'}</span>
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full border ${CHIP}`}>{m.category}</span>
