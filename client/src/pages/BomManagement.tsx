@@ -1960,12 +1960,12 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
         <div style={{fontWeight:600}}>₩{Math.round(amt * cnyKrw).toLocaleString()}</div>
         <div style={{fontSize:'10px', color:'#9CA3AF'}}>{amt ? amt.toFixed(3) : '0'}</div>
       </td>
-      {/* 공급 — 기본은 공장 구매. 우리가 사서 보낼 때만 '본사 사입' 체크 */}
+      {/* 공급 — 체크하면 본사 제공, 안 하면 공장 완사입 */}
       <td className="px-2 py-1 w-24">
-        <label className="flex items-center justify-center gap-1.5 cursor-pointer" title="본사에서 사입해 공장에 보내는 자재">
+        <label className="flex items-center justify-center gap-1.5 cursor-pointer" title="체크: 본사에서 사서 공장에 제공 / 미체크: 공장 완사입">
           <input type="checkbox" checked={isHqProvided} onChange={e => handleHqChange(e.target.checked)} className="w-4 h-4 accent-primary" />
           <span className={`text-xs font-medium ${isHqProvided ? 'text-primary' : 'text-muted-foreground'}`}>
-            {isHqProvided ? '본사 사입' : '공장'}
+            {isHqProvided ? '제공' : '공장 완사입'}
           </span>
         </label>
       </td>
@@ -2275,6 +2275,9 @@ export default function BomManagement() {
   const fileRef = useRef<HTMLInputElement>(null);
   const preFileRef = useRef<HTMLInputElement>(null);
   const postFileRef = useRef<HTMLInputElement>(null);
+
+  // 공장 원가표 업로드 통화 — 중국 공장은 보통 USD로 보낸다
+  const [uploadCurrency, setUploadCurrency] = useState<'USD' | 'CNY' | 'KRW'>('USD');
 
   const markDirty = () => setIsDirty(true);
 
@@ -3312,7 +3315,11 @@ export default function BomManagement() {
           postMaterials: postMaterials.length > 0 ? postMaterials : prev.postMaterials,
           postProcessingFee: parsedProcessingFee || prev.postProcessingFee,
           postProcessLines: parsedPostLines2.length > 0 ? parsedPostLines2 : prev.postProcessLines,
-          exchangeRateCny: parsedRate,
+          // 원가표에 적힌 환율은 '그 통화 → KRW' 값이다. 선택한 통화 자리에 넣는다
+          currency: uploadCurrency,
+          ...(uploadCurrency === 'USD'
+            ? { exchangeRateUsd: parsedRate, postExchangeRateCny: prev.postExchangeRateCny ?? prev.exchangeRateCny }
+            : { exchangeRateCny: parsedRate, postExchangeRateCny: parsedRate }),
           postSourceFileName: file.name,
           postColorBoms: updatedPostColorBoms,
         };
@@ -4437,15 +4444,28 @@ export default function BomManagement() {
                     </div>
                   )}
 
-                  {/* 공장 원가표 업로드 */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => postFileRef.current?.click()}
-                    className="gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/10"
-                  >
-                    <Upload className="w-3.5 h-3.5" /> 공장 원가표 업로드
-                  </Button>
+                  {/* 공장 원가표 업로드 — 파일 통화를 먼저 고른다 (중국 공장은 보통 USD) */}
+                  <div className="flex items-end gap-1.5">
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block font-medium">원가표 통화</label>
+                      <Select value={uploadCurrency} onValueChange={v => setUploadCurrency(v as 'USD' | 'CNY' | 'KRW')}>
+                        <SelectTrigger className="h-8 text-xs w-24"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD" className="text-xs">$ USD</SelectItem>
+                          <SelectItem value="CNY" className="text-xs">¥ CNY</SelectItem>
+                          <SelectItem value="KRW" className="text-xs">₩ KRW</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => postFileRef.current?.click()}
+                      className="gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/10 h-8"
+                    >
+                      <Upload className="w-3.5 h-3.5" /> 공장 원가표 업로드
+                    </Button>
+                  </div>
                   {editBom.postSourceFileName && (
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                       <FileText className="w-3 h-3 text-primary" /> {editBom.postSourceFileName}

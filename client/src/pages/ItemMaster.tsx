@@ -452,6 +452,8 @@ export default function ItemMaster() {
     materials: any[]; processingFee: number; exchangeRateCny: number; postProcessLines: any[];
   }>(null);
   const costSheetRef = useRef<HTMLInputElement>(null);
+  // 원가표 통화 — 중국 공장은 보통 USD로 보낸다
+  const [costSheetCurrency, setCostSheetCurrency] = useState<'USD' | 'CNY' | 'KRW'>('USD');
   const [editItem, setEditItem] = useState<Partial<Item>>({ ...emptyItem });
   const [isEdit, setIsEdit] = useState(false);
   // 변경사항 추적
@@ -1601,6 +1603,9 @@ export default function ItemMaster() {
           exchangeRateCny: exchangeRateCny || base.exchangeRateCny,
           snapshotCnyKrw: exchangeRateCny || base.snapshotCnyKrw,
         };
+    // 원가표에 적힌 환율은 '그 통화 → KRW'. 고른 통화 자리에 넣는다
+    bom.currency = costSheetCurrency;
+    if (costSheetCurrency === 'USD') bom.exchangeRateUsd = exchangeRateCny || bom.exchangeRateUsd;
     const { totalCostKrw, factoryUnitCostKrw } = calcBomCosts(bom);
     if (costSheetMode === 'post') { bom.postSubtotalKrw = totalCostKrw; bom.postTotalCostKrw = totalCostKrw; }
     if (factoryUnitCostKrw > 0) bom.pnl = { ...(bom.pnl || {}), factoryUnitCostKrw };
@@ -3083,6 +3088,15 @@ export default function ItemMaster() {
                 >
                   <option value="pre">사전원가</option>
                   <option value="post">사후원가</option>
+                </select>
+                <select
+                  value={costSheetCurrency}
+                  onChange={e => setCostSheetCurrency(e.target.value as 'USD' | 'CNY' | 'KRW')}
+                  className="h-8 text-xs border border-border rounded-md bg-card px-2"
+                >
+                  <option value="USD">$ USD</option>
+                  <option value="CNY">¥ CNY</option>
+                  <option value="KRW">₩ KRW</option>
                 </select>
                 <input ref={costSheetRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleCostSheetPick} />
                 <Button type="button" variant="outline" size="sm" onClick={() => costSheetRef.current?.click()} className="gap-1.5">
