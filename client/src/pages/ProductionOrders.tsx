@@ -3900,7 +3900,11 @@ export default function ProductionOrders() {
               try { await saveDocAsImage(batchSheetRef.current, `발주서_${batchSheet.batchNo}`); toast.success('이미지 저장됨'); }
               catch (e) { toast.error((e as Error).message); }
             }}>이미지 저장</Button>
-            <Button onClick={() => { batchSheet?.orders.forEach(o => void markSent(o)); printDoc(batchSheetRef.current); }}>
+            <Button onClick={() => {
+              const sheet = batchSheet;
+              if (sheet) sheet.orders.forEach(o => void markSent(o));
+              printDoc(batchSheetRef.current);
+            }}>
               <Printer className="w-4 h-4 mr-1.5" />A4 인쇄 · PDF
             </Button>
           </DialogFooter>
