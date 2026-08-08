@@ -28,6 +28,23 @@ import { printDoc, copyDocAsImage, saveDocAsImage } from '@/lib/docExport';
 import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera, MoreHorizontal, ChevronRight, ChevronDown, Layers } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
+
+/** 서류 언어 — 중국 공장에 보낼 때 항목명만 중국어로 바꾼다 (숫자·번호는 그대로) */
+type DocLang = 'ko' | 'zh';
+const DOC_T: Record<DocLang, Record<string, string>> = {
+  ko: {
+    po: '발 주 서', orderNo: '발주번호', orderDate: '발주일', factory: '공장', delivery: '납기일',
+    style: '스타일', buyerStyle: '바이어 품번', color: '컬러', qty: '수량', unitPrice: '단가',
+    amount: '금액', total: '합계', memo: '비고', styles: '스타일', pcs: 'PCS', batch: '발주서',
+    no: 'No.', name: '품명', colorQty: '컬러별 수량', totalQty: '총수량', undecided: '미정',
+  },
+  zh: {
+    po: '采 购 订 单', orderNo: '订单编号', orderDate: '下单日期', factory: '工厂', delivery: '交期',
+    style: '款号', buyerStyle: '客户款号', color: '颜色', qty: '数量', unitPrice: '单价',
+    amount: '金额', total: '合计', memo: '备注', styles: '款数', pcs: '件', batch: '采购订单',
+    no: '序号', name: '品名', colorQty: '各色数量', totalQty: '总数量', undecided: '未定',
+  },
+};
 const ORDER_STATUSES: OrderStatus[] = ['발주생성', '생산중', '생산완료', '입고완료'];
 
 const STATUS_COLOR: Record<OrderStatus, string> = {
@@ -128,6 +145,7 @@ export default function ProductionOrders() {
 
   // 작업지시서 모달 상태
   const [batchSheet, setBatchSheet] = useState<{ batchNo: string; orders: ProductionOrder[] } | null>(null);
+  const [docLang, setDocLang] = useState<DocLang>('ko');
   const [confirmTarget, setConfirmTarget] = useState<ProductionOrder | null>(null);
   const [confirmForm, setConfirmForm] = useState({ confirmedDate: '', confirmNote: '' });
   const batchSheetRef = useRef<HTMLDivElement>(null);
@@ -2896,7 +2914,7 @@ export default function ProductionOrders() {
                 </div>
                 <div><p className="text-xs text-muted-foreground">리오더</p><p className="font-medium">{showDetail.isReorder ? `${showDetail.revision}차` : '신규'}</p></div>
                 {showDetail.orderDate && (
-                  <div><p className="text-xs text-muted-foreground">발주일</p><p className="font-mono">{showDetail.orderDate}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{DOC_T[docLang].orderDate}</p><p className="font-mono">{showDetail.orderDate}</p></div>
                 )}
                 {showDetail.deliveryDate && (
                   <div>
@@ -3142,25 +3160,29 @@ export default function ProductionOrders() {
             const total = rows.reduce((sum, r) => sum + r.qty * unit, 0);
             return (
               <div ref={poSheetRef} className="p-4 space-y-4 text-sm bg-white text-neutral-900 rounded">
-                <h2 className="text-center text-lg font-bold tracking-widest border-b-2 border-neutral-800 pb-2">발 주 서</h2>
+                <h2 className="text-center text-lg font-bold tracking-widest border-b-2 border-neutral-800 pb-2">{DOC_T[docLang].po}</h2>
                 <table className="data-table w-full text-xs border-collapse">
                   <tbody>
                     <tr>
-                      <td className="border border-neutral-300 bg-neutral-100 font-semibold w-24">발주번호</td>
+                      <td className="border border-neutral-300 bg-neutral-100 font-semibold w-24">{DOC_T[docLang].orderNo}</td>
                       <td className="nw border border-neutral-300 font-mono">{poTarget.orderNo}</td>
-                      <td className="border border-neutral-300 bg-neutral-100 font-semibold w-24">발주일</td>
+                      <td className="border border-neutral-300 bg-neutral-100 font-semibold w-24">{DOC_T[docLang].orderDate}</td>
                       <td className="border border-neutral-300">{poTarget.orderDate}</td>
                     </tr>
                     <tr>
-                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">공장</td>
-                      <td className="border border-neutral-300">{poTarget.vendorName || '—'}</td>
-                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">납기일</td>
+                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">{DOC_T[docLang].factory}</td>
+                      <td className="border border-neutral-300">
+                        {(docLang === 'zh'
+                          ? (allVendors.find((v: any) => v.id === poTarget.vendorId) as any)?.nameCn
+                          : undefined) || poTarget.vendorName || '—'}
+                      </td>
+                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">{DOC_T[docLang].delivery}</td>
                       <td className="border border-neutral-300 font-semibold text-red-600">{poTarget.deliveryDate || '—'}</td>
                     </tr>
                     <tr>
-                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">스타일</td>
+                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">{DOC_T[docLang].style}</td>
                       <td className="border border-neutral-300" colSpan={3}>
-                        {poTarget.styleNo} — {poTarget.styleName}{it?.buyerStyleNo ? ` (바이어 품번 ${it.buyerStyleNo})` : ''}
+                        {poTarget.styleNo} — {poTarget.styleName}{it?.buyerStyleNo ? ` (${DOC_T[docLang].buyerStyle} ${it.buyerStyleNo})` : ''}
                       </td>
                     </tr>
                   </tbody>
@@ -3169,10 +3191,10 @@ export default function ProductionOrders() {
                 <table className="data-table w-full text-xs border-collapse">
                   <thead>
                     <tr className="bg-neutral-100">
-                      <th className="border border-neutral-300">컬러</th>
-                      <th className="border border-neutral-300 num">수량</th>
-                      <th className="border border-neutral-300 num">단가</th>
-                      <th className="border border-neutral-300 num">금액</th>
+                      <th className="border border-neutral-300">{DOC_T[docLang].color}</th>
+                      <th className="border border-neutral-300 num">{DOC_T[docLang].qty}</th>
+                      <th className="border border-neutral-300 num">{DOC_T[docLang].unitPrice}</th>
+                      <th className="border border-neutral-300 num">{DOC_T[docLang].amount}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3185,7 +3207,7 @@ export default function ProductionOrders() {
                       </tr>
                     ))}
                     <tr className="bg-neutral-50 font-semibold">
-                      <td className="border border-neutral-300">합계</td>
+                      <td className="border border-neutral-300">{DOC_T[docLang].total}</td>
                       <td className="nw border border-neutral-300 num font-mono">{formatNumber(rows.reduce((s2, r) => s2 + r.qty, 0))}</td>
                       <td className="border border-neutral-300"></td>
                       <td className="nw border border-neutral-300 num font-mono">{formatKRW(total)}</td>
@@ -3193,11 +3215,19 @@ export default function ProductionOrders() {
                   </tbody>
                 </table>
 
-                {poTarget.memo && <p className="text-xs text-neutral-600">비고: {poTarget.memo}</p>}
+                {poTarget.memo && <p className="text-xs text-neutral-600">{DOC_T[docLang].memo}: {poTarget.memo}</p>}
               </div>
             );
           })()}
           <DialogFooter className="flex-wrap gap-2">
+            <div className="mr-auto flex rounded-md border border-border overflow-hidden">
+              {(['ko', 'zh'] as DocLang[]).map(l => (
+                <button key={l} type="button" onClick={() => setDocLang(l)}
+                  className={`px-3 h-9 text-xs ${docLang === l ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}>
+                  {l === 'ko' ? '한국어' : '中文'}
+                </button>
+              ))}
+            </div>
             <Button variant="outline" onClick={() => setPoTarget(null)}>닫기</Button>
             <Button variant="outline" onClick={async () => {
               if (!poSheetRef.current) return;
@@ -3838,7 +3868,7 @@ export default function ProductionOrders() {
         <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[96vw] sm:h-auto sm:max-w-5xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Printer className="w-4 h-4" />발주서 — {batchSheet?.batchNo}
+              <Printer className="w-4 h-4" />{DOC_T[docLang].batch} — {batchSheet?.batchNo}
             </DialogTitle>
           </DialogHeader>
           {batchSheet && (() => {
@@ -3850,10 +3880,10 @@ export default function ProductionOrders() {
             return (
               <div className="space-y-4 py-1" ref={batchSheetRef}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                  <div><p className="text-xs text-muted-foreground">공장</p><p className="font-semibold">{vendorNames.join(', ') || '미지정'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">발주일</p><p className="font-semibold">{list[0]?.orderDate || '—'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">납기</p><p className="font-semibold">{dates.length ? (dates[0] === dates[dates.length - 1] ? dates[0] : `${dates[0]} ~ ${dates[dates.length - 1]}`) : '—'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">스타일</p><p className="font-semibold tabular-nums">{list.length}개 · {totalQty.toLocaleString()} PCS</p></div>
+                  <div><p className="text-xs text-muted-foreground">{DOC_T[docLang].factory}</p><p className="font-semibold">{vendorNames.join(', ') || '미지정'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{DOC_T[docLang].orderDate}</p><p className="font-semibold">{list[0]?.orderDate || '—'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{DOC_T[docLang].delivery}</p><p className="font-semibold">{dates.length ? (dates[0] === dates[dates.length - 1] ? dates[0] : `${dates[0]} ~ ${dates[dates.length - 1]}`) : '—'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">{DOC_T[docLang].styles}</p><p className="font-semibold tabular-nums">{list.length} · {totalQty.toLocaleString()} {DOC_T[docLang].pcs}</p></div>
                 </div>
 
                 {vendorNames.length > 1 && (
@@ -3890,11 +3920,11 @@ export default function ProductionOrders() {
                           <td className="num">{(o.qty || 0).toLocaleString()}</td>
                           <td className="num">{o.factoryUnitPriceKrw ? formatKRW(o.factoryUnitPriceKrw) : '—'}</td>
                           <td className="num">{o.factoryUnitPriceKrw ? formatKRW((o.qty || 0) * o.factoryUnitPriceKrw) : '—'}</td>
-                          <td className="nw text-xs">{o.deliveryDate || <span className="text-[var(--system-orange)]">미정</span>}</td>
+                          <td className="nw text-xs">{o.deliveryDate || <span className="text-[var(--system-orange)]">{DOC_T[docLang].undecided}</span>}</td>
                         </tr>
                       ))}
                       <tr>
-                        <td colSpan={5} className="font-semibold">합계</td>
+                        <td colSpan={5} className="font-semibold">{DOC_T[docLang].total}</td>
                         <td className="num font-semibold">{totalQty.toLocaleString()}</td>
                         <td></td>
                         <td className="num font-semibold">{totalAmt > 0 ? formatKRW(totalAmt) : '—'}</td>
@@ -3919,6 +3949,14 @@ export default function ProductionOrders() {
             );
           })()}
           <DialogFooter className="flex-wrap gap-2">
+            <div className="mr-auto flex rounded-md border border-border overflow-hidden">
+              {(['ko', 'zh'] as DocLang[]).map(l => (
+                <button key={l} type="button" onClick={() => setDocLang(l)}
+                  className={`px-3 h-9 text-xs ${docLang === l ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}>
+                  {l === 'ko' ? '한국어' : '中文'}
+                </button>
+              ))}
+            </div>
             <Button variant="outline" onClick={() => setBatchSheet(null)}>닫기</Button>
             <Button variant="outline" onClick={async () => {
               if (!batchSheetRef.current) return;
