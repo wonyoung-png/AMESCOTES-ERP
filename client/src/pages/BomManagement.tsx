@@ -9,6 +9,7 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useLocation, useSearch } from 'wouter';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { calcQty, calcLineAmt, ceil10, calcPostSummary, calcActualMultiple, type PostSummary } from '@/lib/costing';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -157,6 +158,27 @@ interface ExtBomLine {
 const BOM_SECTIONS: BomCategory[] = ['원자재', '지퍼', '장식', '보강재', '봉사·접착제', '포장재', '철형'];
 const UNITS = ['SF', 'YD', 'M', 'EA', 'L', '콘', 'KG', 'SET', '장', '개', 'PC', 'CM', '직접입력'];
 const SUB_PARTS: BomSubPart[] = ['바디', '안감', '트림1', '트림2', '기타'];
+/** 접이식 섹션 — BOM 화면이 길어 한 번에 다 보이면 읽기 어렵다.
+    열고 닫은 상태는 localStorage 에 남아 다음에 들어와도 그대로다. */
+function Fold({ id, title, hint, defaultOpen = false, right, children }: {
+  id: string; title: string; hint?: React.ReactNode; defaultOpen?: boolean;
+  right?: React.ReactNode; children: React.ReactNode;
+}) {
+  const [open, setOpen] = usePersistedState(`bom.fold.${id}`, defaultOpen);
+  return (
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
+      <button type="button" onClick={() => setOpen(!open)}
+        className="w-full px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] flex items-center gap-2 text-left hover:bg-[var(--fill-tertiary)]">
+        <ChevronRight className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {hint && <span className="text-muted-foreground text-xs font-normal">{hint}</span>}
+        <span className="ml-auto flex items-center gap-2" onClick={e => e.stopPropagation()}>{right}</span>
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
 // 섹션별 부위 옵션
 const SECTION_SUB_PARTS: Record<string, string[]> = {
   '원자재': ['바디', '안감', '트림1', '트림2', '기타'],
@@ -4104,10 +4126,7 @@ export default function BomManagement() {
 
                 {/* 사전원가 요약 */}
                 {summary && (
-                  <div className="bg-card rounded-lg border border-border overflow-hidden">
-                    <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
-                      <h2 className="text-sm font-semibold">사전 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— [{colorBom.color}] 기준</span></h2>
-                    </div>
+                  <Fold id="pre-summary" title="사전 원가 요약" hint={`— [${colorBom.color}] 기준`} defaultOpen>
                     <table className="data-table w-full text-[13px]">
                       <thead><tr className="bg-[var(--fill-tertiary)] text-[13px] font-semibold text-muted-foreground"><th className="w-12">구분</th><th>항목</th><th className="text-muted-foreground">내용/비고</th><th className="num w-40">금액 (원)</th></tr></thead>
                       <tbody>
@@ -4221,10 +4240,10 @@ export default function BomManagement() {
                         })()}
                       </tbody>
                     </table>
-                  </div>
+                  </Fold>
                 )}
 
-                {/* 본사/업체제공 자재 목록 */}
+                {/* 본사/업체제공 자재 목록 — 평소엔 접어둔다 */}
                 {summary && (() => {
                   const allLines = colorBom.lines;
                   const hqLines = allLines.filter(l => l.isHqProvided);
@@ -4309,10 +4328,7 @@ export default function BomManagement() {
 
                 {/* P&L 분석 */}
                 {summary && editBom.pnl && pnlResult && (
-                  <div className="bg-card rounded-lg border border-border overflow-hidden">
-                    <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
-                      <h2 className="text-sm font-semibold">P&L 분석 <span className="text-muted-foreground text-xs font-normal ml-2">— [{colorBom.color}] 기준</span></h2>
-                    </div>
+                  <Fold id="pnl" title="P&L 분석" hint={`— [${colorBom.color}] 기준`}>
                     <div className="p-5 space-y-5">
                       <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                         <h3 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h3>
@@ -4381,7 +4397,7 @@ export default function BomManagement() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </Fold>
                 )}
               </div>
             );
@@ -4747,10 +4763,7 @@ export default function BomManagement() {
                 const marginClass = marginPct < 15 ? 'text-[var(--system-red)]' : marginPct < 20 ? 'text-[var(--system-orange)]' : marginPct <= 30 ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]';
                 const marginBg = marginPct < 15 ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20' : marginPct < 30 ? 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20';
                 return (
-                  <div className="bg-card rounded-lg border border-border overflow-hidden">
-                    <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
-                      <h2 className="text-sm font-semibold">사후 원가 요약 <span className="text-muted-foreground text-xs font-normal ml-2">— [{activePostColorBom?.color}] 기준</span></h2>
-                    </div>
+                  <Fold id="post-summary" title="사후 원가 요약" hint={`— [${activePostColorBom?.color ?? ''}] 기준`} defaultOpen>
                     <table className="data-table w-full text-[13px]">
                       <thead><tr className="bg-[var(--fill-tertiary)] text-[13px] font-semibold text-muted-foreground"><th className="w-12">구분</th><th>항목</th><th className="text-muted-foreground">내용/비고</th><th className="num w-40">금액 (원)</th></tr></thead>
                       <tbody>
@@ -4927,7 +4940,7 @@ export default function BomManagement() {
                         <span className="text-[11px] text-muted-foreground">품목마스터: {fmtKrw(linkedItem.deliveryPrice)}</span>
                       )}
                     </div>
-                  </div>
+                  </Fold>
                 );
               })()}
 
@@ -4940,10 +4953,7 @@ export default function BomManagement() {
                 const postPnlResult = editBom?.pnl ? calcPnl(finalCost, editBom.pnl) : null;
                 if (!editBom?.pnl || !postPnlResult) return null;
                 return (
-                  <div className="bg-card rounded-lg border border-border overflow-hidden">
-                    <div className="px-5 py-3 border-b border-border bg-[var(--fill-quaternary)] text-foreground">
-                      <h2 className="text-sm font-semibold">P&L 분석 <span className="text-muted-foreground text-xs font-normal ml-2">— 사후원가 [{activePostColorBom?.color}] 기준</span></h2>
-                    </div>
+                  <Fold id="post-pnl" title="P&L 분석" hint={`— 사후원가 [${activePostColorBom?.color ?? ''}] 기준`}>
                     <div className="p-5 space-y-5">
                       <div className="bg-[var(--fill-quaternary)] rounded-md p-4 border border-border">
                         <h3 className="text-xs font-semibold text-muted-foreground mb-3">가정 (Assumptions)</h3>
@@ -5012,7 +5022,7 @@ export default function BomManagement() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </Fold>
                 );
               })()}
             </>
