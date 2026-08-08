@@ -798,6 +798,35 @@ export default function MaterialMaster() {
               )}
             </div>
 
+            {/* 공장 보유 재고 — 재고를 쌓아두진 않지만 가죽·장식은 남는다.
+                발주 전에 공장에 확인한 결과를 적어두면 다음 발주 때 덜 시킬 수 있다 */}
+            <div className="space-y-1.5">
+              <Label>공장 보유 <span className="opt">확인한 경우만</span></Label>
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                <Input
+                  type="number" step="0.001" min="0"
+                  value={form.factoryStockQty ?? ''}
+                  onChange={e => setForm(prev => ({
+                    ...prev,
+                    factoryStockQty: e.target.value === '' ? undefined : Number(e.target.value),
+                    factoryStockCheckedAt: e.target.value === '' ? undefined : (prev.factoryStockCheckedAt || new Date().toISOString().split('T')[0]),
+                  }))}
+                  placeholder={`남은 수량 (${form.unit || ''})`}
+                />
+                <Input
+                  type="date" className="w-40"
+                  value={form.factoryStockCheckedAt || ''}
+                  onChange={e => setForm(prev => ({ ...prev, factoryStockCheckedAt: e.target.value || undefined }))}
+                  title="확인한 날"
+                />
+              </div>
+              <Input
+                value={form.factoryStockNote || ''}
+                onChange={e => setForm(prev => ({ ...prev, factoryStockNote: e.target.value }))}
+                placeholder="예: 블랙만 남음 / 다음 발주까지 보관 요청"
+              />
+            </div>
+
             {/* 메모 */}
             <div className="space-y-1.5">
               <Label>메모</Label>

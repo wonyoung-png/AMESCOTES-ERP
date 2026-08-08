@@ -45,7 +45,7 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
   materials: ['id', 'item_code', 'name', 'name_en', 'spec', 'unit', 'unit_price', 'unit_price_cny', 'unit_price_krw',
               'unit_price_usd', 'price_currency', 'brand', 'image_url',
               'currency', 'vendor_id', 'category', 'sub_type', 'plating_color', 'mold_cost', 'mold_cost_amount', 'mold_cost_currency', 'plating_prices', 'season',
-              'stock_qty', 'memo',
+              'stock_qty', 'factory_stock_qty', 'factory_stock_checked_at', 'factory_stock_note', 'memo',
               'order_status', 'order_date', 'order_qty', 'order_vendor_name',
               'created_at', 'updated_at'],
   // 자재구매 — 운영 DB 컬럼과 1:1 (없는 컬럼을 보내면 PostgREST 가 통째로 거부한다)

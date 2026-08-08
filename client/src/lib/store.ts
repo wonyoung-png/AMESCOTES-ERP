@@ -130,6 +130,12 @@ export interface Material {
   category: MaterialCategory;
   subType?: string;       // 세부 타입 (가죽: 소가죽/양가죽… · 장식: 버클/링/프레임…)
   brand?: string;         // 전용 브랜드 ('공통' | 바이어명, 예: LUMEN / AETALOOF)
+  /** 공장에 남아 있는 수량 — 발주 전에 공장에 확인해서 적어둔다 */
+  factoryStockQty?: number;
+  /** 공장 재고를 마지막으로 확인한 날 */
+  factoryStockCheckedAt?: string;
+  /** 확인 메모 (예: 블랙만 남음) */
+  factoryStockNote?: string;
   spec?: string;          // 스펙 (두께, 사이즈 등)
   platingColor?: string;  // 도금 컬러 (장식) — 대표 컬러 (레거시·표시용)
   /** 도금 컬러별 단가 — 품목은 하나인데 컬러마다 값이 다를 때 */

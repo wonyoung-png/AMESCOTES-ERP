@@ -750,6 +750,28 @@ export default function ProductionOrders() {
     }
   };
 
+  /** 자재 마스터에 적어둔 재고(창고 + 공장 보유)를 장바구니 보유재고에 채운다.
+      재고를 상시 관리하지 않으므로 자동 차감 대신 이 버튼으로 한 번에 반영한다. */
+  const fillStockFromMaster = async () => {
+    try {
+      const mats = await fetchMaterials();
+      let hit = 0;
+      for (const item of store.getMaterialCart()) {
+        const m = (mats as any[]).find(x =>
+          x.name === item.materialName && (!x.unit || !item.unit || x.unit === item.unit));
+        if (!m) continue;
+        const total = (Number(m.stockQty) || 0) + (Number(m.factoryStockQty) || 0);
+        if (total <= 0) continue;
+        store.updateCartItemStock(item.materialName, item.unit, total);
+        hit += 1;
+      }
+      refreshCart();
+      toast.success(hit ? `${hit}종에 재고 반영 — 발주수량이 그만큼 줄었습니다` : '자재 마스터에 적힌 재고가 없습니다');
+    } catch (e) {
+      toast.error(`재고 불러오기 실패: ${(e as Error).message}`);
+    }
+  };
+
   /** 발주서를 공장에 보낸 것으로 표시 — 이미지/인쇄 직후 자동으로도 찍힌다 */
   const markSent = async (o: ProductionOrder) => {
     if (o.sentAt) return;
@@ -3648,6 +3670,14 @@ export default function ProductionOrders() {
             </div>
           ) : (
             <div className="space-y-4 py-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fillStockFromMaster}>
+                  자재 마스터 재고 불러오기
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  창고 재고 + 공장 보유를 합쳐 채웁니다 · 발주수량 = 소요수량 − 보유재고
+                </span>
+              </div>
               <div className="overflow-x-auto">
                 <table className="data-table w-full min-w-[640px] text-sm">
                   <thead>

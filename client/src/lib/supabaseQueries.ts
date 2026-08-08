@@ -836,6 +836,9 @@ export async function fetchMaterials() {
     priceCurrency: row.price_currency || undefined,
     imageUrl: row.image_url || undefined,
     stockQty: row.stock_qty || 0,
+    factoryStockQty: row.factory_stock_qty ?? undefined,
+    factoryStockCheckedAt: row.factory_stock_checked_at || undefined,
+    factoryStockNote: row.factory_stock_note || undefined,
     vendorId: row.vendor_id || '',
     memo: row.memo || '',
     orderStatus: row.order_status || undefined,
@@ -873,6 +876,9 @@ export async function upsertMaterial(mat: Record<string, any>): Promise<void> {
   if (mat.priceCurrency !== undefined) row.price_currency = mat.priceCurrency || null;
   if (mat.imageUrl !== undefined) row.image_url = mat.imageUrl || null;
   if (mat.stockQty !== undefined) row.stock_qty = mat.stockQty;
+  if (mat.factoryStockQty !== undefined) row.factory_stock_qty = mat.factoryStockQty;
+  if (mat.factoryStockCheckedAt !== undefined) row.factory_stock_checked_at = mat.factoryStockCheckedAt || null;
+  if (mat.factoryStockNote !== undefined) row.factory_stock_note = mat.factoryStockNote || null;
   if (mat.vendorId !== undefined) row.vendor_id = mat.vendorId || null;
   if (mat.memo !== undefined) row.memo = mat.memo || null;
   if (mat.orderStatus !== undefined) row.order_status = mat.orderStatus || null;
