@@ -46,6 +46,36 @@ export default function Dashboard() {
 
   const now = new Date();
   const thisMonth = now.toISOString().slice(0, 7);
+  const today = now.toISOString().split('T')[0];
+
+  // ── 오늘 할 일 — 숫자가 아니라 "지금 손대야 할 건"만 모은다 ──
+  const todo = useMemo(() => {
+    const list: Array<{ key: string; label: string; detail: string; href: string; tone: 'bad' | 'warn' | 'plain' }> = [];
+    const live = orders.filter(o => o.status !== '초안');
+
+    const drafts = orders.filter(o => o.status === '초안');
+    if (drafts.length) list.push({ key: 'draft', label: '초안 발주 확정', detail: `${drafts.length}건 — 간편등록으로 넣은 발주에 번호가 아직 없습니다`, href: '/orders', tone: 'warn' });
+
+    const notSent = live.filter(o => !o.sentAt && o.status === '발주생성');
+    if (notSent.length) list.push({ key: 'notsent', label: '공장에 발주서 전달', detail: `${notSent.length}건 — 등록만 되고 아직 보내지 않았습니다`, href: '/orders', tone: 'warn' });
+
+    const waiting = live.filter(o => o.sentAt && !o.confirmedAt);
+    if (waiting.length) list.push({ key: 'confirm', label: '공장 회신 기록', detail: `${waiting.length}건 — 보낸 뒤 컨펌이 안 들어왔습니다`, href: '/orders', tone: 'warn' });
+
+    const overdue = live.filter(o => o.deliveryDate && o.deliveryDate < today && o.status !== '입고완료');
+    if (overdue.length) list.push({ key: 'overdue', label: '납기 지난 발주', detail: `${overdue.length}건 — 입고가 안 끝났습니다`, href: '/deadlines', tone: 'bad' });
+
+    const soon = live.filter(o => o.deliveryDate && o.deliveryDate >= today && calcDDay(o.deliveryDate) <= 7 && o.status !== '입고완료');
+    if (soon.length) list.push({ key: 'soon', label: '납기 임박 (7일 이내)', detail: `${soon.length}건`, href: '/deadlines', tone: 'warn' });
+
+    const noPrice = live.filter(o => !o.factoryUnitPriceKrw);
+    if (noPrice.length) list.push({ key: 'noprice', label: '공장단가 미입력', detail: `${noPrice.length}건 — 원가·손익이 계산되지 않습니다`, href: '/orders', tone: 'bad' });
+
+    const received = live.filter(o => o.status === '입고완료' && !o.tradeStatementId);
+    if (received.length) list.push({ key: 'bill', label: '입고 완료 · 미청구', detail: `${received.length}건 — 거래명세를 발행하세요`, href: '/trade-statement', tone: 'warn' });
+
+    return list;
+  }, [orders, today]);
 
   // ── KPI 계산 (제조/OEM 중심) ──
   const monthBilledCount = useMemo(() =>
@@ -162,6 +192,34 @@ export default function Dashboard() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">생산 대시보드</h1>
         <p className="text-sm text-muted-foreground mt-0.5">ATLM 제조 ERP — OEM 생산·납기·정산 현황</p>
+      </div>
+
+      {/* ── 오늘 할 일 — 홈에서 바로 클릭해 들어간다 ── */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <p className="font-semibold text-sm">오늘 할 일</p>
+          <span className="text-xs text-muted-foreground tabular-nums">{todo.length}건</span>
+        </div>
+        {todo.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-muted-foreground text-center">지금 손댈 건이 없습니다</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {todo.map(t => (
+              <Link key={t.key} href={t.href}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--fill-quaternary)]">
+                <span className={`w-1.5 h-8 rounded-full shrink-0 ${
+                  t.tone === 'bad' ? 'bg-[var(--system-red)]'
+                  : t.tone === 'warn' ? 'bg-[var(--system-orange)]'
+                  : 'bg-border'}`} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-foreground">{t.label}</span>
+                  <span className="block text-xs text-muted-foreground truncate">{t.detail}</span>
+                </span>
+                <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── KPI 7개 ── */}
