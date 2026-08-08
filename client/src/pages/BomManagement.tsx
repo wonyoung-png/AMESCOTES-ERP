@@ -33,6 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge';
 import { HoverZoomImage } from '@/components/HoverZoomImage';
 import { toast } from 'sonner';
+import { onSaveFail } from '@/lib/saveGuard';
 import {
   Plus, Trash2, Upload, FileText, Download, ChevronDown, ChevronRight,
   Calculator, TrendingUp, AlertTriangle, CheckCircle, Save, X, Copy, Search,
@@ -855,11 +856,11 @@ function SimpleCostModal({
         id: item.id,
         baseCostKrw: preCostNum,
         hasBom: true,
-      } as any))).catch(() => {});
+      } as any))).catch(onSaveFail('BOM'));
 
       // 간단 사후원가 → items 테이블 동기화
       if (postCostNum && postCostNum > 0) {
-        import('@/lib/supabaseQueries').then(m => m.updateItemCostData(item.id, postCostNum)).catch(() => {});
+        import('@/lib/supabaseQueries').then(m => m.updateItemCostData(item.id, postCostNum)).catch(onSaveFail('BOM'));
       }
 
       toast.success(`[${item.styleNo}] 간단 원가 저장 완료`);
@@ -1449,7 +1450,7 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
     import('@/lib/supabaseQueries').then(m => {
       m.upsertVendor(newVendor)
         .then(() => queryClient.invalidateQueries({ queryKey: ['vendors'] }))
-        .catch(() => {});
+        .catch(onSaveFail('BOM'));
     });
     queryClient.invalidateQueries({ queryKey: ['vendors'] });
     toast.success(`"${name}" 거래처 마스터에 등록됨`);
@@ -3024,7 +3025,7 @@ export default function BomManagement() {
       // 1. 기본 품목 정보 저장 (has_bom, colors 등 — 항상 성공해야 함)
       m.upsertItem(updatedItemData as any)
         .then(() => queryClient.invalidateQueries({ queryKey: ['items'] }))
-        .catch(() => {});
+        .catch(onSaveFail('BOM'));
       // 2. 사후원가/확정판매가 별도 저장 (migration_add_post_cost_to_items.sql 실행 후 반영)
       if (postCostKrw > 0 || editBom.pnl?.confirmedSalePrice) {
         m.updateItemCostData(
@@ -3406,9 +3407,9 @@ export default function BomManagement() {
     if (confirm(`${selectedBomIds.size}개 BOM을 삭제하시겠습니까?`)) {
       const newBoms = extBoms.filter(b => !selectedBomIds.has(b.id));
       const deletedIds = [...selectedBomIds];
-      deletedIds.forEach(id => deleteBomSB(id).catch(() => {}));
+      deletedIds.forEach(id => deleteBomSB(id).catch(onSaveFail('BOM')));
       extBoms.filter(b => selectedBomIds.has(b.id)).forEach(b => {
-        import('@/lib/supabaseQueries').then(m => m.upsertItem({ id: b.styleId, hasBom: false } as any)).catch(() => {});
+        import('@/lib/supabaseQueries').then(m => m.upsertItem({ id: b.styleId, hasBom: false } as any)).catch(onSaveFail('BOM'));
       });
       saveExtBoms(newBoms);
       setExtBoms(newBoms);
@@ -4917,7 +4918,7 @@ export default function BomManagement() {
                         onChange={e => {
                           const val = e.target.value === '' ? null : Number(e.target.value);
                           updateField('postDeliveryPrice', val as any);
-                          if (editBom.styleId) import('@/lib/supabaseQueries').then(m => m.upsertItem({ id: editBom.styleId, deliveryPrice: val ?? 0 } as any)).catch(() => {});
+                          if (editBom.styleId) import('@/lib/supabaseQueries').then(m => m.upsertItem({ id: editBom.styleId, deliveryPrice: val ?? 0 } as any)).catch(onSaveFail('BOM'));
                         }}
                         className="h-8 text-sm border-border text-right w-36 font-semibold"
                         placeholder="납품가 입력"

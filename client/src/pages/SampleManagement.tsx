@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { onSaveFail } from '@/lib/saveGuard';
 import {
   Plus, Search, Trash2, Camera, FileText,
   ClipboardCheck, Eye, PackagePlus, FileSpreadsheet, File, Paperclip,
@@ -654,7 +655,7 @@ export default function SampleManagement() {
 
     // billingStatus 업데이트
     const updatePromises = unclaimed.map(s => upsertSampleSB({ ...s, billingStatus: '청구완료', billingDate: today }));
-    Promise.all(updatePromises).then(() => refresh()).catch(() => {});
+    Promise.all(updatePromises).then(() => refresh()).catch(onSaveFail('샘플'));
     toast.success(`거래명세표 ${createdCount}건이 생성되었습니다`);
   };
 
@@ -670,7 +671,7 @@ export default function SampleManagement() {
       ...detailSample,
       revisionHistory: [...(detailSample.revisionHistory || []), note],
     };
-    upsertSampleSB({ ...updated }).then(() => refresh()).catch(() => {});
+    upsertSampleSB({ ...updated }).then(() => refresh()).catch(onSaveFail('샘플'));
     setDetailSample(updated);
     setNewRevNote('');
     toast.success('메모가 추가되었습니다');
@@ -684,7 +685,7 @@ export default function SampleManagement() {
       ...detailSample,
       materialChecklist: [...(detailSample.materialChecklist || []), item],
     };
-    upsertSampleSB({ ...updated }).then(() => refresh()).catch(() => {});
+    upsertSampleSB({ ...updated }).then(() => refresh()).catch(onSaveFail('샘플'));
     setDetailSample(updated);
     setNewCheckItem('');
   };
@@ -698,7 +699,7 @@ export default function SampleManagement() {
         c.id === itemId ? { ...c, isReady: !c.isReady } : c
       ),
     };
-    upsertSampleSB({ ...updated }).then(() => refresh()).catch(() => {});
+    upsertSampleSB({ ...updated }).then(() => refresh()).catch(onSaveFail('샘플'));
     setDetailSample(updated);
   };
 
@@ -760,7 +761,7 @@ export default function SampleManagement() {
   };
 
   const handleApprove = (s: Sample) => {
-    upsertSampleSB({ ...s, stage: '최종승인', approvedBy: '관리자' }).then(() => refresh()).catch(() => {});
+    upsertSampleSB({ ...s, stage: '최종승인', approvedBy: '관리자' }).then(() => refresh()).catch(onSaveFail('샘플'));
     // 승인은 샘플 단계만 "최종승인"으로 변경 (품목은 접수 때 이미 등록됨)
     refresh();
     toast.success(`${s.styleNo} 최종 승인 완료`);
@@ -1283,7 +1284,7 @@ export default function SampleManagement() {
                           <button
                             onClick={() => {
                               if (confirm('청구완료를 미청구로 되돌리겠습니까?')) {
-                                upsertSampleSB({ ...s, billingStatus: '미청구', billingDate: undefined }).then(() => refresh()).catch(() => {});
+                                upsertSampleSB({ ...s, billingStatus: '미청구', billingDate: undefined }).then(() => refresh()).catch(onSaveFail('샘플'));
                               }
                             }}
                             className="text-[11px] text-muted-foreground hover:text-[var(--system-red)]"
@@ -2235,7 +2236,7 @@ export default function SampleManagement() {
                       toast.success(`${stmt.statementNo}에 추가됐습니다`);
                     }
                   }
-                  upsertSampleSB({ ...billingTarget, billingStatus: '청구완료', billingDate: today }).then(() => refresh()).catch(() => {});
+                  upsertSampleSB({ ...billingTarget, billingStatus: '청구완료', billingDate: today }).then(() => refresh()).catch(onSaveFail('샘플'));
                   setBillingModal(false);
                 }}
               >

@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { onSaveFail } from '@/lib/saveGuard';
 import { Plus, Trash2, ShoppingCart, FileText, Receipt, Printer, X, Mail, Eye, Camera } from 'lucide-react';
 
 const CURRENCIES: Currency[] = ['KRW', 'USD', 'CNY'];
@@ -122,7 +123,7 @@ export default function PurchaseMatching() {
             const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
             if (localOrder && localOrder.status === '발주생성') {
               store.updateOrder(localOrder.id, { status: '생산중' });
-              upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(() => {});
+              upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(onSaveFail('자재구매'));
             }
           }
         } catch {
@@ -338,7 +339,7 @@ export default function PurchaseMatching() {
             const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
             if (localOrder && localOrder.status === '발주생성') {
               store.updateOrder(localOrder.id, { status: '생산중' });
-              upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(() => {});
+              upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(onSaveFail('자재구매'));
               toast.success(`생산발주 [${item.orderNo}] → 생산중으로 변경됐어요`);
             }
           }

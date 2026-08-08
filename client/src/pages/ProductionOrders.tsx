@@ -23,6 +23,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { onSaveFail } from '@/lib/saveGuard';
 import { printDoc, copyDocAsImage, saveDocAsImage } from '@/lib/docExport';
 import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera, MoreHorizontal, ChevronRight, ChevronDown, Layers } from 'lucide-react';
 
@@ -282,7 +283,7 @@ export default function ProductionOrders() {
     if (order) {
       upsertOrder({ ...order, expenseId: payable.id, updatedAt: new Date().toISOString() })
         .then(() => refresh())
-        .catch(() => {});
+        .catch(onSaveFail('발주'));
     }
     toast.success('지출결의(임가공)가 생성되었습니다 — /payables 에서 결제');
     setExpenseModal(false);
@@ -465,7 +466,7 @@ export default function ProductionOrders() {
     if (!confirm(`선택한 ${selectedIds.size}건을 삭제하시겠습니까?`)) return;
     for (const id of Array.from(selectedIds)) {
       store.deleteOrder(id);
-      deleteOrderSB(id).catch(() => {});
+      deleteOrderSB(id).catch(onSaveFail('발주'));
     }
     setSelectedIds(new Set());
     refresh();
@@ -923,7 +924,7 @@ export default function ProductionOrders() {
         .map(c => ({ name: c }));
       if (newColors.length > 0 && currentItem) {
         const updatedColors = [...normalizeColors(currentItem.colors || []), ...newColors];
-        import('@/lib/supabaseQueries').then(m => m.upsertItem({ ...currentItem, colors: updatedColors } as any)).catch(() => {});
+        import('@/lib/supabaseQueries').then(m => m.upsertItem({ ...currentItem, colors: updatedColors } as any)).catch(onSaveFail('발주'));
         queryClient.setQueryData(['items'], (old: any[] = []) =>
           old.map((it: any) => it.id === form.styleId ? { ...it, colors: updatedColors } : it)
         );
@@ -1087,7 +1088,7 @@ export default function ProductionOrders() {
     }
     const existing = (orders as ProductionOrder[]).find(o => o.id === id);
     if (existing) {
-      upsertOrder({ ...existing, status, updatedAt: new Date().toISOString() }).then(() => refresh()).catch(() => {});
+      upsertOrder({ ...existing, status, updatedAt: new Date().toISOString() }).then(() => refresh()).catch(onSaveFail('발주'));
     }
   };
 
@@ -1198,7 +1199,7 @@ export default function ProductionOrders() {
           ...order,
           postDefects: (order.postDefects || []).map(d => d.settledAt ? d : { ...d, settledAt: today2 }),
           updatedAt: new Date().toISOString(),
-        }).catch(() => {});
+        }).catch(onSaveFail('발주'));
       }
 
       const newStatement: TradeStatement = {
@@ -1218,7 +1219,7 @@ export default function ProductionOrders() {
       const existingOrder1 = (orders as ProductionOrder[]).find(o => o.id === order.id);
       if (existingOrder1) {
         upsertOrder({ ...existingOrder1, tradeStatementId: newStatement.id, updatedAt: new Date().toISOString() })
-          .then(() => refresh()).catch(() => {});
+          .then(() => refresh()).catch(onSaveFail('발주'));
       }
       setBillingModal(false);
       toast.success(`거래명세표 ${statementNo} 생성 완료 → 거래명세표 탭에서 확인하세요`);
@@ -1241,7 +1242,7 @@ export default function ProductionOrders() {
       const existingOrder2 = (orders as ProductionOrder[]).find(o => o.id === order.id);
       if (existingOrder2) {
         upsertOrder({ ...existingOrder2, tradeStatementId: linkStatementId, updatedAt: new Date().toISOString() })
-          .then(() => refresh()).catch(() => {});
+          .then(() => refresh()).catch(onSaveFail('발주'));
       }
       setBillingModal(false);
       toast.success(`${stmt.statementNo}에 발주 항목이 추가됐습니다`);

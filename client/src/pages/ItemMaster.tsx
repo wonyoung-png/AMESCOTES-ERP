@@ -29,6 +29,7 @@ import { HoverZoomImage } from '@/components/HoverZoomImage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link, ShoppingCart, Printer, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Columns3, Factory, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { onSaveFail } from '@/lib/saveGuard';
 import * as XLSX from 'xlsx';
 
 // ─── 공장 원가표 일괄 업로드 타입 ───
@@ -3639,7 +3640,7 @@ function MultiBulkOrderModal({
       if (merged.length === 0) continue;
       const existKeys = new Set(existing.map(c => c.name.toUpperCase()));
       if (merged.every(c => existKeys.has(c.name.toUpperCase())) && merged.length === existing.length) continue;
-      upsertItem({ id: master.id, colors: merged } as any).catch(() => {});
+      upsertItem({ id: master.id, colors: merged } as any).catch(onSaveFail('품목'));
       changed = true;
     }
     if (changed) queryClient.invalidateQueries({ queryKey: ['items'] });
@@ -3689,7 +3690,7 @@ function MultiBulkOrderModal({
     } else {
       updatedColors = [...currentColors, { name: colorName, [field]: value }];
     }
-    upsertItem({ id: itemId, colors: updatedColors } as any).catch(() => {});
+    upsertItem({ id: itemId, colors: updatedColors } as any).catch(onSaveFail('품목'));
     queryClient.setQueryData(['items'], (old: any[] = []) =>
       old.map((it: any) => it.id === itemId ? { ...it, colors: updatedColors } : it)
     );
@@ -3884,7 +3885,7 @@ function MultiBulkOrderModal({
           if (!existingColorNames.includes(cq.color)) {
             // 새 컬러: 품목 마스터에 추가 (낙관적 업데이트)
             const newColors = [...existingColors, itemColor];
-            upsertItem({ id: state.item.id, colors: newColors } as any).catch(() => {});
+            upsertItem({ id: state.item.id, colors: newColors } as any).catch(onSaveFail('품목'));
             queryClient.setQueryData(['items'], (old: any[] = []) =>
               old.map((it: any) => it.id === state.item.id ? { ...it, colors: newColors } : it)
             );
@@ -3901,7 +3902,7 @@ function MultiBulkOrderModal({
               const updatedColors = existingColors.map(c =>
                 c.name === cq.color ? { ...c, ...itemColor } : c
               );
-              upsertItem({ id: state.item.id, colors: updatedColors } as any).catch(() => {});
+              upsertItem({ id: state.item.id, colors: updatedColors } as any).catch(onSaveFail('품목'));
               queryClient.setQueryData(['items'], (old: any[] = []) =>
                 old.map((it: any) => it.id === state.item.id ? { ...it, colors: updatedColors } : it)
               );
