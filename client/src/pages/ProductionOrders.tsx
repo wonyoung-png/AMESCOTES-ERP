@@ -1927,7 +1927,7 @@ export default function ProductionOrders() {
 
       {/* ─── 스타일 선택 사이드 패널 (오른쪽에서 슬라이드) ─── */}
       <Sheet open={stylePickerOpen} onOpenChange={setStylePickerOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
+        <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col">
           <SheetHeader className="px-4 pt-4 pb-2">
             <SheetTitle className="text-base">스타일 선택</SheetTitle>
           </SheetHeader>
@@ -2846,7 +2846,7 @@ export default function ProductionOrders() {
 
       {/* 입고 처리 팝업 */}
       <Dialog open={showReceiveModal} onOpenChange={setShowReceiveModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-md sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>입고 처리</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">입고 수량과 불량 수량을 입력해주세요.</p>
@@ -3620,7 +3620,7 @@ export default function ProductionOrders() {
       {/* ── 발주 완료 후 액션 팝업 ── */}
       {postOrderInfo && (
         <Dialog open={postOrderModal} onOpenChange={setPostOrderModal}>
-          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-md">
+          <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-lg sm:rounded-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-[var(--system-green)]">
                 <CheckCircle2 className="w-5 h-5" />
@@ -3831,7 +3831,7 @@ export default function ProductionOrders() {
 
       {/* ── 공장 컨펌 기록 ── 발주서를 보낸 뒤 공장 회신을 남긴다 (납기 분쟁 근거) ── */}
       <Dialog open={!!confirmTarget} onOpenChange={o => { if (!o) setConfirmTarget(null); }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>공장 컨펌 — {confirmTarget?.orderNo}</DialogTitle></DialogHeader>
           {confirmTarget && (
             <div className="space-y-4 py-1">
@@ -4231,7 +4231,7 @@ export default function ProductionOrders() {
 
       {/* ── 입고완료 지출결의 모달 ── */}
       <Dialog open={expenseModal} onOpenChange={setExpenseModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-primary" />
@@ -4337,7 +4337,7 @@ export default function ProductionOrders() {
 
       {/* ── 이메일 입력 모달 ── */}
       <Dialog open={emailInputModal} onOpenChange={setEmailInputModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-sm sm:rounded-md">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-md sm:rounded-md">
           <DialogHeader>
             <DialogTitle>이메일 주소 입력</DialogTitle>
           </DialogHeader>
