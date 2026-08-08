@@ -376,6 +376,14 @@ export interface ProductionOrder {
   brandBatchId?: string;
   /** 발주 묶음 번호 — 일괄 발주 1회 = 묶음 1개. 공장 발주서는 이 단위로 1장 나간다 */
   poBatchNo?: string;
+  /** 발주서를 공장에 보낸 시점 */
+  sentAt?: string;
+  /** 공장이 회신한 시점 */
+  confirmedAt?: string;
+  /** 공장이 확정한 납기 (우리 요청 납기와 다를 수 있다) */
+  confirmedDate?: string;
+  /** 회신 내용 — 납기 분쟁 시 근거 */
+  confirmNote?: string;
   shippedQty?: number;
   isEmployeePurchase?: boolean;
   // 리오더 네고 이력

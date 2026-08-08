@@ -128,6 +128,8 @@ export default function ProductionOrders() {
 
   // 작업지시서 모달 상태
   const [batchSheet, setBatchSheet] = useState<{ batchNo: string; orders: ProductionOrder[] } | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<ProductionOrder | null>(null);
+  const [confirmForm, setConfirmForm] = useState({ confirmedDate: '', confirmNote: '' });
   const batchSheetRef = useRef<HTMLDivElement>(null);
   const [workOrderModal, setWorkOrderModal] = useState(false);
   const [workOrderTarget, setWorkOrderTarget] = useState<ProductionOrder | null>(null);
@@ -745,6 +747,34 @@ export default function ProductionOrders() {
       refresh();
     } catch (e) {
       toast.error(`확정 실패: ${(e as Error).message}`);
+    }
+  };
+
+  /** 발주서를 공장에 보낸 것으로 표시 — 이미지/인쇄 직후 자동으로도 찍힌다 */
+  const markSent = async (o: ProductionOrder) => {
+    if (o.sentAt) return;
+    try {
+      await upsertOrder({ ...o, sentAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      refresh();
+    } catch (e) { onSaveFail('발주')(e); }
+  };
+
+  /** 공장 회신 기록 — 납기 분쟁의 근거가 된다 */
+  const saveFactoryConfirm = async () => {
+    if (!confirmTarget) return;
+    try {
+      await upsertOrder({
+        ...confirmTarget,
+        confirmedAt: new Date().toISOString(),
+        confirmedDate: confirmForm.confirmedDate || confirmTarget.deliveryDate,
+        confirmNote: confirmForm.confirmNote || undefined,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success('공장 컨펌 기록됨');
+      setConfirmTarget(null);
+      refresh();
+    } catch (e) {
+      toast.error(`컨펌 저장 실패: ${(e as Error).message}`);
     }
   };
 
@@ -1595,6 +1625,20 @@ export default function ProductionOrders() {
                       <span className="font-mono font-semibold text-foreground">{o.orderNo}</span>
                       {o.status === '초안' && (
                         <Badge variant="outline" className="text-[11px] h-4 text-[var(--system-orange)] border-[var(--system-orange)]/30 bg-[var(--system-orange)]/10">초안</Badge>
+                      )}
+                      {o.status !== '초안' && (
+                        o.confirmedAt ? (
+                          <Badge variant="outline" className="text-[11px] h-4 text-[var(--system-green)] border-[var(--system-green)]/30 bg-[var(--system-green)]/10"
+                            title={`공장 확정 납기 ${o.confirmedDate || '-'}${o.confirmNote ? ` · ${o.confirmNote}` : ''}`}>컨펌</Badge>
+                        ) : o.sentAt ? (
+                          <button type="button" title="공장 회신을 기록하세요"
+                            onClick={() => { setConfirmTarget(o); setConfirmForm({ confirmedDate: o.deliveryDate || '', confirmNote: '' }); }}
+                            className="text-[11px] h-4 px-1.5 rounded border border-[var(--system-orange)]/40 text-[var(--system-orange)] bg-[var(--system-orange)]/10">
+                            회신대기
+                          </button>
+                        ) : (
+                          <Badge variant="outline" className="text-[11px] h-4 text-muted-foreground border-border" title="아직 공장에 보내지 않았습니다">미전달</Badge>
+                        )
                       )}
                       {o.isReorder && <Badge variant="outline" className="text-[11px] h-4 text-primary border-primary/20">리오더</Badge>}
                       {o.poBatchNo && (
@@ -3143,7 +3187,7 @@ export default function ProductionOrders() {
               try { await saveDocAsImage(poSheetRef.current, `발주서_${poTarget?.orderNo}`); toast.success('이미지 저장됨'); }
               catch (e) { toast.error((e as Error).message); }
             }}>이미지 저장</Button>
-            <Button onClick={() => printDoc(poSheetRef.current)}>
+            <Button onClick={() => { if (poTarget) void markSent(poTarget); printDoc(poSheetRef.current); }}>
               <Printer className="w-4 h-4 mr-1.5" />A4 인쇄 · PDF
             </Button>
           </DialogFooter>
@@ -3725,6 +3769,39 @@ export default function ProductionOrders() {
         </DialogContent>
       </Dialog>
 
+      {/* ── 공장 컨펌 기록 ── 발주서를 보낸 뒤 공장 회신을 남긴다 (납기 분쟁 근거) ── */}
+      <Dialog open={!!confirmTarget} onOpenChange={o => { if (!o) setConfirmTarget(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>공장 컨펌 — {confirmTarget?.orderNo}</DialogTitle></DialogHeader>
+          {confirmTarget && (
+            <div className="space-y-4 py-1">
+              <div className="text-sm text-muted-foreground">
+                {confirmTarget.vendorName || '공장 미지정'} · 요청 납기 {confirmTarget.deliveryDate || '미정'}
+                {confirmTarget.sentAt && <> · 보낸 날 {confirmTarget.sentAt.slice(0, 10)}</>}
+              </div>
+              <div className="space-y-1.5">
+                <Label>공장이 확정한 납기</Label>
+                <Input type="date" value={confirmForm.confirmedDate}
+                  onChange={e => setConfirmForm(f => ({ ...f, confirmedDate: e.target.value }))} />
+                {confirmForm.confirmedDate && confirmTarget.deliveryDate && confirmForm.confirmedDate > confirmTarget.deliveryDate && (
+                  <p className="text-xs text-[var(--system-orange)]">요청 납기보다 늦습니다 — 바이어 납기를 확인하세요</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label>회신 내용</Label>
+                <Input value={confirmForm.confirmNote}
+                  onChange={e => setConfirmForm(f => ({ ...f, confirmNote: e.target.value }))}
+                  placeholder="예: 원단 입고 후 15일 소요, 8/25 선적 가능" />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmTarget(null)}>취소</Button>
+            <Button onClick={saveFactoryConfirm}>컨펌 기록</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── 공장 발주서 (묶음 1장) ── 스타일 여러 개를 한 장에 담아 공장에 보낸다.
              작업지시서는 스타일별로 따로 뽑는다 (아래 버튼). ── */}
       <Dialog open={!!batchSheet} onOpenChange={o => { if (!o) setBatchSheet(null); }}>
@@ -3823,7 +3900,7 @@ export default function ProductionOrders() {
               try { await saveDocAsImage(batchSheetRef.current, `발주서_${batchSheet.batchNo}`); toast.success('이미지 저장됨'); }
               catch (e) { toast.error((e as Error).message); }
             }}>이미지 저장</Button>
-            <Button onClick={() => printDoc(batchSheetRef.current)}>
+            <Button onClick={() => { batchSheet?.orders.forEach(o => void markSent(o)); printDoc(batchSheetRef.current); }}>
               <Printer className="w-4 h-4 mr-1.5" />A4 인쇄 · PDF
             </Button>
           </DialogFooter>
