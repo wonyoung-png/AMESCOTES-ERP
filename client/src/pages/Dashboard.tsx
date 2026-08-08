@@ -46,7 +46,8 @@ export default function Dashboard() {
 
   const now = new Date();
   const thisMonth = now.toISOString().slice(0, 7);
-  const today = now.toISOString().split('T')[0];
+  // 한국은 UTC+9 라 새벽엔 toISOString() 이 어제 날짜를 준다 → 로컬 달력으로 만든다
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   // ── 오늘 할 일 — 숫자가 아니라 "지금 손대야 할 건"만 모은다 ──
   const todo = useMemo(() => {
@@ -59,7 +60,7 @@ export default function Dashboard() {
     const notSent = live.filter(o => !o.sentAt && o.status === '발주생성');
     if (notSent.length) list.push({ key: 'notsent', label: '공장에 발주서 전달', detail: `${notSent.length}건 — 등록만 되고 아직 보내지 않았습니다`, href: '/orders', tone: 'warn' });
 
-    const waiting = live.filter(o => o.sentAt && !o.confirmedAt);
+    const waiting = live.filter(o => o.sentAt && !o.confirmedAt && (o.status === '발주생성' || o.status === '생산중'));
     if (waiting.length) list.push({ key: 'confirm', label: '공장 회신 기록', detail: `${waiting.length}건 — 보낸 뒤 컨펌이 안 들어왔습니다`, href: '/orders', tone: 'warn' });
 
     const overdue = live.filter(o => o.deliveryDate && o.deliveryDate < today && o.status !== '입고완료');
