@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { onSaveFail } from '@/lib/saveGuard';
 import { printDoc, copyDocAsImage, saveDocAsImage } from '@/lib/docExport';
+import { PurchaseOrderDoc } from '@/components/PurchaseOrderDoc';
 import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera, MoreHorizontal, ChevronRight, ChevronDown, Layers } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
@@ -3204,64 +3205,9 @@ export default function ProductionOrders() {
               : [{ color: '기본', qty: poTarget.qty }];
             const total = rows.reduce((sum, r) => sum + r.qty * unit, 0);
             return (
-              <div ref={poSheetRef} className="p-4 space-y-4 text-sm bg-white text-neutral-900 rounded">
-                <h2 className="text-center text-lg font-bold tracking-widest border-b-2 border-neutral-800 pb-2">{DOC_T[docLang].po}</h2>
-                <table className="data-table w-full text-xs border-collapse">
-                  <tbody>
-                    <tr>
-                      <td className="border border-neutral-300 bg-neutral-100 font-semibold w-24">{DOC_T[docLang].orderNo}</td>
-                      <td className="nw border border-neutral-300 font-mono">{poTarget.orderNo}</td>
-                      <td className="border border-neutral-300 bg-neutral-100 font-semibold w-24">{DOC_T[docLang].orderDate}</td>
-                      <td className="border border-neutral-300">{poTarget.orderDate}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">{DOC_T[docLang].factory}</td>
-                      <td className="border border-neutral-300">
-                        {(docLang === 'zh'
-                          ? (allVendors.find((v: any) => v.id === poTarget.vendorId) as any)?.nameCn
-                          : undefined) || poTarget.vendorName || '—'}
-                      </td>
-                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">{DOC_T[docLang].delivery}</td>
-                      <td className="border border-neutral-300 font-semibold text-red-600">{poTarget.deliveryDate || '—'}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-neutral-300 bg-neutral-100 font-semibold">{DOC_T[docLang].style}</td>
-                      <td className="border border-neutral-300" colSpan={3}>
-                        {poTarget.styleNo} — {poTarget.styleName}{it?.buyerStyleNo ? ` (${DOC_T[docLang].buyerStyle} ${it.buyerStyleNo})` : ''}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <table className="data-table w-full text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-neutral-100">
-                      <th className="border border-neutral-300">{DOC_T[docLang].color}</th>
-                      <th className="border border-neutral-300 num">{DOC_T[docLang].qty}</th>
-                      <th className="border border-neutral-300 num">{DOC_T[docLang].unitPrice}</th>
-                      <th className="border border-neutral-300 num">{DOC_T[docLang].amount}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r, i) => (
-                      <tr key={i}>
-                        <td className="border border-neutral-300">{r.color}</td>
-                        <td className="nw border border-neutral-300 num font-mono">{formatNumber(r.qty)}</td>
-                        <td className="nw border border-neutral-300 num font-mono">{formatKRW(unit)}</td>
-                        <td className="nw border border-neutral-300 num font-mono">{formatKRW(r.qty * unit)}</td>
-                      </tr>
-                    ))}
-                    <tr className="bg-neutral-50 font-semibold">
-                      <td className="border border-neutral-300">{DOC_T[docLang].total}</td>
-                      <td className="nw border border-neutral-300 num font-mono">{formatNumber(rows.reduce((s2, r) => s2 + r.qty, 0))}</td>
-                      <td className="border border-neutral-300"></td>
-                      <td className="nw border border-neutral-300 num font-mono">{formatKRW(total)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                {poTarget.memo && <p className="text-xs text-neutral-600">{DOC_T[docLang].memo}: {poTarget.memo}</p>}
-              </div>
+              <div ref={poSheetRef}>
+                <PurchaseOrderDoc orders={[poTarget]} vendors={allVendors as any} items={items as any} lang={docLang} />
+                            </div>
             );
           })()}
           <DialogFooter className="flex-wrap gap-2">
@@ -3923,62 +3869,13 @@ export default function ProductionOrders() {
             const totalAmt = list.reduce((s, o) => s + (o.qty || 0) * (o.factoryUnitPriceKrw || 0), 0);
             const dates = list.map(o => o.deliveryDate).filter(Boolean).sort();
             return (
-              <div className="space-y-4 py-1" ref={batchSheetRef}>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                  <div><p className="text-xs text-muted-foreground">{DOC_T[docLang].factory}</p><p className="font-semibold">{vendorNames.join(', ') || '미지정'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">{DOC_T[docLang].orderDate}</p><p className="font-semibold">{list[0]?.orderDate || '—'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">{DOC_T[docLang].delivery}</p><p className="font-semibold">{dates.length ? (dates[0] === dates[dates.length - 1] ? dates[0] : `${dates[0]} ~ ${dates[dates.length - 1]}`) : '—'}</p></div>
-                  <div><p className="text-xs text-muted-foreground">{DOC_T[docLang].styles}</p><p className="font-semibold tabular-nums">{list.length} · {totalQty.toLocaleString()} {DOC_T[docLang].pcs}</p></div>
+              <div className="space-y-4 py-1">
+                <div ref={batchSheetRef}>
+                  <PurchaseOrderDoc orders={list} batchNo={batchSheet.batchNo} vendors={allVendors as any} items={items as any} lang={docLang} />
                 </div>
-
                 {vendorNames.length > 1 && (
-                  <p className="text-xs text-[var(--system-orange)]">공장이 {vendorNames.length}곳입니다 — 공장별로 나눠서 인쇄하세요.</p>
+                  <p className="text-xs text-[var(--system-orange)] no-capture no-print">공장이 {vendorNames.length}곳입니다 — 공장별로 나눠서 인쇄하세요.</p>
                 )}
-
-                <div className="border border-border rounded-md overflow-x-auto">
-                  <table className="data-table min-w-[760px]">
-                    <thead>
-                      <tr>
-                        <th className="num" style={{ width: 36 }}>{DOC_T[docLang].no}</th>
-                        <th className="nw" style={{ width: 128 }}>{DOC_T[docLang].orderNo}</th>
-                        <th className="nw" style={{ width: 112 }}>{DOC_T[docLang].style}</th>
-                        <th style={{ width: 96 }}>{DOC_T[docLang].name}</th>
-                        <th>{DOC_T[docLang].colorQty}</th>
-                        <th className="num" style={{ width: 72 }}>{DOC_T[docLang].totalQty}</th>
-                        <th className="num" style={{ width: 88 }}>{DOC_T[docLang].unitPrice}</th>
-                        <th className="num" style={{ width: 108 }}>{DOC_T[docLang].amount}</th>
-                        <th className="nw" style={{ width: 92 }}>{DOC_T[docLang].delivery}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {list.map((o, i) => (
-                        <tr key={o.id}>
-                          <td className="num text-muted-foreground">{i + 1}</td>
-                          <td className="nw font-mono text-xs">{o.orderNo}</td>
-                          <td className="nw font-medium">{o.styleNo}</td>
-                          <td className="text-muted-foreground">{o.styleName}</td>
-                          <td className="text-xs">
-                            {(o.colorQtys || []).length
-                              ? (o.colorQtys || []).map(c => `${c.color} ${c.qty.toLocaleString()}`).join(' · ')
-                              : '—'}
-                          </td>
-                          <td className="num">{(o.qty || 0).toLocaleString()}</td>
-                          <td className="num">{o.factoryUnitPriceKrw ? formatKRW(o.factoryUnitPriceKrw) : '—'}</td>
-                          <td className="num">{o.factoryUnitPriceKrw ? formatKRW((o.qty || 0) * o.factoryUnitPriceKrw) : '—'}</td>
-                          <td className="nw text-xs">{o.deliveryDate || <span className="text-[var(--system-orange)]">{DOC_T[docLang].undecided}</span>}</td>
-                        </tr>
-                      ))}
-                      <tr>
-                        <td colSpan={5} className="font-semibold">{DOC_T[docLang].total}</td>
-                        <td className="num font-semibold">{totalQty.toLocaleString()}</td>
-                        <td></td>
-                        <td className="num font-semibold">{totalAmt > 0 ? formatKRW(totalAmt) : '—'}</td>
-                        <td></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
                 <div className="no-capture no-print">
                   <p className="text-xs text-muted-foreground mb-2">작업지시서는 스타일별로 따로 나갑니다</p>
                   <div className="flex flex-wrap gap-2">
@@ -4010,7 +3907,7 @@ export default function ProductionOrders() {
             }}>이미지 복사</Button>
             <Button variant="outline" onClick={async () => {
               if (!batchSheetRef.current) return;
-              try { await saveDocAsImage(batchSheetRef.current, `발주서_${batchSheet.batchNo}`); toast.success('이미지 저장됨'); }
+              try { await saveDocAsImage(batchSheetRef.current, `발주서_${batchSheet?.batchNo ?? ''}`); toast.success('이미지 저장됨'); }
               catch (e) { toast.error((e as Error).message); }
             }}>이미지 저장</Button>
             <Button onClick={() => {
