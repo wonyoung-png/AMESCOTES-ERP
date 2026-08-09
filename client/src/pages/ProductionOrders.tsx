@@ -2213,11 +2213,51 @@ export default function ProductionOrders() {
               {form.styleId && (() => {
                 const existingOrdersForStyle = (orders as ProductionOrder[]).filter(o => o.styleNo === form.styleNo && (!isEditMode || o.id !== editOrderId));
                 const existingCount = existingOrdersForStyle.length;
-                return existingCount > 0 ? (
-                  <div className="p-2 rounded-md bg-primary/10 border border-primary/20 text-xs text-primary flex items-center gap-1.5">
-                    <span>이 스타일 기존 발주 <strong>{existingCount}건</strong> 있음 (리오더)</span>
+                if (existingCount === 0) return null;
+                // 단가 이력 — 지난 발주 단가를 그 자리에서 보여준다 (협상 근거)
+                const history = existingOrdersForStyle
+                  .filter(o => o.factoryUnitPriceKrw && o.factoryUnitPriceKrw > 0)
+                  .sort((a, b) => (b.orderDate || '').localeCompare(a.orderDate || ''))
+                  .slice(0, 4);
+                const last = history[0]?.factoryUnitPriceKrw || 0;
+                const now = Number(form.factoryUnitPriceKrw) || 0;
+                const diff = last > 0 && now > 0 ? now - last : 0;
+                return (
+                  <div className="rounded-md bg-primary/10 border border-primary/20 text-xs text-primary overflow-hidden">
+                    <div className="px-2.5 py-2 flex items-center gap-1.5">
+                      <span>이 스타일 기존 발주 <strong>{existingCount}건</strong> (리오더)</span>
+                      {diff !== 0 && (
+                        <span className={`ml-auto font-semibold ${diff > 0 ? 'text-[var(--system-red)]' : 'text-[var(--system-green)]'}`}>
+                          지난 발주 대비 {diff > 0 ? '+' : ''}{formatKRW(diff)}
+                        </span>
+                      )}
+                    </div>
+                    {history.length > 0 && (
+                      <table className="data-table w-full text-[11px] bg-card text-foreground">
+                        <thead>
+                          <tr>
+                            <th className="nw">발주일</th>
+                            <th className="nw">발주번호</th>
+                            <th className="num">수량</th>
+                            <th className="num">공장단가</th>
+                            <th className="nw">공장</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {history.map(o => (
+                            <tr key={o.id}>
+                              <td className="nw">{o.orderDate || '-'}</td>
+                              <td className="nw font-mono">{o.orderNo}</td>
+                              <td className="num">{formatNumber(o.qty || 0)}</td>
+                              <td className="num font-semibold">{formatKRW(o.factoryUnitPriceKrw || 0)}</td>
+                              <td className="nw text-muted-foreground">{o.vendorName || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
-                ) : null;
+                );
               })()}
               {form.orderNo && (
                 <div className={`p-3 rounded-md border ${bomCalc.hasBomWarning ? 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20'}`}>
