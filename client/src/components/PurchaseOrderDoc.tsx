@@ -39,7 +39,17 @@ export function PurchaseOrderDoc({ orders, batchNo, vendors, items, lang = 'ko',
   const T = PO_T[lang];
   const won = (n: number) => `₩${Math.round(n).toLocaleString('ko-KR')}`;
   const first = orders[0];
+  const vendorIds = Array.from(new Set(orders.map(o => o.vendorId || '')));
   const vendor = vendors.find(v => v.id === first?.vendorId);
+  if (vendorIds.length > 1) {
+    // 한 장에 여러 공장을 담으면 다른 공장의 스타일·단가가 엉뚱한 곳으로 나간다
+    return (
+      <div className="bg-white text-neutral-900 p-6 text-sm">
+        <p className="font-semibold mb-1">공장이 {vendorIds.length}곳 섞여 있어 발주서를 만들 수 없습니다.</p>
+        <p className="text-neutral-600 text-[12px]">발주 목록에서 공장별로 나눠 선택한 뒤 다시 출력하세요.</p>
+      </div>
+    );
+  }
   const vendorName = (lang === 'zh' ? (vendor as any)?.nameCn : undefined) || vendor?.name || first?.vendorName || '-';
 
   const rows = orders.flatMap((o, oi) => {
@@ -54,7 +64,9 @@ export function PurchaseOrderDoc({ orders, batchNo, vendors, items, lang = 'ko',
   });
   const totalQty = rows.reduce((s, r) => s + r.qty, 0);
   const totalSupply = rows.reduce((s, r) => s + r.supply, 0);
-  const vat = Math.round(totalSupply * 0.1);
+  // 부가세는 국내 과세 거래에만. 해외공장·중문 서류엔 붙이지 않는다 (총액이 부풀던 문제)
+  const isDomestic = vendor?.type === '공장' && ((vendor as any)?.country ?? '한국') === '한국';
+  const vat = isDomestic && lang === 'ko' ? Math.round(totalSupply * 0.1) : 0;
   const dates = orders.map(o => o.deliveryDate).filter(Boolean).sort() as string[];
 
   const Party = ({ title, rows: pr }: { title: string; rows: Array<[string, string]> }) => (
@@ -140,8 +152,11 @@ export function PurchaseOrderDoc({ orders, batchNo, vendors, items, lang = 'ko',
           <div className="flex items-center gap-3 px-3 py-2">
             <span className="text-[11px] text-neutral-500 shrink-0">{T.totalWords}</span>
             {lang === 'ko'
-              ? <span className="font-semibold">일금 {krwInWords(totalSupply + vat)}원정</span>
-              : <span className="font-semibold">{T.vat} 10% 포함</span>}
+              ? <span className="font-semibold">
+                  일금 {krwInWords(totalSupply + vat)}원정
+                  <span className="ml-2 text-[11px] font-normal text-neutral-500">{vat > 0 ? '(부가세 포함)' : '(부가세 별도 없음)'}</span>
+                </span>
+              : <span className="font-semibold text-[11px] text-neutral-500">不含税</span>}
             <span className="ml-auto text-base font-bold tabular-nums">{won(totalSupply + vat)}</span>
           </div>
         </div>
