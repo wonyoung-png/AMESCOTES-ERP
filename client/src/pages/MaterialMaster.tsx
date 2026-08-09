@@ -252,7 +252,10 @@ export default function MaterialMaster() {
       const cur = currencyOf(mat);
       const newPrice = priceOf(mat);
       const oldPrice = before ? priceOf(before) : undefined;
-      if (newPrice != null && (!before || Number(oldPrice ?? NaN) !== Number(newPrice))) {
+      const oldCur = before ? currencyOf(before) : undefined;
+      const sameCurrency = oldCur === cur;
+      const changed = !before || !sameCurrency || Number(oldPrice ?? NaN) !== Number(newPrice);
+      if (newPrice != null && changed) {
         await recordPriceChange({
           kind: 'material',
           refId: mat.id,
@@ -261,7 +264,9 @@ export default function MaterialMaster() {
           vendorName: vendorQuery || undefined,
           currency: cur,
           unitPrice: Number(newPrice),
-          prevPrice: oldPrice != null ? Number(oldPrice) : undefined,
+          // 통화가 바뀌었으면 이전값을 넘기지 않는다 — 다른 통화끼리 빼면 숫자가 거짓말을 한다
+          prevPrice: sameCurrency && oldPrice != null ? Number(oldPrice) : undefined,
+          memo: sameCurrency ? undefined : `통화 변경 ${oldCur ?? '-'} → ${cur}`,
         }).catch(onSaveFail('단가 이력'));
       }
       queryClient.invalidateQueries({ queryKey: ['materials'] });
@@ -508,6 +513,9 @@ export default function MaterialMaster() {
                     <div className="flex items-center justify-center gap-1">
                       <button onClick={() => setDetail(m)} title="상세보기" className="p-1.5 rounded hover:bg-[var(--fill-tertiary)] text-muted-foreground">
                         <Eye size={14} />
+                      </button>
+                      <button onClick={() => openHistory(m)} title="단가 이력" className="p-1.5 rounded hover:bg-[var(--fill-tertiary)] text-muted-foreground">
+                        <History size={14} />
                       </button>
                       <button onClick={() => openEdit(m)} title="수정" className="p-1.5 rounded hover:bg-[var(--fill-tertiary)] text-muted-foreground">
                         <Pencil size={14} />
