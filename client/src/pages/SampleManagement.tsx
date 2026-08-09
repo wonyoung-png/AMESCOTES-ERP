@@ -18,6 +18,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { SampleRequestDoc } from '@/components/SampleRequestDoc';
+import { printDoc, copyDocAsImage, saveDocAsImage } from '@/lib/docExport';
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -132,6 +134,8 @@ export default function SampleManagement() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<Partial<Sample>>({});
   const [editId, setEditId] = useState<string | null>(null);
+  const [requestDoc, setRequestDoc] = useState<Sample | null>(null);
+  const reqDocRef = useRef<HTMLDivElement>(null);
   const [manualStyleNo, setManualStyleNo] = useState(false);
   /** 품목마스터와 같은 규칙으로 만든 스타일번호 미리보기 (바이어 코드 + YYMM + 타입 + 일련) */
   const previewStyleNo = useMemo(() => {
@@ -1863,6 +1867,36 @@ export default function SampleManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* ── 샘플 의뢰서 — 공장·개발실에 보내는 서류 ── */}
+      <Dialog open={!!requestDoc} onOpenChange={o => { if (!o) setRequestDoc(null); }}>
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-[96vw] sm:max-w-3xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>샘플 의뢰서 — {requestDoc?.styleNo}</DialogTitle></DialogHeader>
+          {requestDoc && (
+            <div ref={reqDocRef} className="border border-border rounded-md overflow-hidden">
+              <SampleRequestDoc
+                sample={requestDoc}
+                buyer={allVendors.find((v: any) => v.id === requestDoc.buyerId) as any}
+                item={(items as any[]).find(i => i.id === requestDoc.styleId || i.styleNo === requestDoc.styleNo) as any}
+              />
+            </div>
+          )}
+          <DialogFooter className="flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setRequestDoc(null)}>닫기</Button>
+            <Button variant="outline" onClick={async () => {
+              if (!reqDocRef.current) return;
+              try { await copyDocAsImage(reqDocRef.current); toast.success('이미지 복사됨 — 카톡·위챗에 붙여넣으세요'); }
+              catch (e) { toast.error((e as Error).message); }
+            }}>이미지 복사</Button>
+            <Button variant="outline" onClick={async () => {
+              if (!reqDocRef.current) return;
+              try { await saveDocAsImage(reqDocRef.current, `샘플의뢰서_${requestDoc?.styleNo}`); toast.success('이미지 저장됨'); }
+              catch (e) { toast.error((e as Error).message); }
+            }}>이미지 저장</Button>
+            <Button onClick={() => printDoc(reqDocRef.current)}>A4 인쇄 · PDF</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── 상세 모달 (차수별 메모 + 자재 체크리스트) ── */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
@@ -2063,8 +2097,9 @@ export default function SampleManagement() {
                 </div>
               </div>
 
-              <DialogFooter>
+              <DialogFooter className="flex-wrap gap-2">
                 <Button variant="outline" onClick={() => setShowDetail(false)}>닫기</Button>
+                <Button onClick={() => { setShowDetail(false); setRequestDoc(detailSample); }}>샘플 의뢰서</Button>
               </DialogFooter>
             </>
           )}
