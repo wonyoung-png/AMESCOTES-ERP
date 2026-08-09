@@ -1,6 +1,7 @@
 // 작업지시서 — 수기로 쓰던 엑셀 양식을 그대로 옮기고 BOM에서 값을 끌어온다.
 // 컬러 한 줄 = 메인자재 / 우라 / 장식 / 불박로고 / 기리매 / 실 / 지퍼 / 발주수량 / 출고지
 import type { ProductionOrder, Bom, BomLine, Item, Vendor } from '@/lib/store';
+import { SignatureSlot } from './SignaturePad';
 
 type ColorRow = {
   color: string;
@@ -25,12 +26,14 @@ function pick(lines: BomLine[], test: (l: BomLine) => boolean) {
   return lines.find(test);
 }
 
-export function WorkOrderDoc({ order, bom, item, vendors, note }: {
+export function WorkOrderDoc({ order, bom, item, vendors, note, onSign }: {
   order: ProductionOrder;
   bom?: Bom | null;
   item?: Item;
   vendors?: Vendor[];
   note?: string;
+  /** 서명 칸을 눌렀을 때 — 인쇄 미리보기에서는 넘기지 않는다 */
+  onSign?: (slot: 'writer' | 'checker' | 'receiver') => void;
 }) {
   const factory = order.vendorName || '';
   const colorBoms: any[] = ((bom as any)?.postColorBoms?.length ? (bom as any).postColorBoms : (bom as any)?.colorBoms) || [];
@@ -140,7 +143,7 @@ export function WorkOrderDoc({ order, bom, item, vendors, note }: {
         <thead>
           <tr>
             <th className={`${head} w-[19%]`}>메인자재</th>
-            <th className={`${head} w-[11%]`}>우라</th>
+            <th className={`${head} w-[11%]`}>우라(안감)</th>
             <th className={`${head} w-[10%]`}>장식</th>
             <th className={`${head} w-[13%]`}>불박로고</th>
             <th className={`${head} w-[12%]`}>기리매</th>
@@ -221,11 +224,11 @@ export function WorkOrderDoc({ order, bom, item, vendors, note }: {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 text-[10.5px]">
-        {['작성', '확인', '수령'].map(k => (
-          <div key={k} className="border border-neutral-400 px-3 py-2.5 flex items-end justify-between">
-            <span className="text-neutral-500">{k}</span><span className="text-neutral-400">(서명)</span>
-          </div>
+      <div className="grid grid-cols-3 gap-2">
+        {([['writer', '작성'], ['checker', '확인'], ['receiver', '수령']] as const).map(([slot, label]) => (
+          <SignatureSlot key={slot} label={label}
+            sign={order.signatures?.[slot]}
+            onClick={onSign ? () => onSign(slot) : undefined} />
         ))}
       </div>
     </div>

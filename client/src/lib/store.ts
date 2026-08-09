@@ -380,6 +380,10 @@ export interface ProductionOrder {
   workspace?: 'OEM' | 'LUMEN' | 'AETALOOF';
   productionOrigin?: 'domestic' | 'china';
   brandBatchId?: string;
+  /** 손으로 고친 작업지시서 — 있으면 이걸 그대로 쓴다 (비우면 자동 생성 복귀) */
+  workOrderHtml?: string;
+  /** 작업지시서 전자서명 — { writer, checker, receiver } */
+  signatures?: Record<string, { name?: string; dataUrl?: string; at?: string }>;
   /** 출고지 — 한국출고 / 일본출고 / 태국출고. 공장이 반드시 알아야 하는 값 */
   shipTo?: string;
   /** 발주 묶음 번호 — 일괄 발주 1회 = 묶음 1개. 공장 발주서는 이 단위로 1장 나간다 */

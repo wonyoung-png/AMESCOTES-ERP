@@ -23,10 +23,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { getCurrentUser } from '@/lib/auth';
 import { onSaveFail } from '@/lib/saveGuard';
 import { printDoc, copyDocAsImage, saveDocAsImage } from '@/lib/docExport';
 import { PurchaseOrderDoc } from '@/components/PurchaseOrderDoc';
 import { WorkOrderDoc } from '@/components/WorkOrderDoc';
+import { SignatureDialog, type Signature } from '@/components/SignaturePad';
 import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera, MoreHorizontal, ChevronRight, ChevronDown, Layers } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
@@ -168,6 +170,8 @@ export default function ProductionOrders() {
     if (target) setWorkOrderTarget(target);
   }, [orders]);
   const [workOrderNote, setWorkOrderNote] = useState('');
+  const [woEditing, setWoEditing] = useState(false);
+  const [signSlot, setSignSlot] = useState<null | 'writer' | 'checker' | 'receiver'>(null);
   const [workOrderWithBom, setWorkOrderWithBom] = useState(false);
   // 작업지시서 본사제공 자재 수령 체크란
   const [hqReceive, setHqReceive] = useState<{ received: string; checked: boolean }[]>([]);
@@ -1336,6 +1340,42 @@ export default function ProductionOrders() {
 
   const handlePrintWorkOrder = () => {
     window.print();
+  };
+
+  /** 손으로 고친 작업지시서를 그대로 보관 (비우면 자동 생성으로 복귀) */
+  const saveWorkOrderEdit = async () => {
+    const el = document.getElementById('work-order-print-area');
+    if (!el || !workOrderTarget) return;
+    try {
+      await upsertOrder({ ...workOrderTarget, workOrderHtml: el.innerHTML, updatedAt: new Date().toISOString() });
+      toast.success('수정본 저장됨 — 이 발주는 앞으로 이 내용으로 나갑니다');
+      setWoEditing(false);
+      refresh();
+    } catch (e) { toast.error(`저장 실패: ${(e as Error).message}`); }
+  };
+
+  const resetWorkOrder = async () => {
+    if (!workOrderTarget) return;
+    if (!confirm('수정본을 지우고 BOM 기준으로 다시 만들까요?')) return;
+    try {
+      await upsertOrder({ ...workOrderTarget, workOrderHtml: undefined, updatedAt: new Date().toISOString() });
+      toast.success('자동 생성으로 되돌렸습니다');
+      setWoEditing(false);
+      setWorkOrderTarget({ ...workOrderTarget, workOrderHtml: undefined });
+      refresh();
+    } catch (e) { toast.error(`복원 실패: ${(e as Error).message}`); }
+  };
+
+  const saveSignature = async (sig: Signature) => {
+    if (!workOrderTarget || !signSlot) return;
+    const next = { ...(workOrderTarget.signatures || {}), [signSlot]: sig };
+    try {
+      await upsertOrder({ ...workOrderTarget, signatures: next, updatedAt: new Date().toISOString() });
+      setWorkOrderTarget({ ...workOrderTarget, signatures: next });
+      setSignSlot(null);
+      toast.success('서명 저장됨');
+      refresh();
+    } catch (e) { toast.error(`서명 저장 실패: ${(e as Error).message}`); }
   };
 
   /** 작업지시서를 이미지로 — 카톡·위챗 전달용 */
@@ -3282,7 +3322,20 @@ export default function ProductionOrders() {
                 작업지시서 — {workOrderTarget.orderNo}
               </h2>
               <div className="flex gap-2 flex-wrap">
-                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setWorkOrderModal(false)}>닫기</Button>
+                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => { setWoEditing(false); setWorkOrderModal(false); }}>닫기</Button>
+                {woEditing ? (
+                  <>
+                    <Button size="sm" className="h-8 text-xs" onClick={saveWorkOrderEdit}>수정본 저장</Button>
+                    <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => { setWoEditing(false); refresh(); }}>편집 취소</Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setWoEditing(true)}>수정</Button>
+                    {workOrderTarget.workOrderHtml && (
+                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={resetWorkOrder}>자동 생성으로</Button>
+                    )}
+                  </>
+                )}
                 <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => workOrderAsImage('copy')}>
                   이미지 복사
                 </Button>
@@ -3296,14 +3349,24 @@ export default function ProductionOrders() {
             </div>
 
             {/* 작업지시서 본문 — 가로 A4 양식 */}
-            <div id="work-order-print-area">
-              <WorkOrderDoc
-                order={workOrderTarget}
-                bom={getBomForOrderFromList(boms as Bom[], workOrderTarget.styleNo).bom as any}
-                item={items.find(i => i.id === workOrderTarget.styleId || i.styleNo === workOrderTarget.styleNo) as any}
-                vendors={allVendors as any}
-                note={workOrderNote}
-              />
+            <div
+              id="work-order-print-area"
+              contentEditable={woEditing}
+              suppressContentEditableWarning
+              className={woEditing ? 'outline outline-2 outline-primary/40 rounded' : ''}
+            >
+              {workOrderTarget.workOrderHtml ? (
+                <div dangerouslySetInnerHTML={{ __html: workOrderTarget.workOrderHtml }} />
+              ) : (
+                <WorkOrderDoc
+                  order={workOrderTarget}
+                  bom={getBomForOrderFromList(boms as Bom[], workOrderTarget.styleNo).bom as any}
+                  item={items.find(i => i.id === workOrderTarget.styleId || i.styleNo === workOrderTarget.styleNo) as any}
+                  vendors={allVendors as any}
+                  note={workOrderNote}
+                  onSign={woEditing ? undefined : (slot => setSignSlot(slot))}
+                />
+              )}
             </div>
 
             {/* 하단 버튼 (인쇄 시 숨김) */}
@@ -3318,6 +3381,14 @@ export default function ProductionOrders() {
           </DialogContent>
         </Dialog>
       )}
+
+      <SignatureDialog
+        open={!!signSlot}
+        title={signSlot === 'writer' ? '작성 서명' : signSlot === 'checker' ? '확인 서명' : '수령 서명'}
+        defaultName={signSlot === 'writer' ? (getCurrentUser()?.name || '') : ''}
+        onClose={() => setSignSlot(null)}
+        onSave={saveSignature}
+      />
 
       {/* ── 발주 완료 후 액션 팝업 ── */}
       {postOrderInfo && (
