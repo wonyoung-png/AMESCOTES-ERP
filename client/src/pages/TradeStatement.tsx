@@ -614,7 +614,7 @@ export default function TradeStatement() {
 
       {/* 세금계산서 발행 모달 */}
       <Dialog open={showTaxModal} onOpenChange={setShowTaxModal}>
-        <DialogContent className="w-[95vw] max-w-5xl max-h-[92vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-[95vw] max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-5 h-5 text-primary" />
@@ -745,7 +745,7 @@ export default function TradeStatement() {
 
       {/* 세금계산서 미리보기 모달 */}
       <Dialog open={showTaxPreview} onOpenChange={setShowTaxPreview}>
-        <DialogContent className="w-[95vw] max-w-5xl max-h-[92vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-[95vw] max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-5 h-5 text-[var(--system-green)]" />
@@ -826,7 +826,7 @@ export default function TradeStatement() {
 
       {/* 발주에서 불러오기 모달 */}
       <Dialog open={showOrderModal} onOpenChange={setShowOrderModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-md sm:max-h-[80vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-2xl sm:rounded-md sm:max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="w-4 h-4 text-primary" />
@@ -913,7 +913,7 @@ export default function TradeStatement() {
 
       {/* 발행/수정 모달 */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEdit ? '거래명세표 수정' : '거래명세표 발행'}</DialogTitle>
           </DialogHeader>
@@ -1135,7 +1135,7 @@ function TradeStatementDetailModal({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary" />

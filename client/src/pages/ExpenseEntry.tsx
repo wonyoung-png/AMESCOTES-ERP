@@ -133,7 +133,7 @@ function ExpenseDetailModal({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary" />
@@ -640,7 +640,7 @@ export default function ExpenseEntry() {
 
       {/* 전표 등록 모달 */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>지출 전표 등록</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             {/* 헤더 정보 */}

@@ -285,7 +285,7 @@ export default function DeadlineManagement() {
 
       {/* 캘린더에서 일정을 누르면 발주 상태를 바로 바꾼다 */}
       <Dialog open={!!statusTarget} onOpenChange={o => { if (!o) setStatusTarget(null); }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-sm">
           <DialogHeader><DialogTitle>{statusTarget?.orderNo}</DialogTitle></DialogHeader>
           {statusTarget && (
             <div className="space-y-3">
