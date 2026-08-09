@@ -1,6 +1,6 @@
 // AMESCOTES ERP — 거래명세표 (Phase 1 신규)
 // 전표번호: YYYYMM-거래처코드-순번 (예: 202603-LLL-001)
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   store, genId, formatKRW, formatNumber,
   type TradeStatement, type TradeStatementLine, type TradeStatementStatus, type TaxType,
@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { StatementDoc } from '@/components/StatementDoc';
+import { printDoc, copyDocAsImage, saveDocAsImage } from '@/lib/docExport';
 import { toast } from 'sonner';
 import { Plus, Search, Pencil, Trash2, FileText, X, Receipt, Printer, Download, Eye, CheckCircle } from 'lucide-react';
 
@@ -1103,6 +1105,7 @@ function TradeStatementDetailModal({
   onEdit: (s: TradeStatement) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const docRef = useRef<HTMLDivElement>(null);
   const [editLines, setEditLines] = useState<TradeStatementLine[]>(() => [...statement.lines]);
 
   const updateItemPrice = (id: string, field: 'unitPrice' | 'qty', val: number) => {
@@ -1135,7 +1138,7 @@ function TradeStatementDetailModal({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent onInteractOutside={e => e.preventDefault()} className="w-[96vw] sm:max-w-4xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary" />
@@ -1143,7 +1146,14 @@ function TradeStatementDetailModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 py-2">
+        {/* 보기 모드 — 인쇄물과 똑같은 문서를 그대로 보여준다 (예전엔 팝업과 인쇄가 서로 달랐다) */}
+        {!isEditing && (
+          <div ref={docRef} className="border border-border rounded-md overflow-hidden">
+            <StatementDoc statement={{ ...statement, lines: displayLines }} vendor={vendor as any} />
+          </div>
+        )}
+
+        <div className={`space-y-3 py-2 ${!isEditing ? 'hidden' : ''}`}>
           {/* 헤더 정보 */}
           <div className="grid grid-cols-2 gap-3 text-sm bg-muted rounded-md p-3">
             <div>
@@ -1290,13 +1300,23 @@ function TradeStatementDetailModal({
 
         <DialogFooter className="gap-2 flex-wrap">
           <Button variant="outline" onClick={onClose}>닫기</Button>
-          <Button
-            variant="outline"
-            className="gap-1"
-            onClick={() => onPrint(statement)}
-          >
-            <Printer className="w-4 h-4" />PDF 출력
-          </Button>
+          {!isEditing && (
+            <>
+              <Button variant="outline" className="gap-1" onClick={async () => {
+                if (!docRef.current) return;
+                try { await copyDocAsImage(docRef.current); toast.success('이미지 복사됨 — 카톡·위챗에 붙여넣으세요'); }
+                catch (e) { toast.error((e as Error).message); }
+              }}>이미지 복사</Button>
+              <Button variant="outline" className="gap-1" onClick={async () => {
+                if (!docRef.current) return;
+                try { await saveDocAsImage(docRef.current, `거래명세표_${statement.statementNo}`); toast.success('이미지 저장됨'); }
+                catch (e) { toast.error((e as Error).message); }
+              }}>이미지 저장</Button>
+              <Button variant="outline" className="gap-1" onClick={() => printDoc(docRef.current)}>
+                <Printer className="w-4 h-4" />A4 인쇄 · PDF
+              </Button>
+            </>
+          )}
           {isEditing ? (
             <>
               <Button variant="outline" onClick={() => { setIsEditing(false); setEditLines([...statement.lines]); }}>
