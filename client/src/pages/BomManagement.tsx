@@ -40,6 +40,7 @@ import {
   Calculator, TrendingUp, AlertTriangle, CheckCircle, Save, X, Copy, Search,
   Factory, DollarSign, Camera, Package, Ruler, Printer,
 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 // ─── 타입 정의 ───────────────────────────────────────────────────────────────
 interface PostProcessLine {
@@ -3493,17 +3494,26 @@ export default function BomManagement() {
           <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handleExcelUpload} className="hidden" />
           <input ref={preFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePreExcelUpload} className="hidden" />
           <input ref={postFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePostExcelUpload} className="hidden" />
-          <Button variant="outline" size="sm" onClick={() => setShowSimpleCostModal(true)} className="gap-1.5 text-xs">
-            <DollarSign className="w-3.5 h-3.5" /> 간단 원가 입력
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowCopyModal(true)} className="gap-1.5 text-xs border-border">
-            <Copy className="w-3.5 h-3.5" /> 유사 스타일 복사
-          </Button>
-          {editBom && (activeColorBom || activePostColorBom) && (
-            <Button variant="outline" size="sm" onClick={() => setShowQuote(true)} className="gap-1.5 text-xs text-primary">
-              <FileText className="w-3.5 h-3.5" /> 업체용 견적서
-            </Button>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                더보기 <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => setShowSimpleCostModal(true)}>
+                <DollarSign className="w-3.5 h-3.5 mr-2" /> 간단 원가 입력
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowCopyModal(true)}>
+                <Copy className="w-3.5 h-3.5 mr-2" /> 유사 스타일 복사
+              </DropdownMenuItem>
+              {editBom && (activeColorBom || activePostColorBom) && (
+                <DropdownMenuItem onClick={() => setShowQuote(true)}>
+                  <FileText className="w-3.5 h-3.5 mr-2" /> 업체용 견적서
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {editBom && (
             <Button size="sm" onClick={handleSave} className={`gap-1.5 text-xs ${isDirty ? '' : 'opacity-50'}`}>
               <Save className="w-3.5 h-3.5" /> 저장{isDirty ? '' : ' (변경없음)'}
@@ -3513,11 +3523,11 @@ export default function BomManagement() {
       </div>
 
       {/* 스타일 선택 */}
-      <div className="bg-card rounded-lg border border-border p-5">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      <div className="bg-card rounded-lg border border-border p-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {/* 스타일 선택 — 검색·바이어필터·선택을 콤보박스 하나로 합쳤다 */}
           <div className="col-span-2 md:col-span-3 lg:col-span-4">
-            <label className="text-xs text-muted-foreground mb-1 block font-medium">스타일 선택 <span className="text-[11px] text-muted-foreground font-normal">(브랜드명 · 스타일번호 · 품명으로 검색)</span></label>
+            <label className="text-xs text-muted-foreground mb-1 block font-medium">스타일</label>
             <StylePicker
               options={styleOptions}
               selectedId={selectedStyleId.replace('_reload', '')}
@@ -3537,7 +3547,7 @@ export default function BomManagement() {
               </div>
               {/* 제품이미지 업로드 (품목 imageUrl 폴백) */}
               <div className="col-span-2">
-                <label className="text-xs text-muted-foreground mb-1 block font-medium">포토 구성 (제품사진 - 클릭 또는 Ctrl+V)</label>
+                <label className="text-xs text-muted-foreground mb-1 block font-medium">제품사진</label>
                 <div className="flex items-center gap-3">
                   {(() => {
                     const linkedItemImg = items.find(i => i.id === editBom.styleId)?.imageUrl;
@@ -3559,7 +3569,7 @@ export default function BomManagement() {
                         previewSize={360}
                       />
                     ) : (
-                      <><Camera className="w-5 h-5 text-muted-foreground" /><span className="text-[11px] text-muted-foreground text-center">제품사진</span></>
+                      <Camera className="w-5 h-5 text-muted-foreground" />
                     )}
                   </div>
                   <input id="bom-product-img-input" type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = ev => updateField('productImage', ev.target?.result as string); reader.readAsDataURL(file); e.target.value = ''; }} />
@@ -3567,14 +3577,14 @@ export default function BomManagement() {
                     <button onClick={() => updateField('productImage', undefined)} className="text-[11px] text-[var(--system-red)] hover:text-[var(--system-red)]">× 삭제</button>
                   )}
                   {!editBom.productImage && linkedItemImg && (
-                    <span className="text-[11px] text-muted-foreground">품목 마스터 사진</span>
+                    <span className="text-[11px] text-muted-foreground">품목 사진</span>
                   )}
                   </>
                     );
                   })()}
                 </div>
               </div>
-              <div><label className="text-xs text-muted-foreground mb-1 block font-medium">환율 (CNY→KRW)</label><Input type="number" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 text-xs border-border text-right" /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block font-medium">환율 CNY→KRW</label><Input type="number" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 text-xs border-border text-right" /></div>
             </>
           )}
         </div>
@@ -3607,19 +3617,19 @@ export default function BomManagement() {
               </div>
             </div>
           ) : (
-          <div className="flex items-center border-b-2 border-border">
+          <div className="flex items-center border-b border-border">
             <button
               onClick={() => setMainTab('pre')}
               className={`flex flex-col items-start px-6 py-2.5 border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
                 mainTab === 'pre'
-                  ? 'border-[var(--system-green)] text-[var(--system-green)]'
+                  ? 'border-foreground text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               <div className="flex items-center gap-2 text-sm font-bold">
                 사전원가
                 {(editBom.colorBoms || []).length > 0 && (
-                  <Badge className="text-[11px] py-0 h-4 bg-[var(--system-green)]/10 text-[var(--system-green)] border-[var(--system-green)]/30">{(editBom.colorBoms || []).length}컬러</Badge>
+                  <Badge variant="outline" className="text-[11px] py-0 h-4 font-normal text-muted-foreground border-border">{(editBom.colorBoms || []).length}컬러</Badge>
                 )}
               </div>
             </button>
@@ -3627,7 +3637,7 @@ export default function BomManagement() {
               onClick={() => setMainTab('post')}
               className={`flex flex-col items-start px-6 py-2.5 border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
                 mainTab === 'post'
-                  ? 'border-primary text-primary'
+                  ? 'border-foreground text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -3635,7 +3645,7 @@ export default function BomManagement() {
                 <Factory className="w-4 h-4" />
                 사후원가
                 {(editBom.postColorBoms || []).length > 0 && (
-                  <Badge className="text-[11px] py-0 h-4 bg-primary/10 text-primary border-primary/20">{(editBom.postColorBoms || []).length}컬러</Badge>
+                  <Badge variant="outline" className="text-[11px] py-0 h-4 font-normal text-muted-foreground border-border">{(editBom.postColorBoms || []).length}컬러</Badge>
                 )}
               </div>
             </button>
@@ -3643,7 +3653,7 @@ export default function BomManagement() {
               onClick={() => setMainTab('yardage')}
               className={`flex flex-col items-start px-6 py-2.5 border-b-2 -mb-[2px] transition-colors whitespace-nowrap ${
                 mainTab === 'yardage'
-                  ? 'border-primary text-primary'
+                  ? 'border-foreground text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -3665,14 +3675,14 @@ export default function BomManagement() {
           {!isPackMode && (
           <>
           {mainTab === 'pre' && (
-            <div className="flex items-center border-b border-border overflow-x-auto bg-[var(--system-green)]/5">
+            <div className="flex items-center border-b border-border overflow-x-auto">
               {(editBom.colorBoms || []).map(cb => (
                 <button
                   key={cb.color}
                   onClick={() => setActivePreColor(cb.color)}
                   className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                     activePreColor === cb.color
-                      ? 'border-[var(--system-green)] text-[var(--system-green)] bg-card'
+                      ? 'border-foreground text-foreground'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
@@ -3685,21 +3695,21 @@ export default function BomManagement() {
               ))}
               <button
                 onClick={() => { setAddColorForTab('pre'); setShowAddColorModal(true); }}
-                className="px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-muted-foreground hover:text-[var(--system-green)] transition-colors whitespace-nowrap"
+                className="px-4 py-2.5 text-sm border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
               >+ 컬러 추가</button>
             </div>
           )}
 
           {/* ── 사후원가 컬러 서브탭 ── */}
           {mainTab === 'post' && (
-            <div className="flex items-center border-b border-border overflow-x-auto bg-primary/5">
+            <div className="flex items-center border-b border-border overflow-x-auto">
               {(editBom.postColorBoms || []).map(cb => (
                 <button
                   key={cb.color}
                   onClick={() => setActivePostColor(cb.color)}
                   className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                     activePostColor === cb.color
-                      ? 'border-primary text-primary bg-card'
+                      ? 'border-foreground text-foreground'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
@@ -3712,7 +3722,7 @@ export default function BomManagement() {
               ))}
               <button
                 onClick={() => { setAddColorForTab('post'); setShowAddColorModal(true); }}
-                className="px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-muted-foreground hover:text-primary transition-colors whitespace-nowrap"
+                className="px-4 py-2.5 text-sm border-b-2 border-transparent text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
               >+ 컬러 추가</button>
             </div>
           )}
