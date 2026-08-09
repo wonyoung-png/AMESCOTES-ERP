@@ -3595,13 +3595,12 @@ export default function ProductionOrders() {
             </div>
 
             {/* 하단 버튼 (인쇄 시 숨김) */}
-            <div className="no-print flex justify-end gap-2 mt-3 pt-3 border-t border-border">
+            <div className="no-print no-capture flex flex-wrap justify-end gap-2 mt-3 pt-3 border-t border-border">
               <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setWorkOrderModal(false)}>닫기</Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => window.print()}>
-                <FileText className="w-3.5 h-3.5 mr-1" />PDF 저장
-              </Button>
-              <Button size="sm" className="h-8 text-xs" onClick={() => window.print()}>
-                <Printer className="w-3.5 h-3.5 mr-1" />인쇄
+              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => workOrderAsImage('copy')}>이미지 복사</Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => workOrderAsImage('save')}>이미지 저장</Button>
+              <Button size="sm" className="h-8 text-xs" onClick={handlePrintWorkOrder}>
+                <Printer className="w-3.5 h-3.5 mr-1" />A4 인쇄 · PDF
               </Button>
             </div>
           </DialogContent>
