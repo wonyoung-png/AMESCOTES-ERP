@@ -956,7 +956,7 @@ function SimpleCostModal({
               onChange={e => setPreCost(e.target.value)}
               placeholder="예: 45000"
               className="h-9 text-sm font-mono"
-              type="number"
+              type="number" min="0"
             />
             {preCost && Number(preCost) > 0 && (
               <div className="text-xs text-primary mt-1">
@@ -973,7 +973,7 @@ function SimpleCostModal({
               onChange={e => setPostCost(e.target.value)}
               placeholder="예: 48000"
               className="h-9 text-sm font-mono"
-              type="number"
+              type="number" min="0"
             />
             {postCost && Number(postCost) > 0 && (
               <div className="text-xs text-primary mt-1">
@@ -1230,7 +1230,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
                         <Input value={row.category} onChange={e => updateRow(row.id, 'category', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-muted-foreground font-medium' : ''} ${marginRow ? 'text-primary font-semibold' : ''}`} />
                       </td>
                       <td><Input value={row.itemName} onChange={e => updateRow(row.id, 'itemName', e.target.value)} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 ${vendorRow ? 'text-muted-foreground' : ''} ${marginRow ? 'text-primary' : ''}`} /></td>
-                      <td><Input type="number" value={parseFloat(row.qty.toFixed(2))} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${vendorRow ? 'text-muted-foreground font-semibold' : ''}`} /></td>
+                      <td><Input type="number" min="0" value={parseFloat(row.qty.toFixed(2))} onChange={e => updateRow(row.id, 'qty', Number(e.target.value))} className={`h-6 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-right ${vendorRow ? 'text-muted-foreground font-semibold' : ''}`} /></td>
                       <td>
                         <div className="text-right">
                           {vendorRow ? (
@@ -1706,13 +1706,13 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
             {calcType === 'YD' && (
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="font-semibold whitespace-nowrap">원단폭(cm)</span>
-                <input type="number" value={width} onChange={e => setWidth(parseFloat(e.target.value) || 150)}
+                <input type="number" min="0" value={width} onChange={e => setWidth(parseFloat(e.target.value) || 150)}
                   className="w-20 border border-border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring" />
               </label>
             )}
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="font-semibold whitespace-nowrap">로스율(%)</span>
-              <input type="number" value={lossRate} onChange={e => setLossRate(parseFloat(e.target.value) || 0)}
+              <input type="number" min="0" value={lossRate} onChange={e => setLossRate(parseFloat(e.target.value) || 0)}
                 className="w-20 border border-border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring" min={0} max={100} />
             </label>
           </div>
@@ -1748,15 +1748,15 @@ function CalcModal({ itemName, unit, onApply, onClose }: {
                   return (
                     <tr key={r.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
                       <td><input className={inputCls} value={r.부위} onChange={e => update(r.id, '부위', e.target.value)} placeholder="바디" /></td>
-                      <td><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => update(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
-                      <td><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => update(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
+                      <td><input className={inputCls} type="number" min="0" value={r.가로 || ''} onChange={e => update(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
+                      <td><input className={inputCls} type="number" min="0" value={r.세로 || ''} onChange={e => update(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
                       {calcType === 'SF' && (
                         <>
                           <td><input className={inputRO} value={(r.가로 + 0.5).toFixed(1)} readOnly /></td>
                           <td><input className={inputRO} value={(r.세로 + 0.5).toFixed(1)} readOnly /></td>
                         </>
                       )}
-                      <td><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => update(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
+                      <td><input className={inputCls} type="number" min="0" value={r.수량 || ''} onChange={e => update(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
                       <td><input className={inputRO + ` font-semibold text-${accent}-700`} value={rowNet.toFixed(3)} readOnly /></td>
                       <td className="ctr"><button onClick={() => setRows(p => p.filter(x => x.id !== r.id))} className="text-muted-foreground hover:text-[var(--system-red)]">×</button></td>
                     </tr>
@@ -1982,7 +1982,7 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
       {/* 단가 */}
       <td>
         <Input
-          type="number"
+          type="number" min="0"
           value={line.unitPriceCny || ''}
           onChange={e => onChange(line.id, 'unitPriceCny', Number(e.target.value))}
           className={`${CELL_INPUT} border-border bg-card text-right w-20`}
@@ -1991,14 +1991,14 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
         <div style={{fontSize:'10px', color:'#9CA3AF', textAlign:'right'}}>₩{Math.round(line.unitPriceCny * cnyKrw).toLocaleString()}</div>
       </td>
       {/* NET 소요량 */}
-      <td><Input type="number" step="any" value={netQtyStr} onChange={e => { setNetQtyStr(e.target.value); const n = parseFloat(e.target.value); if (!isNaN(n)) onChange(line.id, 'netQty', n); else onChange(line.id, 'netQty', 0); }} onBlur={e => { const n = parseFloat(e.target.value); const v = isNaN(n) ? 0 : n; onChange(line.id, 'netQty', v); setNetQtyStr(v !== 0 ? String(v) : ''); }} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder="0" /></td>
+      <td><Input type="number" min="0" step="any" value={netQtyStr} onChange={e => { setNetQtyStr(e.target.value); const n = parseFloat(e.target.value); if (!isNaN(n)) onChange(line.id, 'netQty', n); else onChange(line.id, 'netQty', 0); }} onBlur={e => { const n = parseFloat(e.target.value); const v = isNaN(n) ? 0 : n; onChange(line.id, 'netQty', v); setNetQtyStr(v !== 0 ? String(v) : ''); }} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder="0" /></td>
       {/* LOSS */}
-      <td><Input type="number" step="any" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className={`${CELL_INPUT} border-border bg-card text-right w-14`} placeholder="5" /></td>
+      <td><Input type="number" min="0" step="any" value={line.lossRate * 100 || ''} onChange={e => onChange(line.id, 'lossRate', Number(e.target.value) / 100)} className={`${CELL_INPUT} border-border bg-card text-right w-14`} placeholder="5" /></td>
       {/* 소요량 */}
       <td>
         <div className="flex items-center gap-1">
           <Input
-            type="number"
+            type="number" min="0"
             value={line.manualQty !== undefined ? line.manualQty : ''}
             onChange={e => {
               const raw = e.target.value;
@@ -2173,7 +2173,7 @@ function PostCostSummary({
         <div className="flex items-center gap-3 px-1">
           <label className="text-xs font-semibold text-foreground whitespace-nowrap">납품가 (KRW)</label>
           <Input
-            type="number"
+            type="number" min="0"
             value={deliveryPrice || ''}
             onChange={e => onDeliveryPriceChange(Number(e.target.value))}
             className="h-8 text-sm border-border text-right w-36 font-semibold"
@@ -3584,7 +3584,7 @@ export default function BomManagement() {
                   })()}
                 </div>
               </div>
-              <div><label className="text-xs text-muted-foreground mb-1 block font-medium">환율 CNY→KRW</label><Input type="number" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 text-xs border-border text-right" /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block font-medium">환율 CNY→KRW</label><Input type="number" min="0" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 text-xs border-border text-right" /></div>
             </>
           )}
         </div>
@@ -3911,14 +3911,14 @@ export default function BomManagement() {
                     {(editBom.preCurrency || 'CNY') !== 'KRW' && (
                       <div>
                         <label className="text-xs text-muted-foreground mb-1 block font-medium">CNY→KRW 환율</label>
-                        <Input type="number" value={editBom.preExchangeRateCny ?? editBom.snapshotCnyKrw} onChange={e => updateField('preExchangeRateCny', Number(e.target.value))} className="h-8 text-xs border-border text-right w-28" />
+                        <Input type="number" min="0" value={editBom.preExchangeRateCny ?? editBom.snapshotCnyKrw} onChange={e => updateField('preExchangeRateCny', Number(e.target.value))} className="h-8 text-xs border-border text-right w-28" />
                       </div>
                     )}
                     {/* 환율 USD */}
                     {(editBom.preCurrency || 'CNY') !== 'KRW' && (
                       <div>
                         <label className="text-xs text-muted-foreground mb-1 block font-medium">USD→KRW 환율</label>
-                        <Input type="number" value={editBom.preExchangeRateUsd ?? settings.usdKrw} onChange={e => updateField('preExchangeRateUsd', Number(e.target.value))} className="h-8 text-xs border-border text-right w-28" />
+                        <Input type="number" min="0" value={editBom.preExchangeRateUsd ?? settings.usdKrw} onChange={e => updateField('preExchangeRateUsd', Number(e.target.value))} className="h-8 text-xs border-border text-right w-28" />
                       </div>
                     )}
                     {/* 원가표 업로드 */}
@@ -4092,8 +4092,8 @@ export default function BomManagement() {
                                   <Input value={line.name} onChange={e => updateColorPostLine(colorBom.color, line.id, 'name', e.target.value)} className={`${CELL_INPUT} border-border bg-card min-w-[80px]`} placeholder="후가공 품목명" />
                                 </div>
                               </td>
-                              <td><Input type="number" value={line.unitPrice || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'unitPrice', Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={`단가(${curSymbol})`} /></td>
-                              <td><Input type="number" value={line.netQty || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'netQty', Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder="수량" /></td>
+                              <td><Input type="number" min="0" value={line.unitPrice || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'unitPrice', Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={`단가(${curSymbol})`} /></td>
+                              <td><Input type="number" min="0" value={line.netQty || ''} onChange={e => updateColorPostLine(colorBom.color, line.id, 'netQty', Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder="수량" /></td>
                               <td className="ctr text-xs text-muted-foreground">-</td>
                               <td className="num text-xs text-muted-foreground tabular-nums">{fmt(line.netQty)}</td>
                               <td className="num tabular-nums">
@@ -4118,7 +4118,7 @@ export default function BomManagement() {
                             <span className="text-[13px] text-muted-foreground px-2">임가공비 (NET)</span>
                           </td>
                           <td>
-                            <Input type="number" value={colorBom.processingFee || ''} onChange={e => updateColorProcessingFee(colorBom.color, Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={curSymbol} />
+                            <Input type="number" min="0" value={colorBom.processingFee || ''} onChange={e => updateColorProcessingFee(colorBom.color, Number(e.target.value))} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={curSymbol} />
                           </td>
                           <td><span className="text-xs text-muted-foreground px-2">1</span></td>
                           <td></td>
@@ -4152,7 +4152,7 @@ export default function BomManagement() {
                             <td className="text-muted-foreground">{row.desc}</td>
                             <td className="num font-semibold tabular-nums">
                               {row.editable && row.field ? (
-                                <Input type="number" value={(editBom[row.field] as number) || ''} onChange={e => updateField(row.field!, Number(e.target.value) as ExtBom[typeof row.field])} className={`${CELL_INPUT} border-border text-right w-36 ml-auto`} placeholder="0" />
+                                <Input type="number" min="0" value={(editBom[row.field] as number) || ''} onChange={e => updateField(row.field!, Number(e.target.value) as ExtBom[typeof row.field])} className={`${CELL_INPUT} border-border text-right w-36 ml-auto`} placeholder="0" />
                               ) : (
                                 <span className={row.val === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(row.val)}</span>
                               )}
@@ -4195,7 +4195,7 @@ export default function BomManagement() {
                           <td className="text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <Input
-                                type="number"
+                                type="number" min="0"
                                 value={Math.round((editBom.productionMarginRate ?? 0.16) * 100)}
                                 onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)}
                                 className={`${CELL_INPUT} border-border text-right w-16`}
@@ -4347,7 +4347,7 @@ export default function BomManagement() {
                             <div key={item.field}>
                               <label className="text-[11px] text-muted-foreground mb-1 block">{item.label}</label>
                               <div className="flex items-center gap-1">
-                                <Input type="number" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className={`${CELL_INPUT} border-border text-right w-20`} />
+                                <Input type="number" min="0" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className={`${CELL_INPUT} border-border text-right w-20`} />
                                 <span className="text-xs text-muted-foreground">%</span>
                               </div>
                             </div>
@@ -4492,7 +4492,7 @@ export default function BomManagement() {
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block font-medium">CNY→KRW 환율</label>
                       <Input
-                        type="number"
+                        type="number" min="0"
                         value={editBom.exchangeRateCny || editBom.snapshotCnyKrw}
                         onChange={e => updateField('exchangeRateCny', Number(e.target.value))}
                         className="h-8 text-xs border-border text-right w-28"
@@ -4504,7 +4504,7 @@ export default function BomManagement() {
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block font-medium">USD→KRW 환율</label>
                       <Input
-                        type="number"
+                        type="number" min="0"
                         value={editBom.exchangeRateUsd || settings.usdKrw}
                         onChange={e => updateField('exchangeRateUsd', Number(e.target.value))}
                         className="h-8 text-xs border-border text-right w-28"
@@ -4708,10 +4708,10 @@ export default function BomManagement() {
                                 </td>
                                 <td></td>
                                 <td>
-                                  <Input type="number" value={line.netQty || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'netQty', Number(e.target.value))} placeholder="NET" className={`${CELL_INPUT} border-border w-16 text-right`} />
+                                  <Input type="number" min="0" value={line.netQty || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'netQty', Number(e.target.value))} placeholder="NET" className={`${CELL_INPUT} border-border w-16 text-right`} />
                                 </td>
                                 <td>
-                                  <Input type="number" value={line.unitPrice || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'unitPrice', Number(e.target.value))} placeholder="단가" className={`${CELL_INPUT} border-border w-20 text-right`} />
+                                  <Input type="number" min="0" value={line.unitPrice || ''} onChange={e => updatePostColorPostLine(postColorBom.color, line.id, 'unitPrice', Number(e.target.value))} placeholder="단가" className={`${CELL_INPUT} border-border w-20 text-right`} />
                                 </td>
                                 <td></td>
                                 <td className="num tabular-nums">
@@ -4737,7 +4737,7 @@ export default function BomManagement() {
                               <span className="text-[13px] text-muted-foreground px-2">임가공비 (NET)</span>
                             </td>
                             <td>
-                              <Input type="number" value={postColorBom.processingFee || ''} onChange={e => updateColorProcessingFee(postColorBom.color, Number(e.target.value), 'post')} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={curSymbol} />
+                              <Input type="number" min="0" value={postColorBom.processingFee || ''} onChange={e => updateColorProcessingFee(postColorBom.color, Number(e.target.value), 'post')} className={`${CELL_INPUT} border-border bg-card text-right w-20`} placeholder={curSymbol} />
                             </td>
                             <td><span className="text-xs text-muted-foreground px-2">1</span></td>
                             <td></td>
@@ -4816,7 +4816,7 @@ export default function BomManagement() {
                           <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">관</span></td>
                           <td className="font-medium text-foreground">
                             관세
-                            <Input type="number" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className={`inline-block ${CELL_INPUT} border-border text-right w-14 ml-1`} placeholder="%" />
+                            <Input type="number" min="0" value={editBom.customsRate || ''} onChange={e => updateField('customsRate', Number(e.target.value))} className={`inline-block ${CELL_INPUT} border-border text-right w-14 ml-1`} placeholder="%" />
                             <span className="text-xs text-muted-foreground ml-1">%</span>
                           </td>
                           <td className="text-muted-foreground text-xs">공장단가 × 관세율</td>
@@ -4827,7 +4827,7 @@ export default function BomManagement() {
                           <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">물</span></td>
                           <td className="font-medium text-foreground">물류비</td>
                           <td className="text-muted-foreground">
-                            <Input type="number" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className={`${CELL_INPUT} border-border text-right w-24`} placeholder="₩" />
+                            <Input type="number" min="0" value={editBom.logisticsCostKrw || ''} onChange={e => updateField('logisticsCostKrw', Number(e.target.value))} className={`${CELL_INPUT} border-border text-right w-24`} placeholder="₩" />
                           </td>
                           <td className="num font-semibold tabular-nums"><span className="text-foreground">{fmtKrw(ps.logisticsKrw)}</span></td>
                         </tr>
@@ -4836,7 +4836,7 @@ export default function BomManagement() {
                           <td><span className="inline-flex w-5 h-5 items-center justify-center rounded bg-[var(--fill-tertiary)] text-[11px] font-semibold text-muted-foreground">포</span></td>
                           <td className="font-medium text-foreground">포장/검사비</td>
                           <td className="text-muted-foreground">
-                            <Input type="number" value={editBom.packagingCostKrw || ''} onChange={e => updateField('packagingCostKrw', Number(e.target.value))} className={`${CELL_INPUT} border-border text-right w-24`} placeholder="₩" />
+                            <Input type="number" min="0" value={editBom.packagingCostKrw || ''} onChange={e => updateField('packagingCostKrw', Number(e.target.value))} className={`${CELL_INPUT} border-border text-right w-24`} placeholder="₩" />
                           </td>
                           <td className="num font-semibold tabular-nums"><span className={ps.packagingKrw === 0 ? 'text-muted-foreground' : 'text-foreground'}>{fmtKrw(ps.packagingKrw)}</span></td>
                         </tr>
@@ -4884,7 +4884,7 @@ export default function BomManagement() {
                           <td>
                             <div className="flex items-center gap-1">
                               <Input
-                                type="number"
+                                type="number" min="0"
                                 value={Math.round((editBom.productionMarginRate ?? 0) * 100)}
                                 onChange={e => updateField('productionMarginRate', Number(e.target.value) / 100)}
                                 className={`${CELL_INPUT} border-border text-right w-16`}
@@ -4936,7 +4936,7 @@ export default function BomManagement() {
                     <div className="px-4 py-3 border-t border-border flex items-center gap-3">
                       <label className="text-xs font-semibold text-foreground whitespace-nowrap">납품가 (KRW)</label>
                       <Input
-                        type="number"
+                        type="number" min="0"
                         value={editBom.postDeliveryPrice != null ? editBom.postDeliveryPrice : (linkedItem?.deliveryPrice ?? '')}
                         onChange={e => {
                           const val = e.target.value === '' ? null : Number(e.target.value);
@@ -4972,7 +4972,7 @@ export default function BomManagement() {
                             <div key={item.field}>
                               <label className="text-[11px] text-muted-foreground mb-1 block">{item.label}</label>
                               <div className="flex items-center gap-1">
-                                <Input type="number" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className={`${CELL_INPUT} border-border text-right w-20`} />
+                                <Input type="number" min="0" value={Math.round((editBom.pnl[item.field] as number) * 100)} onChange={e => updatePnl(item.field, Number(e.target.value) / 100 as BomPnlAssumptions[typeof item.field])} className={`${CELL_INPUT} border-border text-right w-20`} />
                                 <span className="text-xs text-muted-foreground">%</span>
                               </div>
                             </div>
@@ -5185,7 +5185,7 @@ export default function BomManagement() {
                     <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border-b border-border">
                       <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">로스율 (%)</span>
                       <input
-                        type="number"
+                        type="number" min="0"
                         value={leatherLossRate}
                         onChange={e => setLeatherLossRate(parseFloat(e.target.value) || 0)}
                         className="w-20 border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-ring"
@@ -5214,11 +5214,11 @@ export default function BomManagement() {
                           return (
                             <tr key={r.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
                               <td className={tdCls}><input className={inputCls} value={r.부위} onChange={e => updateLeather(r.id, '부위', e.target.value)} placeholder="바디" /></td>
-                              <td className={tdCls}><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => updateLeather(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
-                              <td className={tdCls}><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => updateLeather(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
+                              <td className={tdCls}><input className={inputCls} type="number" min="0" value={r.가로 || ''} onChange={e => updateLeather(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
+                              <td className={tdCls}><input className={inputCls} type="number" min="0" value={r.세로 || ''} onChange={e => updateLeather(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
                               <td className={tdCls}><input className={inputClsRO} value={garo5.toFixed(1)} readOnly /></td>
                               <td className={tdCls}><input className={inputClsRO} value={sero5.toFixed(1)} readOnly /></td>
-                              <td className={tdCls}><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => updateLeather(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
+                              <td className={tdCls}><input className={inputCls} type="number" min="0" value={r.수량 || ''} onChange={e => updateLeather(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
                               <td className={tdCls}><input className={inputClsRO + ' font-semibold text-primary'} value={rowNet.toFixed(3)} readOnly /></td>
                               <td className={tdCls + ' text-center'}>
                                 <button onClick={() => setLeatherRows(p => p.filter(x => x.id !== r.id))} className="text-muted-foreground hover:text-[var(--system-red)] text-lg leading-none">×</button>
@@ -5251,7 +5251,7 @@ export default function BomManagement() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">원단 폭 (cm)</span>
                         <input
-                          type="number"
+                          type="number" min="0"
                           value={fabricWidth}
                           onChange={e => setFabricWidth(parseFloat(e.target.value) || 150)}
                           className="w-24 border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-ring"
@@ -5260,7 +5260,7 @@ export default function BomManagement() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">로스율 (%)</span>
                         <input
-                          type="number"
+                          type="number" min="0"
                           value={fabricLossRate}
                           onChange={e => setFabricLossRate(parseFloat(e.target.value) || 0)}
                           className="w-20 border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-ring"
@@ -5283,9 +5283,9 @@ export default function BomManagement() {
                         {fabricRows.map((r) => (
                           <tr key={r.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
                             <td className={tdCls}><input className={inputCls} value={r.부위} onChange={e => updateFabric(r.id, '부위', e.target.value)} placeholder="바디" /></td>
-                            <td className={tdCls}><input className={inputCls} type="number" value={r.가로 || ''} onChange={e => updateFabric(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
-                            <td className={tdCls}><input className={inputCls} type="number" value={r.세로 || ''} onChange={e => updateFabric(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
-                            <td className={tdCls}><input className={inputCls} type="number" value={r.수량 || ''} onChange={e => updateFabric(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
+                            <td className={tdCls}><input className={inputCls} type="number" min="0" value={r.가로 || ''} onChange={e => updateFabric(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
+                            <td className={tdCls}><input className={inputCls} type="number" min="0" value={r.세로 || ''} onChange={e => updateFabric(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
+                            <td className={tdCls}><input className={inputCls} type="number" min="0" value={r.수량 || ''} onChange={e => updateFabric(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
                             <td className={tdCls + ' text-center'}>
                               <button onClick={() => setFabricRows(p => p.filter(x => x.id !== r.id))} className="text-muted-foreground hover:text-[var(--system-red)] text-lg leading-none">×</button>
                             </td>

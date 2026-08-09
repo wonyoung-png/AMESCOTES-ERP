@@ -780,7 +780,7 @@ export default function MaterialMaster() {
                 <Label>단가</Label>
                 <div className="flex gap-2">
                   <Input
-                    type="number" step="0.01" className="flex-1"
+                    type="number" min="0" step="0.01" className="flex-1"
                     value={priceOf(form) ?? ''}
                     onChange={e => setPrice(e.target.value === '' ? undefined : Number(e.target.value), currencyOf(form))}
                     placeholder="0"
@@ -818,7 +818,7 @@ export default function MaterialMaster() {
                       <div key={row.color} className="flex items-center gap-2">
                         <span className="text-sm flex-1 truncate">{row.color}</span>
                         <Input
-                          type="number" step="0.01" className="w-32 h-8"
+                          type="number" min="0" step="0.01" className="w-32 h-8"
                           value={row.price ?? ''}
                           placeholder="단가"
                           onChange={e => updatePlating(i, { price: e.target.value === '' ? undefined : Number(e.target.value) })}
@@ -843,7 +843,7 @@ export default function MaterialMaster() {
                   <Label>금형비</Label>
                   <div className="flex gap-2">
                     <Input
-                      type="number" step="0.01" className="flex-1"
+                      type="number" min="0" step="0.01" className="flex-1"
                       value={form.moldCostAmount ?? ''}
                       onChange={e => setForm(prev => ({ ...prev, moldCostAmount: e.target.value === '' ? undefined : Number(e.target.value) }))}
                       placeholder="0"

@@ -172,7 +172,7 @@ export default function PayablesManagement() {
                 <td className="act">
                   {p.status !== 'paid' && (
                     <div className="flex gap-1 items-center justify-end">
-                      <Input className="h-7 w-24 text-xs" type="number"
+                      <Input className="h-7 w-24 text-xs" type="number" min="0"
                         value={payAmount[p.id] ?? ''}
                         onChange={e => setPayAmount(a => ({ ...a, [p.id]: +e.target.value }))}
                         placeholder="금액" />
@@ -253,7 +253,7 @@ export default function PayablesManagement() {
               </select>
             </div>
             <div><Label>project_no</Label><Input value={payForm.projectNo} onChange={e => setPayForm(f => ({ ...f, projectNo: e.target.value }))} /></div>
-            <div><Label>금액 (KRW)</Label><Input type="number" value={payForm.amountKrw || ''} onChange={e => setPayForm(f => ({ ...f, amountKrw: +e.target.value }))} /></div>
+            <div><Label>금액 (KRW)</Label><Input type="number" min="0" value={payForm.amountKrw || ''} onChange={e => setPayForm(f => ({ ...f, amountKrw: +e.target.value }))} /></div>
             <div><Label>지급예정일</Label><Input type="date" value={payForm.dueDate} onChange={e => setPayForm(f => ({ ...f, dueDate: e.target.value }))} /></div>
             <div><Label>메모</Label><Input value={payForm.memo} onChange={e => setPayForm(f => ({ ...f, memo: e.target.value }))} /></div>
           </div>

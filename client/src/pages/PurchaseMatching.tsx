@@ -852,7 +852,7 @@ export default function PurchaseMatching() {
               </div>
               <div className="space-y-1.5">
                 <Label>수량</Label>
-                <Input type="number" value={form.qty || ''} onChange={e => updateAmount(parseInt(e.target.value) || 0, form.unitPriceCny || 0, form.currency || 'KRW')} />
+                <Input type="number" min="0" value={form.qty || ''} onChange={e => updateAmount(parseInt(e.target.value) || 0, form.unitPriceCny || 0, form.currency || 'KRW')} />
               </div>
               <div className="space-y-1.5">
                 <Label>통화</Label>
@@ -863,7 +863,7 @@ export default function PurchaseMatching() {
               </div>
               <div className="space-y-1.5">
                 <Label>단가</Label>
-                <Input type="number" step="0.01" value={form.unitPriceCny || ''} onChange={e => updateAmount(form.qty || 0, parseFloat(e.target.value) || 0, form.currency || 'KRW')} />
+                <Input type="number" min="0" step="0.01" value={form.unitPriceCny || ''} onChange={e => updateAmount(form.qty || 0, parseFloat(e.target.value) || 0, form.currency || 'KRW')} />
               </div>
               <div className="space-y-1.5">
                 <Label>KRW 금액 (자동)</Label>
@@ -1332,7 +1332,7 @@ export default function PurchaseMatching() {
               <div className="space-y-1.5">
                 <Label>금액 (KRW) *</Label>
                 <Input
-                  type="number"
+                  type="number" min="0"
                   value={expenseForm.amountKrw || ''}
                   onChange={e => setExpenseForm(f => ({ ...f, amountKrw: parseInt(e.target.value) || 0 }))}
                   placeholder="0"
@@ -1493,7 +1493,7 @@ export default function PurchaseMatching() {
                       <td className="border border-border font-medium">{item.itemName}</td>
                       <td className="border border-border">
                         <input
-                          type="number"
+                          type="number" min="0"
                           value={item.qty}
                           onChange={e => updateBulkItem(idx, 'qty', e.target.value)}
                           className="w-full text-center border border-border rounded px-1 py-0.5 text-xs"
@@ -1501,7 +1501,7 @@ export default function PurchaseMatching() {
                       </td>
                       <td className="border border-border">
                         <input
-                          type="number"
+                          type="number" min="0"
                           value={item.unitPriceCny}
                           onChange={e => updateBulkItem(idx, 'unitPriceCny', e.target.value)}
                           className="w-full text-center border border-border rounded px-1 py-0.5 text-xs"
@@ -1736,7 +1736,7 @@ function ExpenseDetailInlineModal({
                     </td>
                     <td>
                       <input
-                        type="number"
+                        type="number" min="0"
                         value={line.qty}
                         onChange={e => updateDetailLine(line.id, 'qty', parseFloat(e.target.value) || 0)}
                         className="h-8 text-sm text-right border border-border rounded px-2 w-16"
@@ -1753,7 +1753,7 @@ function ExpenseDetailInlineModal({
                     </td>
                     <td>
                       <input
-                        type="number"
+                        type="number" min="0"
                         value={line.unitPrice}
                         onChange={e => updateDetailLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                         className="h-8 text-sm text-right border border-border rounded px-2 w-24"

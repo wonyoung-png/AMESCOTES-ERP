@@ -228,7 +228,7 @@ function ExpenseDetailModal({
                       </td>
                       <td>
                         <Input
-                          type="number"
+                          type="number" min="0"
                           value={line.qty}
                           onChange={e => {
                             const newQty = parseFloat(e.target.value) || 0;
@@ -253,7 +253,7 @@ function ExpenseDetailModal({
                       <td>
                         <div className="space-y-0.5">
                           <Input
-                            type="number"
+                            type="number" min="0"
                             value={line.unitPrice}
                             onChange={e => updateDetailLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                             className="h-8 text-sm text-right w-24"
@@ -710,7 +710,7 @@ export default function ExpenseEntry() {
                       </td>
                       <td>
                         <Input
-                          type="number"
+                          type="number" min="0"
                           value={line.qty}
                           onChange={e => updateLine(line.id, 'qty', parseFloat(e.target.value) || 0)}
                           className="h-8 text-sm text-right"
@@ -728,7 +728,7 @@ export default function ExpenseEntry() {
                       <td>
                         <div className="space-y-0.5">
                           <Input
-                            type="number"
+                            type="number" min="0"
                             value={line.unitPrice}
                             onChange={e => updateLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                             className="h-8 text-sm text-right"
@@ -782,11 +782,11 @@ export default function ExpenseEntry() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs">공급가액</Label>
-                      <Input type="number" value={header.supplyAmount} onChange={e => setHeader(f => ({ ...f, supplyAmount: e.target.value }))} />
+                      <Input type="number" min="0" value={header.supplyAmount} onChange={e => setHeader(f => ({ ...f, supplyAmount: e.target.value }))} />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">세액</Label>
-                      <Input type="number" value={header.taxAmount} onChange={e => setHeader(f => ({ ...f, taxAmount: e.target.value }))} />
+                      <Input type="number" min="0" value={header.taxAmount} onChange={e => setHeader(f => ({ ...f, taxAmount: e.target.value }))} />
                     </div>
                   </div>
                 </div>

@@ -283,7 +283,7 @@ export default function ExchangeSettings() {
             <div>
               <p className="text-xs text-muted-foreground mb-1">D-Day 알림 기준 (일)</p>
               <Input
-                type="number"
+                type="number" min="0"
                 className="h-8 text-sm"
                 value={settings.ddayAlertDays}
                 onChange={e => handleDdayAlertChange(parseInt(e.target.value) || 7)}
@@ -302,11 +302,11 @@ export default function ExchangeSettings() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <div className="space-y-1.5">
             <Label>USD/KRW</Label>
-            <Input type="number" value={usdInput} onChange={e => setUsdInput(e.target.value)} placeholder="1380" />
+            <Input type="number" min="0" value={usdInput} onChange={e => setUsdInput(e.target.value)} placeholder="1380" />
           </div>
           <div className="space-y-1.5">
             <Label>CNY/KRW</Label>
-            <Input type="number" value={cnyInput} onChange={e => setCnyInput(e.target.value)} placeholder="191" />
+            <Input type="number" min="0" value={cnyInput} onChange={e => setCnyInput(e.target.value)} placeholder="191" />
           </div>
           <div className="space-y-1.5">
             <Label>메모 (선택)</Label>

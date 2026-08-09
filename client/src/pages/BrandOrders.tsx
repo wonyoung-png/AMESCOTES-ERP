@@ -668,7 +668,7 @@ export default function BrandOrders() {
                               />
                               <Input
                                 className="h-8 text-xs col-span-2"
-                                type="number"
+                                type="number" min="0"
                                 placeholder="수량"
                                 value={cq.qty || ''}
                                 onChange={e => setLineColorQtys(prev => prev.map((x, i) => i === idx ? { ...x, qty: +e.target.value } : x))}
@@ -842,7 +842,7 @@ export default function BrandOrders() {
             </div>
             <div>
               <Label>수량</Label>
-              <Input type="number" value={recvForm.qty || ''} onChange={e => setRecvForm(f => ({ ...f, qty: +e.target.value }))} />
+              <Input type="number" min="0" value={recvForm.qty || ''} onChange={e => setRecvForm(f => ({ ...f, qty: +e.target.value }))} />
             </div>
             <div>
               <Label>컬러 <span className="text-destructive">*</span></Label>

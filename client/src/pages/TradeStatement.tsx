@@ -686,7 +686,7 @@ export default function TradeStatement() {
                 <div className="flex items-center gap-3">
                   <Label className="text-xs w-24 shrink-0">공급가액</Label>
                   <Input
-                    type="number"
+                    type="number" min="0"
                     value={taxForm.supplyAmount || ''}
                     onChange={e => {
                       const supplyAmount = parseInt(e.target.value) || 0;
@@ -700,7 +700,7 @@ export default function TradeStatement() {
                 <div className="flex items-center gap-3">
                   <Label className="text-xs w-24 shrink-0">세액 (10%)</Label>
                   <Input
-                    type="number"
+                    type="number" min="0"
                     value={taxForm.taxAmount || ''}
                     onChange={e => setTaxForm(f => ({ ...f, taxAmount: parseInt(e.target.value) || 0 }))}
                     className="h-8 text-sm text-right font-mono"
@@ -710,7 +710,7 @@ export default function TradeStatement() {
                 <div className="flex items-center gap-3">
                   <Label className="text-xs w-24 shrink-0 font-bold">합계금액</Label>
                   <Input
-                    type="number"
+                    type="number" min="0"
                     value={taxForm.totalAmount || ''}
                     onChange={e => {
                       const totalAmount = parseInt(e.target.value) || 0;
@@ -1229,7 +1229,7 @@ function TradeStatementDetailModal({
                       <td>
                         {isEditing ? (
                           <input
-                            type="number"
+                            type="number" min="0"
                             value={line.qty}
                             onChange={e => updateItemPrice(line.id, 'qty', parseInt(e.target.value) || 1)}
                             className="h-8 text-sm text-right border border-border rounded px-2 w-16"
@@ -1242,7 +1242,7 @@ function TradeStatementDetailModal({
                       <td>
                         {isEditing ? (
                           <input
-                            type="number"
+                            type="number" min="0"
                             value={line.unitPrice}
                             onChange={e => updateItemPrice(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                             className="h-8 text-sm text-right border border-border rounded px-2 w-28"

@@ -223,7 +223,7 @@ export default function QuickEntry() {
 
               <div className="space-y-1.5">
                 <Label>수량 (PCS) *</Label>
-                <Input type="number" inputMode="numeric" value={qty} onChange={e => setQty(e.target.value)} className="h-11 text-base" placeholder="0" />
+                <Input type="number" min="0" inputMode="numeric" value={qty} onChange={e => setQty(e.target.value)} className="h-11 text-base" placeholder="0" />
               </div>
 
               <div className="space-y-1.5">
@@ -269,7 +269,7 @@ export default function QuickEntry() {
           </div>
           <div className="space-y-1.5">
             <Label>{mode === 'receive' ? '입고 수량 *' : '차감 금액 (원) *'}</Label>
-            <Input type="number" inputMode="numeric" value={logQty} onChange={e => setLogQty(e.target.value)} className="h-11 text-base" placeholder="0" />
+            <Input type="number" min="0" inputMode="numeric" value={logQty} onChange={e => setLogQty(e.target.value)} className="h-11 text-base" placeholder="0" />
           </div>
           <div className="space-y-1.5">
             <Label>{mode === 'receive' ? '메모' : '사유'}</Label>

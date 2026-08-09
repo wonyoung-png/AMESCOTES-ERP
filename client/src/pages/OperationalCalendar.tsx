@@ -310,7 +310,7 @@ export default function OperationalCalendar() {
               <div><Label>시작</Label><Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} /></div>
               <div><Label>종료</Label><Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} /></div>
             </div>
-            <div><Label>할인율 %</Label><Input type="number" value={form.discountRate} onChange={e => setForm(f => ({ ...f, discountRate: +e.target.value }))} /></div>
+            <div><Label>할인율 %</Label><Input type="number" min="0" value={form.discountRate} onChange={e => setForm(f => ({ ...f, discountRate: +e.target.value }))} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNew(false)}>취소</Button>

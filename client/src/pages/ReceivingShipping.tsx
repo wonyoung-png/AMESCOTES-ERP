@@ -247,10 +247,10 @@ export default function ReceivingShipping() {
             <DialogTitle>{modal ? LOG_LABELS[modal.logType] : ''} 등록</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <div><Label>수량</Label><Input type="number" value={form.qty} onChange={e => setForm(f => ({ ...f, qty: +e.target.value }))} /></div>
+            <div><Label>수량</Label><Input type="number" min="0" value={form.qty} onChange={e => setForm(f => ({ ...f, qty: +e.target.value }))} /></div>
             {modal?.logType === 'inbound' && (
               <>
-                <div><Label>불량 수량</Label><Input type="number" value={form.defectQty} onChange={e => setForm(f => ({ ...f, defectQty: +e.target.value }))} /></div>
+                <div><Label>불량 수량</Label><Input type="number" min="0" value={form.defectQty} onChange={e => setForm(f => ({ ...f, defectQty: +e.target.value }))} /></div>
                 <div><Label>불량 사유</Label><Input value={form.defectNote} onChange={e => setForm(f => ({ ...f, defectNote: e.target.value }))} /></div>
               </>
             )}

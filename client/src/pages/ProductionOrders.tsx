@@ -2152,7 +2152,7 @@ export default function ProductionOrders() {
                               className="h-8 text-xs flex-1"
                             />
                             <Input
-                              type="number"
+                              type="number" min="0"
                               value={c.qty}
                               onChange={e => updColor(idx, { qty: e.target.value })}
                               placeholder="수량"
@@ -2305,7 +2305,7 @@ export default function ProductionOrders() {
                 <div className="space-y-1.5">
                   <Label>수량 (PCS)</Label>
                   <Input
-                    type="number"
+                    type="number" min="0"
                     value={colorQtys.length > 0 ? colorQtys.reduce((s, c) => s + c.qty, 0) : (form.qty || '')}
                     onChange={e => { if (colorQtys.length === 0) handleQtyChange(parseInt(e.target.value) || 0); }}
                     placeholder="0"
@@ -2574,7 +2574,7 @@ export default function ProductionOrders() {
                         </div>
                         {manualFactoryPrice ? (
                           <Input
-                            type="number"
+                            type="number" min="0"
                             value={manualPriceCny || ''}
                             onChange={e => setManualPriceCny(parseFloat(e.target.value) || 0)}
                             placeholder="0.00"
@@ -2725,7 +2725,7 @@ export default function ProductionOrders() {
                                                   </span>
                                                 ) : (
                                                   <Input
-                                                    type="number" value={item.requiredQty || ''}
+                                                    type="number" min="0" value={item.requiredQty || ''}
                                                     onChange={e => {
                                                       const updated = [...hqItems];
                                                       updated[idx] = { ...updated[idx], requiredQty: parseFloat(e.target.value) || 0 };
@@ -3150,7 +3150,7 @@ export default function ProductionOrders() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>불량 수량 *</Label>
-                  <Input type="number" value={postDefectForm.qty}
+                  <Input type="number" min="0" value={postDefectForm.qty}
                     onChange={e => setPostDefectForm(f => ({ ...f, qty: e.target.value }))} placeholder="0" />
                 </div>
                 <div className="space-y-1.5">
@@ -3251,7 +3251,7 @@ export default function ProductionOrders() {
                 #work-order-print-area { position: absolute; top: 0; left: 0; width: 100%; }
                 .no-print { display: none !important; }
                 textarea { border: none !important; resize: none; background: transparent; }
-                input[type="text"], input[type="number"] { border: none !important; background: transparent; }
+                input[type="text"], input[type="number" min="0"] { border: none !important; background: transparent; }
                 input[type="checkbox"] { display: inline-block !important; }
               }
             `}</style>
@@ -4211,7 +4211,7 @@ export default function ProductionOrders() {
               <div className="space-y-1.5">
                 <Label>금액 (KRW) *</Label>
                 <Input
-                  type="number"
+                  type="number" min="0"
                   value={expenseForm.amountKrw || ''}
                   onChange={e => setExpenseForm(f => ({ ...f, amountKrw: parseInt(e.target.value) || 0 }))}
                   placeholder="0"

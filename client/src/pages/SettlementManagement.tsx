@@ -504,11 +504,11 @@ export default function SettlementManagement() {
               </div>
               <div className="space-y-1.5">
                 <Label>청구금액 (KRW)</Label>
-                <Input type="number" value={form.billedAmountKrw || ''} onChange={e => setForm(f => ({ ...f, billedAmountKrw: parseInt(e.target.value) || 0 }))} placeholder="0" />
+                <Input type="number" min="0" value={form.billedAmountKrw || ''} onChange={e => setForm(f => ({ ...f, billedAmountKrw: parseInt(e.target.value) || 0 }))} placeholder="0" />
               </div>
               <div className="space-y-1.5">
                 <Label>수금금액 (KRW)</Label>
-                <Input type="number" value={form.collectedAmountKrw || ''} onChange={e => setForm(f => ({ ...f, collectedAmountKrw: parseInt(e.target.value) || 0 }))} placeholder="0" />
+                <Input type="number" min="0" value={form.collectedAmountKrw || ''} onChange={e => setForm(f => ({ ...f, collectedAmountKrw: parseInt(e.target.value) || 0 }))} placeholder="0" />
               </div>
               <div className="space-y-1.5">
                 <Label>수금일</Label>

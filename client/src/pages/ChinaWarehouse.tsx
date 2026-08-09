@@ -273,7 +273,7 @@ export default function ChinaWarehouse() {
             </div>
             <div>
               <Label>수량</Label>
-              <Input type="number" value={form.qty || ''} onChange={e => setForm(f => ({ ...f, qty: +e.target.value }))} />
+              <Input type="number" min="0" value={form.qty || ''} onChange={e => setForm(f => ({ ...f, qty: +e.target.value }))} />
             </div>
             <div>
               <Label>출고일</Label>
@@ -310,7 +310,7 @@ export default function ChinaWarehouse() {
             </div>
             <div>
               <Label>조정 수량 (+/−)</Label>
-              <Input type="number" value={form.qty || ''} onChange={e => setForm(f => ({ ...f, qty: +e.target.value }))} />
+              <Input type="number" min="0" value={form.qty || ''} onChange={e => setForm(f => ({ ...f, qty: +e.target.value }))} />
             </div>
             <div>
               <Label>일자</Label>

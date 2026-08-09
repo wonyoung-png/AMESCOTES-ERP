@@ -3177,7 +3177,7 @@ export default function ItemMaster() {
               <div className="space-y-1.5">
                 <Label>납품가(KRW)</Label>
                 <Input
-                  type="number"
+                  type="number" min="0"
                   value={editItem.deliveryPrice ?? editItem.targetSalePrice ?? ''}
                   onChange={e => {
                     const val = Number(e.target.value);
