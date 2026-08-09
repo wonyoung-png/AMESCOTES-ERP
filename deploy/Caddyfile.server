@@ -45,6 +45,16 @@ daily.54-116-241-64.sslip.io {
 	reverse_proxy daily:8000
 }
 
+# HR/Operation (근태·휴가·계좌·카드·세금계산서)
+hr.54-116-241-64.sslip.io {
+	encode zstd gzip
+	log {
+		output stdout
+		format json
+	}
+	reverse_proxy hr:8100
+}
+
 # IP/HTTP 접속 → 정식 https 주소로 자동 이동 (헬스체크는 직접 응답)
 http://:80 {
 	handle /healthz {
