@@ -26,6 +26,7 @@ import { toast } from 'sonner';
 import { onSaveFail } from '@/lib/saveGuard';
 import { printDoc, copyDocAsImage, saveDocAsImage } from '@/lib/docExport';
 import { PurchaseOrderDoc } from '@/components/PurchaseOrderDoc';
+import { WorkOrderDoc } from '@/components/WorkOrderDoc';
 import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera, MoreHorizontal, ChevronRight, ChevronDown, Layers } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
@@ -972,6 +973,7 @@ export default function ProductionOrders() {
       factoryCurrency,
       bomType: manualFactoryPrice ? 'manual' : (bomCalc.bomType ?? undefined),
       deliveryDate: form.deliveryDate,
+      shipTo: form.shipTo,
       negoHistory: finalNegoHistory,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -2877,9 +2879,26 @@ export default function ProductionOrders() {
                   />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>메모</Label>
-                <Input value={form.memo || ''} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="비고" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  {/* 작업지시서 우측 끝 칸 — 공장이 어디로 보낼지 알아야 한다 */}
+                  <Label>출고지</Label>
+                  <select
+                    value={form.shipTo || ''}
+                    onChange={e => setForm(f => ({ ...f, shipTo: e.target.value || undefined }))}
+                    className="w-full h-9 rounded-md border border-border bg-card px-3 text-sm"
+                  >
+                    <option value="">미지정</option>
+                    <option value="한국출고">한국출고</option>
+                    <option value="일본출고">일본출고</option>
+                    <option value="태국출고">태국출고</option>
+                    <option value="중국내수">중국내수</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>메모</Label>
+                  <Input value={form.memo || ''} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="비고" />
+                </div>
               </div>
             </div>
           </div>
@@ -3278,320 +3297,13 @@ export default function ProductionOrders() {
 
             {/* 작업지시서 본문 — 가로 A4 양식 */}
             <div id="work-order-print-area">
-              {(() => {
-                const order = workOrderTarget;
-                const item = items.find(i => i.id === order.styleId);
-                const { bom } = getBomForOrderFromList(boms as Bom[], order.styleNo);
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                // 컬러별 BOM에서 첫 번째 컬러 사용, 없으면 기존 방식
-                const getColorBomLines = (b: any) => {
-                  if (!b) return [];
-                  // 사후원가 컬러 BOM 우선
-                  if (b.postColorBoms && b.postColorBoms.length > 0) return b.postColorBoms[0].lines || [];
-                  if (b.postMaterials && b.postMaterials.length > 0) return b.postMaterials;
-                  // 사전원가 컬러 BOM
-                  if (b.colorBoms && b.colorBoms.length > 0) return b.colorBoms[0].lines || [];
-                  return b.lines || [];
-                };
-                const bomLines: any[] = getColorBomLines(bom);
-
-                // 원자재 (바디/안감)
-                const rawMaterials = bomLines.filter((l: any) => l.category === '원자재');
-                // 바디 자재: subPart=바디 or 첫 번째 원자재 (안감 제외)
-                const bodyMat = rawMaterials.find((l: any) => l.subPart === '바디') || rawMaterials.find((l: any) => l.subPart !== '안감') || rawMaterials[0];
-                // 안감 자재
-                const liningMat = rawMaterials.find((l: any) => l.subPart === '안감');
-                // 지퍼
-                const zipperMat = bomLines.find((l: any) => l.category === '지퍼' || (l.itemName && l.itemName.includes('지퍼')));
-                // 불박 로고
-                const logoMat = bomLines.find((l: any) => l.itemName && (l.itemName.includes('불박') || l.itemName.includes('로고')));
-                // 기리매
-                const girimaeMat = bomLines.find((l: any) => l.itemName && l.itemName.includes('기리매'));
-                // 실
-                const threadMat = bomLines.find((l: any) => l.category === '부자재' && l.itemName && l.itemName.includes('실'));
-
-                // 본사제공 자재 목록 (isHqProvided=true)
-                const hqMaterials = bomLines.filter((l: any) => l.isHqProvided);
-
-                // 컬러 정보 (품목 마스터)
-                const itemColors = normalizeColors(item?.colors || []);
-
-                // 컬러별 발주수량
-                const colorQtyList = (order.colorQtys || []).length > 0
-                  ? (order.colorQtys as { color: string; qty: number }[])
-                  : [{ color: '기본', qty: order.qty }];
-
-                // 샘플 이미지 가져오기
-                const samples = store.getSamples().filter(s => s.styleId === order.styleId);
-                const sampleImages = samples.flatMap(s => s.imageUrls || []).slice(0, 3);
-                const itemImage = item?.imageUrl;
-                const allImages: string[] = sampleImages.length > 0 ? sampleImages.slice(0, 3) : (itemImage ? [itemImage] : []);
-
-                // 기본 작업 지시사항
-                const defaultWorkNote = `1. 가죽 재단 후 기스 및 불량 확인
-2. 봉제, 기리매 기본 철저히 준수
-3. 주의사항 및 변경 사항 확인 필수
-4. 애매한 것은 담당자에게 확인하여 빠르게 해결하기
-5. 시아기 본드자국 및 실 끝처리 확인 철저
-6. 원부자재 빠르게 공급하기
-
-7. 제품 생산 완료 후 내부 검수필수 (실, 바늘, 물 등등)
-8. 재단물, 장식 전달 후 수량 파악 필수`;
-
-                return (
-                  <div style={{ fontFamily: "'Nanum Gothic', '나눔고딕', 'Malgun Gothic', sans-serif", fontSize: '12px', background: 'white' }}>
-
-                    {/* ── 타이틀 ── */}
-                    <div style={{ textAlign: 'center', padding: '8px 0 6px', borderBottom: '2px solid #333' }}>
-                      <h1 style={{ fontSize: '20px', fontWeight: 'bold', letterSpacing: '0.4em', margin: 0 }}>작  업  지  시  서</h1>
-                    </div>
-
-                    {/* ── 상단 헤더 테이블 (발주일자 / 납기일 / 스타일넘버 / 작업장) ── */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '1px solid #555' }}>
-                      <tbody>
-                        <tr>
-                          <td style={{ border: '1px solid #999', padding: '4px 8px', background: '#f5f5f5', fontWeight: 'bold', width: '12%', whiteSpace: 'nowrap' }}>발주일자</td>
-                          <td style={{ border: '1px solid #999', padding: '4px 8px', width: '22%' }}>
-                            {order.orderDate ? `${order.orderDate.slice(0,4)}년 ${parseInt(order.orderDate.slice(5,7))}월 ${parseInt(order.orderDate.slice(8,10))}일` : '—'}
-                          </td>
-                          <td style={{ border: '1px solid #999', padding: '4px 8px', background: '#f5f5f5', fontWeight: 'bold', width: '10%', whiteSpace: 'nowrap' }}>납기일</td>
-                          <td style={{ border: '1px solid #999', padding: '4px 8px', width: '56%', color: '#cc0000', fontWeight: 'bold', fontSize: '13px' }}>
-                            {order.deliveryDate || '—'}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{ border: '1px solid #999', padding: '4px 8px', background: '#f5f5f5', fontWeight: 'bold', whiteSpace: 'nowrap' }}>스타일넘버(품명)</td>
-                          <td style={{ border: '1px solid #999', padding: '4px 8px', fontWeight: 'bold', fontSize: '13px' }}>
-                            {order.styleNo} / {order.styleName}
-                          </td>
-                          <td style={{ border: '1px solid #999', padding: '4px 8px', background: '#f5f5f5', fontWeight: 'bold', whiteSpace: 'nowrap' }}>작업장</td>
-                          <td style={{ border: '1px solid #999', padding: '4px 8px', fontWeight: 'bold', fontSize: '13px' }}>
-                            {order.vendorName || '—'}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    {/* ── 원단/가죽 소요량 행 ── */}
-                    <div style={{ background: '#fafafa', border: '1px solid #ccc', borderTop: 'none', padding: '5px 10px', display: 'flex', gap: '24px', fontSize: '12px' }}>
-                      <span>
-                        <strong>원단/가죽 소요량: </strong>
-                        {bodyMat
-                          ? `${(bodyMat.netQty * (1 + bodyMat.lossRate)).toFixed(3)} ${bodyMat.unit}`
-                          : '—'}
-                      </span>
-                      <span style={{ color: '#888' }}>|</span>
-                      <span>
-                        <strong>안감 소요량: </strong>
-                        {liningMat
-                          ? `${(liningMat.netQty * (1 + liningMat.lossRate)).toFixed(3)} ${liningMat.unit}`
-                          : '—'}
-                      </span>
-                    </div>
-
-                    {/* ── 컬러별 자재 정보 테이블 ── */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '4px', fontSize: '11px' }}>
-                      <thead>
-                        <tr style={{ background: '#e8e8e8' }}>
-                          <th style={{ border: '1px solid #aaa', padding: '4px 6px', width: '22%', textAlign: 'center' }}>메인자재<br/><span style={{ fontWeight: 'normal', fontSize: '10px' }}>(발주수량)</span></th>
-                          <th style={{ border: '1px solid #aaa', padding: '4px 6px', width: '10%', textAlign: 'center' }}>우라<br/><span style={{ fontWeight: 'normal', fontSize: '10px' }}>(안감)</span></th>
-                          <th style={{ border: '1px solid #aaa', padding: '4px 6px', width: '10%', textAlign: 'center' }}>장식</th>
-                          <th style={{ border: '1px solid #aaa', padding: '4px 6px', width: '12%', textAlign: 'center' }}>불박로고</th>
-                          <th style={{ border: '1px solid #aaa', padding: '4px 6px', width: '10%', textAlign: 'center' }}>기리매</th>
-                          <th style={{ border: '1px solid #aaa', padding: '4px 6px', width: '10%', textAlign: 'center' }}>실번버</th>
-                          <th style={{ border: '1px solid #aaa', padding: '4px 6px', width: '12%', textAlign: 'center' }}>지퍼번버</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {colorQtyList.map((cq, i) => {
-                          // 이 컬러에 해당하는 품목 컬러 정보
-                          const colorInfo = itemColors.find(c => c.name === cq.color) || itemColors[0];
-                          return (
-                            <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                              <td style={{ border: '1px solid #ccc', padding: '5px 6px', verticalAlign: 'top' }}>
-                                <div style={{ fontWeight: 'bold', lineHeight: 1.4 }}>
-                                  {colorInfo?.leatherColor || cq.color}
-                                </div>
-                                <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
-                                  {bodyMat?.spec && <span>{bodyMat.spec}</span>}
-                                </div>
-                                <div style={{ fontWeight: 'bold', marginTop: '3px', fontSize: '12px' }}>
-                                  {cq.qty.toLocaleString()} PCS
-                                </div>
-                              </td>
-                              <td style={{ border: '1px solid #ccc', padding: '5px 6px', textAlign: 'center', verticalAlign: 'top' }}>
-                                <div style={{ fontSize: '11px' }}>
-                                  {liningMat ? (liningMat.spec || liningMat.itemName || '—') : '—'}
-                                </div>
-                              </td>
-                              <td style={{ border: '1px solid #ccc', padding: '5px 6px', textAlign: 'center', verticalAlign: 'top' }}>
-                                <div style={{ fontSize: '11px' }}>
-                                  {colorInfo?.decorColor || '—'}
-                                </div>
-                              </td>
-                              <td style={{ border: '1px solid #ccc', padding: '5px 6px', textAlign: 'center', verticalAlign: 'top' }}>
-                                <div style={{ fontSize: '11px' }}>
-                                  {logoMat ? (logoMat.spec || logoMat.itemName) : '—'}
-                                </div>
-                              </td>
-                              <td style={{ border: '1px solid #ccc', padding: '5px 6px', textAlign: 'center', verticalAlign: 'top' }}>
-                                <div style={{ fontSize: '11px' }}>
-                                  {colorInfo?.girimaeColor || (girimaeMat ? (girimaeMat.spec || girimaeMat.itemName) : '—')}
-                                </div>
-                              </td>
-                              <td style={{ border: '1px solid #ccc', padding: '5px 6px', textAlign: 'center', verticalAlign: 'top' }}>
-                                <div style={{ fontSize: '11px' }}>
-                                  {colorInfo?.threadColor || (threadMat ? (threadMat.spec || threadMat.itemName) : '—')}
-                                </div>
-                              </td>
-                              <td style={{ border: '1px solid #ccc', padding: '5px 6px', textAlign: 'center', verticalAlign: 'top' }}>
-                                <div style={{ fontSize: '11px' }}>
-                                  {zipperMat ? (zipperMat.spec || zipperMat.itemName) : '—'}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {/* 합계 행 */}
-                        <tr style={{ background: '#f0f0f0', fontWeight: 'bold' }}>
-                          <td style={{ border: '1px solid #ccc', padding: '4px 6px' }}>
-                            합계: {colorQtyList.reduce((s, c) => s + c.qty, 0).toLocaleString()} PCS
-                          </td>
-                          <td colSpan={6} style={{ border: '1px solid #ccc', padding: '4px 6px', fontSize: '10px', color: '#888' }}>
-                            {colorQtyList.map(cq => `${cq.color} ${cq.qty.toLocaleString()}PCS`).join(' / ')}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    {/* ── 제품 이미지 영역 ── */}
-                    <div style={{ border: '1px solid #ccc', borderTop: 'none', padding: '8px', display: 'flex', gap: '8px', minHeight: '90px', alignItems: 'center' }}>
-                      <div style={{ fontWeight: 'bold', fontSize: '11px', color: '#555', minWidth: '60px', writingMode: 'vertical-rl', textAlign: 'center' }}>제품사진</div>
-                      {allImages.length > 0 ? (
-                        allImages.map((img, i) => (
-                          <div key={i} style={{ width: '80px', height: '80px', border: '1px solid #ddd', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
-                            <img src={img} alt={`제품이미지${i+1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          </div>
-                        ))
-                      ) : (
-                        Array.from({ length: 3 }).map((_, i) => (
-                          <div key={i} style={{ width: '80px', height: '80px', border: '1px dashed #bbb', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#bbb', fontSize: '10px' }}>
-                            사진 {i+1}
-                          </div>
-                        ))
-                      )}
-                      <div style={{ flex: 1 }} />
-                      {/* 이미지 없으면 메모란 */}
-                      {allImages.length === 0 && (
-                        <div style={{ flex: 1, fontSize: '10px', color: '#aaa', border: '1px dashed #ddd', padding: '6px', borderRadius: '4px', minHeight: '60px' }}>
-                          품목 마스터 또는 샘플에 이미지를 등록하면 자동으로 표시됩니다
-                        </div>
-                      )}
-                    </div>
-
-                    {/* ── 하단 2열 레이아웃: 작업 기본사항 | 본사제공 자재 체크란 ── */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', border: '1px solid #ccc', borderTop: 'none' }}>
-
-                      {/* 왼쪽: 6대 작업 기본사항 */}
-                      <div style={{ borderRight: '1px solid #ccc', padding: '8px' }}>
-                        <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '6px', borderBottom: '1px solid #ddd', paddingBottom: '4px' }}>
-                          6대 작업 기본사항
-                        </div>
-                        <textarea
-                          className="no-print"
-                          style={{ width: '100%', border: '1px solid #e0e0e0', borderRadius: '3px', padding: '6px', fontSize: '11px', lineHeight: 1.7, resize: 'vertical', minHeight: '120px', fontFamily: 'inherit', background: '#fafffe' }}
-                          value={workOrderNote || defaultWorkNote}
-                          onChange={e => setWorkOrderNote(e.target.value)}
-                        />
-                        {/* 인쇄용 (화면에선 숨김) */}
-                        <div style={{ display: 'none', fontSize: '11px', lineHeight: 1.7, whiteSpace: 'pre-wrap' }} className="print-only">
-                          {workOrderNote || defaultWorkNote}
-                        </div>
-                        <style>{`.print-only { display: none; } @media print { .print-only { display: block !important; } .no-print { display: none !important; } }`}</style>
-                        <div style={{ marginTop: '8px', fontWeight: 'bold', color: '#cc0000', fontSize: '12px', textAlign: 'center' }}>
-                          수정사항 꼭 확인해주세요
-                        </div>
-                      </div>
-
-                      {/* 오른쪽: 본사제공 자재 수령 체크란 */}
-                      <div style={{ padding: '8px' }}>
-                        <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '6px', borderBottom: '1px solid #ddd', paddingBottom: '4px' }}>
-                          본사제공 자재 수령 체크란
-                        </div>
-                        {hqMaterials.length > 0 ? (
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                            <thead>
-                              <tr style={{ background: '#f0f0f0' }}>
-                                <th style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center', width: '30%' }}>품명</th>
-                                <th style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center', width: '22%' }}>필요수량</th>
-                                <th style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center', width: '28%' }}>수령수량</th>
-                                <th style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center', width: '10%' }}>✓</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {hqMaterials.map((mat: any, idx: number) => {
-                                const reqQty = (mat.netQty * (1 + mat.lossRate) * order.qty);
-                                return (
-                                  <tr key={idx}>
-                                    <td style={{ border: '1px solid #ccc', padding: '3px 5px' }}>
-                                      {mat.itemName}
-                                      {mat.spec && <span style={{ color: '#888', fontSize: '10px' }}><br/>{mat.spec}</span>}
-                                    </td>
-                                    <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center', fontFamily: 'monospace' }}>
-                                      {reqQty % 1 === 0 ? reqQty.toLocaleString() : reqQty.toFixed(2)} {mat.unit}
-                                    </td>
-                                    <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center' }}>
-                                      <input
-                                        type="text"
-                                        className="no-print"
-                                        placeholder="수령량"
-                                        value={hqReceive[idx]?.received || ''}
-                                        onChange={e => {
-                                          const updated = [...hqReceive];
-                                          updated[idx] = { ...updated[idx], received: e.target.value };
-                                          setHqReceive(updated);
-                                        }}
-                                        style={{ width: '70px', border: '1px solid #ccc', borderRadius: '2px', padding: '2px 4px', fontSize: '11px', textAlign: 'center' }}
-                                      />
-                                      <span className="print-only" style={{ display: 'none', fontFamily: 'monospace' }}>
-                                        {hqReceive[idx]?.received || '___'} {mat.unit}
-                                      </span>
-                                    </td>
-                                    <td style={{ border: '1px solid #ccc', padding: '3px 5px', textAlign: 'center' }}>
-                                      <input
-                                        type="checkbox"
-                                        checked={hqReceive[idx]?.checked || false}
-                                        onChange={e => {
-                                          const updated = [...hqReceive];
-                                          updated[idx] = { ...updated[idx], checked: e.target.checked };
-                                          setHqReceive(updated);
-                                        }}
-                                        style={{ width: '14px', height: '14px', cursor: 'pointer' }}
-                                      />
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        ) : (
-                          <div style={{ padding: '16px', textAlign: 'center', color: '#bbb', fontSize: '11px', border: '1px dashed #ddd', borderRadius: '4px' }}>
-                            본사제공 자재 없음<br/>
-                            <span style={{ fontSize: '10px' }}>(BOM에서 isHqProvided=true 항목이 없습니다)</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* ── 하단 서명란 ── */}
-                    <div style={{ border: '1px solid #ccc', borderTop: 'none', padding: '6px 12px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '11px', color: '#555' }}>
-                      <div>작성: _______________</div>
-                      <div>확인: _______________</div>
-                      <div>수령: _______________</div>
-                    </div>
-                  </div>
-                );
-              })()}
+              <WorkOrderDoc
+                order={workOrderTarget}
+                bom={getBomForOrderFromList(boms as Bom[], workOrderTarget.styleNo).bom as any}
+                item={items.find(i => i.id === workOrderTarget.styleId || i.styleNo === workOrderTarget.styleNo) as any}
+                vendors={allVendors as any}
+                note={workOrderNote}
+              />
             </div>
 
             {/* 하단 버튼 (인쇄 시 숨김) */}
