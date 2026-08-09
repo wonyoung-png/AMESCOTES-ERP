@@ -1018,3 +1018,66 @@ export async function updatePurchaseItemStatus(id: string, status: string, extra
   const { error } = await supabase.from('purchase_items').update(update).eq('id', id);
   if (error) throw error;
 }
+
+// ─────────────────────────────────────────────
+// 단가 이력 — 덮어쓰기만 하던 단가를 바뀔 때마다 한 줄씩 남긴다 (협상 근거)
+// ─────────────────────────────────────────────
+export type PriceHistoryRow = {
+  id: string;
+  kind: 'material' | 'factory';
+  refId?: string;
+  refName: string;
+  vendorId?: string;
+  vendorName?: string;
+  currency?: string;
+  unitPrice: number;
+  prevPrice?: number;
+  memo?: string;
+  changedAt: string;
+};
+
+/** 단가가 실제로 바뀐 경우에만 기록한다 (같은 값이면 아무 것도 안 남김) */
+export async function recordPriceChange(row: Omit<PriceHistoryRow, 'id' | 'changedAt'>): Promise<void> {
+  if (row.prevPrice != null && Number(row.prevPrice) === Number(row.unitPrice)) return;
+  if (!Number.isFinite(Number(row.unitPrice))) return;
+  const { error } = await supabase.from('price_history').insert({
+    id: `ph_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    kind: row.kind,
+    ref_id: row.refId || null,
+    ref_name: row.refName,
+    vendor_id: row.vendorId || null,
+    vendor_name: row.vendorName || null,
+    currency: row.currency || null,
+    unit_price: row.unitPrice,
+    prev_price: row.prevPrice ?? null,
+    memo: row.memo || null,
+    changed_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+/** 특정 자재·스타일의 단가 이력 (최신순) */
+export async function fetchPriceHistory(
+  kind: 'material' | 'factory',
+  opts: { refId?: string; refName?: string; limit?: number },
+): Promise<PriceHistoryRow[]> {
+  let q = supabase.from('price_history').select('*').eq('kind', kind)
+    .order('changed_at', { ascending: false }).limit(opts.limit ?? 20);
+  if (opts.refId) q = q.eq('ref_id', opts.refId);
+  else if (opts.refName) q = q.eq('ref_name', opts.refName);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    kind: r.kind,
+    refId: r.ref_id || undefined,
+    refName: r.ref_name,
+    vendorId: r.vendor_id || undefined,
+    vendorName: r.vendor_name || undefined,
+    currency: r.currency || undefined,
+    unitPrice: Number(r.unit_price) || 0,
+    prevPrice: r.prev_price != null ? Number(r.prev_price) : undefined,
+    memo: r.memo || undefined,
+    changedAt: r.changed_at,
+  }));
+}

@@ -4,7 +4,7 @@ import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, MATERIAL_CATEGORIES, MATERIAL_SUB_TYPES, PLATING_COLORS, COMMON_BRAND, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
 import { Link } from 'wouter';
-import { fetchMaterials, upsertMaterial, deleteMaterial as deleteMaterialSB, fetchVendors, updateMaterialStatus } from '@/lib/supabaseQueries';
+import { fetchMaterials, upsertMaterial, deleteMaterial as deleteMaterialSB, fetchVendors, updateMaterialStatus, recordPriceChange, fetchPriceHistory, type PriceHistoryRow } from '@/lib/supabaseQueries';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,8 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { onSaveFail } from '@/lib/saveGuard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Plus, Search, Pencil, Trash2, Package, ChevronDown, Eye, X } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, ChevronDown, Eye, X, History } from 'lucide-react';
 import { HoverZoomImage } from '@/components/HoverZoomImage';
 
 /** 검색 가능한 단일 선택 드롭다운 — 네이티브 datalist 대신 (Select 와 같은 외형) */
@@ -115,6 +116,9 @@ export default function MaterialMaster() {
   const [form, setForm] = useState<Partial<Material>>({ ...emptyForm });
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [vendorQuery, setVendorQuery] = useState('');
+  const [historyOf, setHistoryOf] = useState<Material | null>(null);
+  const [history, setHistory] = useState<PriceHistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
@@ -168,6 +172,19 @@ export default function MaterialMaster() {
     setVendorQuery('');
     setEditId(null);
     setShowModal(true);
+  };
+
+  const openHistory = async (m: Material) => {
+    setHistoryOf(m);
+    setHistoryLoading(true);
+    try {
+      setHistory(await fetchPriceHistory('material', { refId: m.id, refName: m.name }));
+    } catch (e) {
+      toast.error(`이력 조회 실패: ${(e as Error).message}`);
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const openEdit = (m: any) => {
@@ -230,6 +247,23 @@ export default function MaterialMaster() {
 
     try {
       await upsertMaterial(mat);
+      // 단가가 바뀌었으면 이력 한 줄 — 다음 시즌 협상 때 근거가 된다
+      const before = editId ? (materials as Material[]).find(m => m.id === editId) : undefined;
+      const cur = currencyOf(mat);
+      const newPrice = priceOf(mat);
+      const oldPrice = before ? priceOf(before) : undefined;
+      if (newPrice != null && (!before || Number(oldPrice ?? NaN) !== Number(newPrice))) {
+        await recordPriceChange({
+          kind: 'material',
+          refId: mat.id,
+          refName: mat.name || '',
+          vendorId: mat.vendorId || undefined,
+          vendorName: vendorQuery || undefined,
+          currency: cur,
+          unitPrice: Number(newPrice),
+          prevPrice: oldPrice != null ? Number(oldPrice) : undefined,
+        }).catch(onSaveFail('단가 이력'));
+      }
       queryClient.invalidateQueries({ queryKey: ['materials'] });
       toast.success(editId ? '자재가 수정되었습니다' : '자재가 등록되었습니다');
       setShowModal(false);
@@ -489,6 +523,53 @@ export default function MaterialMaster() {
           </tbody>
         </table>
       </div>
+
+      {/* 단가 이력 — 언제 얼마였는지 (협상 근거) */}
+      <Dialog open={!!historyOf} onOpenChange={o => { if (!o) setHistoryOf(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>단가 이력 — {historyOf?.name}</DialogTitle></DialogHeader>
+          {historyLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">불러오는 중…</p>
+          ) : history.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-muted-foreground">아직 기록이 없습니다</p>
+              <p className="text-xs text-muted-foreground mt-1">단가를 수정하면 이때부터 한 줄씩 쌓입니다</p>
+            </div>
+          ) : (
+            <div className="max-h-80 overflow-y-auto border border-border rounded-md">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="nw">변경일</th>
+                    <th className="num">단가</th>
+                    <th className="num">변동</th>
+                    <th>공급업체</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map(h => {
+                    const diff = h.prevPrice != null ? h.unitPrice - h.prevPrice : null;
+                    const rate = h.prevPrice ? Math.round((diff! / h.prevPrice) * 1000) / 10 : null;
+                    return (
+                      <tr key={h.id}>
+                        <td className="nw text-xs text-muted-foreground">{h.changedAt.slice(0, 10)}</td>
+                        <td className="num font-medium">{CURRENCY_SIGN[(h.currency as PriceCurrency) || 'KRW']}{h.unitPrice.toLocaleString()}</td>
+                        <td className={`num text-xs ${diff == null ? 'text-muted-foreground' : diff > 0 ? 'text-[var(--system-red)]' : 'text-[var(--system-green)]'}`}>
+                          {diff == null ? '최초' : `${diff > 0 ? '+' : ''}${diff.toLocaleString()}${rate != null ? ` (${rate > 0 ? '+' : ''}${rate}%)` : ''}`}
+                        </td>
+                        <td className="text-xs text-muted-foreground">{h.vendorName || '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHistoryOf(null)}>닫기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 등록/수정 모달 */}
       {/* 자재 상세보기 */}
