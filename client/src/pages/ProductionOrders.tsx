@@ -2220,7 +2220,12 @@ export default function ProductionOrders() {
                   .sort((a, b) => (b.orderDate || '').localeCompare(a.orderDate || ''))
                   .slice(0, 4);
                 const last = history[0]?.factoryUnitPriceKrw || 0;
-                const now = Number(form.factoryUnitPriceKrw) || 0;
+                // 신규 발주는 form 에 단가가 없다 — 저장 때와 같은 방식으로 현재 단가를 만든다
+                const curCny = manualFactoryPrice ? manualPriceCny : bomCalc.factoryUnitPriceCny;
+                const nowKrw = factoryCurrency === 'KRW' ? Math.round(curCny)
+                  : factoryCurrency === 'USD' ? Math.round(curCny * usdKrwDisplay)
+                  : Math.round(curCny * cnyKrwDisplay);
+                const now = Number(form.factoryUnitPriceKrw) || nowKrw || 0;
                 const diff = last > 0 && now > 0 ? now - last : 0;
                 return (
                   <div className="rounded-md bg-primary/10 border border-primary/20 text-xs text-primary overflow-hidden">
