@@ -2959,7 +2959,7 @@ export default function ProductionOrders() {
                 </div>
                 <div><p className="text-xs text-muted-foreground">리오더</p><p className="font-medium">{showDetail.isReorder ? `${showDetail.revision}차` : '신규'}</p></div>
                 {showDetail.orderDate && (
-                  <div><p className="text-xs text-muted-foreground">{DOC_T[docLang].orderDate}</p><p className="font-mono">{showDetail.orderDate}</p></div>
+                  <div><p className="text-xs text-muted-foreground">발주일</p><p className="font-mono">{showDetail.orderDate}</p></div>
                 )}
                 {showDetail.deliveryDate && (
                   <div>
@@ -3939,15 +3939,15 @@ export default function ProductionOrders() {
                   <table className="data-table min-w-[760px]">
                     <thead>
                       <tr>
-                        <th className="num" style={{ width: 36 }}>No.</th>
-                        <th className="nw nw" style={{ width: 128 }}>발주번호</th>
-                        <th className="nw" style={{ width: 112 }}>스타일</th>
-                        <th style={{ width: 96 }}>품명</th>
-                        <th>컬러별 수량</th>
-                        <th className="num" style={{ width: 72 }}>총수량</th>
-                        <th className="num" style={{ width: 88 }}>단가</th>
-                        <th className="num" style={{ width: 108 }}>금액</th>
-                        <th className="nw nw" style={{ width: 92 }}>납기</th>
+                        <th className="num" style={{ width: 36 }}>{DOC_T[docLang].no}</th>
+                        <th className="nw" style={{ width: 128 }}>{DOC_T[docLang].orderNo}</th>
+                        <th className="nw" style={{ width: 112 }}>{DOC_T[docLang].style}</th>
+                        <th style={{ width: 96 }}>{DOC_T[docLang].name}</th>
+                        <th>{DOC_T[docLang].colorQty}</th>
+                        <th className="num" style={{ width: 72 }}>{DOC_T[docLang].totalQty}</th>
+                        <th className="num" style={{ width: 88 }}>{DOC_T[docLang].unitPrice}</th>
+                        <th className="num" style={{ width: 108 }}>{DOC_T[docLang].amount}</th>
+                        <th className="nw" style={{ width: 92 }}>{DOC_T[docLang].delivery}</th>
                       </tr>
                     </thead>
                     <tbody>
