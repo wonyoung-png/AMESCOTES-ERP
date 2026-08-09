@@ -139,7 +139,15 @@ const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
   { group: '실행 & 일정', label: '일정 목록', icon: <CalendarDays size={17} /> },
 ];
 
-const pmsTabUrl = (label: string) => `${PMS_URL}#${encodeURIComponent(label)}`;
+/**
+ * PMS 탭 링크. ERP 로그인 토큰을 함께 실어 보내 비밀번호를 다시 묻지 않게 한다.
+ * PMS는 같은 PGRST_JWT_SECRET으로 이 토큰을 검증하고, 받자마자 주소창에서 지운다.
+ */
+const pmsTabUrl = (label: string) => {
+  const t = localStorage.getItem('erp_token');
+  const q = t ? `?erp=${encodeURIComponent(t)}` : '';
+  return `${PMS_URL}${q}#${encodeURIComponent(label)}`;
+};
 
 type WorkspaceId = Workspace;
 
