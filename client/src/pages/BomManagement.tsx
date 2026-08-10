@@ -5041,10 +5041,9 @@ export default function BomManagement() {
               return r.kind === '보강재' ? cm2 / w / 100 : cm2 / w / 91.44;                              // M / YD
             };
 
-            /** 한 종류를 BOM 자재 명세에 만들어 넣는다 — 사전·사후 양쪽 같이.
-             *  · 가죽·원단 : 부위(바디/트림1/트림2)마다 한 줄, 소요량은 그 부위 합계
-             *  · 안감      : 부위를 안 쓰므로 한 줄, 소요량은 전체 합계
-             *  · 보강재    : 자재가 제각각이라 패턴부위마다 한 줄
+            /** 한 종류를 BOM 자재 명세에 만들어 넣는다 — 지금 고른 원가구분(사전/사후)에만.
+             *  · 가죽·원단·안감 : 종류마다 한 줄. 소요량은 부위를 다 합친 값
+             *  · 보강재         : 자재가 제각각이라 패턴부위마다 한 줄
              *  자재명·단가·업체는 손으로 넣는 값이라, 다시 눌러도 지우지 않고 소요량만 갱신한다. */
             const syncToBom = (k: YardKind) => {
               if (!editBom) return;
@@ -5055,18 +5054,16 @@ export default function BomManagement() {
               const loss = cfgOf(k).로스;
               const category: BomCategory = k === '보강재' ? '보강재' : '원자재';
 
-              // 어떤 단위로 줄을 나눌지 — 보강재만 패턴부위, 나머지는 부위(안감은 하나)
+              // 보강재만 자재별로 쪼개고, 나머지는 종류당 한 줄로 합친다
               const buckets: Array<{ key: string; subPart?: string; itemName: string; net: number }> =
                 k === '보강재'
                   ? rows.map(r => ({ key: r.패턴부위 || r.id, itemName: r.패턴부위 || '', net: rowNet(r) }))
-                  : k === '안감'
-                    ? [{ key: '안감', subPart: '안감', itemName: '', net: rows.reduce((s, r) => s + rowNet(r), 0) }]
-                    : YARD_PARTS
-                        .filter(p => rows.some(r => (r.part || '바디') === p))
-                        .map(p => ({
-                          key: p, subPart: p, itemName: '',
-                          net: rows.filter(r => (r.part || '바디') === p).reduce((s, r) => s + rowNet(r), 0),
-                        }));
+                  : [{
+                      key: k,
+                      subPart: k === '안감' ? '안감' : undefined,
+                      itemName: '',
+                      net: rows.reduce((s, r) => s + rowNet(r), 0),
+                    }];
 
               const merge = (ls: ExtBomLine[]) => {
                 const kept = ls.filter(l => l.fromYard !== k);
@@ -5087,13 +5084,17 @@ export default function BomManagement() {
                 });
                 return [...kept, ...made];
               };
-              const made = buckets;
-              setEditBom(prev => prev && ({
-                ...prev,
-                colorBoms: (prev.colorBoms || []).map(cb => cb.color === yardColor ? { ...cb, lines: merge(cb.lines) } : cb),
-                postColorBoms: (prev.postColorBoms || []).map(cb => cb.color === yardColor ? { ...cb, lines: merge(cb.lines) } : cb),
-              }));
-              toast.success(`${k} ${made.length}줄을 사전·사후 원가에 만들었습니다 — 저장을 눌러 확정하세요`);
+              // 위에서 고른 원가구분에만 넣는다 — 사전·사후를 한 번에 덮어쓰지 않는다
+              const scopeLabel = yardScope === 'post' ? '사후원가' : '사전원가';
+              setEditBom(prev => {
+                if (!prev) return prev;
+                const key = yardScope === 'post' ? 'postColorBoms' : 'colorBoms';
+                return {
+                  ...prev,
+                  [key]: (prev[key] || []).map(cb => cb.color === yardColor ? { ...cb, lines: merge(cb.lines) } : cb),
+                };
+              });
+              toast.success(`${k} ${buckets.length}줄을 ${scopeLabel} · ${yardColor} 에 만들었습니다 — 저장을 눌러 확정하세요`);
             };
 
             const ocrFileRef = React.createRef<HTMLInputElement>();
@@ -5307,7 +5308,8 @@ export default function BomManagement() {
                             );
                           })}
                           <Button size="sm" className="text-xs h-8 ml-auto" onClick={() => syncToBom(k)}>
-                            {k} {rows.length}줄 BOM에 생성 (사전·사후)
+                            {k} → {yardScope === 'post' ? '사후원가' : '사전원가'} BOM에 넣기
+                            {k === '보강재' ? ` (${rows.length}줄)` : ' (1줄)'}
                           </Button>
                         </div>
                       )}
