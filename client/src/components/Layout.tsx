@@ -50,6 +50,14 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: '기획 & 일정',
+    brandOnly: true,
+    items: [
+      { path: '/projects', label: '프로젝트', icon: <ClipboardList size={17} />, table: 'projects' },
+      { path: '/calendar', label: '운영 캘린더 · 기획전', icon: <CalendarDays size={17} />, table: 'campaigns' },
+    ],
+  },
+  {
     label: '마스터',
     items: [
       { path: '/vendors', label: '거래처 마스터', icon: <Building2 size={17} />, table: 'vendors' },
@@ -60,12 +68,12 @@ const navGroups: NavGroup[] = [
   },
   {
     label: '생산',
-    oemOnly: true,
     items: [
-      { path: '/bom', label: 'BOM / 원가', icon: <ClipboardList size={17} />, table: 'boms' },
-      { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} />, table: 'boms' },
-      { path: '/orders', label: '생산 발주', icon: <Factory size={17} />, table: 'production_orders' },
-      { path: '/deadlines', label: '납기 캘린더', icon: <CalendarClock size={17} />, table: 'milestones' },
+      { path: '/bom', label: 'BOM / 원가', icon: <ClipboardList size={17} />, table: 'boms', oemOnly: true },
+      { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} />, table: 'boms', oemOnly: true },
+      { path: '/orders', label: '생산 발주', icon: <Factory size={17} />, table: 'production_orders', oemOnly: true },
+      { path: '/brand-orders', label: '오더관리', icon: <Factory size={17} />, table: 'production_orders', lumenOnly: true },
+      { path: '/deadlines', label: '납기 캘린더', icon: <CalendarClock size={17} />, table: 'milestones', oemOnly: true },
     ],
   },
   {
@@ -77,15 +85,14 @@ const navGroups: NavGroup[] = [
   },
   {
     label: '정산',
-    oemOnly: true,
     items: [
-      { path: '/trade-statement', label: '거래명세표', icon: <FileText size={17} />, table: 'trade_statements' },
-      { path: '/settlement', label: '미수금 / 정산', icon: <Receipt size={17} />, table: 'settlements' },
+      { path: '/trade-statement', label: '거래명세표', icon: <FileText size={17} />, table: 'trade_statements', oemOnly: true },
+      { path: '/settlement', label: '미수금 / 정산', icon: <Receipt size={17} />, table: 'settlements', oemOnly: true },
       { path: '/payables', label: '미지급 · 불량차감', icon: <Wallet size={17} />, table: 'payables' },
       { path: '/expense', label: '지출결의', icon: <Receipt size={17} />, table: 'expenses' },
       { path: '/project-pl', label: '발주 손익', icon: <BarChart3 size={17} />, table: 'projects' },
-      { path: '/sales-summary', label: '매출집계', icon: <LineChart size={17} />, table: '누적생산량' },
-      { path: '/documents', label: '서류 출력', icon: <FileText size={17} />, table: '공장PO · PI · PL' },
+      { path: '/sales-summary', label: '매출집계', icon: <LineChart size={17} />, table: '누적생산량', oemOnly: true },
+      { path: '/documents', label: '서류 출력', icon: <FileText size={17} />, table: '공장PO · PI · PL', oemOnly: true },
     ],
   },
   {
@@ -104,20 +111,6 @@ const bottomTabs = [
   { path: '/purchase', label: '구매', icon: <ShoppingCart size={20} /> },
   { path: '/trade-statement', label: '명세', icon: <FileText size={20} /> },
   { path: '/', label: '더보기', icon: <MoreHorizontal size={20} />, isMore: true },
-];
-
-/**
- * LUMEN/AETALOOF 워크스페이스 전용 ERP 화면.
- * PMS 미러(외부 링크)와 달리 이 앱 안의 페이지라 내부 라우팅으로 연다.
- * 운영 캘린더·기획전은 브랜드가 쓰는 기획 도구라 OEM 생산 그룹에서 여기로 옮겼다.
- */
-const brandNav: { group: string; path: string; label: string; icon: React.ReactNode }[] = [
-  { group: '기획 & 일정', path: '/projects', label: '프로젝트', icon: <ClipboardList size={17} /> },
-  { group: '기획 & 일정', path: '/calendar', label: '운영 캘린더 · 기획전', icon: <CalendarDays size={17} /> },
-  // 브랜드도 돈이 나간다. 오더의 미지급, 프로젝트 예산의 지출결의가 여기서 보여야 한다
-  { group: '정산', path: '/brand-orders', label: '오더관리', icon: <Factory size={17} /> },
-  { group: '정산', path: '/payables', label: '미지급 · 불량차감', icon: <Wallet size={17} /> },
-  { group: '정산', path: '/expense', label: '지출결의', icon: <Receipt size={17} /> },
 ];
 
 const PMS_URL = 'https://daily.54-116-241-64.sslip.io/app/';
@@ -271,35 +264,66 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3 px-2">
-          {isBrand ? (
-            <>
-            {/* 브랜드 전용 ERP 화면 — PMS 미러가 아니라 이 앱 안의 페이지라 내부 링크로 연다 */}
-            {brandNav.map((item, bi) => (
-              <div key={item.path} className="mb-0.5">
-                {(bi === 0 || brandNav[bi - 1].group !== item.group) && !collapsed && (
-                  <div className={`px-3 pb-1.5 ${bi === 0 ? 'pt-1' : 'pt-4'}`}>
-                    <span className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      {item.group}
-                    </span>
-                  </div>
-                )}
-                <Link href={item.path}>
-                  <a
+          {navGroups.map((group, gi) => {
+            // oemOnly: LUMEN/AETALOOF에서 숨김 · brandOnly: OEM에서 숨김
+            if (group.oemOnly && isBrand) return null;
+            if (group.brandOnly && !isBrand) return null;
+            // 항목이 전부 걸러진 그룹은 머리글만 남아 빈칸이 된다
+            if (!group.items.some(i => !(i.oemOnly && isBrand) && !(i.lumenOnly && !isBrand))) return null;
+            return (
+            <div key={gi} className="mb-1">
+              {group.label && !collapsed && (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.label)}
+                  className="w-full flex items-center justify-between px-3 pt-4 pb-1.5 group/nav"
+                >
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase">
+                    {group.label}
+                  </span>
+                  <ChevronRight
+                    size={12}
+                    className={`text-muted-foreground transition-transform ${closedGroups.includes(group.label) ? '' : 'rotate-90'}`}
+                  />
+                </button>
+              )}
+              {group.label && collapsed && <div className="my-2 mx-2 h-px bg-border" />}
+              {(group.label && !collapsed && closedGroups.includes(group.label) ? [] : group.items).map((item) => {
+                if (item.oemOnly && isBrand) return null;
+                if (item.lumenOnly && !isBrand) return null;
+                if (item.adminOnly && !isAdminEmail(currentUser?.email)) return null;
+                const active = isActive(item.path);
+                return (
+                  <Link
+                    key={item.path}
+                    href={item.path}
                     onClick={() => setSidebarOpen(false)}
                     className={`
-                      relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 outline-none focus-visible:outline-none
-                      ${isActive(item.path)
-                        ? 'bg-sidebar-primary text-sidebar-primary-foreground font-medium'
-                        : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'}
+                      relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 mb-0.5 outline-none focus-visible:outline-none
+                      ${active
+                        ? 'bg-[var(--fill-quaternary)] text-foreground font-medium'
+                        : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'
+                      }
                       ${collapsed ? 'justify-center px-2' : ''}
                     `}
                   >
-                    <span className="shrink-0">{item.icon}</span>
-                    {!collapsed && <span className="flex-1 min-w-0 truncate">{item.label}</span>}
-                  </a>
-                </Link>
-              </div>
-            ))}
+                    {active && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-[var(--accent-mint)]" />
+                    )}
+                    <span className={`shrink-0 ${active ? 'text-sidebar-primary' : ''}`}>
+                      {item.icon}
+                    </span>
+                    {!collapsed && (
+                      <span className="flex-1 min-w-0 truncate">{item.label}</span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+            );
+          })}
+          {isBrand && (
+            <>
             {/* LUMEN/AETALOOF: PMS 탭 미러 — 클릭 시 PMS 해당 탭으로 (named window 재사용) */}
             {pmsTabs.map((tab, ti) => {
               const groupStart = ti === 0 || pmsTabs[ti - 1].group !== tab.group;
@@ -333,62 +357,6 @@ export default function Layout({ children, onLogout }: LayoutProps) {
               );
             })}
             </>
-          ) : (
-          navGroups.map((group, gi) => {
-            // oemOnly: LUMEN/AETALOOF 탭에서 숨김
-            if (group.oemOnly && isBrand) return null;
-            if (!group.items.length) return null;
-            return (
-            <div key={gi} className="mb-1">
-              {group.label && !collapsed && (
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(group.label)}
-                  className="w-full flex items-center justify-between px-3 pt-4 pb-1.5 group/nav"
-                >
-                  <span className="text-[11px] font-semibold text-muted-foreground uppercase">
-                    {group.label}
-                  </span>
-                  <ChevronRight
-                    size={12}
-                    className={`text-muted-foreground transition-transform ${closedGroups.includes(group.label) ? '' : 'rotate-90'}`}
-                  />
-                </button>
-              )}
-              {group.label && collapsed && <div className="my-2 mx-2 h-px bg-border" />}
-              {(group.label && !collapsed && closedGroups.includes(group.label) ? [] : group.items).map((item) => {
-                if (item.oemOnly && isBrand) return null;
-                if (item.adminOnly && !isAdminEmail(currentUser?.email)) return null;
-                const active = isActive(item.path);
-                return (
-                  <Link
-                    key={item.path}
-                    href={item.path}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`
-                      relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 mb-0.5 outline-none focus-visible:outline-none
-                      ${active
-                        ? 'bg-[var(--fill-quaternary)] text-foreground font-medium'
-                        : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'
-                      }
-                      ${collapsed ? 'justify-center px-2' : ''}
-                    `}
-                  >
-                    {active && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-[var(--accent-mint)]" />
-                    )}
-                    <span className={`shrink-0 ${active ? 'text-sidebar-primary' : ''}`}>
-                      {item.icon}
-                    </span>
-                    {!collapsed && (
-                      <span className="flex-1 min-w-0 truncate">{item.label}</span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-            );
-          })
           )}
         </nav>
 
