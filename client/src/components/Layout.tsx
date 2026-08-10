@@ -235,10 +235,11 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           )}
         </div>
 
-        {/* 워크스페이스 탭 */}
-        {!collapsed && (
-          <div className="px-3 py-3 border-b border-sidebar-border">
-            <div className="flex gap-1 bg-[var(--fill-tertiary)] rounded-md p-1">
+        {/* 워크스페이스 탭 — 어떤 화면에서도 사라지면 안 된다.
+            여기서만 OEM↔LUMEN↔AETALOOF를 오갈 수 있어서, 없어지면 돌아올 길이 막힌다.
+            사이드바를 접어도 첫 글자로 남긴다. */}
+        <div className={`border-b border-sidebar-border ${collapsed ? 'px-2 py-2' : 'px-3 py-3'}`}>
+            <div className={`flex gap-1 bg-[var(--fill-tertiary)] rounded-md p-1 ${collapsed ? 'flex-col' : ''}`}>
               {(['OEM', 'LUMEN', 'AETALOOF'] as WorkspaceId[]).map((ws) => {
                 const active = workspace === ws;
                 return (
@@ -246,21 +247,23 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     key={ws}
                     type="button"
                     onClick={() => setWorkspace(ws)}
+                    title={ws}
                     className={`
                       flex-1 text-[11px] font-semibold py-1.5 rounded-md transition-all
                       ${active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'}
                     `}
                   >
-                    {ws}
+                    {collapsed ? ws[0] : ws}
                   </button>
                 );
               })}
             </div>
-            <p className="text-[11px] text-muted-foreground mt-1.5 px-1">
-              {workspace === 'OEM' ? 'OEM 제조 운영' : `${workspace} 브랜드 운영`}
-            </p>
-          </div>
-        )}
+            {!collapsed && (
+              <p className="text-[11px] text-muted-foreground mt-1.5 px-1">
+                {workspace === 'OEM' ? 'OEM 제조 운영' : `${workspace} 브랜드 운영`}
+              </p>
+            )}
+        </div>
 
         <nav className="flex-1 overflow-y-auto py-3 px-2">
           {isBrand ? (
