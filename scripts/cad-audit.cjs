@@ -172,6 +172,7 @@ function parseFile(file) {
         lineName: base.endsWith(m.label) ? base : base + ' ' + m.label, w: p.w, h: p.h, pair: p.pair, qty: p.qty,
         material: m.label, ea: m.ea, wari: m.wari,
         assign: cls.a, why: cls.why, count, bodyPart: bodyPartOf(cls.a, p.group, p.name),
+        partKey: cls.a === 'skip' ? '제외' : cls.a === 'interlining' ? '보강재' : (bodyPartOf(cls.a, p.group, p.name) || '바디'),
         sf: (p.w + 0.5) * (p.h + 0.5) * count / 10000 * 10.764,
         cm2: p.w * p.h * count,
       });
@@ -200,14 +201,13 @@ for (const d of parsed) {
 }
 const data = [...byStyle.values()].sort((a, b) => (a.styleNo || '').localeCompare(b.styleNo || ''));
 
-const LB = { leather: '가죽', outer: '원단(겉감)', lining: '안감', interlining: '보강재', skip: '제외' };
-const KEYS = ['leather', 'outer', 'lining', 'interlining', 'skip'];
-const PARTS = ['바디', '트림1', '트림2', '안감', ''];
+const KEYS = ['바디', '트림1', '트림2', '안감', '보강재', '제외'];
+const LB = Object.fromEntries(KEYS.map(k => [k, k]));
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const allLines = data.flatMap(d => d.lines.map((l, i) => ({ ...l, style: d.styleNo || d.file, rid: `${d.styleNo || d.file}#${i}` })));
 const stats = {};
-allLines.forEach(l => { stats[l.assign] = (stats[l.assign] || 0) + 1; });
+allLines.forEach(l => { stats[l.partKey] = (stats[l.partKey] || 0) + 1; });
 const CONFIDENT = new Set(['자재명', '기본패턴']);
 const needCheck = allLines.filter(l => !CONFIDENT.has(l.why)).length;
 
@@ -219,14 +219,13 @@ for (const f of data) {
     const rid = `${f.styleNo || f.file}#${i}`;
     const first = l.raw !== last; last = l.raw;
     const sure = CONFIDENT.has(l.why);
-    body += `<tr data-id="${esc(rid)}" data-style="${esc(f.styleNo || f.file)}" data-raw="${esc(l.raw)}" data-mat="${esc(l.lineName || l.material)}" data-a="${l.assign}" data-p="${esc(l.bodyPart)}" data-sure="${sure ? 1 : 0}" class="${l.assign === 'skip' ? 'off' : ''}">`
+    body += `<tr data-id="${esc(rid)}" data-style="${esc(f.styleNo || f.file)}" data-raw="${esc(l.raw)}" data-mat="${esc(l.lineName || l.material)}" data-a="${esc(l.partKey)}" data-p="${esc(l.bodyPart)}" data-sure="${sure ? 1 : 0}" class="${l.partKey === '제외' ? 'off' : ''}">`
       + `<td class="nm">${first ? esc(l.raw) : '<span class="dim">〃</span>'}</td>`
       + `<td class="nm"><b>${esc(l.lineName || l.material)}</b>${sure ? '' : ' <span class="warn">확인</span>'}</td>`
       + `<td class="ctr dim sm">${esc(l.group || '-')}</td>`
       + `<td class="num">${l.count}</td>`
       + `<td class="num">${l.w.toFixed(1)} × ${l.h.toFixed(1)}</td>`
-      + `<td class="ctr"><select class="kind">${KEYS.map(k => `<option value="${k}"${k === l.assign ? ' selected' : ''}>${LB[k]}</option>`).join('')}</select></td>`
-      + `<td class="ctr"><select class="part">${PARTS.map(p => `<option value="${esc(p)}"${p === l.bodyPart ? ' selected' : ''}>${p || '—'}</option>`).join('')}</select></td>`
+      + `<td class="ctr"><select class="kind">${KEYS.map(k => `<option value="${k}"${k === l.partKey ? ' selected' : ''}>${k}</option>`).join('')}</select></td>`
       + `<td class="dim sm">${esc(l.why)}</td>`
       + `<td><input class="memo" placeholder="틀린 점 적어주세요"></td>`
       + '</tr>';
@@ -277,17 +276,16 @@ input.memo:focus{background:var(--panel);outline:1px solid var(--accent)}
 </style>
 <div class="wrap">
 <h1>CAD 소요량표 — 분류 검수</h1>
-<p class="lede">한글 소요량표 <b>${data.length}개</b>만 남겼습니다. 행마다 <b>분류·부위</b>를 고치고, 맨 오른쪽 <b>메모</b>에 틀린 점을 적으세요.
+<p class="lede">한글 소요량표 <b>${data.length}개</b>만 남겼습니다. 행마다 <b>부위</b>를 고치고, 맨 오른쪽 <b>메모</b>에 틀린 점을 적으세요.
 바꾼 행만 모아 고치는 즉시 <b>자동 저장</b>됩니다 — 새로고침해도 남습니다. 다 적으셨으면 화면 맨 아래 <b>수정분 복사하기</b>를 누르고 대화창에 붙여넣으세요.</p>
 <div class="note">
-<b>부위는 이렇게 가릅니다</b> — 이 파일들의 마커그룹은 <code>SELF · 겉감 · 안감 · 심 · 트림2</code> 다섯 개뿐입니다.<br>
+<b>종류(가죽/원단)는 여기서 안 고릅니다</b> — 소요량표에 안 적혀 있어서, ERP 팝업에서 <b>부위별로 한 번씩</b> 고릅니다. 여기선 <b>부위만</b> 봐주세요.<br><br><b>부위는 이렇게 가릅니다</b> — 이 파일들의 마커그룹은 <code>SELF · 겉감 · 안감 · 심 · 트림2</code> 다섯 개뿐입니다.<br>
 · <b>안감</b> = 마커그룹 <code>안감</code> 또는 자재명 우라/안감 · <b>트림2</b> = 마커그룹 <code>트림2</code> (파일이 직접 알려줌)<br>
 · <b>트림1</b> = 조각 이름에 "트림"이 있고 트림2가 아닌 것 · <b>바디</b> = 나머지(SELF·겉감) · <b>보강재</b>는 부위 없음(—)
 </div>
 ${dropped.length ? `<div class="note">폐기 ${dropped.length}건 — ${dropped.map(d => `${esc(d.file)} <span class="dim">(${d.why})</span>`).join(' · ')}</div>` : ''}
 <div class="stat">
-<span>가죽 ${stats.leather || 0}</span><span>원단 ${stats.outer || 0}</span><span>안감 ${stats.lining || 0}</span>
-<span>보강재 ${stats.interlining || 0}</span><span>제외(기본패턴) ${stats.skip || 0}</span>
+${KEYS.map(k => `<span>${k} ${stats[k] || 0}</span>`).join('')}
 <span style="color:var(--warn)">확인 필요 ${needCheck}</span>
 </div>
 
@@ -301,7 +299,7 @@ ${KEYS.map(k => `<button data-f="${k}">${LB[k]}</button>`).join('')}
 
 <div class="scroll"><table id="t"><thead><tr>
 <th>조각 이름 (원문)</th><th>자재</th><th class="ctr">마커그룹</th><th class="num">수량</th><th class="num">가로 × 세로</th>
-<th class="ctr">분류</th><th class="ctr">부위</th><th>근거</th><th>메모 (틀린 점)</th>
+<th class="ctr">부위</th><th>근거</th><th>메모 (틀린 점)</th>
 </tr></thead><tbody>${body}</tbody></table></div>
 </div>
 
@@ -320,10 +318,9 @@ const rows = [...document.querySelectorAll('#t tbody tr[data-id]')];
 
 function diff(tr){
   const id = tr.dataset.id, s = saved[id] || {};
-  const k = tr.querySelector('.kind').value, p = tr.querySelector('.part').value, m = tr.querySelector('.memo').value.trim();
+  const k = tr.querySelector('.kind').value, m = tr.querySelector('.memo').value.trim();
   const out = {};
   if (k !== tr.dataset.a) out.k = k;
-  if (p !== tr.dataset.p) out.p = p;
   if (m) out.m = m;
   return out;
 }
@@ -342,11 +339,10 @@ rows.forEach(tr => {
   const s = saved[tr.dataset.id];
   if (s) {
     if (s.k) tr.querySelector('.kind').value = s.k;
-    if (s.p !== undefined) tr.querySelector('.part').value = s.p;
     if (s.m) tr.querySelector('.memo').value = s.m;
     tr.classList.add('edited');
   }
-  tr.querySelectorAll('.kind,.part').forEach(el => el.addEventListener('change', () => save(tr)));
+  tr.querySelector('.kind').addEventListener('change', () => save(tr));
   tr.querySelector('.memo').addEventListener('input', () => save(tr));
 });
 document.getElementById('n').textContent = Object.keys(saved).length;
@@ -382,8 +378,7 @@ document.getElementById('copy').addEventListener('click', async () => {
     ids.forEach(id => {
       const tr = rows.find(r => r.dataset.id === id); if (!tr) return;
       const d = saved[id], parts = [];
-      if (d.k) parts.push('분류 ' + LB[tr.dataset.a] + ' -> ' + LB[d.k]);
-      if (d.p !== undefined) parts.push('부위 ' + (tr.dataset.p || '없음') + ' -> ' + (d.p || '없음'));
+      if (d.k) parts.push('부위 ' + tr.dataset.a + ' -> ' + d.k);
       if (d.m) parts.push('메모: ' + d.m);
       (byStyle[tr.dataset.style] ||= []).push('  - [' + tr.dataset.raw + '] ' + tr.dataset.mat + ' : ' + parts.join(' / '));
     });
@@ -401,7 +396,6 @@ document.getElementById('reset').addEventListener('click', () => {
   Object.keys(saved).forEach(k => delete saved[k]);
   rows.forEach(tr => {
     tr.querySelector('.kind').value = tr.dataset.a;
-    tr.querySelector('.part').value = tr.dataset.p;
     tr.querySelector('.memo').value = '';
     tr.classList.remove('edited');
   });
