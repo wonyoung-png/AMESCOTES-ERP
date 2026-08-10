@@ -19,6 +19,8 @@ import {
 import { fetchBoms, upsertBom, deleteBom as deleteBomSB, fetchItems, fetchVendors, fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
 import { PackBomEditor } from '@/components/PackBomEditor';
 import { MaterialQuickAddDialog } from '@/components/MaterialQuickAddDialog';
+import { CadAssignDialog } from '@/components/CadAssignDialog';
+import { parseCadWorkbook, type CadLine } from '@/lib/cadYardage';
 import { SalesPricingPanel } from '@/components/SalesPricingPanel';
 import {
   applyPackLinesToBom, createEmptyPackBom, isPackItem,
@@ -2237,6 +2239,10 @@ export default function BomManagement() {
   const [yardScope, setYardScope] = useState<'pre' | 'post'>('post');
   const [yardColor, setYardColor] = useState<string>('');
   const [yardLineId, setYardLineId] = useState<string>('');
+  // CAD 소요량표 업로드 → 배정 팝업
+  const [cadOpen, setCadOpen] = useState(false);
+  const [cadLines, setCadLines] = useState<CadLine[]>([]);
+  const [cadStyle, setCadStyle] = useState<string | undefined>();
   const [leatherRows, setLeatherRows] = useState<Array<{id: string; 부위: string; 가로: number; 세로: number; 수량: number}>>([]);
   const [fabricRows, setFabricRows] = useState<Array<{id: string; 부위: string; 가로: number; 세로: number; 수량: number}>>([]);
   const [fabricWidth, setFabricWidth] = useState<number>(150);
@@ -5070,20 +5076,18 @@ export default function BomManagement() {
             const yardageFileRef = React.createRef<HTMLInputElement>();
             const ocrFileRef = React.createRef<HTMLInputElement>();
 
+            // 공장 CAD 소요량표는 브라우저에서 바로 읽는다 (서버 왕복 불필요)
             const handleYardageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
               const file = e.target.files?.[0];
               if (!file) return;
-              const fd = new FormData();
-              fd.append('file', file);
               try {
-                const res = await fetch('/api/yardage/parse', { method: 'POST', body: fd });
-                if (!res.ok) throw new Error(await res.text());
-                const data = await res.json() as { leather: Array<{부위:string;가로:number;세로:number;수량:number}>; fabric: Array<{부위:string;가로:number;세로:number;수량:number}> };
-                if (data.leather?.length) setLeatherRows(data.leather.map(r => ({ ...r, id: genId() })));
-                if (data.fabric?.length) setFabricRows(data.fabric.map(r => ({ ...r, id: genId() })));
-                toast.success(`파싱 완료 — 가죽 ${data.leather?.length ?? 0}행, 원단 ${data.fabric?.length ?? 0}행`);
+                const { styleNo, lines } = parseCadWorkbook(await file.arrayBuffer());
+                if (!lines.length) throw new Error('패턴 조각을 찾지 못했습니다 — CAD 소요량표가 맞는지 확인하세요');
+                setCadStyle(styleNo);
+                setCadLines(lines);
+                setCadOpen(true);
               } catch (err) {
-                toast.error(`파싱 오류: ${String(err)}`);
+                toast.error(`파싱 오류: ${err instanceof Error ? err.message : String(err)}`);
               }
               e.target.value = '';
             };
@@ -5107,19 +5111,12 @@ export default function BomManagement() {
               e.target.value = '';
             };
 
-            const applyToBom = () => {
-              if (!editBom) return;
-              const value = yardageTab === 'leather'
-                ? Math.ceil(finalSF * 1000) / 1000
-                : Math.ceil(finalYD * 1000) / 1000;
-              const loss = yardageTab === 'leather' ? leatherLossRate : fabricLossRate;
-              if (!yardLineId) { toast.error('적용할 자재 줄을 고르세요'); return; }
-
+            // 고른 원가구분·컬러의 자재 줄 하나에만 순소요량·로스율을 넣는다
+            const patchLine = (targetId: string, netQty: number, lossPct: number) => {
               const patch = (lines: ExtBomLine[]) =>
-                lines.map(l => l.id === yardLineId
-                  ? { ...l, netQty: Math.ceil((value / (1 + loss / 100)) * 1000) / 1000, lossRate: loss / 100 }
+                lines.map(l => l.id === targetId
+                  ? { ...l, netQty: Math.ceil(netQty * 1000) / 1000, lossRate: lossPct / 100 }
                   : l);
-
               setEditBom(prev => {
                 if (!prev) return prev;
                 if (yardScope === 'post') {
@@ -5135,8 +5132,27 @@ export default function BomManagement() {
                     cb.color === yardColor ? { ...cb, lines: patch(cb.lines) } : cb),
                 };
               });
+            };
+
+            const applyToBom = () => {
+              if (!editBom) return;
+              if (!yardLineId) { toast.error('적용할 자재 줄을 고르세요'); return; }
+              const loss = yardageTab === 'leather' ? leatherLossRate : fabricLossRate;
+              const value = yardageTab === 'leather'
+                ? Math.ceil(finalSF * 1000) / 1000
+                : Math.ceil(finalYD * 1000) / 1000;
+              patchLine(yardLineId, value / (1 + loss / 100), loss);
               toast.success(`${yardScope === 'post' ? '사후원가' : '사전원가'} · ${yardColor} 에 ${value.toFixed(3)} ${yardageTab === 'leather' ? 'SF' : 'YD'} 적용 — 저장 버튼을 눌러 확정하세요`);
             };
+
+            // 팝업에 넘길 적용 대상 후보 — 위 셀렉터와 같은 범위
+            const targetLines = ((yardScope === 'post' ? (editBom?.postColorBoms || []) : (editBom?.colorBoms || []))
+              .find(cb => cb.color === yardColor)?.lines || [])
+              .filter(l => ['원자재', '가죽', '원단'].includes(l.category as string))
+              .map(l => ({
+                id: l.id,
+                label: `${l.subPart || '부위 미지정'} · ${l.itemName || '(자재명 없음)'}${l.spec ? ` / ${l.spec}` : ''} [${l.customUnit || l.unit}]`,
+              }));
 
             const thCls = 'text-[11px] text-muted-foreground font-semibold text-center py-2 px-2';
             const tdCls = 'px-2 py-1';
@@ -5145,6 +5161,15 @@ export default function BomManagement() {
 
             return (
               <div className="space-y-4">
+                <CadAssignDialog
+                  open={cadOpen}
+                  onOpenChange={setCadOpen}
+                  styleNo={cadStyle}
+                  lines={cadLines}
+                  targets={targetLines}
+                  scopeLabel={`${yardScope === 'post' ? '사후원가' : '사전원가'} · ${yardColor || '컬러 미선택'}`}
+                  onApply={(id, net, lossPct) => patchLine(id, net, lossPct)}
+                />
                 {/* 상단 컨트롤 */}
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex gap-2">
