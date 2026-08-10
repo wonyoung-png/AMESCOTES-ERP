@@ -102,6 +102,7 @@ export type YardRow = {
   id: string;
   kind: YardKind;
   part: string;      // 보강재는 빈 값
+  패턴부위: string;  // CAD 조각 이름 (예: 가락지 겉감 420D)
   가로: number;      // cm
   세로: number;      // cm
   수량: number;

@@ -5056,7 +5056,7 @@ export default function BomManagement() {
               setYardCfg(p => ({ ...p, [k]: { ...cfgOf(k), [f]: v } }));
 
             const addRow = (kind: YardKind) =>
-              setYardRows(p => [...p, { id: genId(), kind, part: kind === '보강재' ? '' : '바디', 가로: 0, 세로: 0, 수량: 1 }]);
+              setYardRows(p => [...p, { id: genId(), kind, part: kind === '보강재' ? '' : '바디', 패턴부위: '', 가로: 0, 세로: 0, 수량: 1 }]);
             const upd = (id: string, f: string, v: string | number) =>
               setYardRows(p => p.map(r => r.id === id ? { ...r, [f]: v } : r));
 
@@ -5133,7 +5133,7 @@ export default function BomManagement() {
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json() as { leather: Array<{부위:string;가로:number;세로:number;수량:number}>; fabric: Array<{부위:string;가로:number;세로:number;수량:number}> };
                 const conv = (rs: typeof data.leather, kind: YardKind): YardRow[] =>
-                  (rs || []).map(r => ({ id: genId(), kind, part: kind === '보강재' ? '' : '바디', 가로: r.가로, 세로: r.세로, 수량: r.수량 }));
+                  (rs || []).map(r => ({ id: genId(), kind, part: kind === '보강재' ? '' : '바디', 패턴부위: r.부위 || '', 가로: r.가로, 세로: r.세로, 수량: r.수량 }));
                 setYardRows([...conv(data.leather, '가죽'), ...conv(data.fabric, '원단')]);
                 toast.success(`OCR 완료 — 가죽 ${data.leather?.length ?? 0}행, 원단 ${data.fabric?.length ?? 0}행`);
               } catch (err) {
@@ -5251,22 +5251,27 @@ export default function BomManagement() {
                       <div className="overflow-x-auto"><table className="data-table w-full min-w-[620px]">
                         <thead className="border-b border-border">
                           <tr>
-                            <th className={thCls} style={{ width: '20%' }}>부위</th>
-                            <th className={thCls} style={{ width: '18%' }}>가로 CM</th>
-                            <th className={thCls} style={{ width: '18%' }}>세로 CM</th>
-                            <th className={thCls} style={{ width: '14%' }}>수량</th>
-                            <th className={thCls} style={{ width: '22%' }}>NET</th>
-                            <th className={thCls} style={{ width: '8%' }}></th>
+                            <th className={thCls + ' text-left'} style={{ width: '30%' }}>패턴부위</th>
+                            <th className={thCls} style={{ width: '14%' }}>부위</th>
+                            <th className={thCls} style={{ width: '13%' }}>가로 CM</th>
+                            <th className={thCls} style={{ width: '13%' }}>세로 CM</th>
+                            <th className={thCls} style={{ width: '10%' }}>수량</th>
+                            <th className={thCls} style={{ width: '14%' }}>NET</th>
+                            <th className={thCls} style={{ width: '6%' }}></th>
                           </tr>
                         </thead>
                         <tbody>
                           {rows.length === 0 && (
-                            <tr><td colSpan={6} className="text-center text-xs text-muted-foreground py-4">
+                            <tr><td colSpan={7} className="text-center text-xs text-muted-foreground py-4">
                               행이 없습니다. 아래 <b>+ 행 추가</b> 또는 CAD 업로드.
                             </td></tr>
                           )}
                           {rows.map(r => (
                             <tr key={r.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                              <td className={tdCls}>
+                                <input className={inputCls + ' !text-left'} placeholder="패턴부위" value={r.패턴부위 || ''}
+                                  onChange={e => upd(r.id, '패턴부위', e.target.value)} />
+                              </td>
                               <td className={tdCls}>
                                 {k === '보강재'
                                   ? <span className="block text-center text-xs text-muted-foreground">—</span>

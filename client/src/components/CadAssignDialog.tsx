@@ -145,6 +145,7 @@ export function CadAssignDialog({
         return {
           kind: k,
           part: k === '보강재' ? '' : (b === '안감' ? '바디' : (b as string)),
+          패턴부위: l.lineName || l.material,
           가로: l.w, 세로: l.h,
           수량: l.count,
         };
@@ -242,7 +243,7 @@ export function CadAssignDialog({
 
         {/* 조각별 — 부위가 틀린 줄만 고친다 */}
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[11px] text-muted-foreground">조각 {lines.length}줄</span>
+          <span className="text-[11px] text-muted-foreground">패턴부위 {lines.length}줄</span>
           <label className="text-[11px] flex items-center gap-1 cursor-pointer">
             <input type="checkbox" checked={onlyChecked} onChange={e => setOnlyChecked(e.target.checked)} />
             확인 필요만 보기
@@ -252,8 +253,8 @@ export function CadAssignDialog({
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-card border-b border-border z-10">
               <tr>
-                <th className={`${th} text-left`}>조각 이름 (원문)</th>
-                <th className={`${th} text-left`}>자재 행 이름</th>
+                <th className={`${th} text-left`}>패턴부위 (원문)</th>
+                <th className={`${th} text-left`}>패턴부위 · 자재</th>
                 <th className={`${th} text-right`}>수량</th>
                 <th className={`${th} text-right`}>가로 × 세로</th>
                 <th className={th}>부위</th>
