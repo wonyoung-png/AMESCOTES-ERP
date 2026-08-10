@@ -229,6 +229,8 @@ input.memo{font:inherit;font-size:11.5px;width:100%;min-width:150px;padding:3px 
 input.memo:focus{background:var(--panel);outline:1px solid var(--accent)}
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--panel);border-top:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
 .dock b{color:var(--accent)}
+.ok{color:#2E6B4F;font-size:12px;font-weight:600;margin-left:6px}
+@media (prefers-color-scheme:dark){.ok{color:#6FBF95}}
 .dock button{font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:8px;border:0;background:var(--ink);color:var(--bg);cursor:pointer}
 .dock button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:400}
 #out{width:100%;max-width:1100px;font-family:var(--mono);font-size:11.5px;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);display:none}
@@ -237,7 +239,7 @@ input.memo:focus{background:var(--panel);outline:1px solid var(--accent)}
 <div class="wrap">
 <h1>CAD 소요량표 — 분류 검수</h1>
 <p class="lede">한글 소요량표 <b>${data.length}개</b>만 남겼습니다. 행마다 <b>분류·부위</b>를 고치고, 맨 오른쪽 <b>메모</b>에 틀린 점을 적으세요.
-바꾼 행만 모아 <b>회신용 텍스트 복사</b>로 저에게 넘기시면 됩니다.</p>
+바꾼 행만 모아 고치는 즉시 <b>자동 저장</b>됩니다 — 새로고침해도 남습니다. 다 적으셨으면 화면 맨 아래 <b>수정분 복사하기</b>를 누르고 대화창에 붙여넣으세요.</p>
 <div class="note">
 <b>부위는 이렇게 가릅니다</b> — 이 파일들의 마커그룹은 <code>SELF · 겉감 · 안감 · 심 · 트림2</code> 다섯 개뿐입니다.<br>
 · <b>안감</b> = 마커그룹 <code>안감</code> 또는 자재명 우라/안감 · <b>트림2</b> = 마커그룹 <code>트림2</code> (파일이 직접 알려줌)<br>
@@ -265,8 +267,8 @@ ${KEYS.map(k => `<button data-f="${k}">${LB[k]}</button>`).join('')}
 </div>
 
 <div class="dock">
-  <span>수정 <b id="n">0</b>행</span>
-  <button id="copy">회신용 텍스트 복사</button>
+  <span>수정 <b id="n">0</b>행 <span id="flash" class="ok"></span></span>
+  <button id="copy">수정분 복사하기 → 대화창에 붙여넣기</button>
   <button id="reset" class="ghost">되돌리기</button>
   <textarea id="out" rows="8" readonly></textarea>
 </div>
@@ -292,6 +294,10 @@ function save(tr){
   localStorage.setItem(KEY, JSON.stringify(saved));
   tr.classList.toggle('edited', !!saved[tr.dataset.id]);
   document.getElementById('n').textContent = Object.keys(saved).length;
+  const f = document.getElementById('flash');
+  f.textContent = '✓ 저장됨';
+  clearTimeout(window.__ft);
+  window.__ft = setTimeout(() => { f.textContent = ''; }, 1500);
 }
 rows.forEach(tr => {
   const s = saved[tr.dataset.id];
@@ -301,8 +307,8 @@ rows.forEach(tr => {
     if (s.m) tr.querySelector('.memo').value = s.m;
     tr.classList.add('edited');
   }
-  tr.querySelectorAll('.kind,.part,.memo').forEach(el => el.addEventListener('change', () => save(tr)));
-  tr.querySelector('.memo').addEventListener('blur', () => save(tr));
+  tr.querySelectorAll('.kind,.part').forEach(el => el.addEventListener('change', () => save(tr)));
+  tr.querySelector('.memo').addEventListener('input', () => save(tr));
 });
 document.getElementById('n').textContent = Object.keys(saved).length;
 
