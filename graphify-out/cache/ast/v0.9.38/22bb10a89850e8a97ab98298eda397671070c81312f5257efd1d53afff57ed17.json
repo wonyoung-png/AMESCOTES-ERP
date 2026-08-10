@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_db_09_materials_subtype_sql", "label": "09_materials_subtype.sql", "file_type": "code", "source_file": "db/09_materials_subtype.sql", "source_location": null}, {"id": "materials", "label": "materials", "file_type": "code", "source_file": "", "source_location": "", "origin_file": "$graphify-root$/db/09_materials_subtype.sql"}], "edges": []}

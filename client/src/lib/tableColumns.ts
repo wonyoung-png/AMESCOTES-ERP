@@ -7,9 +7,14 @@
 // 컬럼 추가 시: supabase/ 마이그레이션 SQL 실행 → 아래 목록에 추가
 
 export const TABLE_COLUMNS: Record<string, string[]> = {
+  // 기획전 — 팀 업무·할인율은 기획전에 딸린 값이라 jsonb로 통째로 담는다
+  campaigns: ['id', 'workspace', 'title', 'channel', 'start_date', 'end_date', 'status',
+              'discount_rate', 'owner', 'project_id', 'onboarded_at', 'tasks',
+              'product_discounts', 'category_discounts', 'created_at', 'updated_at'],
   // 대형 프로젝트 (팝업 오픈·시즌 런칭) — 기획전보다 길고 팀이 여럿 붙는다
   projects: ['id', 'project_no', 'workspace', 'title', 'kind', 'anchor_date', 'anchor_label',
-             'status', 'owner', 'budget_cap', 'memo', 'created_at', 'updated_at'],
+             'status', 'owner', 'budget_cap', 'memo', 'start_date', 'end_date',
+             'created_at', 'updated_at'],
   project_items: ['id', 'project_id', 'phase', 'area', 'title', 'detail', 'due', 'owner',
                   'budget', 'urgent', 'blocker', 'done', 'done_at', 'sort_no',
                   'team', 'owner_user_id'],

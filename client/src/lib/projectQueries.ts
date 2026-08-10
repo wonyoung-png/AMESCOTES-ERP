@@ -34,8 +34,10 @@ export interface Project {
   workspace: 'LUMEN' | 'AETALOOF';
   title: string;
   kind?: string;
-  /** D-day 계산 기준 — 오픈일 역산이 전부다 */
-  anchorDate?: string;
+  startDate?: string;
+  /** 끝나는 날 = 오픈일. 여기서 D-day를 센다 */
+  endDate?: string;
+  /** 끝나는 날이 무슨 날인지 — '고객오픈', '프레스데이' */
   anchorLabel?: string;
   status: ProjectStatus;
   owner?: string;
@@ -57,7 +59,7 @@ export async function fetchProjects(workspace: 'LUMEN' | 'AETALOOF'): Promise<Pr
   const { data: ps, error } = await supabase
     .from('projects').select('*').eq('workspace', workspace);
   if (error) throw error;
-  const rows = (ps || []).filter((p: any) => p.anchor_date || p.kind);  // 발주 손익용 행은 제외
+  const rows = (ps || []).filter((p: any) => p.end_date || p.anchor_date || p.kind);  // 발주 손익용 행은 제외
   if (rows.length === 0) return [];
   const { data: its } = await supabase
     .from('project_items').select('*').in('project_id', rows.map((p: any) => p.id));
@@ -69,17 +71,19 @@ export async function fetchProjects(workspace: 'LUMEN' | 'AETALOOF'): Promise<Pr
   });
   return rows.map((p: any) => ({
     id: p.id, workspace: p.workspace, title: p.title, kind: p.kind || undefined,
-    anchorDate: p.anchor_date || undefined, anchorLabel: p.anchor_label || undefined,
+    startDate: p.start_date || undefined, endDate: p.end_date || p.anchor_date || undefined,
+    anchorLabel: p.anchor_label || undefined,
     status: (p.status as ProjectStatus) || '진행', owner: p.owner || undefined,
     budgetCap: p.budget_cap ?? undefined, memo: p.memo || undefined,
     items: (byProject.get(p.id) || []).sort((a, b) => a.sortNo - b.sortNo),
-  })).sort((a, b) => (a.anchorDate || '9999').localeCompare(b.anchorDate || '9999'));
+  })).sort((a, b) => (a.endDate || '9999').localeCompare(b.endDate || '9999'));
 }
 
 export async function upsertProject(p: Partial<Project> & { id: string }) {
   const row = filterForTable('projects', {
     id: p.id, workspace: p.workspace, title: p.title, kind: p.kind,
-    anchor_date: p.anchorDate || null, anchor_label: p.anchorLabel,
+    start_date: p.startDate || null, end_date: p.endDate || null,
+    anchor_date: p.endDate || null, anchor_label: p.anchorLabel,
     status: p.status, owner: p.owner, budget_cap: p.budgetCap, memo: p.memo,
     updated_at: new Date().toISOString(),
   });

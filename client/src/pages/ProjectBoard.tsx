@@ -149,7 +149,7 @@ export default function ProjectBoard() {
   const [hideDone, setHideDone] = useState(false);
 
   const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState({ title: '', kind: '팝업·오픈', anchorDate: '', anchorLabel: '오픈' });
+  const [form, setForm] = useState({ title: '', kind: '팝업·오픈', startDate: '', endDate: '', anchorLabel: '오픈' });
   /** 항목 직접 입력·수정 — 이게 기본 경로다. 붙여넣기는 처음 한 번 옮길 때만 쓴다 */
   const [editing, setEditing] = useState<ProjectItem | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -222,7 +222,7 @@ export default function ProjectBoard() {
     const late = items.filter(i => !i.done && (daysTo(i.due) ?? 99) < 0).length;
     const week = items.filter(i => { const d = daysTo(i.due); return !i.done && d !== null && d >= 0 && d <= 7; }).length;
     const budget = items.reduce((s, i) => s + (i.budget || 0), 0);
-    return { done, blocked, late, week, budget, dday: daysTo(project?.anchorDate) };
+    return { done, blocked, late, week, budget, dday: daysTo(project?.endDate) };
   }, [items, project]);
 
   const toggle = async (item: ProjectItem) => {
@@ -233,16 +233,18 @@ export default function ProjectBoard() {
 
   const createProject = async () => {
     if (!form.title.trim()) { toast.error('프로젝트 이름을 입력하세요'); return; }
+    if (!form.endDate) { toast.error('종료일을 입력하세요 — D-day 기준입니다'); return; }
+    if (form.startDate && form.startDate > form.endDate) { toast.error('시작일이 종료일보다 늦습니다'); return; }
     const id = uid();
     try {
       await upsertProject({
         id, workspace: ws, title: form.title.trim(), kind: form.kind,
-        anchorDate: form.anchorDate || undefined, anchorLabel: form.anchorLabel,
+        startDate: form.startDate || undefined, endDate: form.endDate || undefined, anchorLabel: form.anchorLabel,
         status: '진행',
       });
       toast.success('프로젝트가 생성되었습니다');
       setShowNew(false);
-      setForm({ title: '', kind: '팝업·오픈', anchorDate: '', anchorLabel: '오픈' });
+      setForm({ title: '', kind: '팝업·오픈', startDate: '', endDate: '', anchorLabel: '오픈' });
       await load();
       setSelId(id);
     } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
@@ -316,7 +318,9 @@ export default function ProjectBoard() {
                   <p className="text-xl font-bold text-foreground font-mono">
                     {stat.dday === null ? '—' : stat.dday >= 0 ? `D-${stat.dday}` : `D+${-stat.dday}`}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">{project.anchorDate || '기준일 미정'}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {project.startDate ? `${project.startDate} ~ ` : ''}{project.endDate || '종료일 미정'}
+                  </p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
                   <p className="text-[11px] text-muted-foreground">진행</p>
@@ -440,15 +444,23 @@ export default function ProjectBoard() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label>기준일 라벨</Label>
+                <Label>끝나는 날이 무슨 날인가요</Label>
                 <Input value={form.anchorLabel} onChange={e => setForm(f => ({ ...f, anchorLabel: e.target.value }))}
-                  placeholder="고객오픈" />
+                  placeholder="고객오픈 · 행사 종료" />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>기준일 — 여기서 D-day를 셉니다</Label>
-              <Input type="date" value={form.anchorDate}
-                onChange={e => setForm(f => ({ ...f, anchorDate: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>시작일</Label>
+                <Input type="date" value={form.startDate}
+                  onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>종료일 *</Label>
+                <Input type="date" value={form.endDate}
+                  onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} />
+                <p className="text-[11px] text-muted-foreground">이 날짜로 D-day를 셉니다</p>
+              </div>
             </div>
           </div>
           <DialogFooter>

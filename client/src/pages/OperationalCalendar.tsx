@@ -65,21 +65,23 @@ export default function OperationalCalendar() {
     () => Array.from(new Set(store.getItems().map((i: any) => i.erpCategory).filter(Boolean))).sort() as string[],
     [showNew],
   );
-  const [pForm, setPForm] = useState({ title: '', kind: '팝업·오픈', anchorDate: '', anchorLabel: '오픈' });
+  const [pForm, setPForm] = useState({ title: '', kind: '팝업·오픈', startDate: '', endDate: '', anchorLabel: '오픈' });
   const loadProjects = () => fetchProjects(ws).then(setProjects).catch(() => {});
   useEffect(() => { loadProjects(); /* eslint-disable-next-line */ }, [ws]);
 
   const createProject = async () => {
     if (!pForm.title.trim()) { toast.error('프로젝트 이름을 입력하세요'); return; }
+    if (!pForm.endDate) { toast.error('종료일을 입력하세요 — D-day 기준입니다'); return; }
+    if (pForm.startDate && pForm.startDate > pForm.endDate) { toast.error('시작일이 종료일보다 늦습니다'); return; }
     const id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
     try {
       await upsertProject({
         id, workspace: ws, title: pForm.title.trim(), kind: pForm.kind,
-        anchorDate: pForm.anchorDate || undefined, anchorLabel: pForm.anchorLabel, status: '진행',
+        startDate: pForm.startDate || undefined, endDate: pForm.endDate || undefined, anchorLabel: pForm.anchorLabel, status: '진행',
       });
       toast.success('프로젝트를 만들었습니다. 상세 업무는 프로젝트 탭에서 관리합니다');
       setShowNewProject(false);
-      setPForm({ title: '', kind: '팝업·오픈', anchorDate: '', anchorLabel: '오픈' });
+      setPForm({ title: '', kind: '팝업·오픈', startDate: '', endDate: '', anchorLabel: '오픈' });
       loadProjects();
     } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
   };
@@ -171,10 +173,10 @@ export default function OperationalCalendar() {
     // 프로젝트 띠 — 기간이 걸치는 프로젝트만. 클릭하면 프로젝트 탭으로 간다.
     const projEvs: PlacedEvent[] = [];
     projects.forEach(pr => {
-      if (!pr.anchorDate) return;
+      if (!pr.endDate) return;
       // 시작이 따로 없으니 앵커(오픈일) 하루짜리로 두되, 항목 마감 중 가장 이른 날부터 그린다
-      const firstDue = pr.items.map(i => i.due).filter(Boolean).sort()[0];
-      const pos = eventPosition(firstDue || pr.anchorDate, pr.anchorDate, band);
+      const firstDue = pr.startDate || pr.items.map(i => i.due).filter(Boolean).sort()[0];
+      const pos = eventPosition(firstDue || pr.endDate, pr.endDate, band);
       if (pos) projEvs.push({ ...(pr as any), title: pr.title, status: 'active', _s: pos.s, _e: pos.e, _lane: 0 });
     });
     const projLanes = assignLanes(projEvs);
@@ -466,15 +468,23 @@ export default function OperationalCalendar() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label>기준일 라벨</Label>
+                <Label>끝나는 날이 무슨 날인가요</Label>
                 <Input value={pForm.anchorLabel} onChange={e => setPForm(f => ({ ...f, anchorLabel: e.target.value }))}
-                  placeholder="고객오픈" />
+                  placeholder="고객오픈 · 행사 종료" />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>기준일 — 여기서 D-day를 셉니다</Label>
-              <Input type="date" value={pForm.anchorDate}
-                onChange={e => setPForm(f => ({ ...f, anchorDate: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>시작일</Label>
+                <Input type="date" value={pForm.startDate}
+                  onChange={e => setPForm(f => ({ ...f, startDate: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>종료일 *</Label>
+                <Input type="date" value={pForm.endDate}
+                  onChange={e => setPForm(f => ({ ...f, endDate: e.target.value }))} />
+                <p className="text-[11px] text-muted-foreground">이 날짜로 D-day를 셉니다</p>
+              </div>
             </div>
           </div>
           <DialogFooter>

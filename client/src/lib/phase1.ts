@@ -338,6 +338,16 @@ export function resolveDiscount(
   return c.discountRate ?? 0;
 }
 
+
+/**
+ * 기획전 저장 — 로컬에 쓰고 서버에도 올린다.
+ * localStorage에만 두면 만든 사람 브라우저에서만 보인다.
+ */
+function saveCampaigns(list: Campaign[]) {
+  setAll(KEYS.campaigns, list);
+  import('./campaignQueries').then(m => m.pushCampaigns(list)).catch(() => {});
+}
+
 export const CAMPAIGN_CHANNELS = ['자사몰', '센텀', '29CM', 'W컨셉', '쇼룸', '해외'] as const;
 
 /** 예전 자동생성 템플릿 업무명 — 로드 시 제거 (직접 입력 업무만 유지) */
@@ -408,7 +418,7 @@ function seedCampaignsIfEmpty() {
     { workspace: 'LUMEN', title: '가을 대형 (안)', channel: '자사몰', startDate: '2026-09-01', endDate: '2026-09-14', status: 'draft' },
   ];
   const now = new Date().toISOString();
-  setAll(KEYS.campaigns, samples.map(s => ({
+  saveCampaigns( samples.map(s => ({
     ...s,
     id: uid(),
     tasks: [] as CampaignTask[],
@@ -1084,7 +1094,7 @@ export const phase1 = {
     seedCampaignsIfEmpty();
     let all = getAll<Campaign>(KEYS.campaigns).map(migrateCampaignTasks);
     const migrated = all.some((c, i) => c !== getAll<Campaign>(KEYS.campaigns)[i]);
-    if (migrated) setAll(KEYS.campaigns, all);
+    if (migrated) saveCampaigns( all);
     return workspace ? all.filter(c => c.workspace === workspace) : all;
   },
 
@@ -1106,7 +1116,7 @@ export const phase1 = {
     });
     const a = getAll<Campaign>(KEYS.campaigns);
     a.push(row);
-    setAll(KEYS.campaigns, a);
+    saveCampaigns( a);
     return row;
   },
 
@@ -1129,7 +1139,7 @@ export const phase1 = {
       next.tasks = buildCampaignProjectTasks(next.startDate, u.tasks);
     }
     a[i] = migrateCampaignTasks(next);
-    setAll(KEYS.campaigns, a);
+    saveCampaigns( a);
   },
 
   updateCampaignTask: (campaignId: string, taskId: string, patch: Partial<CampaignTask>) => {
@@ -1147,7 +1157,7 @@ export const phase1 = {
       });
     });
     a[i] = { ...a[i], tasks, updatedAt: new Date().toISOString() };
-    setAll(KEYS.campaigns, a);
+    saveCampaigns( a);
   },
 
   addCampaignTask: (
@@ -1173,7 +1183,7 @@ export const phase1 = {
       tasks: [...a[i].tasks, task],
       updatedAt: new Date().toISOString(),
     };
-    setAll(KEYS.campaigns, a);
+    saveCampaigns( a);
   },
 
   deleteCampaignTask: (campaignId: string, taskId: string) => {
@@ -1185,7 +1195,7 @@ export const phase1 = {
       tasks: a[i].tasks.filter(t => t.id !== taskId),
       updatedAt: new Date().toISOString(),
     };
-    setAll(KEYS.campaigns, a);
+    saveCampaigns( a);
   },
 
   addCampaignTaskMessage: (
@@ -1235,7 +1245,7 @@ export const phase1 = {
       }),
       updatedAt: now,
     };
-    setAll(KEYS.campaigns, a);
+    saveCampaigns( a);
   },
 
   toggleCampaignTaskCheck: (
@@ -1268,7 +1278,7 @@ export const phase1 = {
       }),
       updatedAt: now,
     };
-    setAll(KEYS.campaigns, a);
+    saveCampaigns( a);
   },
 
   toggleCampaignTask: (campaignId: string, taskId: string) => {

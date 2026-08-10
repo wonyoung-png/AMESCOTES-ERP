@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_supabase_migration_at_delivery_to_confirmed_sale_price_sql", "label": "migration_at_delivery_to_confirmed_sale_price.sql", "file_type": "code", "source_file": "supabase/migration_at_delivery_to_confirmed_sale_price.sql", "source_location": null}], "edges": []}
