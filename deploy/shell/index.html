@@ -60,6 +60,24 @@
   .go{font-size:12px;color:var(--text-tertiary)}
   .userbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;font-size:12px;color:var(--text-secondary)}
   .userbar b{color:var(--text-primary);font-weight:600}
+
+  /* 퀵 액션 (출퇴근·휴가) */
+  .quick{background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;
+    padding:14px 16px;margin-bottom:12px;text-align:left}
+  .quick-row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:28px}
+  .quick-label{font-size:12px;color:var(--text-secondary)}
+  .quick-status{font-size:13px;font-weight:600}
+  .quick-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .btn.dark{background:var(--text-primary);color:var(--bg-canvas);border-color:transparent}
+  .btn.dark:hover{background:#333}
+  .quick-link{font-size:11px;color:var(--text-tertiary);background:none;border:none;
+    cursor:pointer;text-decoration:underline;font-family:inherit;padding:0}
+  .quick-form{border-top:1px solid var(--border);margin-top:12px;padding-top:12px}
+  .quick-form .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+  .quick-form select{width:100%;height:32px;background:var(--bg-subtle);border:1px solid var(--border);
+    border-radius:8px;color:var(--text-primary);padding:0 8px;font-size:13px;font-family:inherit;
+    margin-bottom:14px;outline:none}
+  .quick-note{font-size:11px;color:var(--text-tertiary);margin-top:2px}
   .foot{margin-top:28px;padding-top:16px;border-top:1px solid var(--border);
     display:flex;justify-content:space-between;font-size:11px;color:var(--text-tertiary)}
   .foot a{color:var(--text-tertiary)}
@@ -93,6 +111,56 @@
         <span><b id="uname"></b> <span id="urole"></span></span>
         <button class="btn" id="logoutBtn">로그아웃</button>
       </div>
+
+      <!-- 퀵 액션: 출퇴근 · 휴가 신청 -->
+      <div class="quick hidden" id="quick">
+        <div class="quick-row">
+          <div>
+            <div class="quick-label">오늘 근태</div>
+            <div class="quick-status" id="attStatus">확인 중…</div>
+          </div>
+          <div class="quick-actions" id="attActions"></div>
+        </div>
+        <div class="quick-row" style="margin-top:10px">
+          <div>
+            <div class="quick-label">연차 잔여</div>
+            <div class="quick-status" id="leaveRemain">—</div>
+          </div>
+          <div class="quick-actions">
+            <button class="btn" id="leaveToggle">휴가 신청</button>
+          </div>
+        </div>
+        <div class="quick-form hidden" id="leaveForm">
+          <div class="grid">
+            <div>
+              <label>종류</label>
+              <select id="lvType"></select>
+            </div>
+            <div>
+              <label>단위</label>
+              <select id="lvPortion">
+                <option value="FULL">종일</option>
+                <option value="AM">오전반차</option>
+                <option value="PM">오후반차</option>
+                <option value="QUARTER">반반차</option>
+              </select>
+            </div>
+            <div>
+              <label>시작일</label>
+              <input id="lvStart" type="date" />
+            </div>
+            <div>
+              <label>종료일</label>
+              <input id="lvEnd" type="date" />
+            </div>
+          </div>
+          <label>사유</label>
+          <input id="lvReason" type="text" placeholder="사유 (선택)" />
+          <p class="err" id="lvErr"></p>
+          <button class="btn dark" style="width:100%;height:32px" id="lvSubmit">신청하기</button>
+        </div>
+      </div>
+
       <nav class="apps">
         <a class="app" href="https://54-116-241-64.sslip.io/">
           <span class="tile"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></span>
@@ -147,7 +215,106 @@ function showLauncher(user) {
   $('urole').textContent = user.role ? '· ' + user.role : '';
   $('usersLink').style.display = ADMINS.includes((user.email || '').toLowerCase()) ? '' : 'none';
   show('launcher');
+  initQuick();
 }
+
+// ── 퀵 액션: 출퇴근 · 휴가 신청 (HR 서비스, SSO 쿠키) ──
+const HR = 'https://hr.54-116-241-64.sslip.io';
+async function hrApi(path, init) {
+  const r = await fetch(HR + '/api' + path, Object.assign({ credentials: 'include' }, init || {}));
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.detail || j.error || ('HTTP ' + r.status)); e.status = r.status; e.body = j; throw e; }
+  return j;
+}
+function fmtT(iso) {
+  return iso ? new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' }) : '';
+}
+async function refreshAtt() {
+  const today = await hrApi('/attendance/today');
+  const rec = today.record || today;
+  const st = $('attStatus'), act = $('attActions');
+  act.innerHTML = '';
+  const mkBtn = (label, dark, fn) => {
+    const b = document.createElement('button');
+    b.className = 'btn' + (dark ? ' dark' : ''); b.textContent = label;
+    b.addEventListener('click', fn); act.appendChild(b); return b;
+  };
+  if (rec && rec.clock_in_at && rec.clock_out_at) {
+    st.textContent = '퇴근 완료 · ' + fmtT(rec.clock_in_at) + ' ~ ' + fmtT(rec.clock_out_at);
+  } else if (rec && rec.clock_in_at) {
+    st.textContent = '근무 중 · ' + fmtT(rec.clock_in_at) + ' 출근';
+    mkBtn('퇴근하기', true, () => clockOut());
+  } else {
+    st.textContent = '미출근';
+    mkBtn('출근하기', true, () => clock('/attendance/clock-in', {}));
+    const link = document.createElement('button');
+    link.className = 'quick-link'; link.textContent = '외근으로 출근';
+    link.addEventListener('click', () => {
+      const reason = window.prompt('외근 사유를 입력하세요 (관리자 승인 후 인정됩니다)');
+      if (reason) clock('/attendance/clock-in', { method: 'field', field_reason: reason });
+    });
+    act.appendChild(link);
+  }
+}
+async function clock(path, body) {
+  try {
+    await hrApi(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    await refreshAtt();
+  } catch (e) { alert(e.message || '처리하지 못했습니다'); }
+}
+async function clockOut() {
+  try {
+    await hrApi('/attendance/clock-out', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    await refreshAtt();
+  } catch (e) {
+    if (e.status === 409 && e.body && e.body.need_overtime_reason) {
+      const pick = window.prompt('정규 시간 이후 퇴근 — 야근 사유를 선택하세요\n1 자율 · 2 업무 · 3 기타', '1');
+      const map = { '1': 'VOLUNTARY', '2': 'WORK', '3': 'OTHER' };
+      if (pick && map[pick.trim()]) {
+        try {
+          await hrApi('/attendance/clock-out', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ overtime_reason: map[pick.trim()] }) });
+          await refreshAtt();
+        } catch (e2) { alert(e2.message || '처리하지 못했습니다'); }
+      }
+    } else alert(e.message || '처리하지 못했습니다');
+  }
+}
+async function initQuick() {
+  try {
+    await refreshAtt();
+    $('quick').classList.remove('hidden');
+  } catch (e) { return; /* HR 미접속/미로그인 → 위젯 숨김 유지 */ }
+  try {
+    const bal = await hrApi('/leave/balance');
+    const ann = (bal.items || []).find(x => x.type_key === 'annual');
+    if (ann) $('leaveRemain').textContent = ann.remaining + '일';
+    const types = await hrApi('/leave/types');
+    $('lvType').innerHTML = (types.items || [])
+      .map(t => '<option value="' + t.id + '">' + t.name + '</option>').join('');
+  } catch (e) { /* 표시만 생략 */ }
+}
+$('leaveToggle').addEventListener('click', () => $('leaveForm').classList.toggle('hidden'));
+$('lvStart').addEventListener('change', () => { if (!$('lvEnd').value) $('lvEnd').value = $('lvStart').value; });
+$('lvSubmit').addEventListener('click', async () => {
+  $('lvErr').textContent = '';
+  const start = $('lvStart').value, end = $('lvEnd').value || start;
+  if (!$('lvType').value || !start) { $('lvErr').textContent = '종류와 시작일을 선택하세요'; return; }
+  $('lvSubmit').disabled = true;
+  try {
+    await hrApi('/leave/requests', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        leave_type_id: Number($('lvType').value), start_date: start, end_date: end,
+        portion: $('lvPortion').value, reason: $('lvReason').value,
+      }),
+    });
+    alert('휴가 신청 완료 — 승인 결과는 HR/Operation 알림으로 안내됩니다');
+    $('leaveForm').classList.add('hidden');
+    $('lvReason').value = '';
+  } catch (e) { $('lvErr').textContent = e.message || '신청하지 못했습니다'; }
+  $('lvSubmit').disabled = false;
+});
 async function checkSession() {
   try {
     const r = await fetch(ERP + '/api/session', { credentials: 'include' });
