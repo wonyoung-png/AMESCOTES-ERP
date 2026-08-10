@@ -114,6 +114,10 @@ const bottomTabs = [
 const brandNav: { group: string; path: string; label: string; icon: React.ReactNode }[] = [
   { group: '기획 & 일정', path: '/projects', label: '프로젝트', icon: <ClipboardList size={17} /> },
   { group: '기획 & 일정', path: '/calendar', label: '운영 캘린더 · 기획전', icon: <CalendarDays size={17} /> },
+  // 브랜드도 돈이 나간다. 오더의 미지급, 프로젝트 예산의 지출결의가 여기서 보여야 한다
+  { group: '정산', path: '/brand-orders', label: '오더관리', icon: <Factory size={17} /> },
+  { group: '정산', path: '/payables', label: '미지급 · 불량차감', icon: <Wallet size={17} /> },
+  { group: '정산', path: '/expense', label: '지출결의', icon: <Receipt size={17} /> },
 ];
 
 const PMS_URL = 'https://daily.54-116-241-64.sslip.io/app/';
@@ -272,8 +276,8 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             {/* 브랜드 전용 ERP 화면 — PMS 미러가 아니라 이 앱 안의 페이지라 내부 링크로 연다 */}
             {brandNav.map((item, bi) => (
               <div key={item.path} className="mb-0.5">
-                {bi === 0 && !collapsed && (
-                  <div className="px-3 pt-1 pb-1.5">
+                {(bi === 0 || brandNav[bi - 1].group !== item.group) && !collapsed && (
+                  <div className={`px-3 pb-1.5 ${bi === 0 ? 'pt-1' : 'pt-4'}`}>
                     <span className="text-[11px] font-semibold text-muted-foreground uppercase">
                       {item.group}
                     </span>
