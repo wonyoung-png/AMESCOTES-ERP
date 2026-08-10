@@ -1,7 +1,7 @@
 // 기획전 프로젝트 워크스페이스 — 팀별 상세 업무 (BGROW L2)
 import { useMemo, useState } from 'react';
 import {
-  phase1, CAMPAIGN_TEAMS, type Campaign, type CampaignStatus, type CampaignTask, type CampaignTaskStatus,
+  phase1, CAMPAIGN_TEAMS, normalizeTeam, type Campaign, type CampaignStatus, type CampaignTask, type CampaignTaskStatus,
 } from '@/lib/phase1';
 import { getCurrentUser } from '@/lib/auth';
 import { store } from '@/lib/store';
@@ -242,7 +242,7 @@ interface Props {
 }
 
 export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: Props) {
-  const [teamTab, setTeamTab] = useState<string>('MD');
+  const [teamTab, setTeamTab] = useState<string>(CAMPAIGN_TEAMS[0]);
   const [newLabel, setNewLabel] = useState('');
   const [newAssignee, setNewAssignee] = useState('');
   const [newDueDate, setNewDueDate] = useState('');
@@ -335,7 +335,7 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
             <div className="flex flex-wrap gap-2 mt-2">
               {CAMPAIGN_TEAMS.map(team => {
                 const pct = phase1.getCampaignTeamProgress(detail, team);
-                const cnt = detail.tasks.filter(t => t.team === team).length;
+                const cnt = detail.tasks.filter(t => normalizeTeam(t.team) === team).length;
                 return (
                   <span key={team} className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--fill-quaternary)] text-muted-foreground">
                     {team} {cnt ? `${pct}%` : '—'}
@@ -361,7 +361,7 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
               <TabsList className="flex flex-wrap h-auto gap-1">
                 {CAMPAIGN_TEAMS.map(team => {
                   const pct = phase1.getCampaignTeamProgress(detail, team);
-                  const cnt = detail.tasks.filter(t => t.team === team).length;
+                  const cnt = detail.tasks.filter(t => normalizeTeam(t.team) === team).length;
                   return (
                     <TabsTrigger key={team} value={team} className="text-xs">
                       {team} <span className="ml-1 opacity-60">{cnt ? `${pct}%` : '0'}</span>

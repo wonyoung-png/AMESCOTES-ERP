@@ -244,7 +244,16 @@ const KEYS = {
 export type CampaignStatus = 'draft' | 'onboarded' | 'active' | 'closed';
 export type CampaignTaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
 
-export const CAMPAIGN_TEAMS = ['MD', '마케팅', '비주얼', '디자인', '물류', '쇼룸'] as const;
+// 회사 팀 — 기획전·프로젝트가 같은 목록을 쓴다. 갈라지면 팀별 보기가 어긋난다.
+export const CAMPAIGN_TEAMS = [
+  '국내영업', '해외영업', '비주얼컨텐츠', '디자인', '생산', '마케팅', '물류CS', '쇼룸',
+] as const;
+
+/** 예전 표기 → 지금 팀 이름. 기존 업무가 '팀 미지정'으로 떨어지지 않게 한다 */
+export const LEGACY_TEAM_MAP: Record<string, string> = {
+  MD: '국내영업', 비주얼: '비주얼컨텐츠', 물류: '물류CS',
+};
+export const normalizeTeam = (t?: string) => (t && LEGACY_TEAM_MAP[t]) || t || '';
 export type CampaignTeam = typeof CAMPAIGN_TEAMS[number];
 
 export interface CampaignTaskMessage {
@@ -294,6 +303,8 @@ export interface Campaign {
   endDate: string;
   status: CampaignStatus;
   discountRate?: number;
+  /** 소속 대형 프로젝트. 없으면 단독 기획전 */
+  projectId?: string;
   pushSkus?: string[];
   owner?: string;
   tasks: CampaignTask[];
@@ -1253,7 +1264,9 @@ export const phase1 = {
     return Math.round((teamTasks.filter(t => t.done).length / teamTasks.length) * 100);
   },
 
-  getCampaignTasksByTeam: (c: Campaign, team: string) => c.tasks.filter(t => t.team === team),
+  // 옛 표기(MD·비주얼·물류)로 저장된 업무도 새 팀에 붙어 보이게 한다
+  getCampaignTasksByTeam: (c: Campaign, team: string) =>
+    c.tasks.filter(t => normalizeTeam(t.team) === team),
 
   getProjectPL: (key: string) => {
     type OrderRow = {

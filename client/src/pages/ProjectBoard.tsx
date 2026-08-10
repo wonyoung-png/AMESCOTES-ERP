@@ -8,18 +8,19 @@
 //   예산    — 얼마 쓰기로 했고 얼마 잡혀 있나
 import { useEffect, useMemo, useState } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { Link } from 'wouter';
+import { phase1, type Campaign } from '@/lib/phase1';
 import {
   fetchProjects, upsertProject, upsertItems, deleteProject, deleteItem, fetchMembers,
   TEAMS, type Project, type ProjectItem, type Member,
 } from '@/lib/projectQueries';
-import { parseChecklist } from '@/lib/checklistImport';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Trash2, ClipboardPaste, AlertTriangle, CalendarClock, Wallet } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, CalendarClock, Wallet } from 'lucide-react';
 
 type View = 'all' | 'team' | 'owner' | 'budget';
 
@@ -149,12 +150,15 @@ export default function ProjectBoard() {
 
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState({ title: '', kind: '팝업·오픈', anchorDate: '', anchorLabel: '오픈' });
-  const [showImport, setShowImport] = useState(false);
-  const [paste, setPaste] = useState('');
   /** 항목 직접 입력·수정 — 이게 기본 경로다. 붙여넣기는 처음 한 번 옮길 때만 쓴다 */
   const [editing, setEditing] = useState<ProjectItem | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   useEffect(() => { fetchMembers().then(setMembers).catch(() => {}); }, []);
+  // 이 프로젝트로 무슨 기획전을 돌리는지 — 운영 캘린더에서 소속을 지정한 것들
+  const linked: Campaign[] = useMemo(
+    () => phase1.getCampaigns(ws).filter(c => (c as any).projectId === selId),
+    [ws, selId, projects],
+  );
 
   const load = async () => {
     setLoading(true);
@@ -244,21 +248,6 @@ export default function ProjectBoard() {
     } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
   };
 
-  const doImport = async () => {
-    if (!project) return;
-    const year = Number((project.anchorDate || todayStr()).slice(0, 4));
-    const parsed = parseChecklist(paste, year);
-    if (parsed.items.length === 0) { toast.error('체크리스트 항목(- [ ])을 찾지 못했습니다'); return; }
-    const base = items.length;
-    const rows: ProjectItem[] = parsed.items.map((i, n) => ({ ...i, projectId: project.id, sortNo: base + n }));
-    try {
-      await upsertItems(rows);
-      toast.success(`${rows.length}개 항목을 가져왔습니다`);
-      setShowImport(false); setPaste('');
-      await load();
-    } catch (e: any) { toast.error('가져오기 실패: ' + (e?.message || e)); }
-  };
-
   const removeProject = async () => {
     if (!project) return;
     if (!confirm(`"${project.title}" 프로젝트와 항목 ${items.length}건을 모두 삭제합니다. 계속할까요?`)) return;
@@ -277,16 +266,9 @@ export default function ProjectBoard() {
         </div>
         <div className="flex items-center gap-2">
           {project && (
-            <>
-              <Button size="sm" className="gap-1.5" onClick={() => setEditing(blankItem())}>
-                <Plus className="w-4 h-4" />항목 추가
-              </Button>
-              <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground"
-                title="쓰던 체크리스트를 처음 한 번 옮길 때만 쓰세요"
-                onClick={() => setShowImport(true)}>
-                <ClipboardPaste className="w-4 h-4" />붙여넣기로 한 번에
-              </Button>
-            </>
+            <Button size="sm" className="gap-1.5" onClick={() => setEditing(blankItem())}>
+              <Plus className="w-4 h-4" />항목 추가
+            </Button>
           )}
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowNew(true)}>
             <Plus className="w-4 h-4" />프로젝트
@@ -300,7 +282,7 @@ export default function ProjectBoard() {
         <div className="border border-dashed border-border rounded-lg py-16 text-center">
           <p className="text-sm text-foreground font-medium">아직 프로젝트가 없습니다</p>
           <p className="text-xs text-muted-foreground mt-1">
-            프로젝트를 만든 뒤 쓰시던 체크리스트를 통째로 붙여넣으면 항목이 자동으로 들어갑니다
+운영 캘린더에서 프로젝트를 만들면 여기에 나타납니다
           </p>
           <Button size="sm" className="mt-4 gap-1.5" onClick={() => setShowNew(true)}>
             <Plus className="w-4 h-4" />첫 프로젝트 만들기
@@ -394,18 +376,32 @@ export default function ProjectBoard() {
                 </Button>
               </div>
 
+              {linked.length > 0 && (
+                <div className="bg-card border border-border rounded-lg overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-[var(--fill-quaternary)] border-b border-border">
+                    <span className="text-sm font-semibold text-foreground">이 프로젝트로 도는 기획전</span>
+                    <span className="text-[11px] text-muted-foreground">{linked.length}건</span>
+                    <Link href="/calendar">
+                      <a className="ml-auto text-[11px] text-muted-foreground hover:text-foreground">운영 캘린더에서 보기 →</a>
+                    </Link>
+                  </div>
+                  {linked.map(c => (
+                    <div key={c.id} className="flex items-center gap-3 px-3 py-2 border-b border-border last:border-b-0">
+                      <span className="text-sm text-foreground flex-1 min-w-0 truncate">{c.title}</span>
+                      <span className="text-[11px] text-muted-foreground">{c.channel}</span>
+                      <span className="text-[11px] text-muted-foreground font-mono">{c.startDate} ~ {c.endDate}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {items.length === 0 ? (
                 <div className="border border-dashed border-border rounded-lg py-14 text-center">
                   <p className="text-sm text-foreground font-medium">항목이 없습니다</p>
-                  <p className="text-xs text-muted-foreground mt-1">할 일을 하나씩 추가하세요. 이미 정리해 둔 체크리스트가 있으면 한 번에 옮길 수도 있습니다</p>
-                  <div className="flex items-center justify-center gap-2 mt-4">
-                    <Button size="sm" className="gap-1.5" onClick={() => setEditing(blankItem())}>
-                      <Plus className="w-4 h-4" />항목 추가
-                    </Button>
-                    <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => setShowImport(true)}>
-                      <ClipboardPaste className="w-4 h-4" />붙여넣기로 한 번에
-                    </Button>
-                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">팀과 담당자를 정해 할 일을 하나씩 추가하세요</p>
+                  <Button size="sm" className="mt-4 gap-1.5" onClick={() => setEditing(blankItem())}>
+                    <Plus className="w-4 h-4" />항목 추가
+                  </Button>
                 </div>
               ) : view === 'budget' ? (
                 <GroupedList items={shown.filter(i => i.budget != null)} groupBy={i => i.phase}
@@ -571,33 +567,6 @@ export default function ProjectBoard() {
         </DialogContent>
       </Dialog>
 
-      {/* 체크리스트 붙여넣기 */}
-      <Dialog open={showImport} onOpenChange={setShowImport}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>체크리스트 붙여넣기</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground">
-            <b>이미 정리해 둔 체크리스트가 있을 때만</b> 쓰세요. 평소에는 위의 "항목 추가"로 하나씩 넣습니다. <code>## 페이즈</code> · <code>### 구역</code> ·
-            <code> - [ ] 내용 / 마감 8/20 / 확인처: 생산팀 / 금액 3,000,000</code> 을 읽습니다.
-            마감일을 <b>굵게</b> 쓰면 급한 것으로, <code>0. 선결</code> 블록은 막고 있는 것으로 표시됩니다.
-          </p>
-          <textarea
-            value={paste}
-            onChange={e => setPaste(e.target.value)}
-            rows={14}
-            className="w-full text-xs font-mono border border-border rounded-md bg-card p-3 resize-y"
-            placeholder="## 1. 8월 (D-125 ~ D-100)&#10;### 생산 발주&#10;- [ ] 참 금형 필요 여부 확인 / 마감 **8/31** / 확인처: 생산팀"
-          />
-          {paste.trim() && (() => {
-            const y = Number((project?.anchorDate || todayStr()).slice(0, 4));
-            const n = parseChecklist(paste, y).items.length;
-            return <p className="text-xs text-muted-foreground">읽은 항목 <b className="text-foreground">{n}</b>개 · {y}년 기준으로 날짜를 채웁니다</p>;
-          })()}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowImport(false)}>취소</Button>
-            <Button onClick={doImport} disabled={!paste.trim()}>가져오기</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

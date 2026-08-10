@@ -114,10 +114,8 @@ export async function deleteItem(id: string) {
   if (error) throw error;
 }
 
-/** 회사 팀 구분 — 업무 담당을 이 안에서 고른다 */
-export const TEAMS = [
-  '국내영업', '해외영업', '비주얼컨텐츠', '디자인', '생산', '마케팅', '물류CS',
-] as const;
+// 팀 목록은 phase1이 정본이다. 여기서 사본을 만들면 기획전과 프로젝트가 갈라진다.
+export { CAMPAIGN_TEAMS as TEAMS, normalizeTeam } from './phase1';
 
 export interface Member { id: string; name: string; team?: string; rank?: string; position?: string; }
 

@@ -76,7 +76,7 @@ export default function OperationalCalendar() {
     } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
   };
   const [form, setForm] = useState({
-    title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15,
+    title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '',
   });
 
   const campaigns = useMemo(() => {
@@ -110,12 +110,13 @@ export default function OperationalCalendar() {
       endDate: form.endDate,
       status: 'onboarded',
       discountRate: form.discountRate,
-      owner: 'MD',
+      projectId: form.projectId || undefined,
+      owner: '국내영업',
     });
     phase1.onboardCampaign(row.id);
     toast.success('기획전이 생성되었습니다. 팀별로 업무를 직접 추가하세요');
     setShowNew(false);
-    setForm({ title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15 });
+    setForm({ title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '' });
     refresh();
   };
 
@@ -362,6 +363,13 @@ export default function OperationalCalendar() {
           <div className="space-y-3">
             <div><Label>이름</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="여름 시즌오프" /></div>
             <div>
+              <Label>소속 프로젝트</Label>
+              <select value={form.projectId}
+                onChange={e => setForm(f => ({ ...f, projectId: e.target.value }))}
+                className="w-full h-9 text-sm border border-border rounded-md bg-card px-2 mb-3">
+                <option value="">단독 기획전 (프로젝트 없음)</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+              </select>
               <Label>채널</Label>
               <select className="w-full border rounded-md h-9 px-2 text-sm" value={form.channel}
                 onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}>
