@@ -416,8 +416,22 @@ function printExpenseTradeStatement(expense: Expense) {
 export default function ExpenseEntry() {
   const [expenses, setExpenses] = useState<Expense[]>(() => store.getExpenses());
   const [showModal, setShowModal] = useState(false);
+  // 프로젝트 항목에서 '결의' 를 누르고 오면 내용·금액이 실려 온다. 다시 타이핑하지 않게 채운다.
+  const fromProject = (() => {
+    const q = new URLSearchParams(location.search);
+    const id = q.get('projectItemId');
+    if (!id) return null;
+    return { id, description: q.get('description') || '', amount: Number(q.get('amount') || 0) };
+  })();
+
   const [header, setHeader] = useState({ ...EMPTY_HEADER });
-  const [lines, setLines] = useState<ExpenseLine[]>([newLine()]);
+  const [projectItemId] = useState<string | undefined>(fromProject?.id);
+  const [lines, setLines] = useState<ExpenseLine[]>(
+    fromProject
+      ? [{ ...newLine(), description: fromProject.description,
+           unitPrice: fromProject.amount, amountKrw: fromProject.amount }]
+      : [newLine()],
+  );
   const [filterType, setFilterType] = useState<string>('all');
   const [filterCat, setFilterCat] = useState<string>('all');
 
@@ -494,6 +508,8 @@ export default function ExpenseEntry() {
       taxAmount: header.hasTaxInvoice && header.taxAmount ? parseInt(header.taxAmount) : undefined,
       taxInvoiceDate: header.hasTaxInvoice ? header.taxInvoiceDate || undefined : undefined,
       memo: header.memo || undefined,
+      // 프로젝트 항목에서 넘어왔으면 그 항목의 집행으로 묶는다
+      projectItemId,
       createdAt: new Date().toISOString(),
     };
     store.addExpense(expense);

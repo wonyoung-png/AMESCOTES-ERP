@@ -8,7 +8,7 @@
 //   예산    — 얼마 쓰기로 했고 얼마 잡혀 있나
 import { useEffect, useMemo, useState } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { phase1, type Campaign } from '@/lib/phase1';
 import {
   fetchProjects, upsertProject, upsertItems, deleteProject, deleteItem, fetchMembers,
@@ -19,7 +19,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Trash2, CalendarClock, Wallet } from 'lucide-react';
+import { Plus, Trash2, CalendarClock, Wallet, Receipt } from 'lucide-react';
+import { fetchSpentByItem } from '@/lib/expenseQueries';
 
 type View = 'all' | 'team' | 'owner' | 'budget';
 
@@ -49,7 +50,8 @@ const COL = {
   team: 'w-24 shrink-0',
   owner: 'w-24 shrink-0',
   due: 'w-28 shrink-0',
-  budget: 'w-32 shrink-0 text-right',
+  budget: 'w-28 shrink-0 text-right',
+  spent: 'w-28 shrink-0 text-right',
   left: 'w-16 shrink-0 text-right',
 };
 
@@ -61,7 +63,8 @@ function HeadRow() {
       <span className={COL.team}>팀</span>
       <span className={COL.owner}>담당자</span>
       <span className={COL.due}>마감</span>
-      <span className={COL.budget}>금액</span>
+      <span className={COL.budget}>계획</span>
+      <span className={COL.spent}>집행</span>
       <span className={COL.left}>남은 날</span>
     </div>
   );
@@ -77,8 +80,9 @@ function daysCell(item: ProjectItem) {
   return <span className="text-muted-foreground">D-{d}</span>;
 }
 
-function ItemRow({ item, onToggle, onEdit }: {
+function ItemRow({ item, onToggle, onEdit, spent, onExpense }: {
   item: ProjectItem; onToggle: (i: ProjectItem) => void; onEdit: (i: ProjectItem) => void;
+  spent: number; onExpense: (i: ProjectItem) => void;
 }) {
   const dim = item.done ? 'text-muted-foreground' : 'text-foreground';
   return (
@@ -98,6 +102,19 @@ function ItemRow({ item, onToggle, onEdit }: {
       <span className={`${COL.budget} text-xs font-mono tabular-nums ${dim}`}>
         {item.budget != null ? won(item.budget) : '—'}
       </span>
+      <span className={`${COL.spent} text-xs font-mono tabular-nums`}>
+        {spent > 0 ? (
+          <span className={item.budget != null && spent > item.budget ? 'text-[var(--system-red)]' : 'text-foreground'}>
+            {won(spent)}
+          </span>
+        ) : (
+          <button type="button" onClick={() => onExpense(item)}
+            className="text-[11px] text-muted-foreground hover:text-primary inline-flex items-center gap-0.5"
+            title="이 항목으로 지출결의 작성">
+            <Receipt className="w-3 h-3" />결의
+          </button>
+        )}
+      </span>
       <span className={`${COL.left} text-xs tabular-nums`}>{daysCell(item)}</span>
     </div>
   );
@@ -113,6 +130,8 @@ function GroupedList({
   onToggle: (i: ProjectItem) => void;
   onEdit: (i: ProjectItem) => void;
   onAdd?: (groupName: string) => void;
+  spent: Record<string, number>;
+  onExpense: (i: ProjectItem) => void;
 }) {
   const groups = useMemo(() => {
     const m = new Map<string, ProjectItem[]>();
@@ -131,13 +150,14 @@ function GroupedList({
       {groups.map(([name, list]) => {
         const done = list.filter(i => i.done).length;
         const sum = list.reduce((t, i) => t + (i.budget || 0), 0);
+        const used = list.reduce((t, i) => t + (spent[i.id] || 0), 0);
         return (
           <div key={name} className="bg-card border border-border rounded-lg overflow-x-auto">
             <div className="min-w-[720px]">
               <div className="flex items-center gap-2 px-3 py-2 bg-[var(--fill-quaternary)] border-b border-border">
                 <span className="text-sm font-semibold text-foreground">{name}</span>
                 <span className="text-[11px] text-muted-foreground">{done}/{list.length}</span>
-                {sum > 0 && <span className="text-[11px] text-muted-foreground font-mono tabular-nums">{won(sum)}</span>}
+                {sum > 0 && <span className="text-[11px] text-muted-foreground font-mono tabular-nums">계획 {won(sum)}{used > 0 ? ` · 집행 ${won(used)}` : ''}</span>}
                 {onAdd && (
                   <button type="button" onClick={() => onAdd(name)}
                     className="ml-auto text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1">
@@ -146,7 +166,8 @@ function GroupedList({
                 )}
               </div>
               <HeadRow />
-              {list.map(i => <ItemRow key={i.id} item={i} onToggle={onToggle} onEdit={onEdit} />)}
+              {list.map(i => <ItemRow key={i.id} item={i} onToggle={onToggle} onEdit={onEdit}
+                  spent={spent[i.id] || 0} onExpense={onExpense} />)}
             </div>
           </div>
         );
@@ -170,7 +191,10 @@ export default function ProjectBoard() {
   const [form, setForm] = useState({ title: '', kind: '팝업·오픈', startDate: '', endDate: '', budgetCap: '' });
   /** 항목 직접 입력·수정 — 이게 기본 경로다. 붙여넣기는 처음 한 번 옮길 때만 쓴다 */
   const [editing, setEditing] = useState<ProjectItem | null>(null);
+  const [, setLocation] = useLocation();
   const [members, setMembers] = useState<Member[]>([]);
+  /** 항목별 실제 집행액 — 계획(budget)과 대조하려면 지출결의를 합쳐 와야 한다 */
+  const [spent, setSpent] = useState<Record<string, number>>({});
   useEffect(() => { fetchMembers().then(setMembers).catch(() => {}); }, []);
   // 이 프로젝트로 무슨 기획전을 돌리는지 — 운영 캘린더에서 소속을 지정한 것들
   const linked: Campaign[] = useMemo(
@@ -190,6 +214,11 @@ export default function ProjectBoard() {
     setLoading(false);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [ws]);
+  useEffect(() => {
+    const ids = (projects.find(p => p.id === selId)?.items || []).map(i => i.id);
+    if (ids.length === 0) { setSpent({}); return; }
+    fetchSpentByItem(ids).then(setSpent).catch(() => setSpent({}));
+  }, [projects, selId]);
 
   const project = projects.find(p => p.id === selId) || null;
   const items = project?.items || [];
@@ -220,6 +249,16 @@ export default function ProjectBoard() {
     urgent: false, blocker: false, done: false, sortNo: items.length,
   });
 
+  /** 이 항목으로 지출결의를 쓴다. 항목 정보를 실어 보내 다시 타이핑하지 않게 한다 */
+  const goExpense = (i: ProjectItem) => {
+    const q = new URLSearchParams({
+      projectItemId: i.id,
+      description: i.title,
+      ...(i.budget != null ? { amount: String(i.budget) } : {}),
+    });
+    setLocation(`/expense?${q.toString()}`);
+  };
+
   const saveItem = async () => {
     if (!editing) return;
     if (!editing.title.trim()) { toast.error('내용을 입력하세요'); return; }
@@ -242,8 +281,9 @@ export default function ProjectBoard() {
     const late = items.filter(i => !i.done && (daysTo(i.due) ?? 99) < 0).length;
     const week = items.filter(i => { const d = daysTo(i.due); return !i.done && d !== null && d >= 0 && d <= 7; }).length;
     const budget = items.reduce((s, i) => s + (i.budget || 0), 0);
-    return { done, late, week, budget, dday: daysTo(project?.endDate) };
-  }, [items, project]);
+    const used = items.reduce((s, i) => s + (spent[i.id] || 0), 0);
+    return { done, late, week, budget, used, dday: daysTo(project?.endDate) };
+  }, [items, project, spent]);
 
   const toggle = async (item: ProjectItem) => {
     const next = { ...item, done: !item.done, doneAt: !item.done ? new Date().toISOString() : undefined };
@@ -429,8 +469,19 @@ export default function ProjectBoard() {
                   <div className="bg-card border border-border rounded-lg p-4 mb-3">
                     <div className="flex items-end gap-6 flex-wrap">
                       <div>
-                        <p className="text-[11px] text-muted-foreground">잡힌 금액</p>
+                        <p className="text-[11px] text-muted-foreground">계획</p>
                         <p className="text-2xl font-bold text-foreground font-mono tabular-nums">{won(stat.budget)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">집행 <span className="text-[10px]">지출결의 합계</span></p>
+                        <p className="text-2xl font-bold text-foreground font-mono tabular-nums">{won(stat.used)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">계획 대비</p>
+                        <p className={`text-lg font-semibold font-mono tabular-nums ${
+                          stat.used > stat.budget ? 'text-[var(--system-red)]' : 'text-foreground'}`}>
+                          {won(stat.budget - stat.used)}
+                        </p>
                       </div>
                       <div>
                         <p className="text-[11px] text-muted-foreground">예산 상한</p>
@@ -462,7 +513,7 @@ export default function ProjectBoard() {
                     )}
                   </div>
                   <GroupedList items={shown.filter(i => i.budget != null)} groupBy={i => i.team || '팀 미지정'}
-                    emptyText="금액이 적힌 항목이 없습니다. 항목을 열어 금액을 넣으면 여기 모입니다" onToggle={toggle} onEdit={setEditing} />
+                    emptyText="금액이 적힌 항목이 없습니다. 항목을 열어 금액을 넣으면 여기 모입니다" onToggle={toggle} onEdit={setEditing} spent={spent} onExpense={goExpense} />
                 </>
               ) : (
                 <GroupedList
@@ -472,6 +523,8 @@ export default function ProjectBoard() {
                   onToggle={toggle}
                   onEdit={setEditing}
                   onAdd={g => setEditing(blankItem(g))}
+                  spent={spent}
+                  onExpense={goExpense}
                 />
               )}
             </>
