@@ -84,6 +84,17 @@ function splitName(raw, group) {
   return { part: part || clean, tag, materials };
 }
 
+
+/** 바디/트림1/트림2/안감 — 마커그룹이 직접 알려주는 것을 우선한다 */
+function bodyPartOf(assign, group, raw) {
+  if (assign === 'interlining' || assign === 'skip') return '';
+  const g = (group || '').trim();
+  if (assign === 'lining' || /안감|里子|lining/i.test(g)) return '안감';
+  if (/트림\s*2/.test(g) || /트림\s*2/.test(raw)) return '트림2';
+  if (/트림|trim/i.test(g) || /트림/.test(raw)) return '트림1';
+  return '바디';
+}
+
 function parseFile(file) {
   const wb = XLSX.readFile(file);
   const pieces = [];
@@ -121,7 +132,7 @@ function parseFile(file) {
       lines.push({
         raw: p.name, part, group: p.group, w: p.w, h: p.h, pair: p.pair, qty: p.qty,
         material: m.label, ea: m.ea, wari: m.wari,
-        assign: cls.a, why: cls.why, count,
+        assign: cls.a, why: cls.why, count, bodyPart: bodyPartOf(cls.a, p.group, p.name),
         sf: (p.w + 0.5) * (p.h + 0.5) * count / 10000 * 10.764,
         cm2: p.w * p.h * count,
       });
@@ -130,182 +141,183 @@ function parseFile(file) {
   return { file: path.basename(file), styleNo, lines };
 }
 
-const files = fs.readdirSync(DIR).filter(f => f.includes('소요량표') && /\.xlsx?$/i.test(f));
-const data = files.map(f => parseFile(path.join(DIR, f)));
+
+// ── 한글 소요량표만 본다. 중국어 파일은 폐기, 같은 스타일 중복 파일은 최신 하나만 ──────
+const HAN = /[가-힣]/;
+const raw = fs.readdirSync(DIR).filter(f => f.includes('소요량표') && /\.xlsx?$/i.test(f));
+const parsed = raw.map(f => ({ ...parseFile(path.join(DIR, f)), mtime: fs.statSync(path.join(DIR, f)).mtimeMs }));
+
+const dropped = [];
+const byStyle = new Map();
+for (const d of parsed) {
+  const koreanNames = d.lines.filter(l => HAN.test(l.raw)).length;
+  if (koreanNames === 0) { dropped.push({ file: d.file, why: '중국어 파일' }); continue; }
+  const key = d.styleNo || d.file;
+  const prev = byStyle.get(key);
+  if (!prev) { byStyle.set(key, d); continue; }
+  const [keep, drop] = prev.mtime >= d.mtime ? [prev, d] : [d, prev];
+  byStyle.set(key, keep);
+  dropped.push({ file: drop.file, why: `${key} 중복` });
+}
+const data = [...byStyle.values()].sort((a, b) => (a.styleNo || '').localeCompare(b.styleNo || ''));
 
 const LB = { leather: '가죽', outer: '원단(겉감)', lining: '안감', interlining: '보강재', skip: '제외' };
-const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-
-// ── 자재명별로 묶는다. 648줄을 다 보는 대신 고유 자재명만 검수하면 된다 ──────────
-const allLines = data.flatMap(d => d.lines.map(l => ({ ...l, file: d.styleNo || d.file })));
-const groupMap = new Map();
-for (const l of allLines) {
-  const key = l.material.trim().toLowerCase();
-  let g = groupMap.get(key);
-  if (!g) { g = { key, name: l.material.trim(), assign: l.assign, why: l.why, n: 0, samples: [], files: new Set() }; groupMap.set(key, g); }
-  g.n++;
-  g.files.add(l.file);
-  if (g.samples.length < 3 && !g.samples.includes(l.raw)) g.samples.push(l.raw);
-}
-const groups = [...groupMap.values()].sort((a, b) => b.n - a.n);
-const GJSON = JSON.stringify(groups.map(g => ({ k: g.key, name: g.name, a: g.assign, n: g.n })));
-
-// ── 자재명별 검수 시트 ────────────────────────────────────────────────────────
 const KEYS = ['leather', 'outer', 'lining', 'interlining', 'skip'];
-const CONFIDENT = new Set(['자재명', '기본패턴']);
+const PARTS = ['바디', '트림1', '트림2', '안감', ''];
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-let rows = '';
-for (const g of groups) {
-  const sure = CONFIDENT.has(g.why);
-  rows += `<tr data-k="${esc(g.key)}" data-a="${g.assign}" data-sure="${sure ? 1 : 0}" data-name="${esc(g.name)}">`
-    + `<td class="nm"><b>${esc(g.name)}</b>${sure ? '' : ' <span class="warn">확인</span>'}</td>`
-    + `<td class="num">${g.n}</td>`
-    + `<td class="ctr dim sm">${g.files.size}개</td>`
-    + `<td class="nm dim sm">${esc(g.samples.join(' · '))}</td>`
-    + `<td class="ctr"><select class="pick">`
-    + KEYS.map(k => `<option value="${k}"${k === g.assign ? ' selected' : ''}>${LB[k]}</option>`).join('')
-    + `</select></td>`
-    + `<td class="dim sm">${esc(g.why)}</td>`
-    + '</tr>';
-}
-
-// 전체 행은 접어둔다 — 자재명별로 고치면 여기 전부 따라간다
-let detail = '';
-for (const f of data) {
-  detail += `<tr class="fh"><td colspan="7"><b>${esc(f.styleNo || f.file)}</b> <span class="dim sm">${esc(f.file)} · ${f.lines.length}행</span></td></tr>`;
-  let last = '';
-  for (const l of f.lines) {
-    const first = l.raw !== last; last = l.raw;
-    detail += `<tr class="${l.assign === 'skip' ? 'off' : ''}">`
-      + `<td class="nm">${first ? esc(l.raw) : ''}</td>`
-      + `<td class="nm dim sm">${esc(l.part)}</td>`
-      + `<td class="ctr dim">${esc(l.group || '-')}</td>`
-      + `<td class="nm"><b>${esc(l.material)}</b></td>`
-      + `<td class="num">${l.count}</td>`
-      + `<td class="num">${l.w.toFixed(2)} × ${l.h.toFixed(2)}</td>`
-      + `<td class="ctr a-${l.assign}"><b>${LB[l.assign]}</b></td>`
-      + '</tr>';
-  }
-}
-
+const allLines = data.flatMap(d => d.lines.map((l, i) => ({ ...l, style: d.styleNo || d.file, rid: `${d.styleNo || d.file}#${i}` })));
 const stats = {};
 allLines.forEach(l => { stats[l.assign] = (stats[l.assign] || 0) + 1; });
-const needCheck = groups.filter(g => !CONFIDENT.has(g.why)).length;
+const CONFIDENT = new Set(['자재명', '기본패턴']);
+const needCheck = allLines.filter(l => !CONFIDENT.has(l.why)).length;
 
-// 부위명 빈도 — 소요량 탭 드롭다운 후보를 뽑는 데 쓴다
-const partCount = {};
-allLines.forEach(l => { const p = (l.part || '').trim(); if (p) partCount[p] = (partCount[p] || 0) + 1; });
-fs.writeFileSync(OUT.replace(/\.html$/, '-parts.json'),
-  JSON.stringify(Object.entries(partCount).sort((a, b) => b[1] - a[1]), null, 0));
+let body = '';
+for (const f of data) {
+  body += `<tr class="fh"><td colspan="9"><b>${esc(f.styleNo || f.file)}</b> <span class="dim sm">${esc(f.file)} · ${f.lines.length}행</span></td></tr>`;
+  let last = '';
+  f.lines.forEach((l, i) => {
+    const rid = `${f.styleNo || f.file}#${i}`;
+    const first = l.raw !== last; last = l.raw;
+    const sure = CONFIDENT.has(l.why);
+    body += `<tr data-id="${esc(rid)}" data-style="${esc(f.styleNo || f.file)}" data-raw="${esc(l.raw)}" data-mat="${esc(l.material)}" data-a="${l.assign}" data-p="${esc(l.bodyPart)}" data-sure="${sure ? 1 : 0}" class="${l.assign === 'skip' ? 'off' : ''}">`
+      + `<td class="nm">${first ? esc(l.raw) : '<span class="dim">〃</span>'}</td>`
+      + `<td class="nm"><b>${esc(l.material)}</b>${sure ? '' : ' <span class="warn">확인</span>'}</td>`
+      + `<td class="ctr dim sm">${esc(l.group || '-')}</td>`
+      + `<td class="num">${l.count}</td>`
+      + `<td class="num">${l.w.toFixed(1)} × ${l.h.toFixed(1)}</td>`
+      + `<td class="ctr"><select class="kind">${KEYS.map(k => `<option value="${k}"${k === l.assign ? ' selected' : ''}>${LB[k]}</option>`).join('')}</select></td>`
+      + `<td class="ctr"><select class="part">${PARTS.map(p => `<option value="${esc(p)}"${p === l.bodyPart ? ' selected' : ''}>${p || '—'}</option>`).join('')}</select></td>`
+      + `<td class="dim sm">${esc(l.why)}</td>`
+      + `<td><input class="memo" placeholder="틀린 점 적어주세요"></td>`
+      + '</tr>';
+  });
+}
 
 const html = `<title>CAD 소요량표 분류 검수</title>
 <style>
 :root{--bg:#F7F6F4;--panel:#fff;--ink:#1A1815;--muted:#6B6560;--line:#E6E1D9;--accent:#8A3A2E;--warn:#9A6B00;
---lea:#8A5A2E;--out:#2F6F7A;--lin:#5B4B8A;--int:#7A6A55;
 --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",Segoe UI,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#131211;--panel:#1B1A18;--ink:#EAE7E2;--muted:#9C958C;--line:#2A2825;--accent:#E08D7A;--warn:#D8AE52;--lea:#D9A46B;--out:#7FC3CE;--lin:#A99BDD;--int:#C2AE8E}}
-:root[data-theme="dark"]{--bg:#131211;--panel:#1B1A18;--ink:#EAE7E2;--muted:#9C958C;--line:#2A2825;--accent:#E08D7A;--warn:#D8AE52;--lea:#D9A46B;--out:#7FC3CE;--lin:#A99BDD;--int:#C2AE8E}
-:root[data-theme="light"]{--bg:#F7F6F4;--panel:#fff;--ink:#1A1815;--muted:#6B6560;--line:#E6E1D9;--accent:#8A3A2E;--warn:#9A6B00;--lea:#8A5A2E;--out:#2F6F7A;--lin:#5B4B8A;--int:#7A6A55}
+@media (prefers-color-scheme:dark){:root{--bg:#131211;--panel:#1B1A18;--ink:#EAE7E2;--muted:#9C958C;--line:#2A2825;--accent:#E08D7A;--warn:#D8AE52}}
+:root[data-theme="dark"]{--bg:#131211;--panel:#1B1A18;--ink:#EAE7E2;--muted:#9C958C;--line:#2A2825;--accent:#E08D7A;--warn:#D8AE52}
+:root[data-theme="light"]{--bg:#F7F6F4;--panel:#fff;--ink:#1A1815;--muted:#6B6560;--line:#E6E1D9;--accent:#8A3A2E;--warn:#9A6B00}
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5}
-.wrap{max-width:1080px;margin:0 auto;padding:32px 16px 130px;display:flex;flex-direction:column;gap:14px}
-h1{font-size:clamp(21px,3.4vw,30px);margin:0;letter-spacing:-.02em}
-p.lede{margin:0;color:var(--muted);font-size:14px;max-width:70ch}
-.stat{display:flex;flex-wrap:wrap;gap:6px;font-size:12.5px}
+.wrap{max-width:1180px;margin:0 auto;padding:30px 14px 120px;display:flex;flex-direction:column;gap:12px}
+h1{font-size:clamp(20px,3.2vw,28px);margin:0;letter-spacing:-.02em}
+p.lede{margin:0;color:var(--muted);font-size:13.5px;max-width:72ch}
+.stat{display:flex;flex-wrap:wrap;gap:6px;font-size:12px}
 .stat span{border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--panel)}
 .bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--line)}
 .bar button{font:inherit;font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
 .bar button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.bar input{font:inherit;font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);min-width:150px}
+.bar input,.bar select{font:inherit;font-size:12px;padding:5px 9px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
 .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px}
-th{background:var(--panel);text-align:left;font-size:11px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-td{padding:5px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-tr.fh td{background:color-mix(in srgb,var(--ink) 6%,transparent)}
-tr.off td{opacity:.45}
-tr.edited{background:color-mix(in srgb,var(--accent) 10%,transparent)}
-.nm{word-break:keep-all;max-width:330px}
-.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-family:var(--mono);font-size:11.5px}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:1040px}
+th{background:var(--panel);text-align:left;font-size:11px;color:var(--muted);padding:8px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:4px 9px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.fh td{background:color-mix(in srgb,var(--ink) 6%,transparent);padding:8px 9px}
+tr.off{opacity:.5}
+tr.edited{background:color-mix(in srgb,var(--accent) 10%,transparent);opacity:1}
+.nm{word-break:keep-all;max-width:280px}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-family:var(--mono);font-size:11px}
 .ctr{text-align:center;white-space:nowrap}
 .dim{color:var(--muted)}.sm{font-size:11px}
 .warn{color:var(--warn);font-size:10.5px;border:1px solid currentColor;border-radius:4px;padding:0 4px;vertical-align:2px}
-select.pick{font:inherit;font-size:11.5px;padding:2px 4px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
-.a-leather b{color:var(--lea)}.a-outer b{color:var(--out)}.a-lining b{color:var(--lin)}.a-interlining b{color:var(--int)}.a-skip b{color:var(--muted)}
+select.kind,select.part{font:inherit;font-size:11.5px;padding:2px 3px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+input.memo{font:inherit;font-size:11.5px;width:100%;min-width:150px;padding:3px 7px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--ink)}
+input.memo:focus{background:var(--panel);outline:1px solid var(--accent)}
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--panel);border-top:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
 .dock b{color:var(--accent)}
 .dock button{font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:8px;border:0;background:var(--ink);color:var(--bg);cursor:pointer}
 .dock button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:400}
-#out{width:100%;max-width:1048px;font-family:var(--mono);font-size:11.5px;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);display:none}
-details summary{cursor:pointer;font-size:13px;color:var(--muted);padding:6px 0}
+#out{width:100%;max-width:1100px;font-family:var(--mono);font-size:11.5px;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);display:none}
+.note{font-size:11.5px;color:var(--muted);border:1px dashed var(--line);border-radius:8px;padding:8px 10px}
 </style>
 <div class="wrap">
 <h1>CAD 소요량표 — 분류 검수</h1>
-<p class="lede">${allLines.length}줄을 다 보실 필요 없습니다. <b>자재명 ${groups.length}개</b>만 확인하시면 됩니다.
-틀린 것만 오른쪽 드롭다운을 바꾸시고, 맨 아래 <b>회신용 텍스트 복사</b>를 눌러 저에게 붙여 주세요.
-<span class="warn">확인</span> 표시는 제가 자신 없는 것이니 그것만 보셔도 됩니다.</p>
+<p class="lede">한글 소요량표 <b>${data.length}개</b>만 남겼습니다. 행마다 <b>분류·부위</b>를 고치고, 맨 오른쪽 <b>메모</b>에 틀린 점을 적으세요.
+바꾼 행만 모아 <b>회신용 텍스트 복사</b>로 저에게 넘기시면 됩니다.</p>
+<div class="note">
+<b>부위는 이렇게 가릅니다</b> — 이 파일들의 마커그룹은 <code>SELF · 겉감 · 안감 · 심 · 트림2</code> 다섯 개뿐입니다.<br>
+· <b>안감</b> = 마커그룹 <code>안감</code> 또는 자재명 우라/안감 · <b>트림2</b> = 마커그룹 <code>트림2</code> (파일이 직접 알려줌)<br>
+· <b>트림1</b> = 조각 이름에 "트림"이 있고 트림2가 아닌 것 · <b>바디</b> = 나머지(SELF·겉감) · <b>보강재</b>는 부위 없음(—)
+</div>
+${dropped.length ? `<div class="note">폐기 ${dropped.length}건 — ${dropped.map(d => `${esc(d.file)} <span class="dim">(${d.why})</span>`).join(' · ')}</div>` : ''}
 <div class="stat">
-<span style="color:var(--lea)">가죽 ${stats.leather || 0}줄</span>
-<span style="color:var(--out)">원단 ${stats.outer || 0}줄</span>
-<span style="color:var(--lin)">안감 ${stats.lining || 0}줄</span>
-<span style="color:var(--int)">보강재 ${stats.interlining || 0}줄</span>
-<span>제외(기본패턴) ${stats.skip || 0}줄</span>
-<span style="color:var(--warn)">확인 필요 ${needCheck}개</span>
+<span>가죽 ${stats.leather || 0}</span><span>원단 ${stats.outer || 0}</span><span>안감 ${stats.lining || 0}</span>
+<span>보강재 ${stats.interlining || 0}</span><span>제외(기본패턴) ${stats.skip || 0}</span>
+<span style="color:var(--warn)">확인 필요 ${needCheck}</span>
 </div>
 
 <div class="bar">
-<button data-f="all" aria-pressed="true">전체 ${groups.length}</button>
+<button data-f="all" aria-pressed="true">전체 ${allLines.length}</button>
 <button data-f="check">확인 필요 ${needCheck}</button>
 ${KEYS.map(k => `<button data-f="${k}">${LB[k]}</button>`).join('')}
-<input id="q" type="search" placeholder="자재명 검색">
+<select id="st"><option value="">스타일 전체</option>${data.map(d => `<option>${esc(d.styleNo || d.file)}</option>`).join('')}</select>
+<input id="q" type="search" placeholder="조각·자재명 검색">
 </div>
 
 <div class="scroll"><table id="t"><thead><tr>
-<th>자재명</th><th class="num">건수</th><th class="ctr">스타일</th><th>이 이름으로 나온 조각 (예시)</th><th class="ctr">분류</th><th>근거</th>
-</tr></thead><tbody>${rows}</tbody></table></div>
-
-<details><summary>▸ 전체 ${allLines.length}행 원문 보기 (참고용)</summary>
-<div class="scroll" style="margin-top:8px"><table><thead><tr>
-<th>조각 이름 (원문)</th><th>부위</th><th class="ctr">마커그룹</th><th>자재</th><th class="num">수량</th><th class="num">가로 × 세로</th><th class="ctr">분류</th>
-</tr></thead><tbody>${detail}</tbody></table></div>
-</details>
+<th>조각 이름 (원문)</th><th>자재</th><th class="ctr">마커그룹</th><th class="num">수량</th><th class="num">가로 × 세로</th>
+<th class="ctr">분류</th><th class="ctr">부위</th><th>근거</th><th>메모 (틀린 점)</th>
+</tr></thead><tbody>${body}</tbody></table></div>
 </div>
 
 <div class="dock">
-  <span>수정 <b id="n">0</b>건</span>
+  <span>수정 <b id="n">0</b>행</span>
   <button id="copy">회신용 텍스트 복사</button>
   <button id="reset" class="ghost">되돌리기</button>
-  <textarea id="out" rows="6" readonly></textarea>
+  <textarea id="out" rows="8" readonly></textarea>
 </div>
 
 <script>
 const LB = ${JSON.stringify(LB)};
-const KEY = 'cad-audit-fix';
-const orig = {}, fix = JSON.parse(localStorage.getItem(KEY) || '{}');
-const rowsEl = [...document.querySelectorAll('#t tbody tr')];
+const KEY = 'cad-audit-v2';
+const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+const rows = [...document.querySelectorAll('#t tbody tr[data-id]')];
 
-rowsEl.forEach(tr => {
-  const k = tr.dataset.k, sel = tr.querySelector('.pick');
-  orig[k] = tr.dataset.a;
-  if (fix[k]) sel.value = fix[k];
-  paint(tr);
-  sel.addEventListener('change', () => {
-    if (sel.value === orig[k]) delete fix[k]; else fix[k] = sel.value;
-    localStorage.setItem(KEY, JSON.stringify(fix));
-    paint(tr); count();
-  });
+function diff(tr){
+  const id = tr.dataset.id, s = saved[id] || {};
+  const k = tr.querySelector('.kind').value, p = tr.querySelector('.part').value, m = tr.querySelector('.memo').value.trim();
+  const out = {};
+  if (k !== tr.dataset.a) out.k = k;
+  if (p !== tr.dataset.p) out.p = p;
+  if (m) out.m = m;
+  return out;
+}
+function save(tr){
+  const d = diff(tr);
+  if (Object.keys(d).length) saved[tr.dataset.id] = d; else delete saved[tr.dataset.id];
+  localStorage.setItem(KEY, JSON.stringify(saved));
+  tr.classList.toggle('edited', !!saved[tr.dataset.id]);
+  document.getElementById('n').textContent = Object.keys(saved).length;
+}
+rows.forEach(tr => {
+  const s = saved[tr.dataset.id];
+  if (s) {
+    if (s.k) tr.querySelector('.kind').value = s.k;
+    if (s.p !== undefined) tr.querySelector('.part').value = s.p;
+    if (s.m) tr.querySelector('.memo').value = s.m;
+    tr.classList.add('edited');
+  }
+  tr.querySelectorAll('.kind,.part,.memo').forEach(el => el.addEventListener('change', () => save(tr)));
+  tr.querySelector('.memo').addEventListener('blur', () => save(tr));
 });
-function paint(tr){ tr.classList.toggle('edited', !!fix[tr.dataset.k]); }
-function count(){ document.getElementById('n').textContent = Object.keys(fix).length; }
-count();
+document.getElementById('n').textContent = Object.keys(saved).length;
 
-let filter = 'all', q = '';
+let filter = 'all', q = '', style = '';
 function apply(){
-  rowsEl.forEach(tr => {
+  rows.forEach(tr => {
     const okF = filter === 'all' ? true
       : filter === 'check' ? tr.dataset.sure === '0'
-      : (tr.querySelector('.pick').value === filter);
-    const okQ = !q || tr.dataset.name.toLowerCase().includes(q);
-    tr.style.display = okF && okQ ? '' : 'none';
+      : tr.querySelector('.kind').value === filter;
+    const okS = !style || tr.dataset.style === style;
+    const hay = (tr.dataset.raw + ' ' + tr.dataset.mat).toLowerCase();
+    tr.style.display = (okF && okS && (!q || hay.includes(q))) ? '' : 'none';
+  });
+  document.querySelectorAll('#t tbody tr.fh').forEach(h => {
+    h.style.display = (filter === 'all' && !q && !style) ? '' : 'none';
   });
 }
 document.querySelectorAll('.bar button').forEach(b => b.addEventListener('click', () => {
@@ -313,15 +325,26 @@ document.querySelectorAll('.bar button').forEach(b => b.addEventListener('click'
   filter = b.dataset.f; apply();
 }));
 document.getElementById('q').addEventListener('input', e => { q = e.target.value.trim().toLowerCase(); apply(); });
+document.getElementById('st').addEventListener('change', e => { style = e.target.value; apply(); });
 
 document.getElementById('copy').addEventListener('click', async () => {
-  const ks = Object.keys(fix);
-  const text = ks.length
-    ? '[CAD 분류 수정]' + String.fromCharCode(10) + ks.map(k => {
-        const tr = rowsEl.find(r => r.dataset.k === k);
-        return '- ' + tr.dataset.name + ' : ' + LB[orig[k]] + ' -> ' + LB[fix[k]];
-      }).join(String.fromCharCode(10))
-    : '[CAD 분류 검수] 수정할 것 없음 - 전부 맞습니다.';
+  const NL = String.fromCharCode(10);
+  const ids = Object.keys(saved);
+  let text;
+  if (!ids.length) { text = '[CAD 분류 검수] 수정할 것 없음 - 전부 맞습니다.'; }
+  else {
+    const byStyle = {};
+    ids.forEach(id => {
+      const tr = rows.find(r => r.dataset.id === id); if (!tr) return;
+      const d = saved[id], parts = [];
+      if (d.k) parts.push('분류 ' + LB[tr.dataset.a] + ' -> ' + LB[d.k]);
+      if (d.p !== undefined) parts.push('부위 ' + (tr.dataset.p || '없음') + ' -> ' + (d.p || '없음'));
+      if (d.m) parts.push('메모: ' + d.m);
+      (byStyle[tr.dataset.style] ||= []).push('  - [' + tr.dataset.raw + '] ' + tr.dataset.mat + ' : ' + parts.join(' / '));
+    });
+    text = '[CAD 분류 수정 ' + ids.length + '행]' + NL +
+      Object.entries(byStyle).map(([s, ls]) => s + NL + ls.join(NL)).join(NL);
+  }
   const out = document.getElementById('out');
   out.style.display = 'block'; out.value = text; out.select();
   try { await navigator.clipboard.writeText(text); alert('복사했습니다. 대화창에 붙여 주세요.'); }
@@ -330,12 +353,17 @@ document.getElementById('copy').addEventListener('click', async () => {
 document.getElementById('reset').addEventListener('click', () => {
   if (!confirm('수정한 것을 모두 되돌립니다.')) return;
   localStorage.removeItem(KEY);
-  Object.keys(fix).forEach(k => delete fix[k]);
-  rowsEl.forEach(tr => { tr.querySelector('.pick').value = orig[tr.dataset.k]; paint(tr); });
-  count(); apply();
+  Object.keys(saved).forEach(k => delete saved[k]);
+  rows.forEach(tr => {
+    tr.querySelector('.kind').value = tr.dataset.a;
+    tr.querySelector('.part').value = tr.dataset.p;
+    tr.querySelector('.memo').value = '';
+    tr.classList.remove('edited');
+  });
+  document.getElementById('n').textContent = '0'; apply();
 });
 </script>`;
 
 fs.writeFileSync(OUT, html);
-console.log(`파일 ${data.length} · 자재행 ${allLines.length} · 고유 자재명 ${groups.length} · 확인필요 ${needCheck}`);
+console.log(`한글 파일 ${data.length}개 (폐기 ${dropped.length}) · 행 ${allLines.length} · 확인필요 ${needCheck}`);
 console.log(JSON.stringify(stats));

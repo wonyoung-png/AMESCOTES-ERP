@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
-  ASSIGN_LABEL, ASSIGN_MATERIAL, calcLeatherSF, calcFabricYD, withLoss,
+  ASSIGN_LABEL, ASSIGN_MATERIAL, calcLeatherSF, calcFabricYD, calcRollM, withLoss, bodyPartOf,
   type Assign, type CadLine,
 } from '@/lib/cadYardage';
 import { store, genId, COMMON_BRAND, type Material, type MaterialCategory, type YardRow } from '@/lib/store';
@@ -14,8 +14,9 @@ import { fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
 
 /** 계산 단위가 있는 버킷 — '제외'는 빠진다 */
 const BUCKETS: Assign[] = ['leather', 'outer', 'lining', 'interlining'];
-const UNIT: Record<string, string> = { leather: 'SF', outer: 'YD', lining: 'YD', interlining: '㎡' };
-const NEEDS_WIDTH = (b: Assign) => b === 'outer' || b === 'lining';
+// 보강재는 자재 마스터에 M 로 등록하므로 계산도 미터로 뽑는다 (면적/폭)
+const UNIT: Record<string, string> = { leather: 'SF', outer: 'YD', lining: 'YD', interlining: 'M' };
+const NEEDS_WIDTH = (b: Assign) => b !== 'leather';
 
 export type CadTarget = { id: string; label: string };
 
@@ -40,7 +41,7 @@ export function CadAssignDialog({
   onFill: (rows: Array<Omit<YardRow, 'id'>>) => void;
 }) {
   const [assign, setAssign] = useState<Record<string, Assign>>({});
-  const [width, setWidth] = useState<Record<string, number>>({ outer: 150, lining: 150 });
+  const [width, setWidth] = useState<Record<string, number>>({ outer: 150, lining: 150, interlining: 100 });
   const [loss, setLoss] = useState<Record<string, number>>({ leather: 15, outer: 10, lining: 10, interlining: 10 });
   const [target, setTarget] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Assign | null>(null);
@@ -69,8 +70,8 @@ export function CadAssignDialog({
     const ls = groups[b] || [];
     if (!ls.length) return 0;
     if (b === 'leather') return calcLeatherSF(ls);
-    if (NEEDS_WIDTH(b)) return calcFabricYD(ls, width[b] || 0);
-    return ls.reduce((s, l) => s + l.w * l.h * l.count, 0) / 10000; // ㎡
+    if (b === 'interlining') return calcRollM(ls, width[b] || 0);   // M
+    return calcFabricYD(ls, width[b] || 0);                          // YD
   };
 
   // 자재 마스터에 없는 자재명을 그대로 등록한다 — 카테고리·단위는 배정에서 나온다
@@ -116,11 +117,7 @@ export function CadAssignDialog({
       .filter(x => x.a !== 'skip')
       .map(({ l, a }) => {
         const kind = KIND_OF[a as Exclude<Assign, 'skip'>];
-        const part = kind === '보강재' ? ''
-          : a === 'lining' ? '안감'
-          : /트림\s*2/.test(l.part) ? '트림2'
-          : /트림/.test(l.part) ? '트림1'
-          : '바디';
+        const part = kind === '보강재' ? '' : (bodyPartOf(a, l.group, l.raw) || '바디');
         return { kind, part, 가로: l.w, 세로: l.h, 폭: kind === '가죽' ? 0 : (width[a] || 150), 로스: loss[a] || 0, 수량: l.count };
       });
     if (!rows.length) { toast.error('표에 넣을 줄이 없습니다'); return; }
@@ -206,6 +203,7 @@ export function CadAssignDialog({
                 <th className={`${th} text-left`}>조각 이름 (원문)</th>
                 <th className={`${th} text-left`}>부위</th>
                 <th className={th}>마커그룹</th>
+                <th className={th}>부위</th>
                 <th className={`${th} text-left`}>자재</th>
                 <th className={`${th} text-right`}>수량</th>
                 <th className={`${th} text-right`}>가로 × 세로</th>
@@ -221,6 +219,7 @@ export function CadAssignDialog({
                     <td className="px-2 py-1 break-keep max-w-[240px]">{first ? l.raw : ''}</td>
                     <td className="px-2 py-1 text-muted-foreground break-keep">{l.part}</td>
                     <td className="px-2 py-1 text-center text-muted-foreground">{l.group || '-'}</td>
+                    <td className="px-2 py-1 text-center">{bodyPartOf(assign[l.id] ?? l.assign, l.group, l.raw) || '—'}</td>
                     <td className="px-2 py-1 font-medium break-keep">
                       {l.material}
                       {l.wari ? <span className="text-muted-foreground ml-1">와리 {l.wari}</span> : null}

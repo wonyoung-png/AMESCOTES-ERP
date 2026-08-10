@@ -30,7 +30,8 @@ export const ASSIGN_MATERIAL: Record<Exclude<Assign, 'skip'>, { category: string
 export type CadLine = {
   id: string;
   raw: string;        // 조각 이름 원문
-  part: string;       // 부위명
+  part: string;       // 부위명 (원판·속고 등 조각 이름)
+  bodyPart: string;   // 바디 / 트림1 / 트림2 / 안감 — 보강재는 빈 값
   group: string;      // 마커그룹
   material: string;   // 자재명
   ea: number;         // 이 자재의 EA
@@ -169,6 +170,7 @@ export function parseCadWorkbook(data: ArrayBuffer): { styleNo?: string; lines: 
       lines.push({
         id: `${lines.length}`,
         raw: p.name, part, group: p.group,
+        bodyPart: bodyPartOf(cls.a, p.group, p.name),
         material: m.label, ea: m.ea, wari: m.wari,
         w: p.w, h: p.h, pair: p.pair, qty: p.qty,
         count: p.qty * (p.pair ? 2 : 1) * (m.ea || 1),
@@ -189,6 +191,24 @@ export function calcLeatherSF(lines: CadLine[]) {
 export function calcFabricYD(lines: CadLine[], widthCm: number) {
   if (!widthCm) return 0;
   return lines.reduce((s, p) => s + p.w * p.h * p.count, 0) / widthCm / 91.44;
+}
+
+/** 바디 / 트림1 / 트림2 / 안감 판정.
+ *  공장 파일의 마커그룹이 실제로 쓰는 값은 SELF · 겉감 · 안감 · 심 · 트림2 다섯 개뿐이라
+ *  트림2 와 안감은 파일이 직접 알려주고, 나머지는 조각 이름으로 가른다. */
+export function bodyPartOf(assign: Assign, group: string, raw: string): string {
+  if (assign === 'interlining' || assign === 'skip') return '';   // 보강재는 부위를 안 쓴다
+  const g = (group || '').trim();
+  if (assign === 'lining' || /안감|里子|lining/i.test(g)) return '안감';
+  if (/트림\s*2/.test(g) || /트림\s*2/.test(raw)) return '트림2';
+  if (/트림|trim/i.test(g) || /트림/.test(raw)) return '트림1';
+  return '바디';
+}
+
+/** 보강재 — 롤 폭(cm)으로 나눠 M 로 환산 (자재 마스터 단위가 M 이다) */
+export function calcRollM(lines: CadLine[], widthCm: number) {
+  if (!widthCm) return 0;
+  return lines.reduce((s, p) => s + p.w * p.h * p.count, 0) / widthCm / 100;
 }
 
 /** 로스율(%) 적용 */

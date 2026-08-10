@@ -44,10 +44,13 @@ export default function ProductDiscountSheet({
       .filter((i: any) => season === 'all' || i.season === season)
       .filter((i: any) => !s || `${i.styleNo} ${i.name || ''}`.toUpperCase().includes(s));
   }, [items, q, cat, season]);
+  // 조건에 맞는 전부 — "이 조건 전부 담기"는 이걸 쓴다
   const candidates = useMemo(
-    () => matched.filter((i: any) => !picked.has(i.styleNo)).slice(0, 200),
+    () => matched.filter((i: any) => !picked.has(i.styleNo)),
     [matched, value],
   );
+  // 목록은 200개만 그린다 (화면 보호용)
+  const shown = useMemo(() => candidates.slice(0, 200), [candidates]);
 
   const add = (i: any) =>
     onChange([...value, { styleNo: i.styleNo, name: i.name, rate: baseRate }]);
@@ -137,13 +140,13 @@ export default function ProductDiscountSheet({
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-5">
-          {candidates.length === 0 ? (
+          {shown.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-8">
               {q ? `"${q}" 에 걸리는 상품이 없습니다` : '추가할 상품이 없습니다'}
             </p>
           ) : (
             <div className="border border-border rounded-md divide-y divide-border">
-              {candidates.map((i: any) => (
+              {shown.map((i: any) => (
                 <button
                   key={i.id || i.styleNo}
                   type="button"
@@ -161,6 +164,11 @@ export default function ProductDiscountSheet({
                 </button>
               ))}
             </div>
+          )}
+          {candidates.length > shown.length && (
+            <p className="text-[11px] text-muted-foreground text-center pt-2">
+              목록엔 {shown.length}개만 보입니다 — 검색으로 좁히거나 <b>이 조건 전부 담기</b>로 {candidates.length}개를 한 번에 담으세요.
+            </p>
           )}
         </div>
 
