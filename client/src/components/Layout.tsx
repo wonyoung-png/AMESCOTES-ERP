@@ -66,7 +66,6 @@ const navGroups: NavGroup[] = [
       { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} />, table: 'boms' },
       { path: '/orders', label: '생산 발주', icon: <Factory size={17} />, table: 'production_orders' },
       { path: '/deadlines', label: '납기 캘린더', icon: <CalendarClock size={17} />, table: 'milestones' },
-      { path: '/calendar', label: '운영 캘린더 · 기획전', icon: <CalendarDays size={17} />, table: 'campaigns' },
     ],
   },
   {
@@ -104,6 +103,15 @@ const bottomTabs = [
   { path: '/purchase', label: '구매', icon: <ShoppingCart size={20} /> },
   { path: '/trade-statement', label: '명세', icon: <FileText size={20} /> },
   { path: '/', label: '더보기', icon: <MoreHorizontal size={20} />, isMore: true },
+];
+
+/**
+ * LUMEN/AETALOOF 워크스페이스 전용 ERP 화면.
+ * PMS 미러(외부 링크)와 달리 이 앱 안의 페이지라 내부 라우팅으로 연다.
+ * 운영 캘린더·기획전은 브랜드가 쓰는 기획 도구라 OEM 생산 그룹에서 여기로 옮겼다.
+ */
+const brandNav: { group: string; path: string; label: string; icon: React.ReactNode }[] = [
+  { group: '기획 & 일정', path: '/calendar', label: '운영 캘린더 · 기획전', icon: <CalendarDays size={17} /> },
 ];
 
 const PMS_URL = 'https://daily.54-116-241-64.sslip.io/app/';
@@ -255,8 +263,36 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
         <nav className="flex-1 overflow-y-auto py-3 px-2">
           {isBrand ? (
-            /* LUMEN/AETALOOF: PMS 탭 미러 — 클릭 시 PMS 해당 탭으로 (named window 재사용) */
-            pmsTabs.map((tab, ti) => {
+            <>
+            {/* 브랜드 전용 ERP 화면 — PMS 미러가 아니라 이 앱 안의 페이지라 내부 링크로 연다 */}
+            {brandNav.map((item, bi) => (
+              <div key={item.path} className="mb-0.5">
+                {bi === 0 && !collapsed && (
+                  <div className="px-3 pt-1 pb-1.5">
+                    <span className="text-[11px] font-semibold text-muted-foreground uppercase">
+                      {item.group}
+                    </span>
+                  </div>
+                )}
+                <Link href={item.path}>
+                  <a
+                    onClick={() => setSidebarOpen(false)}
+                    className={`
+                      relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 outline-none focus-visible:outline-none
+                      ${isActive(item.path)
+                        ? 'bg-sidebar-primary text-sidebar-primary-foreground font-medium'
+                        : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'}
+                      ${collapsed ? 'justify-center px-2' : ''}
+                    `}
+                  >
+                    <span className="shrink-0">{item.icon}</span>
+                    {!collapsed && <span className="flex-1 min-w-0 truncate">{item.label}</span>}
+                  </a>
+                </Link>
+              </div>
+            ))}
+            {/* LUMEN/AETALOOF: PMS 탭 미러 — 클릭 시 PMS 해당 탭으로 (named window 재사용) */}
+            {pmsTabs.map((tab, ti) => {
               const groupStart = ti === 0 || pmsTabs[ti - 1].group !== tab.group;
               return (
                 <div key={tab.label} className="mb-0.5">
@@ -286,7 +322,8 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                   </a>
                 </div>
               );
-            })
+            })}
+            </>
           ) : (
           navGroups.map((group, gi) => {
             // oemOnly: LUMEN/AETALOOF 탭에서 숨김
