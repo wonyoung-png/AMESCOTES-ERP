@@ -305,7 +305,9 @@ export interface Campaign {
   discountRate?: number;
   /** 소속 대형 프로젝트. 없으면 단독 기획전 */
   projectId?: string;
-  /** 상품별 할인율. 여기 없는 상품은 위 discountRate(기본율)를 따른다 */
+  /** 카테고리별 기본율. 상품별 지정이 없을 때 여기를 먼저 본다 */
+  categoryDiscounts?: CategoryDiscount[];
+  /** 상품별 할인율. 가장 우선한다 */
   productDiscounts?: ProductDiscount[];
   pushSkus?: string[];
   owner?: string;
@@ -319,6 +321,21 @@ export interface ProductDiscount {
   name?: string;
   /** % */
   rate: number;
+}
+
+export interface CategoryDiscount { category: string; rate: number; }
+
+/** 할인율은 세 단계로 정해진다. 좁은 것이 이긴다. */
+export function resolveDiscount(
+  c: Pick<Campaign, 'discountRate' | 'categoryDiscounts' | 'productDiscounts'>,
+  styleNo: string,
+  category?: string,
+): number {
+  const p = c.productDiscounts?.find(d => d.styleNo === styleNo);
+  if (p) return p.rate;
+  const g = category ? c.categoryDiscounts?.find(d => d.category === category) : undefined;
+  if (g) return g.rate;
+  return c.discountRate ?? 0;
 }
 
 export const CAMPAIGN_CHANNELS = ['자사몰', '센텀', '29CM', 'W컨셉', '쇼룸', '해외'] as const;

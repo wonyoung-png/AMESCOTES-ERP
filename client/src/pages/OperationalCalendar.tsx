@@ -18,7 +18,8 @@ import { toast } from 'sonner';
 import { Link } from 'wouter';
 import { fetchProjects, upsertProject, type Project } from '@/lib/projectQueries';
 import ProductDiscountSheet from '@/components/ProductDiscountSheet';
-import type { ProductDiscount } from '@/lib/phase1';
+import type { ProductDiscount, CategoryDiscount } from '@/lib/phase1';
+import { store } from '@/lib/store';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const VIEW_MODES: CalendarViewMode[] = ['year', 'half', 'quarter', 'month', 'week', 'day'];
@@ -60,6 +61,10 @@ export default function OperationalCalendar() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showNewProject, setShowNewProject] = useState(false);
   const [showDiscounts, setShowDiscounts] = useState(false);
+  const itemCategories = useMemo(
+    () => Array.from(new Set(store.getItems().map((i: any) => i.erpCategory).filter(Boolean))).sort() as string[],
+    [showNew],
+  );
   const [pForm, setPForm] = useState({ title: '', kind: '팝업·오픈', anchorDate: '', anchorLabel: '오픈' });
   const loadProjects = () => fetchProjects(ws).then(setProjects).catch(() => {});
   useEffect(() => { loadProjects(); /* eslint-disable-next-line */ }, [ws]);
@@ -79,7 +84,7 @@ export default function OperationalCalendar() {
     } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
   };
   const [form, setForm] = useState({
-    title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '', productDiscounts: [] as ProductDiscount[],
+    title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '', productDiscounts: [] as ProductDiscount[], categoryDiscounts: [] as CategoryDiscount[],
   });
 
   const campaigns = useMemo(() => {
@@ -115,12 +120,13 @@ export default function OperationalCalendar() {
       discountRate: form.discountRate,
       projectId: form.projectId || undefined,
       productDiscounts: form.productDiscounts.length ? form.productDiscounts : undefined,
+      categoryDiscounts: form.categoryDiscounts.length ? form.categoryDiscounts : undefined,
       owner: '국내영업',
     });
     phase1.onboardCampaign(row.id);
     toast.success('기획전이 생성되었습니다. 팀별로 업무를 직접 추가하세요');
     setShowNew(false);
-    setForm({ title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '', productDiscounts: [] });
+    setForm({ title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '', productDiscounts: [], categoryDiscounts: [] });
     refresh();
   };
 
@@ -388,7 +394,41 @@ export default function OperationalCalendar() {
               <Label>기본 할인율 %</Label>
               <Input type="number" min="0" max="100" value={form.discountRate}
                 onChange={e => setForm(f => ({ ...f, discountRate: Math.min(100, Math.max(0, +e.target.value)) }))} />
-              <p className="text-[11px] text-muted-foreground mt-1">상품별로 다르게 걸 상품만 따로 지정하세요</p>
+              <p className="text-[11px] text-muted-foreground mt-1">아무것도 지정 안 한 상품에 적용됩니다</p>
+              {/* 카테고리별로 다르게 걸기 — 체크한 카테고리만 자기 율을 쓴다 */}
+              <div className="mt-2 space-y-1.5">
+                {itemCategories.map(c => {
+                  const hit = form.categoryDiscounts.find(d => d.category === c);
+                  return (
+                    <div key={c} className="flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 text-xs cursor-pointer w-24">
+                        <input
+                          type="checkbox"
+                          checked={!!hit}
+                          onChange={e => setForm(f => ({
+                            ...f,
+                            categoryDiscounts: e.target.checked
+                              ? [...f.categoryDiscounts, { category: c, rate: f.discountRate }]
+                              : f.categoryDiscounts.filter(d => d.category !== c),
+                          }))}
+                        />
+                        {c}
+                      </label>
+                      <Input
+                        type="number" min={0} max={100} disabled={!hit}
+                        value={hit ? hit.rate : ''}
+                        onChange={e => {
+                          const r = Math.min(100, Math.max(0, +e.target.value || 0));
+                          setForm(f => ({ ...f, categoryDiscounts: f.categoryDiscounts.map(d => d.category === c ? { ...d, rate: r } : d) }));
+                        }}
+                        placeholder="기본율 사용"
+                        className="h-8 w-24 text-right"
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div>
               <Label>상품별 할인율</Label>

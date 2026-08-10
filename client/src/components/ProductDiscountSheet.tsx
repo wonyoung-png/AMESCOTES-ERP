@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, X, Plus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 const won = (n: number) => '₩' + Math.round(n).toLocaleString();
 
@@ -23,16 +24,30 @@ export default function ProductDiscountSheet({
   onChange: (v: ProductDiscount[]) => void;
 }) {
   const [q, setQ] = useState('');
+  const [cat, setCat] = useState('all');
+  const [season, setSeason] = useState('all');
   const items = useMemo(() => store.getItems(), [open]);
 
   const picked = new Map(value.map(d => [d.styleNo, d]));
-  const candidates = useMemo(() => {
+  const cats = useMemo(
+    () => Array.from(new Set(items.map((i: any) => i.erpCategory).filter(Boolean))).sort(),
+    [items],
+  );
+  const seasons = useMemo(
+    () => Array.from(new Set(items.map((i: any) => i.season).filter(Boolean))).sort().reverse(),
+    [items],
+  );
+  const matched = useMemo(() => {
     const s = q.trim().toUpperCase();
     return items
-      .filter((i: any) => !picked.has(i.styleNo))
-      .filter((i: any) => !s || `${i.styleNo} ${i.name || ''}`.toUpperCase().includes(s))
-      .slice(0, 60);
-  }, [items, q, value]);
+      .filter((i: any) => cat === 'all' || i.erpCategory === cat)
+      .filter((i: any) => season === 'all' || i.season === season)
+      .filter((i: any) => !s || `${i.styleNo} ${i.name || ''}`.toUpperCase().includes(s));
+  }, [items, q, cat, season]);
+  const candidates = useMemo(
+    () => matched.filter((i: any) => !picked.has(i.styleNo)).slice(0, 200),
+    [matched, value],
+  );
 
   const add = (i: any) =>
     onChange([...value, { styleNo: i.styleNo, name: i.name, rate: baseRate }]);
@@ -47,7 +62,8 @@ export default function ProductDiscountSheet({
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-border">
           <SheetTitle>상품별 할인율</SheetTitle>
           <p className="text-xs text-muted-foreground">
-            여기서 고른 상품만 개별 할인율이 적용됩니다. 나머지는 기본 {baseRate}%를 따릅니다.
+            여기서 고른 상품만 개별 할인율이 적용됩니다. 고르지 않은 상품은 카테고리별 할인율,
+            그것도 없으면 기본 {baseRate}%를 따릅니다.
           </p>
         </SheetHeader>
 
@@ -58,7 +74,7 @@ export default function ProductDiscountSheet({
             {value.length > 0 && (
               <button type="button" onClick={applyAll}
                 className="ml-auto text-[11px] text-muted-foreground hover:text-foreground">
-                전부 {baseRate}%로
+                담은 것 전부 {baseRate}%로
               </button>
             )}
           </div>
@@ -99,6 +115,26 @@ export default function ProductDiscountSheet({
             <Input value={q} onChange={e => setQ(e.target.value)}
               placeholder="스타일번호 · 품명으로 검색" className="pl-9 h-9" />
           </div>
+          <div className="flex items-center gap-2 mt-2">
+            <select value={cat} onChange={e => setCat(e.target.value)}
+              className="h-8 text-xs border border-border rounded-md bg-card px-2">
+              <option value="all">전체 카테고리</option>
+              {cats.map(c => <option key={c as string} value={c as string}>{c as string}</option>)}
+            </select>
+            <select value={season} onChange={e => setSeason(e.target.value)}
+              className="h-8 text-xs border border-border rounded-md bg-card px-2">
+              <option value="all">전체 시즌</option>
+              {seasons.map(v => <option key={v as string} value={v as string}>{v as string}</option>)}
+            </select>
+            <span className="text-[11px] text-muted-foreground">{candidates.length}개</span>
+            {candidates.length > 0 && (
+              <button type="button"
+                onClick={() => onChange([...value, ...candidates.map((i: any) => ({ styleNo: i.styleNo, name: i.name, rate: baseRate }))])}
+                className="ml-auto text-[11px] text-primary hover:underline">
+                이 조건 전부 담기
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-5">
           {candidates.length === 0 ? (
@@ -116,6 +152,8 @@ export default function ProductDiscountSheet({
                 >
                   <span className="w-32 shrink-0 text-xs font-mono text-muted-foreground truncate">{i.styleNo}</span>
                   <span className="flex-1 min-w-0 text-sm text-foreground truncate">{i.name || '—'}</span>
+                  {i.erpCategory && <Badge variant="outline" className="text-[10px] h-4 shrink-0">{i.erpCategory}</Badge>}
+                  {i.season && <span className="text-[10px] text-muted-foreground shrink-0">{i.season}</span>}
                   {i.sellPriceKrw ? (
                     <span className="text-[11px] text-muted-foreground font-mono shrink-0">{won(i.sellPriceKrw)}</span>
                   ) : null}
