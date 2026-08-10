@@ -122,7 +122,7 @@ function ItemRow({ item, onToggle, onEdit, spent, onExpense }: {
 
 /** 항목을 어떤 키로 묶어 보여줄지만 다르고, 표 모양은 같다 */
 function GroupedList({
-  items, groupBy, emptyText, onToggle, onEdit, onAdd,
+  items, groupBy, emptyText, onToggle, onEdit, onAdd, spent, onExpense,
 }: {
   items: ProjectItem[];
   groupBy: (i: ProjectItem) => string;
