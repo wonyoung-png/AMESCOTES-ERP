@@ -180,7 +180,7 @@ function splitName(raw: string, group: string): { part: string; base: string; ta
   if (materials.length === 0) materials.push({ label: tag || group || '겉감', ea: 1 });
 
   // "트림" 이라고만 적힌 것은 부위를 트림1 로 잡는다 (트림2 는 그대로 둔다)
-  const trim = [tag, group, clean].find(s => /트림/.test(s || ''));
+  const trim = [tag, clean].find(s => /트림/.test(s || ''));
   if (trim) part = /트림\s*2/.test(trim) ? '트림2' : '트림1';
 
   return { part: part || clean, base: base || clean, tag, materials };
@@ -263,10 +263,10 @@ export function calcFabricYD(lines: CadLine[], widthCm: number) {
  *  트림2 와 안감은 파일이 직접 알려주고, 나머지는 조각 이름으로 가른다. */
 export function bodyPartOf(assign: Assign, group: string, raw: string): string {
   if (assign === 'interlining' || assign === 'skip') return '';   // 보강재는 부위를 안 쓴다
-  const g = (group || '').trim();
-  if (assign === 'lining' || /안감|里子|lining/i.test(g)) return '안감';
-  if (/트림\s*2/.test(g) || /트림\s*2/.test(raw)) return '트림2';
-  if (/트림|trim/i.test(g) || /트림/.test(raw)) return '트림1';
+  const tag = (String(raw || '').match(/^\[([^\]]+)\]/) || [])[1] || '';
+  if (/트림\s*2/.test(tag)) return '트림2';
+  if (/트림|trim/i.test(tag)) return '트림1';
+  if (assign === 'lining' || /안감|里子|lining/i.test((group || '').trim())) return '안감';
   return '바디';
 }
 

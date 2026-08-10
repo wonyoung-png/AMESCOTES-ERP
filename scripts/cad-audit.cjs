@@ -126,10 +126,10 @@ function splitName(raw, group) {
 /** 바디/트림1/트림2/안감 — 마커그룹이 직접 알려주는 것을 우선한다 */
 function bodyPartOf(assign, group, raw) {
   if (assign === 'interlining' || assign === 'skip') return '';
-  const g = (group || '').trim();
-  if (assign === 'lining' || /안감|里子|lining/i.test(g)) return '안감';
-  if (/트림\s*2/.test(g) || /트림\s*2/.test(raw)) return '트림2';
-  if (/트림|trim/i.test(g) || /트림/.test(raw)) return '트림1';
+  const tag = (String(raw || '').match(/^\[([^\]]+)\]/) || [])[1] || '';
+  if (/트림\s*2/.test(tag)) return '트림2';
+  if (/트림|trim/i.test(tag)) return '트림1';
+  if (assign === 'lining' || /안감|里子|lining/i.test((group || '').trim())) return '안감';
   return '바디';
 }
 

@@ -53,7 +53,9 @@ const partOf = (name: string, group = '겉감') =>
   parseCadWorkbook(sheet(name, group, 1, 10, 10)).lines[0].part;
 assert.strictEqual(partOf('앞판 트림 1EA'), '트림1');
 assert.strictEqual(partOf('[트림] 앞판 1EA'), '트림1');
-assert.strictEqual(partOf('앞판 1EA', '트림2'), '트림2');
+assert.strictEqual(partOf('[트림2] 앞판 1EA'), '트림2');
+// 마커그룹 '트림2' 는 두 번째 재단 그룹일 뿐 — 부위를 트림으로 만들지 않는다
+assert.strictEqual(partOf('앞판 1EA', '트림2'), '앞판');
 console.log('ok2');
 
 // 대표님 검수 회신 (10행) — 규칙으로 굳힌다
@@ -103,3 +105,17 @@ assert.strictEqual(rowsOf('별도 속고판 싱 양면 S/L 1.0 1EA, 우라 2EA')
 assert.ok(rowsOf('원판 원형', 'SELF').every(x => x.startsWith('skip')));
 
 console.log('ok4');
+
+// 부위는 조각 이름 앞의 [태그]가 정한다. 마커그룹 '트림2'는 재단 그룹일 뿐 부위가 아니다.
+const partKey = (name: string, group: string) => {
+  const l = parseCadWorkbook(sheet(name, group, 1, 10, 10)).lines[0];
+  return l.assign === 'skip' ? '제외' : l.assign === 'interlining' ? '보강재' : (l.bodyPart || '바디');
+};
+assert.strictEqual(partKey('[원단]앞판 겉감 1EA', '트림2'), '바디');            // ER2604HB01A
+assert.strictEqual(partKey('[캔버스 원단]뒷판 겉감 1EA', '트림2'), '바디');     // NT2603HB02C
+assert.strictEqual(partKey('[트림]뒷판 겉감 1EA', '겉감'), '트림1');
+assert.strictEqual(partKey('[트림]지퍼플러 겉감 1EA(와리:1.1)', '트림2'), '트림1');
+assert.strictEqual(partKey('뒷판 우라 1EA', '안감'), '안감');
+assert.strictEqual(partKey('앞판 겉감 1EA', 'SELF'), '바디');
+
+console.log('ok5');
