@@ -32,7 +32,8 @@ export function MaterialQuickAddDialog({ open, onOpenChange, defaultName, defaul
   const [form, setForm] = useState<Record<string, any>>({});
   const buyers = (vendors as Vendor[]).filter(v => v.type === '바이어');
   const suppliers = (vendors as Vendor[]).filter(v => v.type === '자재거래처');
-  const isCommonBrand = !form.brand || form.brand === COMMON_BRAND;
+  // brand === '' 는 "브랜드 전용을 골랐지만 바이어 미선택" 상태 — 공통과 구분해야 라디오가 바뀐다
+  const isCommonBrand = form.brand === undefined || form.brand === COMMON_BRAND;
   const subTypeOptions = MATERIAL_SUB_TYPES[(form.category as MaterialCategory) || '가죽'] ?? [];
 
   const brandCodeOf = (brandName?: string) => {

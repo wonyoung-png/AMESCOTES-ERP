@@ -80,6 +80,7 @@ export const MATERIAL_CATEGORIES: MaterialCategory[] =
 /** 자재 세부 타입 — 카테고리별 선택지. 품번 채번과 무관하게 "선택만" 하는 값이다. */
 export const MATERIAL_SUB_TYPES: Partial<Record<MaterialCategory, string[]>> = {
   '가죽': ['소가죽', '양가죽', '스플릿', '램스웨이드', '소가죽 스웨이드'],
+  '원단': ['겉감용', '안감용'],
   '장식': [
     '버클 / 비죠', '가락지 / 터널', '링 (오링·삼각링·사각링·타원링)',
     '솔트레지 / 속고발 / 리벳 / 하도메 / 스냅', '프레임', '락장식 (푸쉬락·턴락·후크)',
