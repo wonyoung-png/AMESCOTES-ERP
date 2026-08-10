@@ -1,5 +1,7 @@
 // AMESCOTES ERP — 지출 전표 (거래명세표 방식: 여러 항목 입력)
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchOrders, fetchVendors } from '@/lib/supabaseQueries';
 import {
   store, genId, formatKRW, formatNumber,
   type Expense, type ExpenseLine, type ExpenseType, type ExpenseCategory,
@@ -425,6 +427,21 @@ export default function ExpenseEntry() {
   })();
 
   const [header, setHeader] = useState({ ...EMPTY_HEADER });
+
+  const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
+  const { data: vendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
+  /** 같은 발주번호로 스타일이 여러 건 있다 — 번호 하나만 남긴다 */
+  const orderOpts = useMemo(() => {
+    const m = new Map<string, { orderNo: string; vendorName: string }>();
+    (orders as any[]).forEach(o => {
+      if (o.orderNo && !m.has(o.orderNo)) m.set(o.orderNo, { orderNo: o.orderNo, vendorName: o.vendorName || '' });
+    });
+    return [...m.values()];
+  }, [orders]);
+  const vendorNames = useMemo(
+    () => [...new Set((vendors as any[]).map(v => v.name).filter(Boolean))].sort(),
+    [vendors],
+  );
   const [projectItemId] = useState<string | undefined>(fromProject?.id);
   const [lines, setLines] = useState<ExpenseLine[]>(
     fromProject
@@ -660,7 +677,7 @@ export default function ExpenseEntry() {
       {/* 전표 등록 모달 */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>지출 전표 등록</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>지출결의 등록</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             {/* 헤더 정보 */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -684,11 +701,27 @@ export default function ExpenseEntry() {
               </div>
               <div className="space-y-1.5">
                 <Label>발주번호</Label>
-                <Input value={header.orderNo} onChange={e => setHeader(f => ({ ...f, orderNo: e.target.value }))} placeholder="AME-26SS-001" />
+                {/* 등록된 발주에서 고른다. 발주 없는 지출(보험·임차)도 있어 직접 입력도 막지 않는다 */}
+                <Input list="expense-orders" value={header.orderNo} placeholder="발주 선택 또는 직접 입력"
+                  onChange={e => {
+                    const v = e.target.value;
+                    const hit = orderOpts.find(o => o.orderNo === v);
+                    // 발주를 고르면 거래처는 따라온다 — 다시 칠 일이 아니다
+                    setHeader(f => ({ ...f, orderNo: v, vendorName: hit?.vendorName || f.vendorName }));
+                  }} />
+                <datalist id="expense-orders">
+                  {orderOpts.map(o => (
+                    <option key={o.orderNo} value={o.orderNo}>{o.vendorName || ''}</option>
+                  ))}
+                </datalist>
               </div>
               <div className="space-y-1.5">
                 <Label>거래처명</Label>
-                <Input value={header.vendorName} onChange={e => setHeader(f => ({ ...f, vendorName: e.target.value }))} placeholder="다산" />
+                <Input list="expense-vendors" value={header.vendorName} placeholder="거래처 선택 또는 직접 입력"
+                  onChange={e => setHeader(f => ({ ...f, vendorName: e.target.value }))} />
+                <datalist id="expense-vendors">
+                  {vendorNames.map(n => <option key={n} value={n} />)}
+                </datalist>
               </div>
               <div className="space-y-1.5">
                 <Label>메모</Label>
