@@ -83,6 +83,7 @@ export default function BrandOrders() {
   const [newTitle, setNewTitle] = useState('');
   const [lineForm, setLineForm] = useState({
     styleNo: '', qty: 0, factoryId: '', productionOrigin: 'china' as 'domestic' | 'china',
+    route: 'oem' as 'oem' | 'direct',
   });
   const [lineColorQtys, setLineColorQtys] = useState<{ color: string; qty: number }[]>([]);
 
@@ -160,7 +161,7 @@ export default function BrandOrders() {
   }, [items]);
 
   const createBatch = () => {
-    if (!newTitle.trim()) { toast.error('제목 입력'); return; }
+    // 제목을 강제하면 버튼이 안 눌린 것처럼 보인다. 비면 발주번호로 지어준다
     const b = phase1.createBrandBatch(ws, newTitle.trim());
     setNewTitle('');
     setSelected(b);
@@ -185,10 +186,11 @@ export default function BrandOrders() {
       factoryId: lineForm.factoryId,
       factoryName: factories.find(f => f.id === lineForm.factoryId)?.name,
       productionOrigin: lineForm.productionOrigin,
+      route: lineForm.route,
       isEmployeePurchase: false,
       qty,
     });
-    setLineForm({ styleNo: '', qty: 0, factoryId: '', productionOrigin: 'china' });
+    setLineForm({ styleNo: '', qty: 0, factoryId: '', productionOrigin: 'china', route: 'oem' });
     setLineColorQtys([]);
     refresh();
     setSelected(phase1.getBrandBatch(detail.id) || null);
@@ -209,7 +211,7 @@ export default function BrandOrders() {
     const issued = phase1.issueBrandBatch(detail.id);
     if (!issued.length) { toast.error('승인 완료된 발주만 발행 가능'); return; }
     toast.success(
-      `발주서 ${issued.length}장 발행 — ${issued.map(i => `${i.poNo} (${i.factoryName})`).join(' · ')}`,
+      `발주서 ${issued.length}장 발행 — ${issued.map(i => `${i.poNo} ${i.route === 'direct' ? '[직발주]' : ''}(${i.factoryName})`).join(' · ')}`,
     );
     refresh();
   };
@@ -609,6 +611,7 @@ export default function BrandOrders() {
                         <th className="num">수량</th>
                         <th>공장</th>
                         <th>생산지</th>
+                        <th>경로</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -621,6 +624,7 @@ export default function BrandOrders() {
                             <td className="num">{cq.qty}</td>
                             <td>{i === 0 ? (l.factoryName || '—') : ''}</td>
                             <td>{i === 0 ? (l.productionOrigin === 'china' ? '중국' : '국내') : ''}</td>
+                            <td>{i === 0 ? ((l.route || 'oem') === 'direct' ? '직발주' : 'AMESCOTES') : ''}</td>
                           </tr>
                         ));
                       })}
@@ -642,6 +646,19 @@ export default function BrandOrders() {
                           <option value="">공장</option>
                           {factories.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                         </select>
+                      </div>
+                      {/* 패키지처럼 AMESCOTES를 안 거치는 건이 있다 */}
+                      <div className="flex items-center gap-2">
+                        <select className="border rounded h-9 px-2 text-sm flex-1" value={lineForm.route}
+                          onChange={e => setLineForm(f => ({ ...f, route: e.target.value as 'oem' | 'direct' }))}>
+                          <option value="oem">AMESCOTES 경유 (수주함으로)</option>
+                          <option value="direct">직발주 — 공장에 바로</option>
+                        </select>
+                        <span className="text-[11px] text-muted-foreground flex-1">
+                          {lineForm.route === 'direct'
+                            ? '수주함에 안 가고 이 발주서로 공장에 바로 나갑니다'
+                            : 'AMESCOTES가 받아 생산발주를 겁니다'}
+                        </span>
                       </div>
                       {lineForm.styleNo && (
                         <div className="space-y-1.5 border rounded-md p-2 bg-muted">

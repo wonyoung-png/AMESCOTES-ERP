@@ -191,6 +191,11 @@ export interface BrandOrderLine {
   isEmployeePurchase: boolean;
   qty: number;
   memo?: string;
+  /**
+   * 발주 경로. 'oem' = AMESCOTES 수주함 경유(기본).
+   * 'direct' = 패키지처럼 LUMEN이 공장에 바로 내는 건 — 수주함에 안 간다.
+   */
+  route?: 'oem' | 'direct';
   /** 발주서 번호 (LUM-260810-01-A). 공장별로 1장 = OEM의 PO 번호가 그대로 된다 */
   poNo?: string;
   issuedAt?: string;
@@ -724,8 +729,9 @@ export const phase1 = {
   },
   getBrandBatch: (id: string) => phase1.getBrandBatches().find(b => b.id === id),
 
-  createBrandBatch: (workspace: 'LUMEN' | 'AETALOOF', title: string, weekLabel?: string, createdBy?: string) => {
+  createBrandBatch: (workspace: 'LUMEN' | 'AETALOOF', title?: string, weekLabel?: string, createdBy?: string) => {
     const projectNo = generateProjectNo(workspace);
+    title = (title || '').trim() || `${projectNo} 발주`;
     ensureProject(projectNo, workspace, title);
     const batch: BrandOrderBatch = {
       id: uid(),
@@ -819,11 +825,11 @@ export const phase1 = {
     if (!batch || batch.status !== 'approved') return [];
     const byFactory = new Map<string, BrandOrderLine[]>();
     batch.lines.forEach(l => {
-      const k = l.factoryId || '미지정';
+      const k = `${l.route || 'oem'}|${l.factoryId || '미지정'}`;
       byFactory.set(k, [...(byFactory.get(k) || []), l]);
     });
     const all = getAll<BrandOrderLine>(KEYS.brandLines);
-    const issued: { poNo: string; factoryName: string; lines: number }[] = [];
+    const issued: { poNo: string; factoryName: string; lines: number; route: string }[] = [];
     const now = new Date().toISOString();
     [...byFactory.entries()].forEach(([, lines]: [string, BrandOrderLine[]], i) => {
       const poNo = `${batch.projectNo}-${String.fromCharCode(65 + i)}`;  // A, B, C…
@@ -834,7 +840,10 @@ export const phase1 = {
           syncBrandLine(all[idx]).catch(reportSyncFail('발주서'));
         }
       });
-      issued.push({ poNo, factoryName: lines[0].factoryName || '미지정', lines: lines.length });
+      issued.push({
+        poNo, factoryName: lines[0].factoryName || '미지정',
+        lines: lines.length, route: lines[0].route || 'oem',
+      });
     });
     setAll(KEYS.brandLines, all);
     phase1.updateBrandBatch(batchId, { status: 'issued' });
@@ -843,7 +852,8 @@ export const phase1 = {
 
   /** OEM 수주함 — 발행됐고 아직 생산발주로 안 받은 발주서 */
   getInboundPOs: (): InboundPO[] => {
-    const lines = getAll<BrandOrderLine>(KEYS.brandLines).filter(l => l.poNo && !l.acceptedAt);
+    const lines = getAll<BrandOrderLine>(KEYS.brandLines)
+      .filter(l => l.poNo && !l.acceptedAt && (l.route || 'oem') !== 'direct');
     const batches = getAll<BrandOrderBatch>(KEYS.brandBatches);
     const m = new Map<string, InboundPO>();
     lines.forEach(l => {
@@ -1529,6 +1539,7 @@ const rowToLine = (r: any): BrandOrderLine => ({
   factoryId: r.factory_id || undefined, factoryName: r.factory_name || undefined,
   productionOrigin: r.production_origin || 'china',
   isEmployeePurchase: !!r.is_employee_purchase, qty: r.qty ?? 0, memo: r.memo || undefined,
+  route: r.route === 'direct' ? 'direct' : 'oem',
   poNo: r.po_no || undefined, issuedAt: r.issued_at || undefined,
   acceptedAt: r.accepted_at || undefined,
 });
@@ -1553,7 +1564,7 @@ export async function pullBrandOrders(): Promise<number> {
 }
 
 async function syncBrandBatch(b: BrandOrderBatch) {
-  await supabase.from('brand_order_batches').upsert({
+  const { error } = await supabase.from('brand_order_batches').upsert({
     id: b.id,
     workspace: b.workspace,
     project_no: b.projectNo,
@@ -1567,10 +1578,11 @@ async function syncBrandBatch(b: BrandOrderBatch) {
     created_at: b.createdAt,
     updated_at: b.updatedAt,
   });
+  if (error) throw error;
 }
 
 async function syncBrandLine(l: BrandOrderLine) {
-  await supabase.from('brand_order_lines').upsert({
+  const { error } = await supabase.from('brand_order_lines').upsert({
     id: l.id,
     batch_id: l.batchId,
     style_no: l.styleNo,
@@ -1582,10 +1594,12 @@ async function syncBrandLine(l: BrandOrderLine) {
     is_employee_purchase: l.isEmployeePurchase,
     qty: l.qty,
     memo: l.memo,
+    route: l.route || 'oem',
     po_no: l.poNo,
     issued_at: l.issuedAt,
     accepted_at: l.acceptedAt,
   });
+  if (error) throw error;
 }
 
 async function syncApprovalLog(l: ApprovalLog) {
