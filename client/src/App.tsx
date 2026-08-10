@@ -51,6 +51,7 @@ const ChinaWarehouse = lazyWithReload(() => import("./pages/ChinaWarehouse"));
 const ProjectPL = lazyWithReload(() => import("./pages/ProjectPL"));
 const DeadlineManagement = lazyWithReload(() => import("./pages/DeadlineManagement"));
 const OperationalCalendar = lazyWithReload(() => import("./pages/OperationalCalendar"));
+import ProjectBoard from '@/pages/ProjectBoard';
 const OrgChartPage = lazyWithReload(() => import("./pages/OrgChart"));
 const WorkflowGuide = lazyWithReload(() => import("./pages/WorkflowGuide"));
 const LineSheet = lazyWithReload(() => import("./pages/LineSheet"));
@@ -167,6 +168,7 @@ function Router() {
         <Route path="/line-sheet" component={LineSheet} />
         <Route path="/china-warehouse" component={ChinaWarehouse} />
         <Route path="/calendar" component={OperationalCalendar} />
+        <Route path="/projects" component={ProjectBoard} />
         <Route path="/expense" component={ExpenseEntry} />
         <Route path="/documents" component={DocumentOutput} />
         <Route path="/settings" component={ExchangeSettings} />

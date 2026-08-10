@@ -111,6 +111,7 @@ const bottomTabs = [
  * 운영 캘린더·기획전은 브랜드가 쓰는 기획 도구라 OEM 생산 그룹에서 여기로 옮겼다.
  */
 const brandNav: { group: string; path: string; label: string; icon: React.ReactNode }[] = [
+  { group: '기획 & 일정', path: '/projects', label: '프로젝트', icon: <ClipboardList size={17} /> },
   { group: '기획 & 일정', path: '/calendar', label: '운영 캘린더 · 기획전', icon: <CalendarDays size={17} /> },
 ];
 
