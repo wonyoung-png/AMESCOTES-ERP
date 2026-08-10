@@ -29,7 +29,7 @@ export type OrderReceiptAxis = 'none' | 'advance' | 'partial' | 'complete';
 export type OrderPaymentAxis = 'none' | 'resolution' | 'paid';
 export type OrderDisplayStatus =
   | '결제완료'
-  | '지출결의'
+  | '미지급 등록'
   | '입고완료'
   | '부분입고'
   | '선입고'
@@ -503,7 +503,7 @@ function deriveDisplayStatus(
   payment: OrderPaymentAxis,
 ): OrderDisplayStatus {
   if (payment === 'paid') return '결제완료';
-  if (payment === 'resolution') return '지출결의';
+  if (payment === 'resolution') return '미지급 등록';
   if (receipt === 'complete') return '입고완료';
   if (receipt === 'advance') return '선입고';
   if (receipt === 'partial') return '부분입고';
@@ -630,7 +630,7 @@ export const phase1 = {
     syncPayable(a[i]).catch(reportSyncFail('미지급'));
   },
 
-  /** 자재구매 → 지출결의 (Expense 대신 Payable). 동일 purchaseItem 중복 방지 */
+  /** 자재구매 → 미지급 (Expense 대신 Payable). 동일 purchaseItem 중복 방지 */
   createPayableFromPurchase: (item: {
     id: string;
     orderId?: string;
@@ -663,7 +663,7 @@ export const phase1 = {
     });
   },
 
-  /** OEM 등 생산발주 공장비 → 지출결의 */
+  /** OEM 등 생산발주 공장비 → 미지급 등록 */
   createPayableFromProcessingOrder: (order: {
     id: string;
     orderNo?: string;
@@ -935,7 +935,7 @@ export const phase1 = {
     name: CHINA_CORP_VENDOR_NAME,
   }),
 
-  /** 입고 로그 → 지출결의(payable) 초안. 동일 receiptLogId 중복 방지 */
+  /** 입고 로그 → 미지급(payable) 초안. 동일 receiptLogId 중복 방지 */
   createPayableFromReceipt: (
     log: ReceiptLog,
     opts: {
@@ -978,7 +978,7 @@ export const phase1 = {
     });
   },
 
-  /** 오더에 미결의 입고건 일괄 지출결의 */
+  /** 오더에 미결의 입고건 일괄 미지급 등록 */
   createPayablesForOrderReceipts: (
     orderId: string,
     opts: {
@@ -1360,7 +1360,7 @@ export const phase1 = {
       s + (st.lines || []).reduce((ls, l) => ls + l.qty * l.unitPrice * (1 + (l.taxRate ?? 0)), 0), 0);
     const purchaseFromItems = projPurchases.reduce((s, p) => s + (p.amountKrw || 0), 0);
     const purchaseFromPays = purchasePays.reduce((s, p) => s + (p.amountKrw || 0), 0);
-    // 자재: 구매이력 우선, 없으면 지출결의
+    // 자재: 구매이력 우선, 없으면 미지급 등록
     const purchaseCost = purchaseFromItems > 0 ? purchaseFromItems : purchaseFromPays;
 
     const byStyleColor = projOrders.flatMap(o => {

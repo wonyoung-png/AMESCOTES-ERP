@@ -128,7 +128,7 @@ const OEM_MAIN: FlowNode[] = [
 ];
 
 const OEM_BUY: FlowNode = {
-  id: 'purchase', label: '자재 구매', sub: '구매 → 지출결의', path: '/purchase', icon: <ShoppingCart size={16} />, tone: 'buy',
+  id: 'purchase', label: '자재 구매', sub: '구매 → 미지급', path: '/purchase', icon: <ShoppingCart size={16} />, tone: 'buy',
 };
 const OEM_FACTORY_ONLY: FlowNode = {
   id: 'factory-only', label: '수량만 전달', sub: '구매 없음 · 공장 자체 사입', path: '/orders', icon: <Factory size={16} />, tone: 'produce',
@@ -153,7 +153,7 @@ const BRAND_PRE: FlowNode[] = [
 const BRAND_AFTER: FlowNode[] = [
   { id: 'b-china', label: '중국창고', sub: '중국입고 · 선입', path: '/china-warehouse', icon: <Warehouse size={16} />, tone: 'brand' },
   { id: 'b-recv', label: '입고 · 출고', sub: '3PL / 한국입고', path: '/receiving', icon: <Truck size={16} />, tone: 'produce' },
-  { id: 'b-pay', label: '미지급 · 결제', sub: '공장·자재 지출결의', path: '/payables', icon: <Wallet size={16} />, tone: 'settle' },
+  { id: 'b-pay', label: '미지급 · 결제', sub: '공장·자재 미지급', path: '/payables', icon: <Wallet size={16} />, tone: 'settle' },
   { id: 'b-pl', label: '프로젝트 손익', sub: '생산비 체크', path: '/project-pl', icon: <BarChart3 size={16} />, tone: 'settle' },
   { id: 'b-ez', label: '이지어드민', sub: 'B2C · 쇼룸 출고 (외부)', path: '', icon: <ExternalLink size={16} />, tone: 'external' },
 ];

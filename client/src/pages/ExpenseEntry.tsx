@@ -531,8 +531,11 @@ export default function ExpenseEntry() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">지출 전표</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">법인카드 / 계좌이체 / 현금 지출 기록</p>
+          <h1 className="text-2xl font-bold text-foreground">지출결의</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            법인카드 · 계좌이체 · 현금 지출. 공장 임가공비·자재비는 여기가 아니라
+            발주·구매 화면에서 <b>미지급 등록</b>으로 잡습니다
+          </p>
         </div>
         <Button onClick={() => setShowModal(true)} className="gap-2">
           <Plus className="w-4 h-4" />전표 등록

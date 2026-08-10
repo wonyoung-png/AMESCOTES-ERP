@@ -38,7 +38,7 @@ export default function ProjectPL() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">발주 손익</h1>
           <p className="text-sm text-muted-foreground">
-            발주번호 — 자재·임가공(지출결의) · 품목/컬러 배분 원가
+            발주번호 — 자재·임가공(미지급) · 품목/컬러 배분 원가
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={syncToSupabase}>
@@ -64,7 +64,7 @@ export default function ProjectPL() {
             <Kpi
               label="실제 생산비"
               value={formatKRW(pl.actualCost)}
-              sub={pl.payableFactory > 0 ? '지출결의 기준' : '단가×입고 추정'}
+              sub={pl.payableFactory > 0 ? '미지급 기준' : '단가×입고 추정'}
             />
             <Kpi label="OEM 매출(청구)" value={formatKRW(pl.revenue)} />
             <Kpi label="자재매입" value={formatKRW(pl.purchaseCost)} />

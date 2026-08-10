@@ -1,4 +1,4 @@
-// 리오더 · 오더관리 — R3 승인 + 차수별 입고·지출결의
+// 리오더 · 오더관리 — R3 승인 + 차수별 입고·미지급 등록
 import { useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -21,11 +21,11 @@ import { Check, X, Split, Send, Package, Factory, Palette } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { getAssigneeForStep, R3_ROLE_LABEL, R3_STEP_ROLE } from '@/lib/orgChart';
 
-const PIPELINE = ['발주', '진행중', '생산완료', '한국/중국입고', '지출결의', '공장결제'] as const;
+const PIPELINE = ['발주', '진행중', '생산완료', '한국/중국입고', '미지급 등록', '공장결제'] as const;
 
 const STATUS_CLASS: Record<OrderDisplayStatus, string> = {
   결제완료: 'bg-[var(--fill-quaternary)] text-[var(--system-green)] border-border',
-  지출결의: 'bg-[var(--fill-tertiary)] text-foreground border-border',
+  '미지급 등록': 'bg-[var(--fill-tertiary)] text-foreground border-border',
   입고완료: 'bg-[var(--fill-quaternary)] text-[var(--system-green)] border-border',
   부분입고: 'bg-[var(--fill-quaternary)] text-[var(--system-orange)] border-border',
   선입고: 'bg-[var(--fill-quaternary)] text-[var(--system-orange)] border-border',
@@ -308,12 +308,12 @@ export default function BrandOrders() {
         color: recvForm.color.trim(),
       });
       if (stock) {
-        toast.success(`중국입고 ${recvForm.qty}개 · 중국창고 반영${recvForm.createPayable ? ' · 지출결의' : ''}`);
+        toast.success(`중국입고 ${recvForm.qty}개 · 중국창고 반영${recvForm.createPayable ? ' · 미지급 등록' : ''}`);
       } else {
         toast.success(`중국입고 ${recvForm.qty}개 기록`);
       }
     } else if (recvForm.createPayable) {
-      toast.success(`한국입고 ${recvForm.qty}개 · 지출결의 초안 생성`);
+      toast.success(`한국입고 ${recvForm.qty}개 · 미지급 초안 생성`);
     } else {
       toast.success(`한국입고 ${recvForm.qty}개 기록`);
     }
@@ -342,7 +342,7 @@ export default function BrandOrders() {
       chinaCorpVendorId: cn.id,
       chinaCorpVendorName: cn.name,
     });
-    toast.success(`지출결의 ${created.length}건 확인/생성`);
+    toast.success(`미지급 ${created.length}건 확인/등록`);
     refresh();
   };
 
@@ -366,7 +366,7 @@ export default function BrandOrders() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">리오더 · 오더관리</h1>
-          <p className="text-sm text-muted-foreground">{ws} — 차수별 잔량·선입고 · 한국/중국 입고 · 지출결의</p>
+          <p className="text-sm text-muted-foreground">{ws} — 차수별 잔량·선입고 · 한국/중국 입고 · 미지급 등록</p>
         </div>
         <Button
           size="sm"
@@ -727,10 +727,10 @@ export default function BrandOrders() {
                 {PIPELINE.map((label, i) => {
                   const stepOn =
                     (i === 0) ||
-                    (i === 1 && ['진행중', '생산완료', '부분입고', '선입고', '입고완료', '지출결의', '결제완료'].includes(detailRow.displayStatus)) ||
-                    (i === 2 && ['생산완료', '부분입고', '선입고', '입고완료', '지출결의', '결제완료'].includes(detailRow.displayStatus)) ||
-                    (i === 3 && ['부분입고', '선입고', '입고완료', '지출결의', '결제완료'].includes(detailRow.displayStatus)) ||
-                    (i === 4 && ['지출결의', '결제완료'].includes(detailRow.displayStatus)) ||
+                    (i === 1 && ['진행중', '생산완료', '부분입고', '선입고', '입고완료', '미지급 등록', '결제완료'].includes(detailRow.displayStatus)) ||
+                    (i === 2 && ['생산완료', '부분입고', '선입고', '입고완료', '미지급 등록', '결제완료'].includes(detailRow.displayStatus)) ||
+                    (i === 3 && ['부분입고', '선입고', '입고완료', '미지급 등록', '결제완료'].includes(detailRow.displayStatus)) ||
+                    (i === 4 && ['미지급 등록', '결제완료'].includes(detailRow.displayStatus)) ||
                     (i === 5 && detailRow.displayStatus === '결제완료');
                   return (
                     <span key={label} className={`text-[11px] px-1.5 py-0.5 rounded border ${
@@ -802,7 +802,7 @@ export default function BrandOrders() {
                   <Button size="sm" variant="outline" onClick={() => markProduced(detailRow)}>생산완료</Button>
                 )}
                 {detailLogs.length > 0 && (
-                  <Button size="sm" variant="outline" onClick={() => createPayables(detailRow)}>지출결의 생성</Button>
+                  <Button size="sm" variant="outline" onClick={() => createPayables(detailRow)}>미지급 등록</Button>
                 )}
                 <Link href="/payables">
                   <Button size="sm" variant="ghost">미지급 탭 →</Button>
@@ -836,8 +836,8 @@ export default function BrandOrders() {
               </div>
               <p className="text-[11px] text-muted-foreground mt-1">
                 {recvForm.destination === 'korea'
-                  ? '지출결의 → 공장 다이렉트'
-                  : '지출결의 → 아메스코테스 중국법인'}
+                  ? '미지급 → 공장 다이렉트'
+                  : '미지급 → 아메스코테스 중국법인'}
               </p>
             </div>
             <div>
@@ -880,7 +880,7 @@ export default function BrandOrders() {
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input type="checkbox" checked={recvForm.createPayable}
                 onChange={e => setRecvForm(f => ({ ...f, createPayable: e.target.checked }))} />
-              입고와 함께 지출결의 초안 생성
+              입고와 함께 미지급 초안 생성
             </label>
             <div>
               <Label>메모</Label>

@@ -305,13 +305,13 @@ export default function ProductionOrders() {
       projectNo: order?.projectNo,
       receivedDate: expenseForm.expenseDate,
     }, expenseForm.amountKrw);
-    if (!payable) { toast.error('지출결의 생성 실패 (금액 확인)'); return; }
+    if (!payable) { toast.error('미지급 등록 실패 (금액 확인)'); return; }
     if (order) {
       upsertOrder({ ...order, expenseId: payable.id, updatedAt: new Date().toISOString() })
         .then(() => refresh())
         .catch(onSaveFail('발주'));
     }
-    toast.success('지출결의(임가공)가 생성되었습니다 — /payables 에서 결제');
+    toast.success('미지급으로 등록했습니다 (임가공) — /payables 에서 결제');
     setExpenseModal(false);
   };
 
@@ -335,7 +335,7 @@ export default function ProductionOrders() {
       upsertOrder({ ...order, expenseId: payableId, updatedAt: new Date().toISOString() })
         .then(() => {
           queryClient.invalidateQueries({ queryKey: ['orders'] });
-          toast.success('지출결의가 연결되었습니다');
+          toast.success('미지급 건이 연결되었습니다');
         })
         .catch((e: Error) => toast.error(e.message));
     }
@@ -1887,7 +1887,7 @@ export default function ProductionOrders() {
                                   기존 결의 연결
                                 </DropdownMenuItem>
                                 <DropdownMenuItem className="text-xs cursor-pointer" onClick={() => openExpenseModal(o)}>
-                                  지출결의 생성
+                                  미지급 등록
                                 </DropdownMenuItem>
                               </>
                             )
@@ -3900,7 +3900,7 @@ export default function ProductionOrders() {
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />기존 지출결의 연결
+              <FileText className="w-4 h-4" />기존 미지급 건 연결
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -3943,7 +3943,7 @@ export default function ProductionOrders() {
                   </div>
                 ))}
               {phase1.getPayables().filter(p => p.sourceType === 'processing' || p.sourceType === 'order_receipt').length === 0 && (
-                <p className="text-center py-8 text-muted-foreground text-sm">등록된 공장 지출결의가 없습니다</p>
+                <p className="text-center py-8 text-muted-foreground text-sm">등록된 공장 미지급 등록가 없습니다</p>
               )}
             </div>
           </div>
@@ -3953,13 +3953,13 @@ export default function ProductionOrders() {
         </DialogContent>
       </Dialog>
 
-      {/* ── 입고완료 지출결의 모달 ── */}
+      {/* ── 입고완료 미지급 등록 모달 ── */}
       <Dialog open={expenseModal} onOpenChange={setExpenseModal}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full rounded-none sm:w-[95vw] sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-primary" />
-              지출결의 생성 — 임가공(입고)
+              미지급 등록 — 임가공(입고)
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">

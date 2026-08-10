@@ -152,10 +152,10 @@ export default function PurchaseMatching() {
   const [form, setForm] = useState<Partial<PurchaseItem>>({});
   const [editId, setEditId] = useState<string | null>(null);
 
-  // 지출결의 모달 상태
+  // 미지급 등록 모달 상태
   const [expenseModal, setExpenseModal] = useState(false);
   const [expenseForm, setExpenseForm] = useState<ExpenseFormState>(DEFAULT_EXPENSE_FORM);
-  // 지출결의/구전표 상세
+  // 미지급 등록/구전표 상세
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [selectedPayable, setSelectedPayable] = useState<Payable | null>(null);
   // 생성된 결의 (바로보기용)
@@ -356,7 +356,7 @@ export default function PurchaseMatching() {
     refresh();
   };
 
-  // ── 지출결의(Payable) 생성 ──────────────────────────────────────────
+  // ── 미지급 등록(Payable) 생성 ──────────────────────────────────────────
   const openExpenseModal = (item: PurchaseItem) => {
     setExpenseForm({
       purchaseItemId: item.id,
@@ -401,7 +401,7 @@ export default function PurchaseMatching() {
       projectNo,
       styleNo,
     });
-    if (!payable) { toast.error('지출결의 생성 실패'); return; }
+    if (!payable) { toast.error('미지급 등록 실패'); return; }
 
     await upsertPurchaseItem({
       ...item,
@@ -414,7 +414,7 @@ export default function PurchaseMatching() {
       purchaseDate: expenseForm.expenseDate,
     });
 
-    toast.success('지출결의(자재)가 생성되었습니다 — /payables 에서 결제');
+    toast.success('미지급으로 등록했습니다 (자재) — /payables 에서 결제');
     refresh();
     setExpenseModal(false);
     setJustCreatedPayable(payable);
@@ -475,7 +475,7 @@ export default function PurchaseMatching() {
       totalKrw += item.amountKrw;
     }
     refresh();
-    toast.success(`[${orderNo}] 지출결의 일괄발행 — ${count}종 / ${formatKRW(totalKrw)}`);
+    toast.success(`[${orderNo}] 미지급 일괄등록 — ${count}종 / ${formatKRW(totalKrw)}`);
   };
 
   // 이메일 발송
@@ -744,9 +744,9 @@ export default function PurchaseMatching() {
                         </td>
                         <td className="ctr w-20">
                           {p.statementNo ? (
-                            <span title="지출결의 연결됨" className="inline-flex justify-center text-[var(--system-green)]"><FileText className="w-4 h-4" /></span>
+                            <span title="미지급 연결됨" className="inline-flex justify-center text-[var(--system-green)]"><FileText className="w-4 h-4" /></span>
                           ) : (
-                            <span title="지출결의 미생성" className="text-muted-foreground text-sm">—</span>
+                            <span title="미지급 미등록" className="text-muted-foreground text-sm">—</span>
                           )}
                         </td>
                         <td className="ctr">
@@ -1296,13 +1296,13 @@ export default function PurchaseMatching() {
         </DialogContent>
       </Dialog>
 
-      {/* ── 지출결의 생성 모달 ── */}
+      {/* ── 미지급 등록 모달 ── */}
       <Dialog open={expenseModal} onOpenChange={setExpenseModal}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-primary" />
-              지출결의 생성 (자재)
+              미지급 등록 (자재)
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1407,7 +1407,7 @@ export default function PurchaseMatching() {
         <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />기존 지출결의 연결
+              <FileText className="w-4 h-4" />기존 미지급 건 연결
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -1450,7 +1450,7 @@ export default function PurchaseMatching() {
                   </div>
                 ))}
               {phase1.getPayables().filter(p => p.sourceType === 'purchase').length === 0 && (
-                <p className="text-center py-8 text-muted-foreground text-sm">등록된 자재 지출결의가 없습니다</p>
+                <p className="text-center py-8 text-muted-foreground text-sm">등록된 자재 미지급 등록가 없습니다</p>
               )}
             </div>
           </div>
@@ -1546,7 +1546,7 @@ export default function PurchaseMatching() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-[var(--system-green)]" />
-              지출결의가 생성되었습니다
+              미지급으로 등록했습니다
             </DialogTitle>
           </DialogHeader>
           {justCreatedPayable && (
@@ -1579,12 +1579,12 @@ export default function PurchaseMatching() {
         </DialogContent>
       </Dialog>
 
-      {/* 지출결의 상세 */}
+      {/* 미지급 상세 */}
       {selectedPayable && (
         <Dialog open={!!selectedPayable} onOpenChange={() => setSelectedPayable(null)}>
           <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-md">
             <DialogHeader>
-              <DialogTitle>지출결의 상세</DialogTitle>
+              <DialogTitle>미지급 상세</DialogTitle>
             </DialogHeader>
             <div className="space-y-2 text-sm py-2">
               <p className="font-medium">{selectedPayable.memo}</p>
@@ -1593,7 +1593,7 @@ export default function PurchaseMatching() {
               <p className="text-muted-foreground">발주: {selectedPayable.orderNo || '—'} · 품목: {selectedPayable.styleNo || '—'}</p>
               <p className="text-muted-foreground">상태: {selectedPayable.status} · 지급예정: {selectedPayable.dueDate}</p>
               <p className="font-bold text-lg">{formatKRW(selectedPayable.amountKrw)}</p>
-              <p className="text-xs text-muted-foreground">결제·미지급 관리는 지출결의(/payables) 메뉴에서 진행합니다</p>
+              <p className="text-xs text-muted-foreground">결제·미지급 관리는 미지급·불량차감(/payables) 메뉴에서 진행합니다</p>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setSelectedPayable(null)}>닫기</Button>
