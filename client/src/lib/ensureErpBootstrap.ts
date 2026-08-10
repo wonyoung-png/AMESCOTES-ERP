@@ -4,7 +4,6 @@
 import { syncFromSupabase } from './syncFromSupabase';
 import { seedDemoIntegrationData, DEMO_SEED_FLAG } from './seedDemoData';
 import { seedLumenPackingData, PACK_SEED_FLAG, hasPackageKitItems } from './seedLumenPacking';
-import { fillMissingItemColorsForTest, ITEM_COLOR_FILL_FLAG, ordersNeedColorFix } from './fillItemColorsForTest';
 import { seedLumen27ssRrp, LUMEN_27SS_SEED_FLAG, lumen27ssMissingImages } from './seedLumen27ssRrp';
 import { store } from './store';
 
@@ -53,8 +52,6 @@ export async function ensureErpBootstrap(): Promise<{ seeded: boolean; message: 
       await seedLumenPackingData();
     }
 
-    localStorage.removeItem(ITEM_COLOR_FILL_FLAG);
-    const fill = fillMissingItemColorsForTest(true);
     const lumen = await seedLumen27ssRrp(false);
     const lumenMsg = lumen.created + lumen.updated > 0
       ? ` · LUMEN 27SS ${lumen.created + lumen.updated}건`
@@ -63,7 +60,7 @@ export async function ensureErpBootstrap(): Promise<{ seeded: boolean; message: 
       seeded: true,
       message: result.errors.length
         ? '데모 데이터 생성됨 (일부 Supabase 동기화 실패 — localStorage에는 저장됨)'
-        : `연동 데모·PACKAGE 키트 생성 · 컬러 ${fill.itemsUpdated}품목/${fill.ordersUpdated}발주${lumenMsg}`,
+        : `연동 데모·PACKAGE 키트 생성${lumenMsg}`,
     };
   }
 
@@ -96,25 +93,6 @@ export async function ensureErpBootstrap(): Promise<{ seeded: boolean; message: 
         message: `LUMEN 27SS RRP 품목 ${r.created + r.updated}/${r.total}건 등록`,
       };
     }
-  }
-
-  const needsColorFill = store.getItems().some(i => {
-    if (i.erpCategory === 'PACK' || (i.styleNo || '').startsWith('LPKG-') || (i.styleNo || '').startsWith('PACKAGE-')) return false;
-    return (!i.colors || i.colors.length === 0) && (
-      i.itemStatus === 'TEMP' ||
-      (i.styleNo || '').startsWith('TEMP') ||
-      (i.styleNo || '').startsWith('LLL') ||
-      i.erpCategory === 'HB'
-    );
-  }) || ordersNeedColorFix();
-  if (needsColorFill) localStorage.removeItem(ITEM_COLOR_FILL_FLAG);
-
-  const fill = fillMissingItemColorsForTest(false);
-  if (!fill.skipped && (fill.itemsUpdated > 0 || fill.ordersUpdated > 0)) {
-    return {
-      seeded: true,
-      message: `테스트 컬러 반영: 품목 ${fill.itemsUpdated} · 발주 ${fill.ordersUpdated}`,
-    };
   }
 
   return { seeded: false, message: '' };

@@ -11,7 +11,6 @@ import { RefreshCw, History, TrendingUp, DollarSign, Trash2, Save, Database } fr
 import { manualFetchExchangeRate } from '@/hooks/useAutoExchangeRate';
 import { seedDemoIntegrationData, DEMO, DEMO_SEED_FLAG } from '@/lib/seedDemoData';
 import { seedLumenPackingData, getPackKits } from '@/lib/seedLumenPacking';
-import { applyColorTestData } from '@/lib/fillItemColorsForTest';
 import { seedLumen27ssRrp, getLumen27ssProductCount, LUMEN_27SS_SEED_FLAG } from '@/lib/seedLumen27ssRrp';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
@@ -24,7 +23,6 @@ export default function ExchangeSettings() {
   const [isFetching, setIsFetching] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [isPackSeeding, setIsPackSeeding] = useState(false);
-  const [isColorApplying, setIsColorApplying] = useState(false);
   const [isLumen27Seeding, setIsLumen27Seeding] = useState(false);
   const [packKits, setPackKits] = useState(() => getPackKits());
 
@@ -187,20 +185,6 @@ export default function ExchangeSettings() {
     }
   };
 
-  const handleApplyColors = () => {
-    if (!confirm('품목 컬러 + 발주 colorQtys + 기본/미지정 입고를 실제 컬러로 재적용합니다. 계속할까요?')) return;
-    setIsColorApplying(true);
-    try {
-      const r = applyColorTestData();
-      toast.success(`컬러 재적용 · 품목 ${r.itemsUpdated} · 발주 ${r.ordersUpdated} · 입고 ${r.receiptsRemapped}`);
-      setTimeout(() => window.location.reload(), 800);
-    } catch (e) {
-      toast.error('컬러 재적용 실패');
-      console.error(e);
-    } finally {
-      setIsColorApplying(false);
-    }
-  };
 
   const handleSeedLumen27 = async () => {
     if (!confirm(`LUMEN 바이어 + 27SS RRP 품목 ${getLumen27ssProductCount()}건을 등록합니다.\n(컬러 합산 · KMSRP=확정판매가 · 원가 미입력)\n계속할까요?`)) return;
@@ -403,10 +387,6 @@ export default function ExchangeSettings() {
           <Button onClick={handleSeedPacking} disabled={isPackSeeding} variant="outline">
             <Database className={`w-4 h-4 mr-1.5 ${isPackSeeding ? 'animate-pulse' : ''}`} />
             {isPackSeeding ? '생성 중...' : 'PACKAGE 키트 생성 (자재 BOM)'}
-          </Button>
-          <Button onClick={handleApplyColors} disabled={isColorApplying} variant="outline">
-            <Database className={`w-4 h-4 mr-1.5 ${isColorApplying ? 'animate-pulse' : ''}`} />
-            {isColorApplying ? '적용 중...' : '컬러 테스트 데이터 재적용'}
           </Button>
           <Button onClick={handleSeedLumen27} disabled={isLumen27Seeding} variant="outline">
             <Database className={`w-4 h-4 mr-1.5 ${isLumen27Seeding ? 'animate-pulse' : ''}`} />

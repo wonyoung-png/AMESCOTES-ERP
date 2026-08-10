@@ -9,7 +9,6 @@ import {
   type BrandOrderBatch, type OrderDisplayStatus, type ReceiptDestination, type ReorderOrderRow,
 } from '@/lib/phase1';
 import { fetchOrders } from '@/lib/supabaseQueries';
-import { applyColorTestData } from '@/lib/fillItemColorsForTest';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Check, X, Split, Send, Package, Factory, Palette } from 'lucide-react';
+import { Check, X, Split, Send, Package, Factory } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { getAssigneeForStep, R3_ROLE_LABEL, R3_STEP_ROLE } from '@/lib/orgChart';
 
@@ -348,18 +347,6 @@ export default function BrandOrders() {
 
   const detailLogs = detailRow ? phase1.getReceiptLogsByOrder(detailRow.orderId).filter(l => l.logType === 'inbound') : [];
 
-  const applyColorsForTest = () => {
-    if (!confirm(
-      '품목 컬러를 채우고, 기존 발주·입고의 「기본 / (미지정) / (미배정)」을 실제 컬러로 재분배합니다.\n컬러별 입고·중국창고 테스트용입니다. 계속할까요?',
-    )) return;
-    const r = applyColorTestData();
-    toast.success(
-      `컬러 재적용 · 품목 ${r.itemsUpdated} · 발주 ${r.ordersUpdated}`
-      + (r.receiptsRemapped ? ` · 입고 ${r.receiptsRemapped}` : '')
-      + (r.brandLinesUpdated ? ` · R3라인 ${r.brandLinesUpdated}` : ''),
-    );
-    refresh();
-  };
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
@@ -368,15 +355,6 @@ export default function BrandOrders() {
           <h1 className="text-2xl font-bold text-foreground">리오더 · 오더관리</h1>
           <p className="text-sm text-muted-foreground">{ws} — 차수별 잔량·선입고 · 한국/중국 입고 · 미지급 등록</p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1.5"
-          onClick={applyColorsForTest}
-        >
-          <Palette size={14} />
-          컬러 데이터 재적용
-        </Button>
       </div>
 
       <Tabs value={mainTab} onValueChange={setMainTab}>
@@ -410,9 +388,6 @@ export default function BrandOrders() {
               value={styleSearch}
               onChange={e => setStyleSearch(e.target.value)}
             />
-            <span className="text-[11px] text-muted-foreground ml-auto hidden sm:inline">
-              기본·미지정 컬러가 보이면 「컬러 데이터 재적용」
-            </span>
           </div>
 
           {board.length === 0 ? (
