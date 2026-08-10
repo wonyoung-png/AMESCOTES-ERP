@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Network,
   GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight,
-  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp,
+  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp, Inbox,
 } from 'lucide-react';
 
 interface NavItem {
@@ -71,6 +71,7 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/bom', label: 'BOM / 원가', icon: <ClipboardList size={17} />, table: 'boms', oemOnly: true },
       { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} />, table: 'boms', oemOnly: true },
+      { path: '/inbound-po', label: '수주함', icon: <Inbox size={17} />, table: 'brand_order_lines', oemOnly: true },
       { path: '/orders', label: '생산 발주', icon: <Factory size={17} />, table: 'production_orders', oemOnly: true },
       { path: '/brand-orders', label: '오더관리', icon: <Factory size={17} />, table: 'production_orders', lumenOnly: true },
       { path: '/deadlines', label: '납기 캘린더', icon: <CalendarClock size={17} />, table: 'milestones', oemOnly: true },

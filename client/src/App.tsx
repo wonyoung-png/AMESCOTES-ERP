@@ -47,6 +47,7 @@ const CostSheetPrint = lazyWithReload(() => import("./pages/CostSheetPrint"));
 const ReceivingShipping = lazyWithReload(() => import("./pages/ReceivingShipping"));
 const PayablesManagement = lazyWithReload(() => import("./pages/PayablesManagement"));
 const BrandOrders = lazyWithReload(() => import("./pages/BrandOrders"));
+const InboundPO = lazyWithReload(() => import("./pages/InboundPO"));
 const ChinaWarehouse = lazyWithReload(() => import("./pages/ChinaWarehouse"));
 const ProjectPL = lazyWithReload(() => import("./pages/ProjectPL"));
 const DeadlineManagement = lazyWithReload(() => import("./pages/DeadlineManagement"));
@@ -165,6 +166,7 @@ function Router() {
         <Route path="/payables" component={PayablesManagement} />
         <Route path="/project-pl" component={ProjectPL} />
         <Route path="/brand-orders" component={BrandOrders} />
+        <Route path="/inbound-po" component={InboundPO} />
         <Route path="/line-sheet" component={LineSheet} />
         <Route path="/china-warehouse" component={ChinaWarehouse} />
         <Route path="/calendar" component={OperationalCalendar} />

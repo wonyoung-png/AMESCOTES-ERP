@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { store, formatNumber, normalizeColors, type OrderStatus } from '@/lib/store';
 import {
-  phase1, R3_STEPS, CHINA_CORP_VENDOR_CODE, CHINA_CORP_VENDOR_NAME,
+  phase1, pullBrandOrders, R3_STEPS, CHINA_CORP_VENDOR_CODE, CHINA_CORP_VENDOR_NAME,
   type BrandOrderBatch, type OrderDisplayStatus, type ReceiptDestination, type ReorderOrderRow,
 } from '@/lib/phase1';
 import { fetchOrders } from '@/lib/supabaseQueries';
@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Check, X, Split, Send, Package, Factory } from 'lucide-react';
+import { Check, X, Send, Package, Factory } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { getAssigneeForStep, R3_ROLE_LABEL, R3_STEP_ROLE } from '@/lib/orgChart';
 
@@ -59,9 +59,11 @@ export default function BrandOrders() {
   const ws = workspace === 'AETALOOF' ? 'AETALOOF' : 'LUMEN';
   const queryClient = useQueryClient();
   const { data: remoteOrders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
-  const [, tick] = useState(0);
+  const { data: pulled = 0 } = useQuery({ queryKey: ['brandOrders'], queryFn: pullBrandOrders });
+  const [tickN, tick] = useState(0);
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['orders'] });
+    queryClient.invalidateQueries({ queryKey: ['brandOrders'] });
     tick(n => n + 1);
   };
 
@@ -72,9 +74,9 @@ export default function BrandOrders() {
     return [...map.values()];
   }, [remoteOrders, localOrders, tick]);
 
-  const batches = phase1.getBrandBatches(ws);
+  const batches = useMemo(() => phase1.getBrandBatches(ws), [ws, pulled, tickN]);
   const items = store.getItems();
-  const factories = store.getVendors().filter(v => v.type === '공장' || v.type === '임가공');
+  const factories = store.getVendors().filter(v => v.type === '공장' || v.type === '해외공장');
 
   const [mainTab, setMainTab] = useState('mgmt');
   const [selected, setSelected] = useState<BrandOrderBatch | null>(null);
@@ -201,23 +203,20 @@ export default function BrandOrders() {
       : [{ color: '', qty: 0 }]);
   };
 
-  const splitToOrders = () => {
+  /** 발주서 발행 — 공장별로 1장. 이 번호가 AMESCOTES의 PO가 된다 */
+  const issue = () => {
     if (!detail) return;
-    const created = phase1.splitBrandBatchToOrders(
-      detail.id,
-      (order) => store.addOrder(order as Parameters<typeof store.addOrder>[0]),
-      factories.map(f => ({ id: f.id, name: f.name })),
+    const issued = phase1.issueBrandBatch(detail.id);
+    if (!issued.length) { toast.error('승인 완료된 발주만 발행 가능'); return; }
+    toast.success(
+      `발주서 ${issued.length}장 발행 — ${issued.map(i => `${i.poNo} (${i.factoryName})`).join(' · ')}`,
     );
-    if (created.length) {
-      toast.success(`생산발주 ${created.length}건 생성`);
-      refresh();
-    } else {
-      toast.error('승인 완료된 발주만 분할 가능');
-    }
+    refresh();
   };
 
   const stepLabel = (batch: BrandOrderBatch) => {
     if (batch.status === 'approved') return '승인완료';
+    if (batch.status === 'issued') return '발행완료';
     if (batch.status === 'split') return '분할완료';
     if (batch.status === 'draft') return '작성중';
     const s = R3_STEPS.find(x => x.step === batch.approvalStep);
@@ -585,7 +584,20 @@ export default function BrandOrders() {
                     </div>
                   )}
                   {detail.status === 'approved' && (
-                    <Button size="sm" onClick={splitToOrders}><Split className="w-3 h-3 mr-1" />생산발주 분할</Button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button size="sm" onClick={issue}>
+                        <Send className="w-3 h-3 mr-1" />발주서 발행
+                      </Button>
+                      <span className="text-[11px] text-muted-foreground">
+                        공장별로 1장씩 나가고, AMESCOTES 수주함으로 전달됩니다
+                      </span>
+                    </div>
+                  )}
+                  {detail.status === 'issued' && (
+                    <p className="text-[11px] text-muted-foreground">
+                      발행 완료 —{' '}
+                      {[...new Set(detail.lines.map(l => l.poNo).filter(Boolean))].join(' · ')}
+                    </p>
                   )}
 
                   <div className="overflow-x-auto border rounded-md">

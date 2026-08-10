@@ -18,7 +18,7 @@ export type Workspace = 'OEM' | 'LUMEN' | 'AETALOOF';
 export type ProductionOrigin = 'domestic' | 'china';
 export type ReceiptLogType = 'inbound' | 'outbound_oem' | 'outbound_3pl';
 export type ReceiptDestination = 'korea' | 'china';
-export type BrandBatchStatus = 'draft' | 'in_approval' | 'approved' | 'split' | 'done';
+export type BrandBatchStatus = 'draft' | 'in_approval' | 'approved' | 'issued' | 'split' | 'done';
 export type PayableStatus = 'pending' | 'partial' | 'paid';
 export type PayablePayeeType = 'factory_direct' | 'china_corp';
 export type DefectStatus = 'pending' | 'applied';
@@ -191,6 +191,22 @@ export interface BrandOrderLine {
   isEmployeePurchase: boolean;
   qty: number;
   memo?: string;
+  /** 발주서 번호 (LUM-260810-01-A). 공장별로 1장 = OEM의 PO 번호가 그대로 된다 */
+  poNo?: string;
+  issuedAt?: string;
+  /** OEM이 생산발주로 받은 시각 */
+  acceptedAt?: string;
+}
+
+export interface InboundPO {
+  poNo: string;
+  workspace: string;
+  projectNo: string;
+  title: string;
+  factoryId?: string;
+  factoryName: string;
+  issuedAt?: string;
+  lines: BrandOrderLine[];
 }
 
 export interface ApprovalLog {
@@ -793,44 +809,67 @@ export const phase1 = {
   getApprovalLogs: (batchId: string) =>
     getAll<ApprovalLog>(KEYS.approvalLogs).filter(l => l.batchId === batchId),
 
-  /** 승인 완료 배치 → 생산발주 자동 생성 */
-  splitBrandBatchToOrders: (
-    batchId: string,
-    createOrder: (order: Record<string, unknown>) => void,
-    vendors: { id: string; name: string }[],
-  ) => {
+  /**
+   * 승인 완료 배치 → 공장별 발주서 발행.
+   * 발주서는 공장 1곳에 1장이다. 두 공장이 든 발주서는 공장이 남의 물량을 보게 되므로
+   * 발주서가 아니다. 여기서 나온 번호(LUM-260810-01-A)를 OEM이 PO로 그대로 받는다.
+   */
+  issueBrandBatch: (batchId: string) => {
     const batch = phase1.getBrandBatch(batchId);
     if (!batch || batch.status !== 'approved') return [];
-    const created: string[] = [];
-    for (const line of batch.lines) {
-      const qty = line.qty || line.colorQtys.reduce((s, c) => s + c.qty, 0);
-      const factory = vendors.find(v => v.id === line.factoryId);
-      const orderNo = `${line.styleNo}-R1`;
-      createOrder({
-        id: uid(),
-        orderNo,
-        styleId: line.styleNo,
-        styleNo: line.styleNo,
-        styleName: line.styleName,
-        qty,
-        colorQtys: line.colorQtys,
-        vendorId: line.factoryId || '',
-        vendorName: factory?.name || line.factoryName || '',
-        projectNo: batch.projectNo,
-        workspace: batch.workspace,
-        productionOrigin: line.productionOrigin,
-        isEmployeePurchase: line.isEmployeePurchase,
-        brandBatchId: batch.id,
-        status: '발주생성',
-        hqSupplyItems: [],
-        attachments: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+    const byFactory = new Map<string, BrandOrderLine[]>();
+    batch.lines.forEach(l => {
+      const k = l.factoryId || '미지정';
+      byFactory.set(k, [...(byFactory.get(k) || []), l]);
+    });
+    const all = getAll<BrandOrderLine>(KEYS.brandLines);
+    const issued: { poNo: string; factoryName: string; lines: number }[] = [];
+    const now = new Date().toISOString();
+    [...byFactory.entries()].forEach(([, lines]: [string, BrandOrderLine[]], i) => {
+      const poNo = `${batch.projectNo}-${String.fromCharCode(65 + i)}`;  // A, B, C…
+      lines.forEach(l => {
+        const idx = all.findIndex(x => x.id === l.id);
+        if (idx >= 0) {
+          all[idx] = { ...all[idx], poNo, issuedAt: now };
+          syncBrandLine(all[idx]).catch(reportSyncFail('발주서'));
+        }
       });
-      created.push(orderNo);
-    }
-    phase1.updateBrandBatch(batchId, { status: 'split' });
-    return created;
+      issued.push({ poNo, factoryName: lines[0].factoryName || '미지정', lines: lines.length });
+    });
+    setAll(KEYS.brandLines, all);
+    phase1.updateBrandBatch(batchId, { status: 'issued' });
+    return issued;
+  },
+
+  /** OEM 수주함 — 발행됐고 아직 생산발주로 안 받은 발주서 */
+  getInboundPOs: (): InboundPO[] => {
+    const lines = getAll<BrandOrderLine>(KEYS.brandLines).filter(l => l.poNo && !l.acceptedAt);
+    const batches = getAll<BrandOrderBatch>(KEYS.brandBatches);
+    const m = new Map<string, InboundPO>();
+    lines.forEach(l => {
+      const b = batches.find(x => x.id === l.batchId);
+      const g = m.get(l.poNo!) || {
+        poNo: l.poNo!, workspace: b?.workspace || '', projectNo: b?.projectNo || '',
+        title: b?.title || '', factoryId: l.factoryId, factoryName: l.factoryName || '미지정',
+        issuedAt: l.issuedAt, lines: [],
+      };
+      g.lines.push(l);
+      m.set(l.poNo!, g);
+    });
+    return [...m.values()].sort((a, b) => (b.issuedAt || '').localeCompare(a.issuedAt || ''));
+  },
+
+  /** 수주함의 발주서 1장을 받아 표시 처리 */
+  markPOAccepted: (poNo: string) => {
+    const all = getAll<BrandOrderLine>(KEYS.brandLines);
+    const now = new Date().toISOString();
+    all.forEach((l, i) => {
+      if (l.poNo === poNo) {
+        all[i] = { ...l, acceptedAt: now };
+        syncBrandLine(all[i]).catch(reportSyncFail('수주'));
+      }
+    });
+    setAll(KEYS.brandLines, all);
   },
 
   getOrderReceiptSummary: (orderId: string, orderQty: number) =>
@@ -1476,6 +1515,43 @@ async function syncPayable(p: Payable) {
   });
 }
 
+const rowToBatch = (r: any): BrandOrderBatch => ({
+  id: r.id, workspace: r.workspace, projectNo: r.project_no, title: r.title,
+  weekLabel: r.week_label || undefined, status: r.status, approvalStep: r.approval_step ?? 1,
+  expectedDely: r.expected_dely || undefined, delyRequestedTo: r.dely_requested_to || undefined,
+  createdBy: r.created_by || undefined, lines: [],
+  createdAt: r.created_at, updatedAt: r.updated_at,
+});
+
+const rowToLine = (r: any): BrandOrderLine => ({
+  id: r.id, batchId: r.batch_id, styleNo: r.style_no, styleName: r.style_name || '',
+  colorQtys: Array.isArray(r.color_qtys) ? r.color_qtys : [],
+  factoryId: r.factory_id || undefined, factoryName: r.factory_name || undefined,
+  productionOrigin: r.production_origin || 'china',
+  isEmployeePurchase: !!r.is_employee_purchase, qty: r.qty ?? 0, memo: r.memo || undefined,
+  poNo: r.po_no || undefined, issuedAt: r.issued_at || undefined,
+  acceptedAt: r.accepted_at || undefined,
+});
+
+/** 서버가 정본. LUMEN이 만든 발주를 OEM이 보려면 이게 있어야 한다 */
+export async function pullBrandOrders(): Promise<number> {
+  const [b, l, g] = await Promise.all([
+    supabase.from('brand_order_batches').select('*'),
+    supabase.from('brand_order_lines').select('*'),
+    supabase.from('approval_logs').select('*'),
+  ]);
+  if (b.error) throw b.error;
+  setAll(KEYS.brandBatches, (b.data || []).map(rowToBatch));
+  if (!l.error) setAll(KEYS.brandLines, (l.data || []).map(rowToLine));
+  if (!g.error) {
+    setAll(KEYS.approvalLogs, (g.data || []).map((r: any) => ({
+      id: r.id, batchId: r.batch_id, step: r.step, action: r.action,
+      actorName: r.actor_name || '', comment: r.comment || undefined, createdAt: r.created_at,
+    })));
+  }
+  return (b.data || []).length;
+}
+
 async function syncBrandBatch(b: BrandOrderBatch) {
   await supabase.from('brand_order_batches').upsert({
     id: b.id,
@@ -1506,6 +1582,9 @@ async function syncBrandLine(l: BrandOrderLine) {
     is_employee_purchase: l.isEmployeePurchase,
     qty: l.qty,
     memo: l.memo,
+    po_no: l.poNo,
+    issued_at: l.issuedAt,
+    accepted_at: l.acceptedAt,
   });
 }
 
