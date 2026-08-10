@@ -48,7 +48,6 @@ export default function InboundPO() {
           colorQtys: l.colorQtys,
           vendorId: l.factoryId || '',
           vendorName: l.factoryName || '',
-          buyerName: po.workspace,      // 발주처 = LUMEN / AETALOOF
           status: '발주생성',
           hqSupplyItems: [],
           attachments: [],
