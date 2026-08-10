@@ -52,7 +52,7 @@ const num = (v: unknown) => {
 };
 
 /** 기본패턴 — 소요량이 아니라 패턴 자체다. 계산에서 뺀다 */
-const BASE_PATTERN_RE = /기본형|닺지형|닷지형|그림형/;
+const BASE_PATTERN_RE = /기본형|닺지형|닷지형|그림형|원형/;
 
 /** 자재명·마커그룹으로 무엇으로 볼지 판정 */
 function classify(matName: string, group: string, raw = ''): { a: Assign; why: string } {
@@ -102,27 +102,56 @@ function materialStart(text: string): number {
   return start;
 }
 
+type Seg = { text: string; ea: number; bothSides: boolean };
+
+/** 쉼표로 끊되, 자재가 아닌 쉼표는 도로 이어 붙인다.
+ *  - "핸들 겉감 좌2EA, 우2EA"          → 좌우는 같은 자재. 수량만 4로 합친다
+ *  - "뒷판 구찌, 뒷판 우라 구찌 싱 VXP 0.4 2EA" → 앞 조각에 수량이 없으면 이름이 이어지는 것 */
+function splitSegments(clean: string): Seg[] {
+  const eaSum = (s: string) =>
+    (s.match(/([\d.]+)\s*EA/gi) || []).reduce((a, x) => a + (parseFloat(x) || 0), 0);
+  const out: Seg[] = [];
+
+  for (const piece of clean.split(',').map(s => s.trim()).filter(Boolean)) {
+    const prev = out[out.length - 1];
+    // '우 2EA' 는 반대쪽 짝 — '우라 2EA' 는 자재라 걸리지 않는다
+    if (prev && /^[좌우]\s*[\d.]*\s*EA\b/i.test(piece)) {
+      prev.ea += eaSum(piece) || 1;
+      prev.bothSides = true;
+      continue;
+    }
+    if (prev && !/[\d.]+\s*EA/i.test(prev.text)) {
+      prev.text += `, ${piece}`;
+      prev.ea = eaSum(prev.text) || 1;
+      continue;
+    }
+    out.push({ text: piece, ea: eaSum(piece) || 1, bothSides: false });
+  }
+  return out.length ? out : [{ text: clean, ea: 1, bothSides: false }];
+}
+
 /** 조각 이름을 부위 + 자재 목록으로 쪼갠다 */
 function splitName(raw: string, group: string): { part: string; base: string; tag: string; materials: Mat[] } {
   const tag = (String(raw || '').match(/^\[([^\]]+)\]/) || [])[1] || '';
   const clean = String(raw || '').replace(/^\[[^\]]*\]\s*/, '');
-  const segs = clean.split(',').map(s => s.trim()).filter(Boolean);
+  const segs = splitSegments(clean);
 
   const materials: Mat[] = [];
   let part = '';
   let base = '';   // 첫 세그먼트 전체 — 뒤따르는 자재 이름의 머리말이 된다
 
   segs.forEach((seg, i) => {
-    const eaM = seg.match(/([\d.]+)\s*EA/i);
-    const ea = eaM ? parseFloat(eaM[1]) : 1;
-    const wariM = seg.match(/와리\s*:?\s*([\d.]+)/);
+    const ea = seg.ea;
+    const wariM = seg.text.match(/와리\s*:?\s*([\d.]+)/);
 
-    const text = seg
+    let text = seg.text
       .replace(/\([^)]*\)/g, '')
-      .replace(/[\d.]+\s*EA/i, '')
+      .replace(/[\d.]+\s*EA/gi, '')
       .replace(/,\s*V\s*$/i, '')
       .replace(/\s+\/\s+.*$/, '')   // ' / 맞부착' 같은 공정 노트는 이름이 아니다 (S/L 은 붙여 쓰므로 안 잘린다)
+      .replace(/\s{2,}/g, ' ')
       .trim();
+    if (seg.bothSides) text = text.replace(/좌\s*$/, '좌,우');
 
     const at = materialStart(text);
     if (i === 0) {

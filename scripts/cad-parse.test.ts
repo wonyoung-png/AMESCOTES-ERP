@@ -81,3 +81,25 @@ assert.deepStrictEqual(linesOf('별도 속고판 싱 양면 S/L 1.0 1EA, 우라 
   ['interlining|별도 속고판 싱 양면 S/L 1.0', 'lining|별도 속고판 싱 우라']);
 
 console.log('ok3');
+
+// 2차 검수 회신 — 쉼표가 자재 구분이 아닌 경우 · 좌우 합산 · 원형 제외
+const rowsOf = (name: string, group = '겉감') =>
+  parseCadWorkbook(sheet(name, group, 1, 10, 10)).lines.map(l => `${l.assign}|${l.lineName}|${l.count}`);
+
+// 앞 조각에 수량이 없으면 이름이 이어지는 것 (한 줄로 합친다)
+assert.deepStrictEqual(rowsOf('뒷판 구찌, 뒷판 우라 구찌 싱 VXP 0.4 2EA', '심'),
+  ['interlining|뒷판 구찌, 뒷판 우라 구찌 싱 0.4 VXP|2']);
+
+// 좌/우는 같은 자재 — 수량만 합치고 한 줄로
+assert.deepStrictEqual(rowsOf('핸들 겉감 좌2EA, 우2EA'), ['leather|핸들 겉감 좌,우|4']);
+assert.deepStrictEqual(rowsOf('앞포켓 우라 좌2EA, 우2EA'), ['lining|앞포켓 우라 좌,우|4']);
+assert.deepStrictEqual(rowsOf('원판 2 측면 싱 50g부직포 좌 2EA, 우 2EA', '심'),
+  ['interlining|원판 2 측면 싱 50g 부직포 좌,우|4']);
+
+// '우라'는 좌우가 아니라 자재 — 갈라져야 한다
+assert.strictEqual(rowsOf('별도 속고판 싱 양면 S/L 1.0 1EA, 우라 2EA').length, 2);
+
+// 원형도 기본패턴
+assert.ok(rowsOf('원판 원형', 'SELF').every(x => x.startsWith('skip')));
+
+console.log('ok4');

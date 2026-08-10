@@ -12,7 +12,7 @@ const OUT = process.argv[3] || 'C:/Temp/cad-audit.html';
 const num = v => { const n = parseFloat(String(v ?? '').replace(/[^\d.]/g, '')); return Number.isFinite(n) ? n : 0; };
 
 /** 자재 한 조각을 무엇으로 볼지 */
-const BASE_PATTERN_RE = /기본형|닺지형|닷지형|그림형/;
+const BASE_PATTERN_RE = /기본형|닺지형|닷지형|그림형|원형/;
 function classify(matName, group, raw = '') {
   const t = `${matName}`.trim().toLowerCase();
   const g = (group || '').trim();
@@ -56,6 +56,19 @@ function materialStart(text) {
   return start;
 }
 
+/** 쉼표로 끊되, 자재가 아닌 쉼표는 도로 이어 붙인다 */
+function splitSegments(clean) {
+  const eaSum = s => (s.match(/([\d.]+)\s*EA/gi) || []).reduce((a, x) => a + (parseFloat(x) || 0), 0);
+  const out = [];
+  for (const piece of clean.split(',').map(x => x.trim()).filter(Boolean)) {
+    const prev = out[out.length - 1];
+    if (prev && /^[좌우]\s*[\d.]*\s*EA\b/i.test(piece)) { prev.ea += eaSum(piece) || 1; prev.bothSides = true; continue; }
+    if (prev && !/[\d.]+\s*EA/i.test(prev.text)) { prev.text += ', ' + piece; prev.ea = eaSum(prev.text) || 1; continue; }
+    out.push({ text: piece, ea: eaSum(piece) || 1, bothSides: false });
+  }
+  return out.length ? out : [{ text: clean, ea: 1, bothSides: false }];
+}
+
 /** 자재명 표기 통일 — 두께를 앞에 (VXP 0.4 -> 0.4 VXP) */
 const normalizeMaterialName = l => l.replace(/^(VXP)\s+([\d.]+)$/i, '$2 $1');
 
@@ -63,24 +76,25 @@ const normalizeMaterialName = l => l.replace(/^(VXP)\s+([\d.]+)$/i, '$2 $1');
 function splitName(raw, group) {
   const tag = (String(raw || '').match(/^\[([^\]]+)\]/) || [])[1] || '';
   const clean = String(raw || '').replace(/^\[[^\]]*\]\s*/, '');
-  const segs = clean.split(',').map(s => s.trim()).filter(Boolean);
+  const segs = splitSegments(clean);
 
   const materials = [];
   let part = '';
   let base = '';
 
   segs.forEach((seg, i) => {
-    const eaM = seg.match(/([\d.]+)\s*EA/i);
-    const ea = eaM ? parseFloat(eaM[1]) : 1;
-    const wariM = seg.match(/와리\s*:?\s*([\d.]+)/);
+    const ea = seg.ea;
+    const wariM = seg.text.match(/와리\s*:?\s*([\d.]+)/);
 
     // 수량·괄호를 걷어낸 알맹이
-    let text = seg
+    let text = seg.text
       .replace(/\([^)]*\)/g, '')
-      .replace(/[\d.]+\s*EA/i, '')
+      .replace(/[\d.]+\s*EA/gi, '')
       .replace(/,\s*V\s*$/i, '')
       .replace(/\s+\/\s+.*$/, '')          // ' / 맞부착' 같은 공정 노트는 이름이 아니다
+      .replace(/\s{2,}/g, ' ')
       .trim();
+    if (seg.bothSides) text = text.replace(/좌\s*$/, '좌,우');
 
     const at = materialStart(text);
     if (i === 0) {
