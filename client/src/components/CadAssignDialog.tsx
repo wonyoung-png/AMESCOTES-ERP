@@ -13,6 +13,9 @@ import { store, genId, COMMON_BRAND, YARD_UNIT, type Material, type MaterialCate
 import { fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
 
 /** 부위 — 소요량이 붙는 단위. 보강재는 부위를 안 쓰지만 한 덩어리로 묶어 계산한다 */
+/** 보강재 롤 폭 — 52인치 = 132cm */
+const ROLL_52IN = 132;
+
 const PARTS = ['바디', '트림1', '트림2', '안감', '보강재'] as const;
 type PartKey = typeof PARTS[number];
 const ROW_OPTIONS: Array<PartKey | '제외'> = [...PARTS, '제외'];
@@ -61,7 +64,8 @@ export function CadAssignDialog({
 }) {
   const [part, setPart] = useState<Record<string, PartKey | '제외'>>({});
   const [kind, setKind] = useState<Record<string, YardKind>>({ ...DEFAULT_KIND });
-  const [width, setWidth] = useState<Record<string, number>>({ '바디': 150, '트림1': 150, '트림2': 150, '안감': 150, '보강재': 100 });
+  // 보강재는 52인치 롤(132cm)이 표준. 원단·안감 폭은 아이템마다 달라 직접 넣는다
+  const [width, setWidth] = useState<Record<string, number>>({ '바디': 0, '트림1': 0, '트림2': 0, '안감': 0, '보강재': ROLL_52IN });
   const [loss, setLoss] = useState<Record<string, number>>({ '바디': 15, '트림1': 15, '트림2': 15, '안감': 10, '보강재': 10 });
   const [target, setTarget] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<PartKey | null>(null);
@@ -135,6 +139,7 @@ export function CadAssignDialog({
   const applyOne = (p: PartKey) => {
     const t = target[p];
     if (!t) { toast.error(`${p} 를 적용할 자재 줄을 고르세요`); return; }
+    if (needsWidth(p) && !width[p]) { toast.error(`${p} 폭(cm)을 먼저 입력하세요`); return; }
     const net = netOf(p);
     if (!net) { toast.error(`${p} 계산값이 0입니다`); return; }
     const unit = YARD_UNIT[kindOf(p)];
@@ -153,11 +158,13 @@ export function CadAssignDialog({
           kind: k,
           part: k === '보강재' ? '' : (p as string),
           가로: l.w, 세로: l.h,
-          폭: k === '가죽' ? 0 : (width[p] || 150),
+          폭: k === '가죽' ? 0 : (width[p] || 0),
           로스: loss[p] || 0,
           수량: l.count,
         };
       });
+    const noWidth = PARTS.filter(p => (groups[p] || []).length && needsWidth(p) && !width[p]);
+    if (noWidth.length) { toast.error(`폭(cm)을 먼저 입력하세요 — ${noWidth.join(', ')}`); return; }
     if (!rows.length) { toast.error('표에 넣을 줄이 없습니다'); return; }
     onFill(rows);
   };
@@ -204,8 +211,9 @@ export function CadAssignDialog({
                 <div className="flex items-center gap-2 flex-wrap text-xs">
                   {needsWidth(p) && (
                     <label className="flex items-center gap-1">폭(cm)
-                      <input type="number" min={1} className={inp} value={width[p] ?? 0}
+                      <input type="number" min={1} className={inp} placeholder="입력" value={width[p] || ''}
                         onChange={e => setWidth(s => ({ ...s, [p]: parseFloat(e.target.value) || 0 }))} />
+                      {p === '보강재' && <span className="text-[10px] text-muted-foreground">52"</span>}
                     </label>
                   )}
                   <label className="flex items-center gap-1">로스(%)
@@ -213,11 +221,15 @@ export function CadAssignDialog({
                       onChange={e => setLoss(s => ({ ...s, [p]: parseFloat(e.target.value) || 0 }))} />
                   </label>
                 </div>
-                <div className="text-sm tabular-nums">
-                  <span className="text-muted-foreground text-xs">Net </span>{net.toFixed(3)}
-                  <span className="text-muted-foreground"> → 최종 </span>
-                  <b>{withLoss(net, loss[p] || 0).toFixed(3)} {YARD_UNIT[k]}</b>
-                </div>
+                {needsWidth(p) && !width[p] ? (
+                  <p className="text-xs text-[var(--system-orange,#B45309)]">폭(cm)을 입력하면 계산됩니다</p>
+                ) : (
+                  <div className="text-sm tabular-nums">
+                    <span className="text-muted-foreground text-xs">Net </span>{net.toFixed(3)}
+                    <span className="text-muted-foreground"> → 최종 </span>
+                    <b>{withLoss(net, loss[p] || 0).toFixed(3)} {YARD_UNIT[k]}</b>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <select value={target[p] || ''} onChange={e => setTarget(s => ({ ...s, [p]: e.target.value }))}
                     className="h-8 flex-1 min-w-0 rounded-md border border-border bg-card px-2 text-xs" disabled={!n}>

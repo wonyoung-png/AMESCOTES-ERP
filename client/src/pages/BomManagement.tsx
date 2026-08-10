@@ -5051,7 +5051,7 @@ export default function BomManagement() {
           ══════════════════════════════════════════════════════════════════ */}
           {mainTab === 'yardage' && (() => {
             const addRow = (kind: YardKind = '가죽') =>
-              setYardRows(p => [...p, { id: genId(), kind, part: kind === '보강재' ? '' : '바디', 가로: 0, 세로: 0, 폭: 150, 로스: 10, 수량: 1 }]);
+              setYardRows(p => [...p, { id: genId(), kind, part: kind === '보강재' ? '' : '바디', 가로: 0, 세로: 0, 폭: kind === '보강재' ? 132 : 0, 로스: 10, 수량: 1 }]);
             const upd = (id: string, f: string, v: string | number) =>
               setYardRows(p => p.map(r => r.id === id ? { ...r, [f]: v } : r));
 
@@ -5105,7 +5105,7 @@ export default function BomManagement() {
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json() as { leather: Array<{부위:string;가로:number;세로:number;수량:number}>; fabric: Array<{부위:string;가로:number;세로:number;수량:number}> };
                 const conv = (rs: Array<{부위:string;가로:number;세로:number;수량:number}>, kind: YardKind): YardRow[] =>
-                  (rs || []).map(r => ({ id: genId(), kind, part: kind === '보강재' ? '' : '바디', 가로: r.가로, 세로: r.세로, 폭: 150, 로스: 10, 수량: r.수량 }));
+                  (rs || []).map(r => ({ id: genId(), kind, part: kind === '보강재' ? '' : '바디', 가로: r.가로, 세로: r.세로, 폭: 0, 로스: 10, 수량: r.수량 }));
                 setYardRows([...conv(data.leather, '가죽'), ...conv(data.fabric, '원단')]);
                 toast.success(`OCR 완료 — 가죽 ${data.leather?.length ?? 0}행, 원단 ${data.fabric?.length ?? 0}행`);
               } catch (err) {
@@ -5267,7 +5267,7 @@ export default function BomManagement() {
                           <td className={tdCls}>
                             {r.kind === '가죽'
                               ? <input className={inputClsRO} value="—" readOnly />
-                              : <input className={inputCls} type="number" min="1" value={r.폭 || ''} onChange={e => upd(r.id, '폭', parseFloat(e.target.value) || 0)} />}
+                              : <input className={inputCls} type="number" min="1" placeholder="입력" value={r.폭 || ''} onChange={e => upd(r.id, '폭', parseFloat(e.target.value) || 0)} />}
                           </td>
                           <td className={tdCls}><input className={inputCls} type="number" min="0" max="100" value={r.로스} onChange={e => upd(r.id, '로스', parseFloat(e.target.value) || 0)} /></td>
                           <td className={tdCls}><input className={inputCls} type="number" min="1" value={r.수량 || ''} onChange={e => upd(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
