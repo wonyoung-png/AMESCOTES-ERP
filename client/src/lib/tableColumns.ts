@@ -7,6 +7,11 @@
 // 컬럼 추가 시: supabase/ 마이그레이션 SQL 실행 → 아래 목록에 추가
 
 export const TABLE_COLUMNS: Record<string, string[]> = {
+  // 지출결의 — 품목 라인은 결의서에 딸린 값이라 jsonb로 통째로 담는다
+  expenses: ['id', 'expense_date', 'expense_type', 'category', 'description', 'amount_krw',
+             'lines', 'order_id', 'order_no', 'vendor_id', 'vendor_name',
+             'has_tax_invoice', 'tax_invoice_no', 'supply_amount', 'tax_amount',
+             'tax_invoice_date', 'project_item_id', 'memo', 'created_at', 'updated_at'],
   // 기획전 — 팀 업무·할인율은 기획전에 딸린 값이라 jsonb로 통째로 담는다
   campaigns: ['id', 'workspace', 'title', 'channel', 'start_date', 'end_date', 'status',
               'discount_rate', 'owner', 'project_id', 'onboarded_at', 'tasks',

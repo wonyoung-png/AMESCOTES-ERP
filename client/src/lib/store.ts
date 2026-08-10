@@ -763,8 +763,19 @@ export interface Expense {
   supplyAmount?: number;
   taxAmount?: number;
   taxInvoiceDate?: string;
+  /** 어느 프로젝트 항목의 집행인지 — 예산 계획 대비 실제를 보려면 필요하다 */
+  projectItemId?: string;
   createdAt: string;
   memo?: string;
+}
+
+/**
+ * 지출결의 저장 — 로컬에 쓰고 서버에도 올린다.
+ * localStorage에만 두면 만든 사람 브라우저에서만 보인다.
+ */
+function saveExpenses(list: Expense[]) {
+  setAll(KEYS.expenses, list);
+  import('./expenseQueries').then(m => m.pushExpenses(list)).catch(() => {});
 }
 
 // ─── 매출 (간단 버전) ───
@@ -1459,10 +1470,10 @@ export const store = {
 
   // Expenses
   getExpenses: () => getAll<Expense>(KEYS.expenses),
-  setExpenses: (v: Expense[]) => setAll(KEYS.expenses, v),
-  addExpense: (v: Expense) => { const a = getAll<Expense>(KEYS.expenses); a.push(v); setAll(KEYS.expenses, a); },
-  updateExpense: (id: string, u: Partial<Expense>) => { const a = getAll<Expense>(KEYS.expenses); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.expenses, a); } },
-  deleteExpense: (id: string) => setAll(KEYS.expenses, getAll<Expense>(KEYS.expenses).filter(x => x.id !== id)),
+  setExpenses: (v: Expense[]) => saveExpenses( v),
+  addExpense: (v: Expense) => { const a = getAll<Expense>(KEYS.expenses); a.push(v); saveExpenses( a); },
+  updateExpense: (id: string, u: Partial<Expense>) => { const a = getAll<Expense>(KEYS.expenses); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; saveExpenses( a); } },
+  deleteExpense: (id: string) => saveExpenses( getAll<Expense>(KEYS.expenses).filter(x => x.id !== id)),
 
   // Trade Statements
   getTradeStatements: () => getAll<TradeStatement>(KEYS.tradeStatements),

@@ -178,6 +178,9 @@ function convertBomRow(row: Record<string, any>): Record<string, any> {
 
 const TABLE_KEY_MAP: { table: string; key: string; converter?: (row: Record<string, any>) => Record<string, any> }[] = [
   { table: 'vendors',           key: 'ames_vendors' },
+  // 지출결의·기획전 — 서버가 정본. 다른 사람이 만든 것도 같이 보여야 한다
+  { table: 'expenses',          key: 'ames_expenses' },
+  { table: 'campaigns',         key: 'ames_campaigns' },
   { table: 'items',             key: 'ames_items', converter: (row: Record<string, any>) => {
     const base = toCamelCase(row);
     return {
