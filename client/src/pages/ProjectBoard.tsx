@@ -69,9 +69,8 @@ function ItemRow({ item, onToggle, onEdit }: {
       <button type="button" onClick={() => onEdit(item)} className="min-w-0 flex-1 text-left">
         <div className="flex items-center gap-1.5 flex-wrap">
           {item.blocker && !item.done && (
-            <Badge variant="outline" className="text-[11px] h-5 text-[var(--system-red)] border-[var(--system-red)]/30">막힘</Badge>
+            <Badge variant="outline" className="text-[11px] h-5 text-[var(--system-red)] border-[var(--system-red)]/30" title="이게 안 되면 뒤가 막힙니다">먼저 정해야 함</Badge>
           )}
-          {item.urgent && !item.done && <span className="text-[var(--system-orange)] text-xs">●</span>}
           <span className={`text-sm ${item.done ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
             {item.title}
           </span>
@@ -149,7 +148,7 @@ export default function ProjectBoard() {
   const [hideDone, setHideDone] = useState(false);
 
   const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState({ title: '', kind: '팝업·오픈', startDate: '', endDate: '' });
+  const [form, setForm] = useState({ title: '', kind: '팝업·오픈', startDate: '', endDate: '', budgetCap: '' });
   /** 항목 직접 입력·수정 — 이게 기본 경로다. 붙여넣기는 처음 한 번 옮길 때만 쓴다 */
   const [editing, setEditing] = useState<ProjectItem | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -240,11 +239,12 @@ export default function ProjectBoard() {
       await upsertProject({
         id, workspace: ws, title: form.title.trim(), kind: form.kind,
         startDate: form.startDate || undefined, endDate: form.endDate || undefined, anchorLabel: labelOfKind(form.kind),
+        budgetCap: form.budgetCap ? Number(form.budgetCap) : undefined,
         status: '진행',
       });
       toast.success('프로젝트가 생성되었습니다');
       setShowNew(false);
-      setForm({ title: '', kind: '팝업·오픈', startDate: '', endDate: '' });
+      setForm({ title: '', kind: '팝업·오픈', startDate: '', endDate: '', budgetCap: '' });
       await load();
       setSelId(id);
     } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
@@ -332,7 +332,7 @@ export default function ProjectBoard() {
                 <div className={`border rounded-lg p-3 ${stat.blocked ? 'bg-[var(--system-red)]/5 border-[var(--system-red)]/30' : 'bg-card border-border'}`}>
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1"><AlertTriangle className="w-3 h-3" />막고 있는 것</p>
                   <p className={`text-xl font-bold font-mono ${stat.blocked ? 'text-[var(--system-red)]' : 'text-foreground'}`}>{stat.blocked}</p>
-                  <p className="text-[11px] text-muted-foreground">먼저 정해야 뒤가 풀림</p>
+                  <p className="text-[11px] text-muted-foreground">먼저 정해야 뒤가 풀립니다</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1"><CalendarClock className="w-3 h-3" />마감</p>
@@ -408,8 +408,46 @@ export default function ProjectBoard() {
                   </Button>
                 </div>
               ) : view === 'budget' ? (
-                <GroupedList items={shown.filter(i => i.budget != null)} groupBy={i => i.phase}
-                  emptyText="금액이 적힌 항목이 없습니다" onToggle={toggle} onEdit={setEditing} />
+                <>
+                  {/* 총액을 맨 위에 — 상한 대비 얼마나 잡혔는지가 먼저다 */}
+                  <div className="bg-card border border-border rounded-lg p-4 mb-3">
+                    <div className="flex items-end gap-6 flex-wrap">
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">잡힌 금액</p>
+                        <p className="text-2xl font-bold text-foreground font-mono">{won(stat.budget)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">예산 상한</p>
+                        <p className="text-lg font-semibold text-muted-foreground font-mono">
+                          {project.budgetCap ? won(project.budgetCap) : '미정'}
+                        </p>
+                      </div>
+                      {!!project.budgetCap && (
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">남은 금액</p>
+                          <p className={`text-lg font-semibold font-mono ${
+                            project.budgetCap - stat.budget < 0 ? 'text-[var(--system-red)]' : 'text-[var(--system-green)]'}`}>
+                            {won(project.budgetCap - stat.budget)}
+                          </p>
+                        </div>
+                      )}
+                      <div className="ml-auto text-right">
+                        <p className="text-[11px] text-muted-foreground">금액 적힌 항목</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {items.filter(i => i.budget != null).length} / {items.length}
+                        </p>
+                      </div>
+                    </div>
+                    {!!project.budgetCap && (
+                      <div className="h-2 bg-[var(--fill-quaternary)] rounded mt-3 overflow-hidden">
+                        <div className={`h-full rounded ${stat.budget > project.budgetCap ? 'bg-[var(--system-red)]' : 'bg-primary'}`}
+                          style={{ width: `${Math.min(100, (stat.budget / project.budgetCap) * 100)}%` }} />
+                      </div>
+                    )}
+                  </div>
+                  <GroupedList items={shown.filter(i => i.budget != null)} groupBy={i => i.team || '팀 미지정'}
+                    emptyText="금액이 적힌 항목이 없습니다. 항목을 열어 금액을 넣으면 여기 모입니다" onToggle={toggle} onEdit={setEditing} />
+                </>
               ) : (
                 <GroupedList
                   items={shown}
@@ -455,6 +493,12 @@ export default function ProjectBoard() {
                 <p className="text-[11px] text-muted-foreground">이 날짜로 D-day를 셉니다</p>
               </div>
             </div>
+            <div className="space-y-1.5">
+              <Label>예산 상한</Label>
+              <Input type="number" min={0} value={form.budgetCap}
+                onChange={e => setForm(f => ({ ...f, budgetCap: e.target.value }))}
+                placeholder="비워두면 상한 없음" />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNew(false)}>취소</Button>
@@ -481,21 +525,7 @@ export default function ProjectBoard() {
                   placeholder="한정 참(Charm) 디자인 확정 → 중국 공장 견적"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label>설명</Label>
-                <Input value={editing.detail || ''}
-                  onChange={e => setEditing(v => v && { ...v, detail: e.target.value || undefined })}
-                  placeholder="왜 필요한지 · 판단 근거" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>단계</Label>
-                  <Input list="phase-opts" value={editing.phase}
-                    onChange={e => setEditing(v => v && { ...v, phase: e.target.value })}
-                    placeholder="8월 · 준비 · 오픈 직전" />
-                  <p className="text-[11px] text-muted-foreground">항목을 묶는 이름. 자유롭게 쓰세요</p>
-                  <datalist id="phase-opts">{phaseOpts.map(o => <option key={o} value={o} />)}</datalist>
-                </div>
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label>팀</Label>
                   <select value={editing.team || ''}
@@ -505,13 +535,6 @@ export default function ProjectBoard() {
                     {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1.5">
-                  <Label>마감</Label>
-                  <Input type="date" value={editing.due || ''}
-                    onChange={e => setEditing(v => v && { ...v, due: e.target.value || undefined })} />
-                </div>
                 <div className="space-y-1.5">
                   <Label>담당자</Label>
                   <select
@@ -520,44 +543,63 @@ export default function ProjectBoard() {
                       const v = e.target.value;
                       if (v === '__ext') { setEditing(p => p && { ...p, ownerUserId: undefined, owner: '' }); return; }
                       const m = members.find(x => x.id === v);
-                      // 팀이 비어 있으면 담당자의 팀을 따라간다
-                      setEditing(p => p && {
-                        ...p, ownerUserId: m?.id, owner: m?.name,
-                        team: p.team || m?.team,
-                      });
+                      setEditing(p => p && { ...p, ownerUserId: m?.id, owner: m?.name, team: p.team || m?.team });
                     }}
                     className="w-full h-9 text-sm border border-border rounded-md bg-card px-2">
-                    <option value="">담당 미지정</option>
+                    <option value="">미지정</option>
                     {members
                       .filter(m => !editing.team || !m.team || m.team === editing.team)
-                      .map(m => <option key={m.id} value={m.id}>{m.name}{m.team ? ` · ${m.team}` : ''}</option>)}
+                      .map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                     <option value="__ext">사외 직접 입력…</option>
                   </select>
-                  {!editing.ownerUserId && (
-                    <Input value={editing.owner || ''}
-                      onChange={e => setEditing(v => v && { ...v, owner: e.target.value || undefined })}
-                      placeholder="소방서 · 세무 · 용산구청" className="mt-1.5 h-8 text-xs" />
-                  )}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>금액</Label>
-                  <Input type="number" min={0} value={editing.budget ?? ''}
-                    onChange={e => setEditing(v => v && { ...v, budget: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value)) })}
-                    placeholder="0" />
+                  <Label>마감</Label>
+                  <Input type="date" value={editing.due || ''}
+                    onChange={e => setEditing(v => v && { ...v, due: e.target.value || undefined })} />
                 </div>
               </div>
-              <div className="flex items-center gap-4 pt-1">
-                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                  <input type="checkbox" checked={editing.urgent}
-                    onChange={e => setEditing(v => v && { ...v, urgent: e.target.checked })} />
-                  급함
-                </label>
-                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                  <input type="checkbox" checked={editing.blocker}
-                    onChange={e => setEditing(v => v && { ...v, blocker: e.target.checked })} />
-                  <span>막고 있음 <span className="text-[11px] text-muted-foreground">— 이게 안 끝나면 뒤가 막힘</span></span>
-                </label>
-              </div>
+              {!editing.ownerUserId && (
+                <Input value={editing.owner || ''}
+                  onChange={e => setEditing(v => v && { ...v, owner: e.target.value || undefined })}
+                  placeholder="사외 담당 — 소방서 · 세무 · 용산구청" className="h-8 text-xs" />
+              )}
+
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input type="checkbox" checked={editing.blocker}
+                  onChange={e => setEditing(v => v && { ...v, blocker: e.target.checked })} />
+                <span>먼저 정해야 함 <span className="text-[11px] text-muted-foreground">— 이게 안 되면 뒤가 다 막힙니다</span></span>
+              </label>
+
+              {/* 자주 안 쓰는 것은 접어둔다 */}
+              <details className="border border-border rounded-md">
+                <summary className="px-3 py-2 text-sm cursor-pointer select-none">
+                  설명 · 단계 · 금액
+                </summary>
+                <div className="px-3 pb-3 pt-1 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>설명</Label>
+                    <Input value={editing.detail || ''}
+                      onChange={e => setEditing(v => v && { ...v, detail: e.target.value || undefined })}
+                      placeholder="왜 필요한지 · 판단 근거" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>단계</Label>
+                      <Input list="phase-opts" value={editing.phase}
+                        onChange={e => setEditing(v => v && { ...v, phase: e.target.value })}
+                        placeholder="8월 · 준비 · 오픈 직전" />
+                      <datalist id="phase-opts">{phaseOpts.map(o => <option key={o} value={o} />)}</datalist>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>금액</Label>
+                      <Input type="number" min={0} value={editing.budget ?? ''}
+                        onChange={e => setEditing(v => v && { ...v, budget: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value)) })}
+                        placeholder="0" />
+                    </div>
+                  </div>
+                </div>
+              </details>
             </div>
           )}
           <DialogFooter className="flex items-center">
