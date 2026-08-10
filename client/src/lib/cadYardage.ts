@@ -31,6 +31,7 @@ export type CadLine = {
   id: string;
   raw: string;        // 조각 이름 원문
   part: string;       // 부위명 (원판·속고 등 조각 이름)
+  lineName: string;   // 이 자재 행의 이름 — 부위 + 자재 (예: 가락지 겉감 420D)
   bodyPart: string;   // 바디 / 트림1 / 트림2 / 안감 — 보강재는 빈 값
   group: string;      // 마커그룹
   material: string;   // 자재명
@@ -51,14 +52,14 @@ const num = (v: unknown) => {
 };
 
 /** 기본패턴 — 소요량이 아니라 패턴 자체다. 계산에서 뺀다 */
-const BASE_PATTERN_RE = /기본형|닺지형|닷지형/;
+const BASE_PATTERN_RE = /기본형|닺지형|닷지형|그림형/;
 
 /** 자재명·마커그룹으로 무엇으로 볼지 판정 */
 function classify(matName: string, group: string, raw = ''): { a: Assign; why: string } {
   const t = String(matName).trim().toLowerCase();
   const g = (group || '').trim();
   if (BASE_PATTERN_RE.test(raw) || BASE_PATTERN_RE.test(matName)) return { a: 'skip', why: '기본패턴' };
-  if (/vxp|스타롱|부직포|접착|심지|보강|420d|eva|스펀지|폼|hdpe|pe판|철심|s\/l|싱지|양면/.test(t)) return { a: 'interlining', why: '자재명' };
+  if (/vxp|스타롱|부직포|접착|심지|보강|420d|210d|eva|스펀지|폼|hdpe|pe판|철심|s\/l|싱지|양면/.test(t)) return { a: 'interlining', why: '자재명' };
   if (/우라|안감|里子|lining/.test(t)) return { a: 'lining', why: '자재명' };
   if (/원단|fabric|canvas|자카드|나일론|폴리/.test(t)) return { a: 'outer', why: '자재명' };
   if (/겉감|트림|self/.test(t)) {
@@ -75,21 +76,41 @@ function classify(matName: string, group: string, raw = ''): { a: Assign; why: s
 /** 자재를 가리키는 말 — 이 앞은 부위, 이 뒤는 자재로 본다 */
 const MAT_WORDS = [
   '겉감', '우라', '안감', '里子', '트림', '자재',
-  '양면\\s*S/L', 'S/L', 'VXP', '스타롱', '420D', '부직포', '접착', '심지', '보강', 'EVA', '스펀지', '폼',
+  '양면\\s*S/L', 'S/L', 'VXP', '스타롱', '420D', '210D', '부직포', '접착', '심지', '보강', 'EVA', '스펀지', '폼',
   'HDPE', 'PE판', '철심', '싱지', '원단',
 ];
 const MAT_RE = new RegExp('(' + MAT_WORDS.join('|') + ')', 'i');
 
 type Mat = { label: string; ea: number; wari?: number };
 
+/** 자재어가 어디서 시작하는지 — 붙어 있는 자재어는 한 덩어리로 본다.
+ *  "안감 D링고리 겉감" 은 안감 / 겉감 두 덩어리라 뒤엣것(겉감)이 자재,
+ *  "별도 속고판 싱 양면 S/L 1.0" 은 양면·S/L 이 붙어 있어 한 덩어리(양면 S/L)다.
+ *  → 앞에 붙은 말(안감 D링고리, 별도 속고판 싱)이 부위명이 된다. */
+function materialStart(text: string): number {
+  const re = new RegExp(MAT_RE.source, 'gi');
+  const hits: Array<{ s: number; e: number }> = [];
+  for (let m = re.exec(text); m; m = re.exec(text)) hits.push({ s: m.index, e: m.index + m[0].length });
+  if (!hits.length) return -1;
+
+  let start = hits[hits.length - 1].s;
+  for (let i = hits.length - 1; i > 0; i--) {
+    // 두 자재어 사이가 공백·숫자·기호뿐이면 같은 덩어리로 이어 붙인다
+    if (!/^[\s\d.\-/]*$/.test(text.slice(hits[i - 1].e, hits[i].s))) break;
+    start = hits[i - 1].s;
+  }
+  return start;
+}
+
 /** 조각 이름을 부위 + 자재 목록으로 쪼갠다 */
-function splitName(raw: string, group: string): { part: string; tag: string; materials: Mat[] } {
+function splitName(raw: string, group: string): { part: string; base: string; tag: string; materials: Mat[] } {
   const tag = (String(raw || '').match(/^\[([^\]]+)\]/) || [])[1] || '';
   const clean = String(raw || '').replace(/^\[[^\]]*\]\s*/, '');
   const segs = clean.split(',').map(s => s.trim()).filter(Boolean);
 
   const materials: Mat[] = [];
   let part = '';
+  let base = '';   // 첫 세그먼트 전체 — 뒤따르는 자재 이름의 머리말이 된다
 
   segs.forEach((seg, i) => {
     const eaM = seg.match(/([\d.]+)\s*EA/i);
@@ -100,13 +121,22 @@ function splitName(raw: string, group: string): { part: string; tag: string; mat
       .replace(/\([^)]*\)/g, '')
       .replace(/[\d.]+\s*EA/i, '')
       .replace(/,\s*V\s*$/i, '')
+      .replace(/\s+\/\s+.*$/, '')   // ' / 맞부착' 같은 공정 노트는 이름이 아니다 (S/L 은 붙여 쓰므로 안 잘린다)
       .trim();
 
-    const m = text.match(MAT_RE);
+    const at = materialStart(text);
+    if (i === 0) {
+      // '가락지 겉감' 처럼 몸판 자재면 통째로 머리말에 쓰고,
+      // '별도 속고판 싱 양면 S/L' 처럼 보강재·안감이면 부위명까지만 쓴다
+      const first = at >= 0 ? text.slice(at).trim() : '';
+      const bodyish = !first || /겉감|트림|self/i.test(first);
+      base = (tag ? `[${tag}] ` : '') + (bodyish ? text : text.slice(0, at).trim());
+    }
+
     let label: string;
-    if (m && m.index !== undefined) {
-      const head = text.slice(0, m.index).trim();
-      label = text.slice(m.index).trim();
+    if (at >= 0) {
+      const head = text.slice(0, at).trim();
+      label = text.slice(at).trim();
       if (i === 0 || !part) part = head;
     } else if (i === 0) {
       part = text;
@@ -115,7 +145,7 @@ function splitName(raw: string, group: string): { part: string; tag: string; mat
       label = text;
     }
     if (!label) return;
-    materials.push({ label, ea, wari: wariM ? parseFloat(wariM[1]) : undefined });
+    materials.push({ label: normalizeMaterialName(label), ea, wari: wariM ? parseFloat(wariM[1]) : undefined });
   });
 
   if (materials.length === 0) materials.push({ label: tag || group || '겉감', ea: 1 });
@@ -124,7 +154,12 @@ function splitName(raw: string, group: string): { part: string; tag: string; mat
   const trim = [tag, group, clean].find(s => /트림/.test(s || ''));
   if (trim) part = /트림\s*2/.test(trim) ? '트림2' : '트림1';
 
-  return { part: part || clean, tag, materials };
+  return { part: part || clean, base: base || clean, tag, materials };
+}
+
+/** 자재명 표기 통일 — 두께를 앞에 쓴다 (VXP 0.4 → 0.4 VXP) */
+function normalizeMaterialName(label: string) {
+  return label.replace(/^(VXP)\s+([\d.]+)$/i, '$2 $1');
 }
 
 type RawPiece = { name: string; qty: number; w: number; h: number; pair: boolean; group: string };
@@ -164,19 +199,20 @@ export function parseCadWorkbook(data: ArrayBuffer): { styleNo?: string; lines: 
 
   const lines: CadLine[] = [];
   for (const p of pieces) {
-    const { part, materials } = splitName(p.name, p.group);
-    for (const m of materials) {
+    const { part, base, materials } = splitName(p.name, p.group);
+    materials.forEach((m, mi) => {
       const cls = classify(m.label, p.group, p.name);
       lines.push({
         id: `${lines.length}`,
         raw: p.name, part, group: p.group,
+        lineName: base.endsWith(m.label) ? base : `${base} ${m.label}`,
         bodyPart: bodyPartOf(cls.a, p.group, p.name),
         material: m.label, ea: m.ea, wari: m.wari,
         w: p.w, h: p.h, pair: p.pair, qty: p.qty,
         count: p.qty * (p.pair ? 2 : 1) * (m.ea || 1),
         assign: cls.a, why: cls.why,
       });
-    }
+    });
   }
 
   return { styleNo, lines };

@@ -12,12 +12,12 @@ const OUT = process.argv[3] || 'C:/Temp/cad-audit.html';
 const num = v => { const n = parseFloat(String(v ?? '').replace(/[^\d.]/g, '')); return Number.isFinite(n) ? n : 0; };
 
 /** 자재 한 조각을 무엇으로 볼지 */
-const BASE_PATTERN_RE = /기본형|닺지형|닷지형/;
+const BASE_PATTERN_RE = /기본형|닺지형|닷지형|그림형/;
 function classify(matName, group, raw = '') {
   const t = `${matName}`.trim().toLowerCase();
   const g = (group || '').trim();
   if (BASE_PATTERN_RE.test(raw) || BASE_PATTERN_RE.test(matName)) return { a: 'skip', why: '기본패턴' };
-  if (/vxp|스타롱|부직포|접착|심지|보강|420d|eva|스펀지|폼|hdpe|pe판|철심|s\/l|싱지|양면/.test(t)) return { a: 'interlining', why: '자재명' };
+  if (/vxp|스타롱|부직포|접착|심지|보강|420d|210d|eva|스펀지|폼|hdpe|pe판|철심|s\/l|싱지|양면/.test(t)) return { a: 'interlining', why: '자재명' };
   if (/우라|안감|里子|lining/.test(t)) return { a: 'lining', why: '자재명' };
   if (/원단|fabric|canvas|자카드|나일론|폴리/.test(t)) return { a: 'outer', why: '자재명' };
   if (/겉감|트림|self/.test(t)) {
@@ -37,10 +37,27 @@ function classify(matName, group, raw = '') {
         → 부위 "별도 속고판 싱" / 자재 "양면 S/L 1.0"(보강) 1EA + "우라"(안감) 2EA */
 const MAT_WORDS = [
   '겉감', '우라', '안감', '里子', '트림', '자재',
-  '양면\s*S/L', 'S/L', 'VXP', '스타롱', '420D', '부직포', '접착', '심지', '보강', 'EVA', '스펀지', '폼',
+  '양면\s*S/L', 'S/L', 'VXP', '스타롱', '420D', '210D', '부직포', '접착', '심지', '보강', 'EVA', '스펀지', '폼',
   'HDPE', 'PE판', '철심', '싱지', '원단',
 ];
 const MAT_RE = new RegExp('(' + MAT_WORDS.join('|') + ')', 'i');
+
+/** 자재어 시작 위치 — 붙어 있는 자재어는 한 덩어리로 본다 */
+function materialStart(text) {
+  const re = new RegExp(MAT_RE.source, 'gi');
+  const hits = [];
+  for (let m = re.exec(text); m; m = re.exec(text)) hits.push({ s: m.index, e: m.index + m[0].length });
+  if (!hits.length) return -1;
+  let start = hits[hits.length - 1].s;
+  for (let i = hits.length - 1; i > 0; i--) {
+    if (!/^[\s\d.\-/]*$/.test(text.slice(hits[i - 1].e, hits[i].s))) break;
+    start = hits[i - 1].s;
+  }
+  return start;
+}
+
+/** 자재명 표기 통일 — 두께를 앞에 (VXP 0.4 -> 0.4 VXP) */
+const normalizeMaterialName = l => l.replace(/^(VXP)\s+([\d.]+)$/i, '$2 $1');
 
 /** 이름을 부위 + 자재 목록으로 쪼갠다 — 한 패턴에 자재가 여러 개 올 수 있다 */
 function splitName(raw, group) {
@@ -50,6 +67,7 @@ function splitName(raw, group) {
 
   const materials = [];
   let part = '';
+  let base = '';
 
   segs.forEach((seg, i) => {
     const eaM = seg.match(/([\d.]+)\s*EA/i);
@@ -61,15 +79,21 @@ function splitName(raw, group) {
       .replace(/\([^)]*\)/g, '')
       .replace(/[\d.]+\s*EA/i, '')
       .replace(/,\s*V\s*$/i, '')
+      .replace(/\s+\/\s+.*$/, '')          // ' / 맞부착' 같은 공정 노트는 이름이 아니다
       .trim();
 
-    const m = text.match(MAT_RE);
+    const at = materialStart(text);
+    if (i === 0) {
+      const first = at >= 0 ? text.slice(at).trim() : '';
+      const bodyish = !first || /겉감|트림|self/i.test(first);
+      base = (tag ? '[' + tag + '] ' : '') + (bodyish ? text : text.slice(0, at).trim());
+    }
+
     let label;
-    if (m && m.index !== undefined) {
-      const head = text.slice(0, m.index).trim();
-      label = text.slice(m.index).trim();
-      if (i === 0) part = head;            // 첫 조각의 앞부분이 부위명
-      else if (!part) part = head;
+    if (at >= 0) {
+      const head = text.slice(0, at).trim();
+      label = text.slice(at).trim();
+      if (i === 0 || !part) part = head;
     } else if (i === 0) {
       part = text;                          // 자재어가 없으면 전체가 부위명
       label = tag || group || '겉감';
@@ -77,11 +101,11 @@ function splitName(raw, group) {
       label = text;                         // 뒤 조각은 통째로 자재명
     }
     if (!label) return;
-    materials.push({ label, ea, wari: wariM ? parseFloat(wariM[1]) : undefined });
+    materials.push({ label: normalizeMaterialName(label), ea, wari: wariM ? parseFloat(wariM[1]) : undefined });
   });
 
   if (materials.length === 0) materials.push({ label: tag || group || '겉감', ea: 1 });
-  return { part: part || clean, tag, materials };
+  return { part: part || clean, base: base || clean, tag, materials };
 }
 
 
@@ -125,12 +149,13 @@ function parseFile(file) {
   // 조각 → 자재별 행으로 펼친다
   const lines = [];
   for (const p of pieces) {
-    const { part, materials } = splitName(p.name, p.group);
+    const { part, base, materials } = splitName(p.name, p.group);
     for (const m of materials) {
       const cls = classify(m.label, p.group, p.name);
       const count = p.qty * (p.pair ? 2 : 1) * (m.ea || 1);
       lines.push({
-        raw: p.name, part, group: p.group, w: p.w, h: p.h, pair: p.pair, qty: p.qty,
+        raw: p.name, part, group: p.group,
+        lineName: base.endsWith(m.label) ? base : base + ' ' + m.label, w: p.w, h: p.h, pair: p.pair, qty: p.qty,
         material: m.label, ea: m.ea, wari: m.wari,
         assign: cls.a, why: cls.why, count, bodyPart: bodyPartOf(cls.a, p.group, p.name),
         sf: (p.w + 0.5) * (p.h + 0.5) * count / 10000 * 10.764,
@@ -180,9 +205,9 @@ for (const f of data) {
     const rid = `${f.styleNo || f.file}#${i}`;
     const first = l.raw !== last; last = l.raw;
     const sure = CONFIDENT.has(l.why);
-    body += `<tr data-id="${esc(rid)}" data-style="${esc(f.styleNo || f.file)}" data-raw="${esc(l.raw)}" data-mat="${esc(l.material)}" data-a="${l.assign}" data-p="${esc(l.bodyPart)}" data-sure="${sure ? 1 : 0}" class="${l.assign === 'skip' ? 'off' : ''}">`
+    body += `<tr data-id="${esc(rid)}" data-style="${esc(f.styleNo || f.file)}" data-raw="${esc(l.raw)}" data-mat="${esc(l.lineName || l.material)}" data-a="${l.assign}" data-p="${esc(l.bodyPart)}" data-sure="${sure ? 1 : 0}" class="${l.assign === 'skip' ? 'off' : ''}">`
       + `<td class="nm">${first ? esc(l.raw) : '<span class="dim">〃</span>'}</td>`
-      + `<td class="nm"><b>${esc(l.material)}</b>${sure ? '' : ' <span class="warn">확인</span>'}</td>`
+      + `<td class="nm"><b>${esc(l.lineName || l.material)}</b>${sure ? '' : ' <span class="warn">확인</span>'}</td>`
       + `<td class="ctr dim sm">${esc(l.group || '-')}</td>`
       + `<td class="num">${l.count}</td>`
       + `<td class="num">${l.w.toFixed(1)} × ${l.h.toFixed(1)}</td>`

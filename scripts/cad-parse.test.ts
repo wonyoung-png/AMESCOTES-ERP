@@ -23,7 +23,7 @@ const pick = (name: string, group = '겉감') =>
 // 한 조각에 자재 3개 — 겉감 + 보강 2종
 assert.deepStrictEqual(
   pick('뒷판 핸들 겉감 2EA(와리:1.2), VXP 0.6 1EA, 420D'),
-  ['leather:겉감=2', 'interlining:VXP 0.6=1', 'interlining:420D=1'],
+  ['leather:겉감=2', 'interlining:0.6 VXP=1', 'interlining:420D=1'],
 );
 
 // 부위명은 앞 조각에서 물려받고, 뒤 조각은 자재만 바뀐다
@@ -55,3 +55,29 @@ assert.strictEqual(partOf('앞판 트림 1EA'), '트림1');
 assert.strictEqual(partOf('[트림] 앞판 1EA'), '트림1');
 assert.strictEqual(partOf('앞판 1EA', '트림2'), '트림2');
 console.log('ok2');
+
+// 대표님 검수 회신 (10행) — 규칙으로 굳힌다
+const linesOf = (name: string, group = '겉감') =>
+  parseCadWorkbook(sheet(name, group, 1, 10, 10)).lines.map(l => `${l.assign}|${l.lineName}`);
+
+// 그림형은 기본패턴 → 제외
+assert.ok(linesOf('[파우치]5# 메탈 그림형 / 슬라이드 1EA / 앞,뒤 도매', 'SELF').every(x => x.startsWith('skip')));
+
+// 자재 행 이름 = 첫 세그먼트 + 자재명, VXP 는 두께를 앞에, 210D 는 보강재
+assert.deepStrictEqual(linesOf('[파우치]지퍼 플러 겉감 1EA(와리:1.2), VXP 0.6 1EA, 210D 1EA'), [
+  'leather|[파우치] 지퍼 플러 겉감',
+  'interlining|[파우치] 지퍼 플러 겉감 0.6 VXP',
+  'interlining|[파우치] 지퍼 플러 겉감 210D',
+]);
+assert.deepStrictEqual(linesOf('가락지 겉감 2EA(와리:0.9), 420D 1EA'),
+  ['leather|가락지 겉감', 'interlining|가락지 겉감 420D']);
+
+// 부위명에 '안감'이 들어가도 자재는 뒤엣것(겉감) — 공정 노트는 이름에서 뺀다
+assert.deepStrictEqual(linesOf('안감 D링고리 겉감 2EA(와리:1.0), 420D 1EA / 맞부착'),
+  ['leather|안감 D링고리 겉감', 'interlining|안감 D링고리 겉감 420D']);
+
+// 붙어 있는 자재어(양면 S/L)는 한 덩어리 — 머리말엔 부위명만 남는다
+assert.deepStrictEqual(linesOf('별도 속고판 싱 양면 S/L 1.0 1EA, 우라 2EA'),
+  ['interlining|별도 속고판 싱 양면 S/L 1.0', 'lining|별도 속고판 싱 우라']);
+
+console.log('ok3');

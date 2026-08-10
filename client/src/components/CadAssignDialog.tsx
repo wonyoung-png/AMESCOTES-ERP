@@ -221,7 +221,7 @@ export function CadAssignDialog({
                     <td className="px-2 py-1 text-center text-muted-foreground">{l.group || '-'}</td>
                     <td className="px-2 py-1 text-center">{bodyPartOf(assign[l.id] ?? l.assign, l.group, l.raw) || '—'}</td>
                     <td className="px-2 py-1 font-medium break-keep">
-                      {l.material}
+                      {l.lineName || l.material}
                       {l.wari ? <span className="text-muted-foreground ml-1">와리 {l.wari}</span> : null}
                     </td>
                     <td className="px-2 py-1 text-right tabular-nums">{l.count}{l.pair ? ' (좌우)' : ''}</td>
