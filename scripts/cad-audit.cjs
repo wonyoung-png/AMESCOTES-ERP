@@ -133,7 +133,7 @@ function parseFile(file) {
 const files = fs.readdirSync(DIR).filter(f => f.includes('소요량표') && /\.xlsx?$/i.test(f));
 const data = files.map(f => parseFile(path.join(DIR, f)));
 
-const LB = { leather: '가죽', outer: '원단(겉감)', lining: '안감', interlining: '심지·보강', skip: '제외' };
+const LB = { leather: '가죽', outer: '원단(겉감)', lining: '안감', interlining: '보강재', skip: '제외' };
 const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
 // ── 자재명별로 묶는다. 648줄을 다 보는 대신 고유 자재명만 검수하면 된다 ──────────
@@ -247,7 +247,7 @@ details summary{cursor:pointer;font-size:13px;color:var(--muted);padding:6px 0}
 <span style="color:var(--lea)">가죽 ${stats.leather || 0}줄</span>
 <span style="color:var(--out)">원단 ${stats.outer || 0}줄</span>
 <span style="color:var(--lin)">안감 ${stats.lining || 0}줄</span>
-<span style="color:var(--int)">심지·보강 ${stats.interlining || 0}줄</span>
+<span style="color:var(--int)">보강재 ${stats.interlining || 0}줄</span>
 <span>제외(기본패턴) ${stats.skip || 0}줄</span>
 <span style="color:var(--warn)">확인 필요 ${needCheck}개</span>
 </div>

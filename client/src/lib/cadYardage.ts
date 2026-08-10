@@ -14,7 +14,7 @@ export const ASSIGN_LABEL: Record<Assign, string> = {
   leather: '가죽',
   outer: '원단(겉감)',
   lining: '안감',
-  interlining: '심지·보강',
+  interlining: '보강재',
   skip: '제외',
 };
 
