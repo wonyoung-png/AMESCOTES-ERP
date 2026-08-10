@@ -20,12 +20,12 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Trash2, AlertTriangle, CalendarClock, Wallet } from 'lucide-react';
+import { Plus, Trash2, CalendarClock, Wallet } from 'lucide-react';
 
 type View = 'all' | 'team' | 'owner' | 'budget';
 
 const VIEWS: { id: View; label: string; desc: string }[] = [
-  { id: 'all', label: '단계별', desc: '준비 → 진행 → 마무리 순서대로' },
+  { id: 'all', label: '전체', desc: '마감이 가까운 순서대로' },
   { id: 'team', label: '팀별', desc: '국내영업·디자인·생산 …' },
   { id: 'owner', label: '담당자별', desc: '누가 무엇을 언제까지' },
   { id: 'budget', label: '예산', desc: '상한 대비 잡힌 금액' },
@@ -68,9 +68,6 @@ function ItemRow({ item, onToggle, onEdit }: {
       {/* 줄 아무 데나 누르면 고칠 수 있어야 한다 */}
       <button type="button" onClick={() => onEdit(item)} className="min-w-0 flex-1 text-left">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {item.blocker && !item.done && (
-            <Badge variant="outline" className="text-[11px] h-5 text-[var(--system-red)] border-[var(--system-red)]/30" title="이게 안 되면 뒤가 막힙니다">먼저 정해야 함</Badge>
-          )}
           <span className={`text-sm ${item.done ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
             {item.title}
           </span>
@@ -176,7 +173,10 @@ export default function ProjectBoard() {
   const items = project?.items || [];
 
   const shown = useMemo(
-    () => items.filter(i => (!hideDone || !i.done) && (ownerFilter === 'all' || (i.owner || '미지정') === ownerFilter)),
+    () => items
+      .filter(i => (!hideDone || !i.done) && (ownerFilter === 'all' || (i.owner || '담당 미지정') === ownerFilter))
+      // 마감이 가까운 것부터. 기한 없는 것은 뒤로 민다
+      .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999')),
     [items, hideDone, ownerFilter],
   );
   const owners = useMemo(
@@ -217,11 +217,10 @@ export default function ProjectBoard() {
 
   const stat = useMemo(() => {
     const done = items.filter(i => i.done).length;
-    const blocked = items.filter(i => i.blocker && !i.done).length;
     const late = items.filter(i => !i.done && (daysTo(i.due) ?? 99) < 0).length;
     const week = items.filter(i => { const d = daysTo(i.due); return !i.done && d !== null && d >= 0 && d <= 7; }).length;
     const budget = items.reduce((s, i) => s + (i.budget || 0), 0);
-    return { done, blocked, late, week, budget, dday: daysTo(project?.endDate) };
+    return { done, late, week, budget, dday: daysTo(project?.endDate) };
   }, [items, project]);
 
   const toggle = async (item: ProjectItem) => {
@@ -311,8 +310,8 @@ export default function ProjectBoard() {
 
           {project && (
             <>
-              {/* 요약 — 남은 날과 막힌 것을 맨 앞에 */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {/* 요약 — 남은 날을 맨 앞에 */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="bg-card border border-border rounded-lg p-3">
                   <p className="text-[11px] text-muted-foreground">{project.anchorLabel || labelOfKind(project.kind)}까지</p>
                   <p className="text-xl font-bold text-foreground font-mono">
@@ -328,11 +327,6 @@ export default function ProjectBoard() {
                   <div className="h-1 bg-[var(--fill-quaternary)] rounded mt-1.5">
                     <div className="h-full bg-primary rounded" style={{ width: `${items.length ? (stat.done / items.length) * 100 : 0}%` }} />
                   </div>
-                </div>
-                <div className={`border rounded-lg p-3 ${stat.blocked ? 'bg-[var(--system-red)]/5 border-[var(--system-red)]/30' : 'bg-card border-border'}`}>
-                  <p className="text-[11px] text-muted-foreground flex items-center gap-1"><AlertTriangle className="w-3 h-3" />막고 있는 것</p>
-                  <p className={`text-xl font-bold font-mono ${stat.blocked ? 'text-[var(--system-red)]' : 'text-foreground'}`}>{stat.blocked}</p>
-                  <p className="text-[11px] text-muted-foreground">먼저 정해야 뒤가 풀립니다</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1"><CalendarClock className="w-3 h-3" />마감</p>
@@ -451,7 +445,7 @@ export default function ProjectBoard() {
               ) : (
                 <GroupedList
                   items={shown}
-                  groupBy={view === 'team' ? (i => i.team || '팀 미지정') : view === 'owner' ? (i => i.owner || '미지정') : (i => i.phase)}
+                  groupBy={view === 'team' ? (i => i.team || '팀 미지정') : view === 'owner' ? (i => i.owner || '담당 미지정') : (() => '할 일')}
                   emptyText="조건에 맞는 항목이 없습니다"
                   onToggle={toggle}
                   onEdit={setEditing}
@@ -565,38 +559,22 @@ export default function ProjectBoard() {
                   placeholder="사외 담당 — 소방서 · 세무 · 용산구청" className="h-8 text-xs" />
               )}
 
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input type="checkbox" checked={editing.blocker}
-                  onChange={e => setEditing(v => v && { ...v, blocker: e.target.checked })} />
-                <span>먼저 정해야 함 <span className="text-[11px] text-muted-foreground">— 이게 안 되면 뒤가 다 막힙니다</span></span>
-              </label>
 
               {/* 자주 안 쓰는 것은 접어둔다 */}
               <details className="border border-border rounded-md">
-                <summary className="px-3 py-2 text-sm cursor-pointer select-none">
-                  설명 · 단계 · 금액
-                </summary>
-                <div className="px-3 pb-3 pt-1 space-y-3">
+                <summary className="px-3 py-2 text-sm cursor-pointer select-none">설명 · 금액</summary>
+                <div className="px-3 pb-3 pt-1 grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label>설명</Label>
                     <Input value={editing.detail || ''}
                       onChange={e => setEditing(v => v && { ...v, detail: e.target.value || undefined })}
                       placeholder="왜 필요한지 · 판단 근거" />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label>단계</Label>
-                      <Input list="phase-opts" value={editing.phase}
-                        onChange={e => setEditing(v => v && { ...v, phase: e.target.value })}
-                        placeholder="8월 · 준비 · 오픈 직전" />
-                      <datalist id="phase-opts">{phaseOpts.map(o => <option key={o} value={o} />)}</datalist>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>금액</Label>
-                      <Input type="number" min={0} value={editing.budget ?? ''}
-                        onChange={e => setEditing(v => v && { ...v, budget: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value)) })}
-                        placeholder="0" />
-                    </div>
+                  <div className="space-y-1.5">
+                    <Label>금액</Label>
+                    <Input type="number" min={0} value={editing.budget ?? ''}
+                      onChange={e => setEditing(v => v && { ...v, budget: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value)) })}
+                      placeholder="0" />
                   </div>
                 </div>
               </details>
