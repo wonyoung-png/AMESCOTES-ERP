@@ -13,8 +13,8 @@ import { usePersistedState } from '@/hooks/usePersistedState';
 import { calcQty, calcLineAmt, ceil10, calcPostSummary, calcActualMultiple, type PostSummary } from '@/lib/costing';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  store, genId, normalizeColors, MATERIAL_CATEGORIES, YARD_KINDS, YARD_PARTS, YARD_UNIT,
-  type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material, type Vendor, type YardKind, type YardRow,
+  store, genId, normalizeColors, MATERIAL_CATEGORIES, YARD_KINDS, YARD_PARTS, YARD_UNIT, DEFAULT_YARD_CFG,
+  type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material, type Vendor, type YardKind, type YardRow, type YardCfg,
 } from '@/lib/store';
 import { fetchBoms, upsertBom, deleteBom as deleteBomSB, fetchItems, fetchVendors, fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
 import { PackBomEditor } from '@/components/PackBomEditor';
@@ -2245,6 +2245,7 @@ export default function BomManagement() {
   const [cadStyle, setCadStyle] = useState<string | undefined>();
   const [yardRows, setYardRows] = useState<YardRow[]>([]);
   const [yardTarget, setYardTarget] = useState<Record<string, string>>({});
+  const [yardCfg, setYardCfg] = useState<YardCfg>(DEFAULT_YARD_CFG);
   // 각 탭 내 활성 컬러 탭
   const [activePreColor, setActivePreColor] = useState<string>('');
   const [activePostColor, setActivePostColor] = useState<string>('');
@@ -5050,30 +5051,57 @@ export default function BomManagement() {
             소요량 계산 탭
           ══════════════════════════════════════════════════════════════════ */}
           {mainTab === 'yardage' && (() => {
-            const addRow = (kind: YardKind = '가죽') =>
-              setYardRows(p => [...p, { id: genId(), kind, part: kind === '보강재' ? '' : '바디', 가로: 0, 세로: 0, 폭: kind === '보강재' ? 132 : 0, 로스: 10, 수량: 1 }]);
+            const cfgOf = (k: YardKind) => yardCfg[k] ?? DEFAULT_YARD_CFG[k];
+            const setCfg = (k: YardKind, f: '폭' | '로스', v: number) =>
+              setYardCfg(p => ({ ...p, [k]: { ...cfgOf(k), [f]: v } }));
+
+            const addRow = (kind: YardKind) =>
+              setYardRows(p => [...p, { id: genId(), kind, part: kind === '보강재' ? '' : '바디', 가로: 0, 세로: 0, 수량: 1 }]);
             const upd = (id: string, f: string, v: string | number) =>
               setYardRows(p => p.map(r => r.id === id ? { ...r, [f]: v } : r));
 
-            /** 한 행의 순소요량 — 종류마다 단위가 다르다 */
+            /** 한 줄의 순소요량 — 종류마다 단위가 다르다 */
             const rowNet = (r: YardRow) => {
-              if (r.kind === '가죽') return (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764;   // SF
-              if (!r.폭) return 0;
+              if (r.kind === '가죽') return (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764;  // SF
+              const w = cfgOf(r.kind).폭;
+              if (!w) return 0;
               const cm2 = r.가로 * r.세로 * r.수량;
-              return r.kind === '원단' ? cm2 / r.폭 / 91.44 : cm2 / r.폭 / 100;                          // YD / M
+              return r.kind === '보강재' ? cm2 / w / 100 : cm2 / w / 91.44;                              // M / YD
             };
 
-            // 종류·부위별 소계 — BOM 자재 줄에 이 단위로 붙인다 (보강재는 부위 없이 한 덩어리)
-            const groups: Array<{ key: string; kind: YardKind; part: string; net: number; loss: number; n: number }> = [];
-            for (const r of yardRows) {
-              const part = r.kind === '보강재' ? '' : (r.part || '바디');
-              const key = `${r.kind}|${part}`;
-              let g = groups.find(x => x.key === key);
-              if (!g) { g = { key, kind: r.kind, part, net: 0, loss: r.로스, n: 0 }; groups.push(g); }
-              g.net += rowNet(r);
-              g.loss = r.로스;   // 같은 묶음은 마지막 행의 로스율을 쓴다
-              g.n++;
-            }
+            // 고른 원가구분·컬러의 자재 줄 하나에만 순소요량·로스율을 넣는다
+            const patchLine = (targetId: string, netQty: number, lossPct: number) => {
+              const patch = (ls: ExtBomLine[]) =>
+                ls.map(l => l.id === targetId
+                  ? { ...l, netQty: Math.ceil(netQty * 1000) / 1000, lossRate: lossPct / 100 }
+                  : l);
+              setEditBom(prev => {
+                if (!prev) return prev;
+                if (yardScope === 'post') {
+                  return { ...prev, postColorBoms: (prev.postColorBoms || []).map(cb => cb.color === yardColor ? { ...cb, lines: patch(cb.lines) } : cb) };
+                }
+                return { ...prev, colorBoms: (prev.colorBoms || []).map(cb => cb.color === yardColor ? { ...cb, lines: patch(cb.lines) } : cb) };
+              });
+            };
+
+            const targetLines = ((yardScope === 'post' ? (editBom?.postColorBoms || []) : (editBom?.colorBoms || []))
+              .find(cb => cb.color === yardColor)?.lines || [])
+              .filter(l => ['원자재', '가죽', '원단', '보강재'].includes(l.category as string))
+              .map(l => ({
+                id: l.id,
+                label: `${l.subPart || '부위 미지정'} · ${l.itemName || '(자재명 없음)'}${l.spec ? ` / ${l.spec}` : ''} [${l.customUnit || l.unit}]`,
+              }));
+
+            const applySub = (k: YardKind, part: string, net: number) => {
+              if (!editBom) return;
+              const key = `${k}|${part}`;
+              const tid = yardTarget[key];
+              if (!tid) { toast.error('적용할 자재 줄을 고르세요'); return; }
+              if (!net) { toast.error(k === '가죽' ? '계산값이 0입니다' : '폭(cm)을 먼저 입력하세요'); return; }
+              const loss = cfgOf(k).로스;
+              patchLine(tid, net, loss);
+              toast.success(`${k}${part ? ` · ${part}` : ''} ${(net * (1 + loss / 100)).toFixed(3)} ${YARD_UNIT[k]} 적용 — 저장을 눌러 확정하세요`);
+            };
 
             const ocrFileRef = React.createRef<HTMLInputElement>();
             const yardageFileRef = React.createRef<HTMLInputElement>();
@@ -5104,8 +5132,8 @@ export default function BomManagement() {
                 const res = await fetch('/api/yardage/ocr', { method: 'POST', body: fd });
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json() as { leather: Array<{부위:string;가로:number;세로:number;수량:number}>; fabric: Array<{부위:string;가로:number;세로:number;수량:number}> };
-                const conv = (rs: Array<{부위:string;가로:number;세로:number;수량:number}>, kind: YardKind): YardRow[] =>
-                  (rs || []).map(r => ({ id: genId(), kind, part: kind === '보강재' ? '' : '바디', 가로: r.가로, 세로: r.세로, 폭: 0, 로스: 10, 수량: r.수량 }));
+                const conv = (rs: typeof data.leather, kind: YardKind): YardRow[] =>
+                  (rs || []).map(r => ({ id: genId(), kind, part: kind === '보강재' ? '' : '바디', 가로: r.가로, 세로: r.세로, 수량: r.수량 }));
                 setYardRows([...conv(data.leather, '가죽'), ...conv(data.fabric, '원단')]);
                 toast.success(`OCR 완료 — 가죽 ${data.leather?.length ?? 0}행, 원단 ${data.fabric?.length ?? 0}행`);
               } catch (err) {
@@ -5114,53 +5142,11 @@ export default function BomManagement() {
               e.target.value = '';
             };
 
-            // 고른 원가구분·컬러의 자재 줄 하나에만 순소요량·로스율을 넣는다
-            const patchLine = (targetId: string, netQty: number, lossPct: number) => {
-              const patch = (lines: ExtBomLine[]) =>
-                lines.map(l => l.id === targetId
-                  ? { ...l, netQty: Math.ceil(netQty * 1000) / 1000, lossRate: lossPct / 100 }
-                  : l);
-              setEditBom(prev => {
-                if (!prev) return prev;
-                if (yardScope === 'post') {
-                  return {
-                    ...prev,
-                    postColorBoms: (prev.postColorBoms || []).map(cb =>
-                      cb.color === yardColor ? { ...cb, lines: patch(cb.lines) } : cb),
-                  };
-                }
-                return {
-                  ...prev,
-                  colorBoms: (prev.colorBoms || []).map(cb =>
-                    cb.color === yardColor ? { ...cb, lines: patch(cb.lines) } : cb),
-                };
-              });
-            };
-
-            // 적용 대상 후보 — 현재 고른 원가구분·컬러의 자재 줄
-            const targetLines = ((yardScope === 'post' ? (editBom?.postColorBoms || []) : (editBom?.colorBoms || []))
-              .find(cb => cb.color === yardColor)?.lines || [])
-              .filter(l => ['원자재', '가죽', '원단', '보강재'].includes(l.category as string))
-              .map(l => ({
-                id: l.id,
-                label: `${l.subPart || '부위 미지정'} · ${l.itemName || '(자재명 없음)'}${l.spec ? ` / ${l.spec}` : ''} [${l.customUnit || l.unit}]`,
-              }));
-
-            const applyGroup = (g: typeof groups[number]) => {
-              if (!editBom) return;
-              const tid = yardTarget[g.key];
-              if (!tid) { toast.error('적용할 자재 줄을 고르세요'); return; }
-              if (!g.net) { toast.error('계산값이 0입니다'); return; }
-              patchLine(tid, g.net, g.loss);
-              const fin = g.net * (1 + g.loss / 100);
-              toast.success(`${g.kind}${g.part ? ` · ${g.part}` : ''} ${fin.toFixed(3)} ${YARD_UNIT[g.kind]} 적용 — 저장을 눌러 확정하세요`);
-            };
-
-            const thCls = 'text-[11px] text-muted-foreground font-semibold text-center py-2 px-2';
+            const thCls = 'text-[11px] text-muted-foreground font-semibold text-center py-1.5 px-2';
             const tdCls = 'px-2 py-1';
             const inputCls = 'w-full border border-border rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-1 focus:ring-ring';
-            const inputClsRO = 'w-full border border-border rounded px-2 py-1 text-sm text-center bg-[var(--fill-quaternary)] text-muted-foreground cursor-default';
             const selCls = 'w-full h-[30px] rounded border border-border bg-card px-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring';
+            const cfgInput = 'w-[76px] border border-border rounded px-2 py-1 text-sm text-right bg-card focus:outline-none focus:ring-1 focus:ring-ring';
 
             return (
               <div className="space-y-4">
@@ -5172,10 +5158,15 @@ export default function BomManagement() {
                   targets={targetLines}
                   scopeLabel={`${yardScope === 'post' ? '사후원가' : '사전원가'} · ${yardColor || '컬러 미선택'}`}
                   onApply={(id, net, lossPct) => patchLine(id, net, lossPct)}
-                  onFill={rows => { setYardRows(rows.map(r => ({ ...r, id: genId() }))); setCadOpen(false); toast.success(`소요량 표에 ${rows.length}행 채웠습니다`); }}
+                  onFill={(rows, cfg) => {
+                    setYardRows(rows.map(r => ({ ...r, id: genId() })));
+                    setYardCfg(cfg);
+                    setCadOpen(false);
+                    toast.success(`소요량 표에 ${rows.length}행 채웠습니다`);
+                  }}
                 />
 
-                {/* 상단 — 업로드 / 적용 대상 */}
+                {/* 상단 — 업로드 */}
                 <div className="flex items-center justify-end gap-2 flex-wrap">
                   <input ref={yardageFileRef} type="file" accept=".xls,.xlsx" className="hidden" onChange={handleYardageUpload} />
                   <input ref={ocrFileRef} type="file" accept="image/*" className="hidden" onChange={handleOcrUpload} />
@@ -5215,109 +5206,124 @@ export default function BomManagement() {
                         </select>
                       </div>
                       <p className="text-[11px] text-muted-foreground flex-1 min-w-[240px]">
-                        가죽·원단·보강재를 한 표에 넣고, 아래 <b>소계</b>에서 종류·부위별로 BOM 자재 줄에 각각 붙입니다.
+                        종류마다 표가 따로 있습니다. <b>폭·로스는 종류에 하나</b>, 소요량은 <b>부위별로 따로</b> 나옵니다.
                         적용 후 상단 <b>저장</b>을 눌러야 확정됩니다.
                       </p>
                     </div>
                   );
                 })()}
 
-                {/* 통합 소요량 표 */}
-                <div className="bg-card rounded-lg border border-border overflow-hidden">
-                  <div className="overflow-x-auto"><table className="data-table w-full min-w-[860px]">
-                    <thead className="bg-[var(--fill-quaternary)] border-b border-border">
-                      <tr>
-                        <th className={thCls} style={{width:'11%'}}>종류</th>
-                        <th className={thCls} style={{width:'12%'}}>부위</th>
-                        <th className={thCls} style={{width:'11%'}}>가로 CM</th>
-                        <th className={thCls} style={{width:'11%'}}>세로 CM</th>
-                        <th className={thCls} style={{width:'11%'}}>폭 CM</th>
-                        <th className={thCls} style={{width:'10%'}}>로스 %</th>
-                        <th className={thCls} style={{width:'9%'}}>수량</th>
-                        <th className={thCls} style={{width:'17%'}}>NET</th>
-                        <th className={thCls} style={{width:'5%'}}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {yardRows.length === 0 && (
-                        <tr><td colSpan={9} className="text-center text-xs text-muted-foreground py-6">
-                          행을 추가하거나 CAD 파일을 올리세요.
-                        </td></tr>
-                      )}
-                      {yardRows.map(r => (
-                        <tr key={r.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                          <td className={tdCls}>
-                            <select className={selCls} value={r.kind}
-                              onChange={e => {
-                                const k = e.target.value as YardKind;
-                                setYardRows(p => p.map(x => x.id === r.id ? { ...x, kind: k, part: k === '보강재' ? '' : (x.part || '바디') } : x));
-                              }}>
-                              {YARD_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
-                            </select>
-                          </td>
-                          <td className={tdCls}>
-                            {r.kind === '보강재'
-                              ? <span className="block text-center text-xs text-muted-foreground">—</span>
-                              : <select className={selCls} value={r.part || '바디'} onChange={e => upd(r.id, 'part', e.target.value)}>
-                                  {YARD_PARTS.map(p => <option key={p} value={p}>{p}</option>)}
-                                </select>}
-                          </td>
-                          <td className={tdCls}><input className={inputCls} type="number" min="0" value={r.가로 || ''} onChange={e => upd(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
-                          <td className={tdCls}><input className={inputCls} type="number" min="0" value={r.세로 || ''} onChange={e => upd(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
-                          <td className={tdCls}>
-                            {r.kind === '가죽'
-                              ? <input className={inputClsRO} value="—" readOnly />
-                              : <input className={inputCls} type="number" min="1" placeholder="입력" value={r.폭 || ''} onChange={e => upd(r.id, '폭', parseFloat(e.target.value) || 0)} />}
-                          </td>
-                          <td className={tdCls}><input className={inputCls} type="number" min="0" max="100" value={r.로스} onChange={e => upd(r.id, '로스', parseFloat(e.target.value) || 0)} /></td>
-                          <td className={tdCls}><input className={inputCls} type="number" min="1" value={r.수량 || ''} onChange={e => upd(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
-                          <td className={tdCls}>
-                            <input className={inputClsRO + ' font-semibold text-primary'} readOnly
-                              value={`${rowNet(r).toFixed(3)} ${YARD_UNIT[r.kind]}`} />
-                          </td>
-                          <td className={tdCls + ' text-center'}>
-                            <button onClick={() => setYardRows(p => p.filter(x => x.id !== r.id))}
-                              className="text-muted-foreground hover:text-[var(--system-red)] text-lg leading-none">×</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table></div>
-                  <div className="p-3 flex items-center gap-3 flex-wrap">
-                    {YARD_KINDS.map(k => (
-                      <button key={k} onClick={() => addRow(k)} className="text-xs text-primary hover:text-primary/80 font-semibold">
-                        + {k} 행
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* 종류별 표 */}
+                {YARD_KINDS.map(k => {
+                  const rows = yardRows.filter(r => r.kind === k);
+                  const cfg = cfgOf(k);
+                  const needsWidth = k !== '가죽';
+                  const noWidth = needsWidth && !cfg.폭;
 
-                {/* 종류·부위별 소계 → BOM 적용 */}
-                {groups.length > 0 && (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {groups.map(g => (
-                      <div key={g.key} className="rounded-lg border border-border bg-card p-3 space-y-2">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-sm font-semibold">{g.kind}{g.part ? ` · ${g.part}` : ''}</span>
-                          <span className="text-[11px] text-muted-foreground">{g.n}행</span>
-                        </div>
-                        <div className="text-sm tabular-nums">
-                          <span className="text-muted-foreground text-xs">Net </span>{g.net.toFixed(3)}
-                          <span className="text-muted-foreground"> → 최종 (+{g.loss}%) </span>
-                          <b>{(g.net * (1 + g.loss / 100)).toFixed(3)} {YARD_UNIT[g.kind]}</b>
-                        </div>
-                        <div className="flex gap-2">
-                          <select value={yardTarget[g.key] || ''} onChange={e => setYardTarget(p => ({ ...p, [g.key]: e.target.value }))}
-                            className="h-8 flex-1 min-w-0 rounded-md border border-border bg-card px-2 text-xs">
-                            <option value="">적용할 자재 줄…</option>
-                            {targetLines.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                          </select>
-                          <Button size="sm" className="text-xs h-8" onClick={() => applyGroup(g)}>BOM에 적용</Button>
+                  // 부위별 소계 — 보강재는 부위가 없어 한 덩어리
+                  const parts = k === '보강재' ? [''] : YARD_PARTS.filter(p => rows.some(r => (r.part || '바디') === p));
+                  return (
+                    <div key={k} className="bg-card rounded-lg border border-border overflow-hidden">
+                      {/* 종류 헤더 — 폭·로스는 여기 하나씩 */}
+                      <div className="flex items-center gap-4 px-4 py-2.5 bg-[var(--fill-quaternary)] border-b border-border flex-wrap">
+                        <span className="text-sm font-bold">{k}</span>
+                        <span className="text-[11px] text-muted-foreground">{rows.length}행 · 단위 {YARD_UNIT[k]}</span>
+                        <div className="flex items-center gap-3 ml-auto flex-wrap">
+                          {needsWidth && (
+                            <label className="text-xs flex items-center gap-1.5">
+                              폭 CM
+                              <input type="number" min={1} className={cfgInput} placeholder="입력" value={cfg.폭 || ''}
+                                onChange={e => setCfg(k, '폭', parseFloat(e.target.value) || 0)} />
+                              {k === '보강재' && <span className="text-[10px] text-muted-foreground">52"</span>}
+                            </label>
+                          )}
+                          <label className="text-xs flex items-center gap-1.5">
+                            로스 %
+                            <input type="number" min={0} max={100} className={cfgInput} value={cfg.로스}
+                              onChange={e => setCfg(k, '로스', parseFloat(e.target.value) || 0)} />
+                          </label>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+
+                      {noWidth && rows.length > 0 && (
+                        <p className="px-4 py-2 text-xs text-[var(--system-orange,#B45309)] border-b border-border">
+                          폭(cm)을 입력하면 계산됩니다.
+                        </p>
+                      )}
+
+                      <div className="overflow-x-auto"><table className="data-table w-full min-w-[620px]">
+                        <thead className="border-b border-border">
+                          <tr>
+                            <th className={thCls} style={{ width: '20%' }}>부위</th>
+                            <th className={thCls} style={{ width: '18%' }}>가로 CM</th>
+                            <th className={thCls} style={{ width: '18%' }}>세로 CM</th>
+                            <th className={thCls} style={{ width: '14%' }}>수량</th>
+                            <th className={thCls} style={{ width: '22%' }}>NET</th>
+                            <th className={thCls} style={{ width: '8%' }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.length === 0 && (
+                            <tr><td colSpan={6} className="text-center text-xs text-muted-foreground py-4">
+                              행이 없습니다. 아래 <b>+ 행 추가</b> 또는 CAD 업로드.
+                            </td></tr>
+                          )}
+                          {rows.map(r => (
+                            <tr key={r.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                              <td className={tdCls}>
+                                {k === '보강재'
+                                  ? <span className="block text-center text-xs text-muted-foreground">—</span>
+                                  : <select className={selCls} value={r.part || '바디'} onChange={e => upd(r.id, 'part', e.target.value)}>
+                                      {YARD_PARTS.map(p => <option key={p} value={p}>{p}</option>)}
+                                    </select>}
+                              </td>
+                              <td className={tdCls}><input className={inputCls} type="number" min="0" value={r.가로 || ''} onChange={e => upd(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
+                              <td className={tdCls}><input className={inputCls} type="number" min="0" value={r.세로 || ''} onChange={e => upd(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
+                              <td className={tdCls}><input className={inputCls} type="number" min="1" value={r.수량 || ''} onChange={e => upd(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
+                              <td className={tdCls + ' text-right tabular-nums text-sm font-semibold text-primary pr-3'}>
+                                {rowNet(r).toFixed(3)} {YARD_UNIT[k]}
+                              </td>
+                              <td className={tdCls + ' text-center'}>
+                                <button onClick={() => setYardRows(p => p.filter(x => x.id !== r.id))}
+                                  className="text-muted-foreground hover:text-[var(--system-red)] text-lg leading-none">×</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table></div>
+
+                      <div className="px-3 py-2 border-t border-border">
+                        <button onClick={() => addRow(k)} className="text-xs text-primary hover:text-primary/80 font-semibold">+ {k} 행 추가</button>
+                      </div>
+
+                      {/* 부위별 소계 → BOM 적용 */}
+                      {rows.length > 0 && (
+                        <div className="border-t border-border divide-y divide-border">
+                          {parts.map(p => {
+                            const net = rows.filter(r => k === '보강재' || (r.part || '바디') === p).reduce((s, r) => s + rowNet(r), 0);
+                            const key = `${k}|${p}`;
+                            return (
+                              <div key={key} className="px-3 py-2 flex items-center gap-2 flex-wrap bg-primary/5">
+                                <span className="text-xs font-semibold min-w-[86px]">{k}{p ? ` · ${p}` : ''}</span>
+                                <span className="text-sm tabular-nums">
+                                  <span className="text-[11px] text-muted-foreground">Net </span>{net.toFixed(3)}
+                                  <span className="text-[11px] text-muted-foreground"> → 최종 (+{cfg.로스}%) </span>
+                                  <b>{(net * (1 + cfg.로스 / 100)).toFixed(3)} {YARD_UNIT[k]}</b>
+                                </span>
+                                <select value={yardTarget[key] || ''} onChange={e => setYardTarget(s => ({ ...s, [key]: e.target.value }))}
+                                  className="h-8 flex-1 min-w-[200px] rounded-md border border-border bg-card px-2 text-xs ml-auto">
+                                  <option value="">적용할 자재 줄…</option>
+                                  {targetLines.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                                </select>
+                                <Button size="sm" className="text-xs h-8" onClick={() => applySub(k, p, net)}>BOM에 적용</Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             );
           })()}

@@ -87,22 +87,32 @@ export const MATERIAL_SUB_TYPES: Partial<Record<MaterialCategory, string[]>> = {
     '개고리', '지퍼 슬라이더', '자석', '오브제 장식 (키·볼·팁)', '봉장식 / 바장식',
   ],
 };
-/** 소요량 계산 — 자재 종류와 부위. 보강재는 부위를 쓰지 않는다. */
-export const YARD_KINDS = ['가죽', '원단', '보강재'] as const;
+/** 소요량 계산 — 자재 종류. 종류마다 표가 따로 있고 단위가 다르다 */
+export const YARD_KINDS = ['가죽', '원단', '안감', '보강재'] as const;
 export type YardKind = typeof YARD_KINDS[number];
-export const YARD_PARTS = ['바디', '트림1', '트림2', '안감'];
+/** 부위 — 종류 안에서 다시 갈린다. 가죽 바디 / 가죽 트림1 … 각각 소요량이 따로 나온다.
+ *  보강재는 부위를 쓰지 않는다. */
+export const YARD_PARTS = ['바디', '트림1', '트림2'];
 /** 종류별 계산 단위 */
-export const YARD_UNIT: Record<YardKind, string> = { '가죽': 'SF', '원단': 'YD', '보강재': 'M' };
-/** 소요량 계산 표의 한 줄 */
+export const YARD_UNIT: Record<YardKind, string> = { '가죽': 'SF', '원단': 'YD', '안감': 'YD', '보강재': 'M' };
+/** 보강재 롤 폭 — 52인치 */
+export const ROLL_52IN = 132;
+/** 소요량 계산 표의 한 줄 — 폭·로스는 줄이 아니라 종류에 달린다 */
 export type YardRow = {
   id: string;
   kind: YardKind;
   part: string;      // 보강재는 빈 값
   가로: number;      // cm
   세로: number;      // cm
-  폭: number;        // cm — 원단·보강재만 쓴다
-  로스: number;      // %
   수량: number;
+};
+/** 종류별 설정 — 폭(가죽 제외)과 로스율은 종류마다 하나씩 */
+export type YardCfg = Record<YardKind, { 폭: number; 로스: number }>;
+export const DEFAULT_YARD_CFG: YardCfg = {
+  '가죽': { 폭: 0, 로스: 15 },
+  '원단': { 폭: 0, 로스: 10 },
+  '안감': { 폭: 0, 로스: 10 },
+  '보강재': { 폭: ROLL_52IN, 로스: 10 },
 };
 /** 도금 컬러 — 장식 자재용 */
 export const PLATING_COLORS = ['니켈가랑', '골드가랑', '금가랑', '니켈', '니켈사틴', '바렐'];
