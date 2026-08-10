@@ -312,7 +312,10 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
               <DialogTitle className="text-lg">{detail.title}</DialogTitle>
             </div>
             <Badge>{STATUS_LABEL[detail.status]}</Badge>
-            {detail.discountRate != null && <Badge variant="outline">할인 {detail.discountRate}%</Badge>}
+            {detail.discountRate != null && <Badge variant="outline">기본 할인 {detail.discountRate}%</Badge>}
+            {!!detail.productDiscounts?.length && (
+              <Badge variant="outline">상품별 {detail.productDiscounts.length}건</Badge>
+            )}
           </div>
           {detail.pushSkus?.length ? (
             <div className="flex flex-wrap gap-1 mt-2">
@@ -349,6 +352,23 @@ export default function CampaignProjectPanel({ campaign, onClose, onRefresh }: P
             <div className="bg-muted border border-border rounded-md p-3 text-sm">
               <p className="text-foreground">미온보딩 상태입니다. 온보딩 후 팀별로 업무를 직접 등록하세요.</p>
               <Button size="sm" className="mt-2" onClick={onboard}>캘린더 온보딩</Button>
+            </div>
+          )}
+
+          {!!detail.productDiscounts?.length && (
+            <div className="border border-border rounded-md overflow-hidden mb-3">
+              <div className="px-3 py-2 bg-[var(--fill-quaternary)] border-b border-border text-xs font-semibold text-foreground">
+                상품별 할인율 — 나머지는 기본 {detail.discountRate ?? 0}%
+              </div>
+              <div className="max-h-40 overflow-y-auto divide-y divide-border">
+                {detail.productDiscounts.map(d => (
+                  <div key={d.styleNo} className="flex items-center gap-3 px-3 py-1.5">
+                    <span className="w-32 shrink-0 text-[11px] font-mono text-muted-foreground truncate">{d.styleNo}</span>
+                    <span className="flex-1 min-w-0 text-xs text-foreground truncate">{d.name || '—'}</span>
+                    <span className="text-xs font-mono text-foreground shrink-0">{d.rate}%</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

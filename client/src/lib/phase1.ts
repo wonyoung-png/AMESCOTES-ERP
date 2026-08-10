@@ -305,11 +305,20 @@ export interface Campaign {
   discountRate?: number;
   /** 소속 대형 프로젝트. 없으면 단독 기획전 */
   projectId?: string;
+  /** 상품별 할인율. 여기 없는 상품은 위 discountRate(기본율)를 따른다 */
+  productDiscounts?: ProductDiscount[];
   pushSkus?: string[];
   owner?: string;
   tasks: CampaignTask[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductDiscount {
+  styleNo: string;
+  name?: string;
+  /** % */
+  rate: number;
 }
 
 export const CAMPAIGN_CHANNELS = ['자사몰', '센텀', '29CM', 'W컨셉', '쇼룸', '해외'] as const;

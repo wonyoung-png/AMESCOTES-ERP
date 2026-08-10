@@ -17,6 +17,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
 import { fetchProjects, upsertProject, type Project } from '@/lib/projectQueries';
+import ProductDiscountSheet from '@/components/ProductDiscountSheet';
+import type { ProductDiscount } from '@/lib/phase1';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const VIEW_MODES: CalendarViewMode[] = ['year', 'half', 'quarter', 'month', 'week', 'day'];
@@ -57,6 +59,7 @@ export default function OperationalCalendar() {
   // 대형 프로젝트는 여기서 만들고 프로젝트 탭에서 상세를 관리한다
   const [projects, setProjects] = useState<Project[]>([]);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [showDiscounts, setShowDiscounts] = useState(false);
   const [pForm, setPForm] = useState({ title: '', kind: '팝업·오픈', anchorDate: '', anchorLabel: '오픈' });
   const loadProjects = () => fetchProjects(ws).then(setProjects).catch(() => {});
   useEffect(() => { loadProjects(); /* eslint-disable-next-line */ }, [ws]);
@@ -76,7 +79,7 @@ export default function OperationalCalendar() {
     } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
   };
   const [form, setForm] = useState({
-    title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '',
+    title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '', productDiscounts: [] as ProductDiscount[],
   });
 
   const campaigns = useMemo(() => {
@@ -111,12 +114,13 @@ export default function OperationalCalendar() {
       status: 'onboarded',
       discountRate: form.discountRate,
       projectId: form.projectId || undefined,
+      productDiscounts: form.productDiscounts.length ? form.productDiscounts : undefined,
       owner: '국내영업',
     });
     phase1.onboardCampaign(row.id);
     toast.success('기획전이 생성되었습니다. 팀별로 업무를 직접 추가하세요');
     setShowNew(false);
-    setForm({ title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '' });
+    setForm({ title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '', productDiscounts: [] });
     refresh();
   };
 
@@ -380,7 +384,20 @@ export default function OperationalCalendar() {
               <div><Label>시작</Label><Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} /></div>
               <div><Label>종료</Label><Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} /></div>
             </div>
-            <div><Label>할인율 %</Label><Input type="number" min="0" value={form.discountRate} onChange={e => setForm(f => ({ ...f, discountRate: +e.target.value }))} /></div>
+            <div>
+              <Label>기본 할인율 %</Label>
+              <Input type="number" min="0" max="100" value={form.discountRate}
+                onChange={e => setForm(f => ({ ...f, discountRate: Math.min(100, Math.max(0, +e.target.value)) }))} />
+              <p className="text-[11px] text-muted-foreground mt-1">상품별로 다르게 걸 상품만 따로 지정하세요</p>
+            </div>
+            <div>
+              <Label>상품별 할인율</Label>
+              <Button type="button" variant="outline" className="w-full justify-between mt-1"
+                onClick={() => setShowDiscounts(true)}>
+                <span>{form.productDiscounts.length ? `${form.productDiscounts.length}개 상품 지정됨` : '상품별로 다르게 걸기'}</span>
+                <span className="text-muted-foreground">›</span>
+              </Button>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNew(false)}>취소</Button>
@@ -426,6 +443,14 @@ export default function OperationalCalendar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+    <ProductDiscountSheet
+        open={showDiscounts}
+        onOpenChange={setShowDiscounts}
+        baseRate={form.discountRate}
+        value={form.productDiscounts}
+        onChange={v => setForm(f => ({ ...f, productDiscounts: v }))}
+      />
 
     </div>
   );
