@@ -5155,9 +5155,6 @@ export default function BomManagement() {
                   onOpenChange={setCadOpen}
                   styleNo={cadStyle}
                   lines={cadLines}
-                  targets={targetLines}
-                  scopeLabel={`${yardScope === 'post' ? '사후원가' : '사전원가'} · ${yardColor || '컬러 미선택'}`}
-                  onApply={(id, net, lossPct) => patchLine(id, net, lossPct)}
                   onFill={(rows, cfg) => {
                     setYardRows(rows.map(r => ({ ...r, id: genId() })));
                     setYardCfg(cfg);
@@ -5312,7 +5309,7 @@ export default function BomManagement() {
                                 </span>
                                 <select value={yardTarget[key] || ''} onChange={e => setYardTarget(s => ({ ...s, [key]: e.target.value }))}
                                   className="h-8 flex-1 min-w-[200px] rounded-md border border-border bg-card px-2 text-xs ml-auto">
-                                  <option value="">적용할 자재 줄…</option>
+                                  <option value="">{targetLines.length ? '적용할 자재 줄…' : '자재 줄 없음 — BOM에 원자재를 먼저 추가하세요'}</option>
                                   {targetLines.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
                                 </select>
                                 <Button size="sm" className="text-xs h-8" onClick={() => applySub(k, p, net)}>BOM에 적용</Button>

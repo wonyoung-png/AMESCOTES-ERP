@@ -50,22 +50,18 @@ const guessBucket = (l: CadLine): Bucket | '제외' => {
 };
 
 export function CadAssignDialog({
-  open, onOpenChange, styleNo, lines, targets, scopeLabel, onApply, onFill,
+  open, onOpenChange, styleNo, lines, onFill,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   styleNo?: string;
   lines: CadLine[];
-  targets: CadTarget[];
-  scopeLabel: string;
-  onApply: (targetId: string, netQty: number, lossPct: number, unit: string) => void;
   onFill: (rows: Array<Omit<YardRow, 'id'>>, cfg: YardCfg) => void;
 }) {
   const [bucket, setBucket] = useState<Record<string, Bucket | '제외'>>({});
   const [kind, setKind] = useState<Record<string, YardKind>>({ ...DEFAULT_KIND });
   // 폭·로스는 부위가 아니라 종류에 달린다 (가죽 15%, 원단 10% …)
   const [cfg, setCfg] = useState<YardCfg>(DEFAULT_YARD_CFG);
-  const [target, setTarget] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Bucket | null>(null);
   const widthOf = (b: Bucket) => cfg[kindOf(b)].폭;
   const lossOf = (b: Bucket) => cfg[kindOf(b)].로스;
@@ -137,16 +133,6 @@ export function CadAssignDialog({
     }
   };
 
-  const applyOne = (b: Bucket) => {
-    if (!target[b]) { toast.error(`${b} 를 적용할 자재 줄을 고르세요`); return; }
-    if (needsWidth(b) && !widthOf(b)) { toast.error(`${kindOf(b)} 폭(cm)을 먼저 입력하세요`); return; }
-    const net = netOf(b);
-    if (!net) { toast.error(`${b} 계산값이 0입니다`); return; }
-    const unit = YARD_UNIT[kindOf(b)];
-    onApply(target[b], Math.ceil(net * 1000) / 1000, lossOf(b), unit);
-    toast.success(`${b} ${withLoss(net, lossOf(b)).toFixed(3)} ${unit} 적용`);
-  };
-
   const fillTable = () => {
     const active = BUCKETS.filter(b => (groups[b] || []).length);
     const noWidth = Array.from(new Set(active.filter(b => needsWidth(b) && !widthOf(b)).map(kindOf)));
@@ -181,41 +167,22 @@ export function CadAssignDialog({
           </DialogTitle>
           <p className="text-[11px] text-muted-foreground leading-snug">
             소요량표엔 겉감이 가죽인지 원단인지 없습니다 — <b>부위</b>만 자동으로 잡았습니다.
-            부위마다 <b>종류·폭·로스</b>를 넣으면 계산됩니다. 적용 대상 <b>{scopeLabel}</b>.
+            부위마다 <b>종류·폭·로스</b>를 넣고 아래 <b>소요량 표에 채우기</b>를 누르면, BOM 적용은 소요량 탭에서 합니다.
             {skipCount > 0 && <> 기본패턴 <b>{skipCount}줄</b> 제외.</>}
           </p>
         </DialogHeader>
 
-        {/* 종류별 폭·로스 — 부위가 아니라 종류에 하나씩 */}
-        <div className="flex items-center gap-3 flex-wrap rounded-lg border border-border bg-[var(--fill-quaternary)] px-3 py-2 shrink-0">
-          <span className="text-[11px] font-semibold text-muted-foreground">종류별 폭 · 로스</span>
-          {YARD_KINDS.filter(k => BUCKETS.some(b => (groups[b] || []).length && kindOf(b) === k)).map(k => (
-            <span key={k} className="flex items-center gap-1 text-xs">
-              <b className="font-semibold">{k}</b>
-              {k !== '가죽' && (
-                <label className="flex items-center gap-1">폭
-                  <input type="number" min={1} className={num} placeholder="입력" value={cfg[k].폭 || ''}
-                    onChange={e => setCfgField(k, '폭', parseFloat(e.target.value) || 0)} />
-                </label>
-              )}
-              <label className="flex items-center gap-1">로스%
-                <input type="number" min={0} max={100} className={num} value={cfg[k].로스}
-                  onChange={e => setCfgField(k, '로스', parseFloat(e.target.value) || 0)} />
-              </label>
-            </span>
-          ))}
-        </div>
-
-        {/* 부위별 — 한 줄에 하나 */}
+        {/* 부위별 — 한 줄에 하나. 폭·로스는 같은 종류끼리 값을 공유한다 */}
         <div className="rounded-lg border border-border overflow-x-auto shrink-0">
-          <table className="w-full text-xs min-w-[860px]">
+          <table className="w-full text-xs min-w-[720px]">
             <thead className="bg-[var(--fill-quaternary)] border-b border-border">
               <tr>
                 <th className={`${th} text-left`}>부위</th>
                 <th className={`${th} text-right`}>줄</th>
                 <th className={th}>종류</th>
+                <th className={`${th} text-right`}>폭 CM</th>
+                <th className={`${th} text-right`}>로스 %</th>
                 <th className={`${th} text-right`}>최종 소요량</th>
-                <th className={`${th} text-left`}>적용할 BOM 자재 줄</th>
                 <th className={th}></th>
               </tr>
             </thead>
@@ -237,25 +204,29 @@ export function CadAssignDialog({
                           </select>
                         : <span className="text-muted-foreground">{k}</span>}
                     </td>
+                    <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                      {needsWidth(b)
+                        ? <>
+                            <input type="number" min={1} className={num} placeholder="입력" value={cfg[k].폭 || ''} disabled={!n}
+                              onChange={e => setCfgField(k, '폭', parseFloat(e.target.value) || 0)} />
+                            {k === '보강재' && <span className="text-[10px] text-muted-foreground ml-1">52"</span>}
+                          </>
+                        : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      <input type="number" min={0} max={100} className={num} value={cfg[k].로스} disabled={!n}
+                        onChange={e => setCfgField(k, '로스', parseFloat(e.target.value) || 0)} />
+                    </td>
                     <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                       {!n ? <span className="text-muted-foreground">—</span>
                         : noW ? <span className="text-[11px] text-[var(--system-orange,#B45309)]">폭 입력</span>
                         : <><b>{withLoss(net, lossOf(b)).toFixed(3)} {YARD_UNIT[k]}</b>
                             <span className="text-[10px] text-muted-foreground ml-1">Net {net.toFixed(3)}</span></>}
                     </td>
-                    <td className="px-2 py-1.5">
-                      <select value={target[b] || ''} disabled={!n}
-                        onChange={e => setTarget(s => ({ ...s, [b]: e.target.value }))}
-                        className="h-7 w-full min-w-[180px] rounded border border-border bg-card px-1.5 text-[11px]">
-                        <option value="">자재 줄 선택…</option>
-                        {targets.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">
-                      <Button size="sm" className="text-[11px] h-7 px-2" disabled={!n} onClick={() => applyOne(b)}>적용</Button>
-                      <Button size="sm" variant="ghost" className="text-[11px] h-7 px-2 ml-1" disabled={!n || busy === b}
+                    <td className="px-2 py-1.5 whitespace-nowrap text-center">
+                      <Button size="sm" variant="outline" className="text-[11px] h-7 px-2" disabled={!n || busy === b}
                         onClick={() => registerMissing(b)}>
-                        {busy === b ? '등록중' : '자재등록'}
+                        {busy === b ? '등록중' : '자재 등록'}
                       </Button>
                     </td>
                   </tr>
