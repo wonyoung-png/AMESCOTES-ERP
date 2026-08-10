@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Trash2, CalendarClock, Wallet } from 'lucide-react';
 
@@ -44,48 +43,67 @@ function daysTo(d?: string): number | null {
   return Math.round((x - t) / 86400000);
 }
 
-function DueBadge({ item }: { item: ProjectItem }) {
-  if (item.done) return <Badge variant="outline" className="text-[11px] h-5 text-[var(--system-green)] border-transparent bg-[var(--system-green)]/10">완료</Badge>;
+/** 열 너비를 한 곳에서 정한다 — 머리글과 본문이 어긋나면 표가 아니다 */
+const COL = {
+  check: 'w-9 shrink-0',
+  team: 'w-24 shrink-0',
+  owner: 'w-24 shrink-0',
+  due: 'w-28 shrink-0',
+  budget: 'w-32 shrink-0 text-right',
+  left: 'w-16 shrink-0 text-right',
+};
+
+function HeadRow() {
+  return (
+    <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border text-[11px] text-muted-foreground">
+      <span className={COL.check} />
+      <span className="flex-1 min-w-0">할 일</span>
+      <span className={COL.team}>팀</span>
+      <span className={COL.owner}>담당자</span>
+      <span className={COL.due}>마감</span>
+      <span className={COL.budget}>금액</span>
+      <span className={COL.left}>남은 날</span>
+    </div>
+  );
+}
+
+/** 남은 날 — 지난 것은 빨강, 일주일 안은 주황 */
+function daysCell(item: ProjectItem) {
+  if (item.done) return <span className="text-[var(--system-green)]">완료</span>;
   const d = daysTo(item.due);
-  if (d === null) return <span className="text-xs text-muted-foreground">기한 없음</span>;
-  if (d < 0) return <Badge variant="outline" className="text-[11px] h-5 text-[var(--system-red)] border-transparent bg-[var(--system-red)]/10">{-d}일 지남</Badge>;
-  if (d <= 7) return <Badge variant="outline" className="text-[11px] h-5 text-[var(--system-orange)] border-transparent bg-[var(--system-orange)]/10">D-{d}</Badge>;
-  return <span className="text-xs text-muted-foreground font-mono">D-{d}</span>;
+  if (d === null) return <span className="text-muted-foreground">—</span>;
+  if (d < 0) return <span className="text-[var(--system-red)] font-medium">{-d}일 지남</span>;
+  if (d <= 7) return <span className="text-[var(--system-orange)] font-medium">D-{d}</span>;
+  return <span className="text-muted-foreground">D-{d}</span>;
 }
 
 function ItemRow({ item, onToggle, onEdit }: {
   item: ProjectItem; onToggle: (i: ProjectItem) => void; onEdit: (i: ProjectItem) => void;
 }) {
+  const dim = item.done ? 'text-muted-foreground' : 'text-foreground';
   return (
-    <div className="flex items-start gap-3 px-3 py-2 border-b border-border last:border-b-0 hover:bg-[var(--fill-quaternary)]">
-      <input
-        type="checkbox"
-        checked={item.done}
-        onChange={() => onToggle(item)}
-        onClick={e => e.stopPropagation()}
-        className="mt-1 cursor-pointer shrink-0"
-      />
-      {/* 줄 아무 데나 누르면 고칠 수 있어야 한다 */}
-      <button type="button" onClick={() => onEdit(item)} className="min-w-0 flex-1 text-left">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={`text-sm ${item.done ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-            {item.title}
-          </span>
-        </div>
-        {item.detail && <p className="text-xs text-muted-foreground mt-0.5">{item.detail}</p>}
-        <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground flex-wrap">
-          {item.team && <span className="text-foreground">{item.team}</span>}
-          {item.owner && <span>{item.owner}</span>}
-          {item.due && <span className="font-mono">{item.due}</span>}
-          {item.budget != null && <span className="font-mono">{won(item.budget)}</span>}
-        </div>
+    <div className="flex items-center gap-3 px-3 py-2 border-b border-border last:border-b-0 hover:bg-[var(--fill-quaternary)]">
+      <span className={COL.check}>
+        <input type="checkbox" checked={item.done} onChange={() => onToggle(item)} className="cursor-pointer" />
+      </span>
+      <button type="button" onClick={() => onEdit(item)} className="flex-1 min-w-0 text-left">
+        <span className={`block truncate text-sm ${item.done ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+          {item.title}
+        </span>
+        {item.detail && <span className="block truncate text-[11px] text-muted-foreground">{item.detail}</span>}
       </button>
-      <div className="shrink-0"><DueBadge item={item} /></div>
+      <span className={`${COL.team} truncate text-xs ${dim}`}>{item.team || '—'}</span>
+      <span className={`${COL.owner} truncate text-xs ${dim}`}>{item.owner || '—'}</span>
+      <span className={`${COL.due} text-xs font-mono ${dim}`}>{item.due || '—'}</span>
+      <span className={`${COL.budget} text-xs font-mono tabular-nums ${dim}`}>
+        {item.budget != null ? won(item.budget) : '—'}
+      </span>
+      <span className={`${COL.left} text-xs tabular-nums`}>{daysCell(item)}</span>
     </div>
   );
 }
 
-/** 항목을 어떤 키로 묶어 보여줄지만 다르고, 줄 모양은 같다 */
+/** 항목을 어떤 키로 묶어 보여줄지만 다르고, 표 모양은 같다 */
 function GroupedList({
   items, groupBy, emptyText, onToggle, onEdit, onAdd,
 }: {
@@ -94,13 +112,12 @@ function GroupedList({
   emptyText: string;
   onToggle: (i: ProjectItem) => void;
   onEdit: (i: ProjectItem) => void;
-  /** 그 묶음에 바로 항목을 더한다 — 여기서 입력하는 게 기본이다 */
   onAdd?: (groupName: string) => void;
 }) {
   const groups = useMemo(() => {
     const m = new Map<string, ProjectItem[]>();
     items.forEach(i => {
-      const k = groupBy(i) || '단계 미지정';
+      const k = groupBy(i) || '미지정';
       m.set(k, [...(m.get(k) || []), i]);
     });
     return [...m.entries()];
@@ -110,22 +127,27 @@ function GroupedList({
     return <div className="border border-dashed border-border rounded-lg py-10 text-center text-sm text-muted-foreground">{emptyText}</div>;
   }
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {groups.map(([name, list]) => {
         const done = list.filter(i => i.done).length;
+        const sum = list.reduce((t, i) => t + (i.budget || 0), 0);
         return (
-          <div key={name} className="bg-card border border-border rounded-lg overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 bg-[var(--fill-quaternary)] border-b border-border">
-              <span className="text-sm font-semibold text-foreground">{name}</span>
-              <span className="text-[11px] text-muted-foreground">{done}/{list.length}</span>
-              {onAdd && (
-                <button type="button" onClick={() => onAdd(name)}
-                  className="ml-auto text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1">
-                  <Plus className="w-3 h-3" />항목
-                </button>
-              )}
+          <div key={name} className="bg-card border border-border rounded-lg overflow-x-auto">
+            <div className="min-w-[720px]">
+              <div className="flex items-center gap-2 px-3 py-2 bg-[var(--fill-quaternary)] border-b border-border">
+                <span className="text-sm font-semibold text-foreground">{name}</span>
+                <span className="text-[11px] text-muted-foreground">{done}/{list.length}</span>
+                {sum > 0 && <span className="text-[11px] text-muted-foreground font-mono tabular-nums">{won(sum)}</span>}
+                {onAdd && (
+                  <button type="button" onClick={() => onAdd(name)}
+                    className="ml-auto text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1">
+                    <Plus className="w-3 h-3" />항목
+                  </button>
+                )}
+              </div>
+              <HeadRow />
+              {list.map(i => <ItemRow key={i.id} item={i} onToggle={onToggle} onEdit={onEdit} />)}
             </div>
-            {list.map(i => <ItemRow key={i.id} item={i} onToggle={onToggle} onEdit={onEdit} />)}
           </div>
         );
       })}
@@ -314,7 +336,7 @@ export default function ProjectBoard() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="bg-card border border-border rounded-lg p-3">
                   <p className="text-[11px] text-muted-foreground">{project.anchorLabel || labelOfKind(project.kind)}까지</p>
-                  <p className="text-xl font-bold text-foreground font-mono">
+                  <p className="text-xl font-bold text-foreground font-mono tabular-nums">
                     {stat.dday === null ? '—' : stat.dday >= 0 ? `D-${stat.dday}` : `D+${-stat.dday}`}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
@@ -323,19 +345,19 @@ export default function ProjectBoard() {
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
                   <p className="text-[11px] text-muted-foreground">진행</p>
-                  <p className="text-xl font-bold text-foreground font-mono">{stat.done}/{items.length}</p>
+                  <p className="text-xl font-bold text-foreground font-mono tabular-nums">{stat.done}/{items.length}</p>
                   <div className="h-1 bg-[var(--fill-quaternary)] rounded mt-1.5">
                     <div className="h-full bg-primary rounded" style={{ width: `${items.length ? (stat.done / items.length) * 100 : 0}%` }} />
                   </div>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1"><CalendarClock className="w-3 h-3" />마감</p>
-                  <p className="text-xl font-bold text-foreground font-mono">{stat.late} / {stat.week}</p>
+                  <p className="text-xl font-bold text-foreground font-mono tabular-nums">{stat.late} / {stat.week}</p>
                   <p className="text-[11px] text-muted-foreground">지남 / 7일 내</p>
                 </div>
                 <div className="bg-card border border-border rounded-lg p-3">
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Wallet className="w-3 h-3" />잡힌 금액</p>
-                  <p className="text-xl font-bold text-foreground font-mono">{won(stat.budget)}</p>
+                  <p className="text-xl font-bold text-foreground font-mono tabular-nums">{won(stat.budget)}</p>
                   <p className="text-[11px] text-muted-foreground">
                     {project.budgetCap ? `상한 ${won(project.budgetCap)}` : '상한 미정'}
                   </p>
@@ -408,18 +430,18 @@ export default function ProjectBoard() {
                     <div className="flex items-end gap-6 flex-wrap">
                       <div>
                         <p className="text-[11px] text-muted-foreground">잡힌 금액</p>
-                        <p className="text-2xl font-bold text-foreground font-mono">{won(stat.budget)}</p>
+                        <p className="text-2xl font-bold text-foreground font-mono tabular-nums">{won(stat.budget)}</p>
                       </div>
                       <div>
                         <p className="text-[11px] text-muted-foreground">예산 상한</p>
-                        <p className="text-lg font-semibold text-muted-foreground font-mono">
+                        <p className="text-lg font-semibold text-muted-foreground font-mono tabular-nums">
                           {project.budgetCap ? won(project.budgetCap) : '미정'}
                         </p>
                       </div>
                       {!!project.budgetCap && (
                         <div>
                           <p className="text-[11px] text-muted-foreground">남은 금액</p>
-                          <p className={`text-lg font-semibold font-mono ${
+                          <p className={`text-lg font-semibold font-mono tabular-nums ${
                             project.budgetCap - stat.budget < 0 ? 'text-[var(--system-red)]' : 'text-[var(--system-green)]'}`}>
                             {won(project.budgetCap - stat.budget)}
                           </p>
