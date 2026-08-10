@@ -52,16 +52,20 @@ function DueBadge({ item }: { item: ProjectItem }) {
   return <span className="text-xs text-muted-foreground font-mono">D-{d}</span>;
 }
 
-function ItemRow({ item, onToggle }: { item: ProjectItem; onToggle: (i: ProjectItem) => void }) {
+function ItemRow({ item, onToggle, onEdit }: {
+  item: ProjectItem; onToggle: (i: ProjectItem) => void; onEdit: (i: ProjectItem) => void;
+}) {
   return (
     <div className="flex items-start gap-3 px-3 py-2 border-b border-border last:border-b-0 hover:bg-[var(--fill-quaternary)]">
       <input
         type="checkbox"
         checked={item.done}
         onChange={() => onToggle(item)}
+        onClick={e => e.stopPropagation()}
         className="mt-1 cursor-pointer shrink-0"
       />
-      <div className="min-w-0 flex-1">
+      {/* 줄 아무 데나 누르면 고칠 수 있어야 한다 */}
+      <button type="button" onClick={() => onEdit(item)} className="min-w-0 flex-1 text-left">
         <div className="flex items-center gap-1.5 flex-wrap">
           {item.blocker && !item.done && (
             <Badge variant="outline" className="text-[11px] h-5 text-[var(--system-red)] border-[var(--system-red)]/30">막힘</Badge>
@@ -77,7 +81,7 @@ function ItemRow({ item, onToggle }: { item: ProjectItem; onToggle: (i: ProjectI
           {item.due && <span className="font-mono">{item.due}</span>}
           {item.budget != null && <span className="font-mono">{won(item.budget)}</span>}
         </div>
-      </div>
+      </button>
       <div className="shrink-0"><DueBadge item={item} /></div>
     </div>
   );
@@ -85,12 +89,15 @@ function ItemRow({ item, onToggle }: { item: ProjectItem; onToggle: (i: ProjectI
 
 /** 항목을 어떤 키로 묶어 보여줄지만 다르고, 줄 모양은 같다 */
 function GroupedList({
-  items, groupBy, emptyText, onToggle,
+  items, groupBy, emptyText, onToggle, onEdit, onAdd,
 }: {
   items: ProjectItem[];
   groupBy: (i: ProjectItem) => string;
   emptyText: string;
   onToggle: (i: ProjectItem) => void;
+  onEdit: (i: ProjectItem) => void;
+  /** 그 묶음에 바로 항목을 더한다 — 여기서 입력하는 게 기본이다 */
+  onAdd?: (groupName: string) => void;
 }) {
   const groups = useMemo(() => {
     const m = new Map<string, ProjectItem[]>();
@@ -113,8 +120,14 @@ function GroupedList({
             <div className="flex items-center gap-2 px-3 py-2 bg-[var(--fill-quaternary)] border-b border-border">
               <span className="text-sm font-semibold text-foreground">{name}</span>
               <span className="text-[11px] text-muted-foreground">{done}/{list.length}</span>
+              {onAdd && (
+                <button type="button" onClick={() => onAdd(name)}
+                  className="ml-auto text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1">
+                  <Plus className="w-3 h-3" />항목
+                </button>
+              )}
             </div>
-            {list.map(i => <ItemRow key={i.id} item={i} onToggle={onToggle} />)}
+            {list.map(i => <ItemRow key={i.id} item={i} onToggle={onToggle} onEdit={onEdit} />)}
           </div>
         );
       })}
@@ -137,6 +150,8 @@ export default function ProjectBoard() {
   const [form, setForm] = useState({ title: '', kind: '팝업·오픈', anchorDate: '', anchorLabel: '오픈' });
   const [showImport, setShowImport] = useState(false);
   const [paste, setPaste] = useState('');
+  /** 항목 직접 입력·수정 — 이게 기본 경로다. 붙여넣기는 처음 한 번 옮길 때만 쓴다 */
+  const [editing, setEditing] = useState<ProjectItem | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -162,6 +177,36 @@ export default function ProjectBoard() {
     () => Array.from(new Set(items.map(i => i.owner || '미지정'))).sort(),
     [items],
   );
+  // 이미 쓰고 있는 값을 자동완성으로 준다 — 매번 새로 타이핑하면 표기가 갈라진다
+  const phaseOpts = useMemo(() => Array.from(new Set(items.map(i => i.phase).filter(Boolean))), [items]);
+  const areaOpts = useMemo(() => Array.from(new Set(items.map(i => i.area).filter(Boolean))), [items]);
+  const ownerOpts = useMemo(() => Array.from(new Set(items.map(i => i.owner).filter(Boolean) as string[])), [items]);
+
+  /** 새 항목 틀. 어느 묶음에서 눌렀는지에 따라 페이즈·구역을 미리 채운다 */
+  const blankItem = (group?: string): ProjectItem => ({
+    id: uid(), projectId: selId,
+    phase: view === 'team' ? '' : (group || phaseOpts[0] || ''),
+    area: view === 'team' ? (group || '') : '',
+    title: '', due: undefined, owner: view === 'owner' && group !== '미지정' ? group : undefined,
+    urgent: false, blocker: false, done: false, sortNo: items.length,
+  });
+
+  const saveItem = async () => {
+    if (!editing) return;
+    if (!editing.title.trim()) { toast.error('내용을 입력하세요'); return; }
+    try {
+      await upsertItems([{ ...editing, title: editing.title.trim() }]);
+      setEditing(null);
+      await load();
+    } catch (e: any) { toast.error('저장 실패: ' + (e?.message || e)); }
+  };
+
+  const removeItem = async () => {
+    if (!editing) return;
+    if (!confirm(`"${editing.title}" 항목을 삭제할까요?`)) return;
+    try { await deleteItem(editing.id); setEditing(null); await load(); }
+    catch (e: any) { toast.error('삭제 실패: ' + (e?.message || e)); }
+  };
 
   const stat = useMemo(() => {
     const done = items.filter(i => i.done).length;
@@ -228,11 +273,18 @@ export default function ProjectBoard() {
         </div>
         <div className="flex items-center gap-2">
           {project && (
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowImport(true)}>
-              <ClipboardPaste className="w-4 h-4" />체크리스트 붙여넣기
-            </Button>
+            <>
+              <Button size="sm" className="gap-1.5" onClick={() => setEditing(blankItem())}>
+                <Plus className="w-4 h-4" />항목 추가
+              </Button>
+              <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground"
+                title="쓰던 체크리스트를 처음 한 번 옮길 때만 쓰세요"
+                onClick={() => setShowImport(true)}>
+                <ClipboardPaste className="w-4 h-4" />붙여넣기로 한 번에
+              </Button>
+            </>
           )}
-          <Button size="sm" className="gap-1.5" onClick={() => setShowNew(true)}>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowNew(true)}>
             <Plus className="w-4 h-4" />프로젝트
           </Button>
         </div>
@@ -341,20 +393,27 @@ export default function ProjectBoard() {
               {items.length === 0 ? (
                 <div className="border border-dashed border-border rounded-lg py-14 text-center">
                   <p className="text-sm text-foreground font-medium">항목이 없습니다</p>
-                  <p className="text-xs text-muted-foreground mt-1">쓰시던 체크리스트를 통째로 붙여넣으면 마감일·담당·금액까지 그대로 들어갑니다</p>
-                  <Button size="sm" variant="outline" className="mt-4 gap-1.5" onClick={() => setShowImport(true)}>
-                    <ClipboardPaste className="w-4 h-4" />체크리스트 붙여넣기
-                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1">할 일을 하나씩 추가하세요. 이미 정리해 둔 체크리스트가 있으면 한 번에 옮길 수도 있습니다</p>
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    <Button size="sm" className="gap-1.5" onClick={() => setEditing(blankItem())}>
+                      <Plus className="w-4 h-4" />항목 추가
+                    </Button>
+                    <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => setShowImport(true)}>
+                      <ClipboardPaste className="w-4 h-4" />붙여넣기로 한 번에
+                    </Button>
+                  </div>
                 </div>
               ) : view === 'budget' ? (
                 <GroupedList items={shown.filter(i => i.budget != null)} groupBy={i => i.phase}
-                  emptyText="금액이 적힌 항목이 없습니다" onToggle={toggle} />
+                  emptyText="금액이 적힌 항목이 없습니다" onToggle={toggle} onEdit={setEditing} />
               ) : (
                 <GroupedList
                   items={shown}
                   groupBy={view === 'team' ? (i => i.area) : view === 'owner' ? (i => i.owner || '미지정') : (i => i.phase)}
                   emptyText="조건에 맞는 항목이 없습니다"
                   onToggle={toggle}
+                  onEdit={setEditing}
+                  onAdd={g => setEditing(blankItem(g))}
                 />
               )}
             </>
@@ -399,12 +458,99 @@ export default function ProjectBoard() {
         </DialogContent>
       </Dialog>
 
+      {/* 항목 입력·수정 — 여기가 기본 경로다 */}
+      <Dialog open={!!editing} onOpenChange={o => { if (!o) setEditing(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{items.some(i => i.id === editing?.id) ? '항목 수정' : '항목 추가'}</DialogTitle>
+          </DialogHeader>
+          {editing && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>내용 *</Label>
+                <Input
+                  autoFocus
+                  value={editing.title}
+                  onChange={e => setEditing(v => v && { ...v, title: e.target.value })}
+                  onKeyDown={e => { if (e.key === 'Enter') saveItem(); }}
+                  placeholder="한정 참(Charm) 디자인 확정 → 중국 공장 견적"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>설명</Label>
+                <Input value={editing.detail || ''}
+                  onChange={e => setEditing(v => v && { ...v, detail: e.target.value || undefined })}
+                  placeholder="왜 필요한지 · 판단 근거" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>페이즈</Label>
+                  <Input list="phase-opts" value={editing.phase}
+                    onChange={e => setEditing(v => v && { ...v, phase: e.target.value })}
+                    placeholder="1. 8월 (D-125~D-100)" />
+                  <datalist id="phase-opts">{phaseOpts.map(o => <option key={o} value={o} />)}</datalist>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>구역 (팀 성격)</Label>
+                  <Input list="area-opts" value={editing.area}
+                    onChange={e => setEditing(v => v && { ...v, area: e.target.value })}
+                    placeholder="생산 발주" />
+                  <datalist id="area-opts">{areaOpts.map(o => <option key={o} value={o} />)}</datalist>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>마감</Label>
+                  <Input type="date" value={editing.due || ''}
+                    onChange={e => setEditing(v => v && { ...v, due: e.target.value || undefined })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>담당 · 확인처</Label>
+                  <Input list="owner-opts" value={editing.owner || ''}
+                    onChange={e => setEditing(v => v && { ...v, owner: e.target.value || undefined })}
+                    placeholder="생산팀 · 소방서" />
+                  <datalist id="owner-opts">{ownerOpts.map(o => <option key={o} value={o} />)}</datalist>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>금액</Label>
+                  <Input type="number" min={0} value={editing.budget ?? ''}
+                    onChange={e => setEditing(v => v && { ...v, budget: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value)) })}
+                    placeholder="0" />
+                </div>
+              </div>
+              <div className="flex items-center gap-4 pt-1">
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input type="checkbox" checked={editing.urgent}
+                    onChange={e => setEditing(v => v && { ...v, urgent: e.target.checked })} />
+                  급함
+                </label>
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input type="checkbox" checked={editing.blocker}
+                    onChange={e => setEditing(v => v && { ...v, blocker: e.target.checked })} />
+                  <span>막고 있음 <span className="text-[11px] text-muted-foreground">— 이게 안 끝나면 뒤가 막힘</span></span>
+                </label>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex items-center">
+            {items.some(i => i.id === editing?.id) && (
+              <Button variant="ghost" size="sm" className="mr-auto text-[var(--system-red)] gap-1"
+                onClick={removeItem}>
+                <Trash2 className="w-3.5 h-3.5" />삭제
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setEditing(null)}>취소</Button>
+            <Button onClick={saveItem}>저장</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* 체크리스트 붙여넣기 */}
       <Dialog open={showImport} onOpenChange={setShowImport}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>체크리스트 붙여넣기</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground">
-            쓰시던 형식 그대로 붙여넣으세요. <code>## 페이즈</code> · <code>### 구역</code> ·
+            <b>이미 정리해 둔 체크리스트가 있을 때만</b> 쓰세요. 평소에는 위의 "항목 추가"로 하나씩 넣습니다. <code>## 페이즈</code> · <code>### 구역</code> ·
             <code> - [ ] 내용 / 마감 8/20 / 확인처: 생산팀 / 금액 3,000,000</code> 을 읽습니다.
             마감일을 <b>굵게</b> 쓰면 급한 것으로, <code>0. 선결</code> 블록은 막고 있는 것으로 표시됩니다.
           </p>
