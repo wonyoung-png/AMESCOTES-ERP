@@ -86,7 +86,7 @@ export default function OperationalCalendar() {
     } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
   };
   const [form, setForm] = useState({
-    title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '', productDiscounts: [] as ProductDiscount[], categoryDiscounts: [] as CategoryDiscount[],
+    title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, productDiscounts: [] as ProductDiscount[], categoryDiscounts: [] as CategoryDiscount[],
   });
 
   const campaigns = useMemo(() => {
@@ -120,7 +120,6 @@ export default function OperationalCalendar() {
       endDate: form.endDate,
       status: 'onboarded',
       discountRate: form.discountRate,
-      projectId: form.projectId || undefined,
       productDiscounts: form.productDiscounts.length ? form.productDiscounts : undefined,
       categoryDiscounts: form.categoryDiscounts.length ? form.categoryDiscounts : undefined,
       owner: '국내영업',
@@ -128,8 +127,18 @@ export default function OperationalCalendar() {
     phase1.onboardCampaign(row.id);
     toast.success('기획전이 생성되었습니다. 팀별로 업무를 직접 추가하세요');
     setShowNew(false);
-    setForm({ title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, projectId: '', productDiscounts: [], categoryDiscounts: [] });
+    setForm({ title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, productDiscounts: [], categoryDiscounts: [] });
     refresh();
+  };
+
+  /** 캘린더 빈 칸을 누르면 그 날짜가 채워진 채로 등록창이 열린다 */
+  const openNewCampaignAt = (ds: string, channel: string) => {
+    setForm(f => ({ ...f, startDate: ds, endDate: ds, channel }));
+    setShowNew(true);
+  };
+  const openNewProjectAt = (ds: string) => {
+    setPForm(f => ({ ...f, startDate: ds, endDate: ds }));
+    setShowNewProject(true);
   };
 
   const handleZoom = (ds: string) => {
@@ -187,6 +196,12 @@ export default function OperationalCalendar() {
           프로젝트
         </div>
         <div className="relative" style={{ width: totalW, height: Math.max(34, projLanes * 30 + 4) }}>
+          {band.cols.map((c, i) => (
+            <button key={`pn-${i}`} type="button" title={`${ymd(c)} 프로젝트 등록`}
+              onClick={() => openNewProjectAt(ymd(c))}
+              className="absolute top-0 h-full hover:bg-primary/5"
+              style={{ left: i * colWidth, width: colWidth }} />
+          ))}
           {projEvs.map(ev => (
             <Link key={(ev as any).id} href="/projects">
               <a
@@ -230,6 +245,13 @@ export default function OperationalCalendar() {
                 <div key={i} className="absolute top-0 h-full bg-[var(--fill-quaternary)] pointer-events-none" style={{ left: i * colWidth, width: colWidth }} />
               ) : null
             ))}
+            {/* 빈 칸을 눌러 그 날짜·그 채널로 바로 등록 */}
+            {band.cols.map((c, i) => (
+              <button key={`n-${i}`} type="button" title={`${ymd(c)} · ${ch} 기획전 등록`}
+                onClick={() => openNewCampaignAt(ymd(c), ch)}
+                className="absolute top-0 h-full hover:bg-primary/5"
+                style={{ left: i * colWidth, width: colWidth }} />
+            ))}
             {evs.map(ev => {
               const left = ev._s * colWidth + 2;
               const width = Math.max(24, (ev._e - ev._s + 1) * colWidth - 4);
@@ -269,7 +291,7 @@ export default function OperationalCalendar() {
   };
 
   const hint = bands[0]?.unit === 'day'
-    ? '날짜 헤더 클릭 → 확대 · 막대 클릭 → 팀 프로젝트 업무'
+    ? '빈 칸 클릭 → 그 날짜로 등록 · 날짜 헤더 클릭 → 확대 · 막대 클릭 → 팀 업무'
     : '연간/반기/분기/월/주 뷰 전환 · 막대 클릭 시 팀별 상세 업무 · 완료율은 캘린더에 표시';
 
   return (
@@ -369,81 +391,88 @@ export default function OperationalCalendar() {
       )}
 
       <Dialog open={showNew} onOpenChange={setShowNew}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>기획전 생성</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground -mt-2">업무는 자동 생성되지 않습니다. 생성 후 팀 탭에서 직접 등록하세요.</p>
           <div className="space-y-3">
-            <div><Label>이름</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="여름 시즌오프" /></div>
-            <div>
-              <Label>소속 프로젝트</Label>
-              <select value={form.projectId}
-                onChange={e => setForm(f => ({ ...f, projectId: e.target.value }))}
-                className="w-full h-9 text-sm border border-border rounded-md bg-card px-2 mb-3">
-                <option value="">단독 기획전 (프로젝트 없음)</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-              </select>
-              <Label>채널</Label>
-              <select className="w-full border rounded-md h-9 px-2 text-sm" value={form.channel}
-                onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}>
-                {CAMPAIGN_CHANNELS.map(ch => <option key={ch} value={ch}>{ch}</option>)}
-              </select>
+            <div className="space-y-1.5">
+              <Label>이름 *</Label>
+              <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="여름 시즌오프" autoFocus />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label>시작</Label><Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} /></div>
-              <div><Label>종료</Label><Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} /></div>
-            </div>
-            <div>
-              <Label>기본 할인율 %</Label>
-              <Input type="number" min="0" max="100" value={form.discountRate}
-                onChange={e => setForm(f => ({ ...f, discountRate: Math.min(100, Math.max(0, +e.target.value)) }))} />
-              <p className="text-[11px] text-muted-foreground mt-1">아무것도 지정 안 한 상품에 적용됩니다</p>
-              {/* 카테고리별로 다르게 걸기 — 체크한 카테고리만 자기 율을 쓴다 */}
-              <div className="mt-2 space-y-1.5">
-                {itemCategories.map(c => {
-                  const hit = form.categoryDiscounts.find(d => d.category === c);
-                  return (
-                    <div key={c} className="flex items-center gap-2">
-                      <label className="flex items-center gap-1.5 text-xs cursor-pointer w-24">
-                        <input
-                          type="checkbox"
-                          checked={!!hit}
-                          onChange={e => setForm(f => ({
-                            ...f,
-                            categoryDiscounts: e.target.checked
-                              ? [...f.categoryDiscounts, { category: c, rate: f.discountRate }]
-                              : f.categoryDiscounts.filter(d => d.category !== c),
-                          }))}
-                        />
-                        {c}
-                      </label>
-                      <Input
-                        type="number" min={0} max={100} disabled={!hit}
-                        value={hit ? hit.rate : ''}
-                        onChange={e => {
-                          const r = Math.min(100, Math.max(0, +e.target.value || 0));
-                          setForm(f => ({ ...f, categoryDiscounts: f.categoryDiscounts.map(d => d.category === c ? { ...d, rate: r } : d) }));
-                        }}
-                        placeholder="기본율 사용"
-                        className="h-8 w-24 text-right"
-                      />
-                      <span className="text-xs text-muted-foreground">%</span>
-                    </div>
-                  );
-                })}
+            {/* 한 줄에 둘씩 — 세로로 늘어지면 한눈에 안 들어온다 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>채널</Label>
+                <select className="w-full border border-border rounded-md h-9 px-2 text-sm bg-card" value={form.channel}
+                  onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}>
+                  {CAMPAIGN_CHANNELS.map(ch => <option key={ch} value={ch}>{ch}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>기본 할인율 %</Label>
+                <Input type="number" min="0" max="100" value={form.discountRate}
+                  onChange={e => setForm(f => ({ ...f, discountRate: Math.min(100, Math.max(0, +e.target.value)) }))} />
               </div>
             </div>
-            <div>
-              <Label>상품별 할인율</Label>
-              <Button type="button" variant="outline" className="w-full justify-between mt-1"
-                onClick={() => setShowDiscounts(true)}>
-                <span>{form.productDiscounts.length ? `${form.productDiscounts.length}개 상품 지정됨` : '상품별로 다르게 걸기'}</span>
-                <span className="text-muted-foreground">›</span>
-              </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>시작 *</Label>
+                <Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} /></div>
+              <div className="space-y-1.5"><Label>종료 *</Label>
+                <Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} /></div>
             </div>
+
+            {/* 예외 할인은 대부분 안 쓴다 — 접어두고 필요할 때만 편다 */}
+            <details className="border border-border rounded-md">
+              <summary className="px-3 py-2 text-sm cursor-pointer select-none flex items-center gap-2">
+                예외 할인율
+                <span className="text-[11px] text-muted-foreground">
+                  {form.categoryDiscounts.length || form.productDiscounts.length
+                    ? `카테고리 ${form.categoryDiscounts.length} · 상품 ${form.productDiscounts.length}`
+                    : `전부 ${form.discountRate}%`}
+                </span>
+              </summary>
+              <div className="px-3 pb-3 pt-1 space-y-2">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  {itemCategories.map(c => {
+                    const hit = form.categoryDiscounts.find(d => d.category === c);
+                    return (
+                      <div key={c} className="flex items-center gap-1.5">
+                        <label className="flex items-center gap-1.5 text-xs cursor-pointer flex-1 min-w-0">
+                          <input type="checkbox" checked={!!hit}
+                            onChange={e => setForm(f => ({
+                              ...f,
+                              categoryDiscounts: e.target.checked
+                                ? [...f.categoryDiscounts, { category: c, rate: f.discountRate }]
+                                : f.categoryDiscounts.filter(d => d.category !== c),
+                            }))} />
+                          <span className="truncate">{c}</span>
+                        </label>
+                        <Input type="number" min={0} max={100} disabled={!hit}
+                          value={hit ? hit.rate : ''}
+                          onChange={e => {
+                            const r = Math.min(100, Math.max(0, +e.target.value || 0));
+                            setForm(f => ({ ...f, categoryDiscounts: f.categoryDiscounts.map(d => d.category === c ? { ...d, rate: r } : d) }));
+                          }}
+                          placeholder="—" className="h-7 w-14 text-right text-xs px-1.5" />
+                        <span className="text-[11px] text-muted-foreground">%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <Button type="button" variant="outline" size="sm" className="w-full justify-between"
+                  onClick={() => setShowDiscounts(true)}>
+                  <span className="text-xs">
+                    {form.productDiscounts.length ? `상품 ${form.productDiscounts.length}개 지정됨` : '상품별로 다르게 걸기'}
+                  </span>
+                  <span className="text-muted-foreground">›</span>
+                </Button>
+              </div>
+            </details>
+            <p className="text-[11px] text-muted-foreground">업무는 자동 생성되지 않습니다. 만든 뒤 팀 탭에서 등록하세요.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNew(false)}>취소</Button>
-            <Button onClick={createCampaign}>기획전 생성</Button>
+            <Button onClick={createCampaign}>만들기</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
