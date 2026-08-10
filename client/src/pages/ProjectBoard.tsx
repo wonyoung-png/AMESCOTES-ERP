@@ -1,6 +1,6 @@
 // 대형 프로젝트 — 팝업 오픈·시즌 런칭처럼 몇 달에 걸쳐 여러 팀이 붙는 일.
 //
-// 기획전(운영 캘린더)은 채널×날짜 축이라 이걸 못 담는다. 여기 축은 팀×페이즈다.
+// 기획전(운영 캘린더)은 채널×날짜 축이라 이걸 못 담는다. 여기 축은 팀×단계다.
 // 화면은 네 가지 질문에만 답한다.
 //   전체    — 며칠 남았고, 뭐가 막혀 있나
 //   팀별    — 우리 팀이 칠 것만
@@ -25,7 +25,7 @@ import { Plus, Trash2, AlertTriangle, CalendarClock, Wallet } from 'lucide-react
 type View = 'all' | 'team' | 'owner' | 'budget';
 
 const VIEWS: { id: View; label: string; desc: string }[] = [
-  { id: 'all', label: '전체', desc: '남은 날 · 막힌 것' },
+  { id: 'all', label: '단계별', desc: '준비 → 진행 → 마무리 순서대로' },
   { id: 'team', label: '팀별', desc: '국내영업·디자인·생산 …' },
   { id: 'owner', label: '담당자별', desc: '누가 무엇을 언제까지' },
   { id: 'budget', label: '예산', desc: '상한 대비 잡힌 금액' },
@@ -104,7 +104,7 @@ function GroupedList({
   const groups = useMemo(() => {
     const m = new Map<string, ProjectItem[]>();
     items.forEach(i => {
-      const k = groupBy(i) || '미지정';
+      const k = groupBy(i) || '단계 미지정';
       m.set(k, [...(m.get(k) || []), i]);
     });
     return [...m.entries()];
@@ -189,7 +189,7 @@ export default function ProjectBoard() {
   const areaOpts = useMemo(() => Array.from(new Set(items.map(i => i.area).filter(Boolean))), [items]);
   const ownerOpts = useMemo(() => Array.from(new Set(items.map(i => i.owner).filter(Boolean) as string[])), [items]);
 
-  /** 새 항목 틀. 어느 묶음에서 눌렀는지에 따라 페이즈·구역을 미리 채운다 */
+  /** 새 항목 틀. 어느 묶음에서 눌렀는지에 따라 단계·팀을 미리 채운다 */
   const blankItem = (group?: string): ProjectItem => ({
     id: uid(), projectId: selId,
     phase: view === 'all' ? (group || phaseOpts[0] || '') : (phaseOpts[0] || ''),
@@ -489,10 +489,11 @@ export default function ProjectBoard() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>페이즈</Label>
+                  <Label>단계</Label>
                   <Input list="phase-opts" value={editing.phase}
                     onChange={e => setEditing(v => v && { ...v, phase: e.target.value })}
-                    placeholder="1. 8월 (D-125~D-100)" />
+                    placeholder="8월 · 준비 · 오픈 직전" />
+                  <p className="text-[11px] text-muted-foreground">항목을 묶는 이름. 자유롭게 쓰세요</p>
                   <datalist id="phase-opts">{phaseOpts.map(o => <option key={o} value={o} />)}</datalist>
                 </div>
                 <div className="space-y-1.5">
