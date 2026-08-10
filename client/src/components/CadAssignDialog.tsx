@@ -154,36 +154,40 @@ export function CadAssignDialog({
   };
 
   const th = 'text-[11px] text-muted-foreground font-semibold py-1.5 px-2 whitespace-nowrap';
-  const num = 'w-[68px] border border-border rounded px-1.5 py-1 text-xs text-right bg-card focus:outline-none focus:ring-1 focus:ring-ring';
+  const num = 'w-[62px] max-w-full border border-border rounded px-1.5 py-1 text-xs text-right bg-card focus:outline-none focus:ring-1 focus:ring-ring';
   const sel = 'h-7 rounded border border-border bg-card px-1 text-[11px]';
   const visible = onlyChecked ? lines.filter(l => l.why === '겉감/트림' || l.why === '기본값') : lines;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[92vh] flex flex-col gap-3">
-        <DialogHeader className="space-y-1">
+        <DialogHeader className="shrink-0 space-y-1 pr-8">
           <DialogTitle className="text-base">
             CAD 소요량 분석 {styleNo ? <span className="text-muted-foreground font-normal">· {styleNo}</span> : null}
           </DialogTitle>
-          <p className="text-[11px] text-muted-foreground leading-snug">
-            소요량표엔 겉감이 가죽인지 원단인지 없습니다 — <b>부위</b>만 자동으로 잡았습니다.
-            부위마다 <b>종류·폭·로스</b>를 넣고 아래 <b>소요량 표에 채우기</b>를 누르면, BOM 적용은 소요량 탭에서 합니다.
-            {skipCount > 0 && <> 기본패턴 <b>{skipCount}줄</b> 제외.</>}
+          <p className="text-[11px] text-muted-foreground">
+            부위마다 <b>종류·폭·로스</b>를 넣고 <b>소요량 표에 채우기</b> → BOM 적용은 소요량 탭에서.
+            {skipCount > 0 && <> 기본패턴 {skipCount}줄 제외.</>}
           </p>
         </DialogHeader>
 
         {/* 부위별 — 한 줄에 하나. 폭·로스는 같은 종류끼리 값을 공유한다 */}
         <div className="rounded-lg border border-border overflow-x-auto shrink-0">
-          <table className="w-full text-xs min-w-[720px]">
+          <table className="w-full text-xs table-fixed min-w-[680px]">
+            <colgroup>
+              <col style={{ width: '13%' }} /><col style={{ width: '7%' }} /><col style={{ width: '14%' }} />
+              <col style={{ width: '15%' }} /><col style={{ width: '12%' }} /><col style={{ width: '25%' }} />
+              <col style={{ width: '14%' }} />
+            </colgroup>
             <thead className="bg-[var(--fill-quaternary)] border-b border-border">
               <tr>
                 <th className={`${th} text-left`}>부위</th>
                 <th className={`${th} text-right`}>줄</th>
-                <th className={th}>종류</th>
-                <th className={`${th} text-right`}>폭 CM</th>
-                <th className={`${th} text-right`}>로스 %</th>
+                <th className={`${th} text-center`}>종류</th>
+                <th className={`${th} text-center`}>폭 CM</th>
+                <th className={`${th} text-center`}>로스 %</th>
                 <th className={`${th} text-right`}>최종 소요량</th>
-                <th className={th}></th>
+                <th className={`${th} text-center`}></th>
               </tr>
             </thead>
             <tbody>
@@ -204,7 +208,7 @@ export function CadAssignDialog({
                           </select>
                         : <span className="text-muted-foreground">{k}</span>}
                     </td>
-                    <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                    <td className="px-2 py-1.5 text-center whitespace-nowrap">
                       {needsWidth(b)
                         ? <>
                             <input type="number" min={1} className={num} placeholder="입력" value={cfg[k].폭 || ''} disabled={!n}
@@ -213,7 +217,7 @@ export function CadAssignDialog({
                           </>
                         : <span className="text-muted-foreground">—</span>}
                     </td>
-                    <td className="px-2 py-1.5 text-right">
+                    <td className="px-2 py-1.5 text-center">
                       <input type="number" min={0} max={100} className={num} value={cfg[k].로스} disabled={!n}
                         onChange={e => setCfgField(k, '로스', parseFloat(e.target.value) || 0)} />
                     </td>
