@@ -21,6 +21,7 @@ import { PackBomEditor } from '@/components/PackBomEditor';
 import { MaterialQuickAddDialog } from '@/components/MaterialQuickAddDialog';
 import { CadAssignDialog } from '@/components/CadAssignDialog';
 import { parseCadWorkbook, type CadLine } from '@/lib/cadYardage';
+import { yardRowNet, buildYardBuckets, usesPart } from '@/lib/yardBom';
 import { SalesPricingPanel } from '@/components/SalesPricingPanel';
 import {
   applyPackLinesToBom, createEmptyPackBom, isPackItem,
@@ -5032,18 +5033,12 @@ export default function BomManagement() {
             const upd = (id: string, f: string, v: string | number) =>
               setYardRows(p => p.map(r => r.id === id ? { ...r, [f]: v } : r));
 
-            /** 한 줄의 순소요량 — 종류마다 단위가 다르다 */
-            const rowNet = (r: YardRow) => {
-              if (r.kind === '가죽') return (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764;  // SF
-              const w = cfgOf(r.kind).폭;
-              if (!w) return 0;
-              const cm2 = r.가로 * r.세로 * r.수량;
-              return r.kind === '보강재' ? cm2 / w / 100 : cm2 / w / 91.44;                              // M / YD
-            };
+            const rowNet = (r: YardRow) => yardRowNet(r, yardCfg);
 
             /** 한 종류를 BOM 자재 명세에 만들어 넣는다 — 지금 고른 원가구분(사전/사후)에만.
-             *  · 가죽·원단·안감 : 종류마다 한 줄. 소요량은 부위를 다 합친 값
-             *  · 보강재         : 자재가 제각각이라 패턴부위마다 한 줄
+             *  · 가죽·원단 : 부위(바디/트림1/트림2)마다 한 줄 — 부위마다 자재가 다르다
+             *  · 안감      : 한 줄 (부위 없음)
+             *  · 보강재    : 자재가 제각각이라 패턴부위마다 한 줄
              *  자재명·단가·업체는 손으로 넣는 값이라, 다시 눌러도 지우지 않고 소요량만 갱신한다. */
             const syncToBom = (k: YardKind) => {
               if (!editBom) return;
@@ -5054,16 +5049,7 @@ export default function BomManagement() {
               const loss = cfgOf(k).로스;
               const category: BomCategory = k === '보강재' ? '보강재' : '원자재';
 
-              // 보강재만 자재별로 쪼개고, 나머지는 종류당 한 줄로 합친다
-              const buckets: Array<{ key: string; subPart?: string; itemName: string; net: number }> =
-                k === '보강재'
-                  ? rows.map(r => ({ key: r.패턴부위 || r.id, itemName: r.패턴부위 || '', net: rowNet(r) }))
-                  : [{
-                      key: k,
-                      subPart: k === '안감' ? '안감' : undefined,
-                      itemName: '',
-                      net: rows.reduce((s, r) => s + rowNet(r), 0),
-                    }];
+              const buckets = buildYardBuckets(k, yardRows, yardCfg);
 
               const merge = (ls: ExtBomLine[]) => {
                 const kept = ls.filter(l => l.fromYard !== k);
@@ -5212,8 +5198,7 @@ export default function BomManagement() {
                   const noWidth = needsWidth && !cfg.폭;
 
                   // 부위별 소계 — 보강재는 부위가 없어 한 덩어리
-                  const usesPart = k === '가죽' || k === '원단';
-                  const parts = usesPart ? YARD_PARTS.filter(p => rows.some(r => (r.part || '바디') === p)) : [''];
+                  const parts = usesPart(k) ? YARD_PARTS.filter(p => rows.some(r => (r.part || '바디') === p)) : [''];
                   return (
                     <div key={k} className="bg-card rounded-lg border border-border overflow-hidden">
                       {/* 종류 헤더 — 폭·로스는 여기 하나씩 */}
@@ -5268,7 +5253,7 @@ export default function BomManagement() {
                                   onChange={e => upd(r.id, '패턴부위', e.target.value)} />
                               </td>
                               <td className={tdCls}>
-                                {!usesPart
+                                {!usesPart(k)
                                   ? <span className="block text-center text-xs text-muted-foreground">—</span>
                                   : <select className={selCls} value={r.part || '바디'} onChange={e => upd(r.id, 'part', e.target.value)}>
                                       {YARD_PARTS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -5297,7 +5282,7 @@ export default function BomManagement() {
                       {rows.length > 0 && (
                         <div className="border-t border-border bg-primary/5 px-3 py-2 flex items-center gap-4 flex-wrap">
                           {parts.map(p => {
-                            const net = rows.filter(r => !usesPart || (r.part || '바디') === p).reduce((s, r) => s + rowNet(r), 0);
+                            const net = rows.filter(r => !usesPart(k) || (r.part || '바디') === p).reduce((s, r) => s + rowNet(r), 0);
                             return (
                               <span key={`${k}|${p}`} className="text-xs tabular-nums">
                                 <b className="mr-1.5">{k}{p ? ` · ${p}` : ''}</b>
@@ -5309,7 +5294,7 @@ export default function BomManagement() {
                           })}
                           <Button size="sm" className="text-xs h-8 ml-auto" onClick={() => syncToBom(k)}>
                             {k} → {yardScope === 'post' ? '사후원가' : '사전원가'} BOM에 넣기
-                            {k === '보강재' ? ` (${rows.length}줄)` : ' (1줄)'}
+                            {` (${buildYardBuckets(k, yardRows, yardCfg).length}줄)`}
                           </Button>
                         </div>
                       )}
