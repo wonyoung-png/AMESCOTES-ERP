@@ -1,5 +1,5 @@
 // 운영 캘린더 · 기획전 — L1 타임라인 + L2 팀 프로젝트 (DESIGN_BRAND_OPS §2.2)
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   phase1, CAMPAIGN_CHANNELS, type Campaign, type CampaignStatus,
@@ -15,6 +15,8 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { Link } from 'wouter';
+import { fetchProjects, upsertProject, type Project } from '@/lib/projectQueries';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const VIEW_MODES: CalendarViewMode[] = ['year', 'half', 'quarter', 'month', 'week', 'day'];
@@ -52,6 +54,27 @@ export default function OperationalCalendar() {
 
   const [selected, setSelected] = useState<Campaign | null>(null);
   const [showNew, setShowNew] = useState(false);
+  // 대형 프로젝트는 여기서 만들고 프로젝트 탭에서 상세를 관리한다
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [pForm, setPForm] = useState({ title: '', kind: '팝업·오픈', anchorDate: '', anchorLabel: '오픈' });
+  const loadProjects = () => fetchProjects(ws).then(setProjects).catch(() => {});
+  useEffect(() => { loadProjects(); /* eslint-disable-next-line */ }, [ws]);
+
+  const createProject = async () => {
+    if (!pForm.title.trim()) { toast.error('프로젝트 이름을 입력하세요'); return; }
+    const id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+    try {
+      await upsertProject({
+        id, workspace: ws, title: pForm.title.trim(), kind: pForm.kind,
+        anchorDate: pForm.anchorDate || undefined, anchorLabel: pForm.anchorLabel, status: '진행',
+      });
+      toast.success('프로젝트를 만들었습니다. 상세 업무는 프로젝트 탭에서 관리합니다');
+      setShowNewProject(false);
+      setPForm({ title: '', kind: '팝업·오픈', anchorDate: '', anchorLabel: '오픈' });
+      loadProjects();
+    } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
+  };
   const [form, setForm] = useState({
     title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15,
   });
@@ -134,6 +157,39 @@ export default function OperationalCalendar() {
       );
     });
 
+    // 프로젝트 띠 — 기간이 걸치는 프로젝트만. 클릭하면 프로젝트 탭으로 간다.
+    const projEvs: PlacedEvent[] = [];
+    projects.forEach(pr => {
+      if (!pr.anchorDate) return;
+      // 시작이 따로 없으니 앵커(오픈일) 하루짜리로 두되, 항목 마감 중 가장 이른 날부터 그린다
+      const firstDue = pr.items.map(i => i.due).filter(Boolean).sort()[0];
+      const pos = eventPosition(firstDue || pr.anchorDate, pr.anchorDate, band);
+      if (pos) projEvs.push({ ...(pr as any), title: pr.title, status: 'active', _s: pos.s, _e: pos.e, _lane: 0 });
+    });
+    const projLanes = assignLanes(projEvs);
+    const projRow = projEvs.length === 0 ? null : (
+      <div key={`${bandIdx}-proj`} className="flex border-b-2 border-border">
+        <div className="w-[120px] shrink-0 px-3 py-2 text-xs font-semibold text-foreground border-r border-border bg-card sticky left-0 z-10 flex items-center"
+          style={{ minHeight: Math.max(34, projLanes * 30 + 4) }}>
+          프로젝트
+        </div>
+        <div className="relative" style={{ width: totalW, height: Math.max(34, projLanes * 30 + 4) }}>
+          {projEvs.map(ev => (
+            <Link key={(ev as any).id} href="/projects">
+              <a
+                className="absolute h-[24px] rounded-md border border-primary/30 bg-primary/10 text-primary text-[11px] px-1.5 truncate text-left z-10 flex items-center hover:bg-primary/20"
+                style={{ left: ev._s * colWidth + 2, width: Math.max(24, (ev._e - ev._s + 1) * colWidth - 4), top: (ev._lane ?? 0) * 30 + 4 }}
+                title={`${ev.title} — 프로젝트 탭에서 상세 관리`}
+              >
+                {ev.title}
+              </a>
+            </Link>
+          ))}
+        </div>
+      </div>
+    );
+    const projectBand = projRow;
+
     const channelRows = CAMPAIGN_CHANNELS.map(ch => {
       const evs: PlacedEvent[] = [];
       campaigns.filter(c => c.channel === ch && c.status !== 'draft').forEach(c => {
@@ -193,6 +249,7 @@ export default function OperationalCalendar() {
             {headerCells}
           </div>
         </div>
+        {projectBand}
         {channelRows}
       </div>
     );
@@ -209,7 +266,12 @@ export default function OperationalCalendar() {
           <h1 className="text-2xl font-bold text-foreground">운영 캘린더 · 기획전</h1>
           <p className="text-sm text-muted-foreground">{ws} — 기획전별 팀 프로젝트 · 주/월/분기/반기/연간 뷰</p>
         </div>
-        <Button onClick={() => setShowNew(true)}><Plus className="w-4 h-4 mr-1" />기획전</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowNewProject(true)}>
+            <Plus className="w-4 h-4 mr-1" />프로젝트
+          </Button>
+          <Button onClick={() => setShowNew(true)}><Plus className="w-4 h-4 mr-1" />기획전</Button>
+        </div>
       </div>
 
       {/* 뷰 전환: 연간 · 반기 · 분기 · 월 · 주 · 일 */}
@@ -318,6 +380,45 @@ export default function OperationalCalendar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    <Dialog open={showNewProject} onOpenChange={setShowNewProject}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>새 프로젝트</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            팝업 오픈·시즌 런칭처럼 몇 달에 걸친 일입니다. 여기서 만들고 <b>상세 업무는 프로젝트 탭</b>에서 관리합니다.
+          </p>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>이름 *</Label>
+              <Input value={pForm.title} onChange={e => setPForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="한남 플래그십 오픈" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>유형</Label>
+                <select value={pForm.kind} onChange={e => setPForm(f => ({ ...f, kind: e.target.value }))}
+                  className="w-full h-9 text-sm border border-border rounded-md bg-card px-2">
+                  {['팝업·오픈', '시즌 런칭', '콜라보', '입점', '스토어 구축', '기타'].map(k => <option key={k}>{k}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>기준일 라벨</Label>
+                <Input value={pForm.anchorLabel} onChange={e => setPForm(f => ({ ...f, anchorLabel: e.target.value }))}
+                  placeholder="고객오픈" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>기준일 — 여기서 D-day를 셉니다</Label>
+              <Input type="date" value={pForm.anchorDate}
+                onChange={e => setPForm(f => ({ ...f, anchorDate: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewProject(false)}>취소</Button>
+            <Button onClick={createProject}>만들기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

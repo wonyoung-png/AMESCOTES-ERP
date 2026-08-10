@@ -9,8 +9,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
-  fetchProjects, upsertProject, upsertItems, deleteProject, deleteItem,
-  type Project, type ProjectItem,
+  fetchProjects, upsertProject, upsertItems, deleteProject, deleteItem, fetchMembers,
+  TEAMS, type Project, type ProjectItem, type Member,
 } from '@/lib/projectQueries';
 import { parseChecklist } from '@/lib/checklistImport';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ type View = 'all' | 'team' | 'owner' | 'budget';
 
 const VIEWS: { id: View; label: string; desc: string }[] = [
   { id: 'all', label: '전체', desc: '남은 날 · 막힌 것' },
-  { id: 'team', label: '팀별', desc: '구역별로 묶어 보기' },
+  { id: 'team', label: '팀별', desc: '국내영업·디자인·생산 …' },
   { id: 'owner', label: '담당자별', desc: '누가 무엇을 언제까지' },
   { id: 'budget', label: '예산', desc: '상한 대비 잡힌 금액' },
 ];
@@ -77,6 +77,7 @@ function ItemRow({ item, onToggle, onEdit }: {
         </div>
         {item.detail && <p className="text-xs text-muted-foreground mt-0.5">{item.detail}</p>}
         <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground flex-wrap">
+          {item.team && <span className="text-foreground">{item.team}</span>}
           {item.owner && <span>{item.owner}</span>}
           {item.due && <span className="font-mono">{item.due}</span>}
           {item.budget != null && <span className="font-mono">{won(item.budget)}</span>}
@@ -152,6 +153,8 @@ export default function ProjectBoard() {
   const [paste, setPaste] = useState('');
   /** 항목 직접 입력·수정 — 이게 기본 경로다. 붙여넣기는 처음 한 번 옮길 때만 쓴다 */
   const [editing, setEditing] = useState<ProjectItem | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  useEffect(() => { fetchMembers().then(setMembers).catch(() => {}); }, []);
 
   const load = async () => {
     setLoading(true);
@@ -185,8 +188,9 @@ export default function ProjectBoard() {
   /** 새 항목 틀. 어느 묶음에서 눌렀는지에 따라 페이즈·구역을 미리 채운다 */
   const blankItem = (group?: string): ProjectItem => ({
     id: uid(), projectId: selId,
-    phase: view === 'team' ? '' : (group || phaseOpts[0] || ''),
-    area: view === 'team' ? (group || '') : '',
+    phase: view === 'all' ? (group || phaseOpts[0] || '') : (phaseOpts[0] || ''),
+    area: '',
+    team: view === 'team' && group !== '팀 미지정' ? group : undefined,
     title: '', due: undefined, owner: view === 'owner' && group !== '미지정' ? group : undefined,
     urgent: false, blocker: false, done: false, sortNo: items.length,
   });
@@ -409,7 +413,7 @@ export default function ProjectBoard() {
               ) : (
                 <GroupedList
                   items={shown}
-                  groupBy={view === 'team' ? (i => i.area) : view === 'owner' ? (i => i.owner || '미지정') : (i => i.phase)}
+                  groupBy={view === 'team' ? (i => i.team || '팀 미지정') : view === 'owner' ? (i => i.owner || '미지정') : (i => i.phase)}
                   emptyText="조건에 맞는 항목이 없습니다"
                   onToggle={toggle}
                   onEdit={setEditing}
@@ -491,11 +495,13 @@ export default function ProjectBoard() {
                   <datalist id="phase-opts">{phaseOpts.map(o => <option key={o} value={o} />)}</datalist>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>구역 (팀 성격)</Label>
-                  <Input list="area-opts" value={editing.area}
-                    onChange={e => setEditing(v => v && { ...v, area: e.target.value })}
-                    placeholder="생산 발주" />
-                  <datalist id="area-opts">{areaOpts.map(o => <option key={o} value={o} />)}</datalist>
+                  <Label>팀</Label>
+                  <select value={editing.team || ''}
+                    onChange={e => setEditing(v => v && { ...v, team: e.target.value || undefined })}
+                    className="w-full h-9 text-sm border border-border rounded-md bg-card px-2">
+                    <option value="">팀 선택</option>
+                    {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
@@ -505,11 +511,31 @@ export default function ProjectBoard() {
                     onChange={e => setEditing(v => v && { ...v, due: e.target.value || undefined })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>담당 · 확인처</Label>
-                  <Input list="owner-opts" value={editing.owner || ''}
-                    onChange={e => setEditing(v => v && { ...v, owner: e.target.value || undefined })}
-                    placeholder="생산팀 · 소방서" />
-                  <datalist id="owner-opts">{ownerOpts.map(o => <option key={o} value={o} />)}</datalist>
+                  <Label>담당자</Label>
+                  <select
+                    value={editing.ownerUserId || (editing.owner && !members.some(m => m.name === editing.owner) ? '__ext' : '')}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (v === '__ext') { setEditing(p => p && { ...p, ownerUserId: undefined, owner: '' }); return; }
+                      const m = members.find(x => x.id === v);
+                      // 팀이 비어 있으면 담당자의 팀을 따라간다
+                      setEditing(p => p && {
+                        ...p, ownerUserId: m?.id, owner: m?.name,
+                        team: p.team || m?.team,
+                      });
+                    }}
+                    className="w-full h-9 text-sm border border-border rounded-md bg-card px-2">
+                    <option value="">담당 미지정</option>
+                    {members
+                      .filter(m => !editing.team || !m.team || m.team === editing.team)
+                      .map(m => <option key={m.id} value={m.id}>{m.name}{m.team ? ` · ${m.team}` : ''}</option>)}
+                    <option value="__ext">사외 직접 입력…</option>
+                  </select>
+                  {!editing.ownerUserId && (
+                    <Input value={editing.owner || ''}
+                      onChange={e => setEditing(v => v && { ...v, owner: e.target.value || undefined })}
+                      placeholder="소방서 · 세무 · 용산구청" className="mt-1.5 h-8 text-xs" />
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label>금액</Label>

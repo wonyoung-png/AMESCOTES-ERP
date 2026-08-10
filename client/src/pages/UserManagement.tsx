@@ -22,11 +22,21 @@ interface DbUser {
   email: string;
   name: string;
   role: UserRole;
+  /** 조직 — 프로젝트 업무 담당자를 계정에서 고르려면 팀이 여기 있어야 한다 */
+  team: string | null;
+  rank: string | null;
+  position: string | null;
   is_active: boolean;
   created_at: string;
 }
 
 const ROLES: UserRole[] = ['대표', '생산관리팀장', '부관리 주임', '영업과장', '사원'];
+const TEAMS = ['국내영업', '해외영업', '비주얼컨텐츠', '디자인', '생산', '마케팅', '물류CS'];
+
+async function saveOrg(id: string, patch: Partial<Pick<DbUser, 'team' | 'rank' | 'position'>>) {
+  const { error } = await supabase.from('app_users').update(patch).eq('id', id);
+  if (error) throw error;
+}
 
 async function fetchUsers(): Promise<DbUser[]> {
   const { data, error } = await supabase
@@ -42,7 +52,7 @@ export default function UserManagement() {
   const queryClient = useQueryClient();
   const isAdmin = isAdminEmail(currentUser?.email);
 
-  const { data: users = [], isLoading } = useQuery({
+  const { data: users = [], isLoading, refetch } = useQuery({
     queryKey: ['app_users'],
     queryFn: fetchUsers,
     enabled: isAdmin,
@@ -150,6 +160,9 @@ export default function UserManagement() {
               <th>이름</th>
               <th>이메일</th>
               <th>역할</th>
+              <th>팀</th>
+              <th>직급</th>
+              <th>직책</th>
               <th className="nw">등록일</th>
               <th>활성</th>
               <th className="num">비밀번호</th>
@@ -157,7 +170,7 @@ export default function UserManagement() {
           </thead>
           <tbody className="divide-y divide-border">
             {isLoading && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Data Loading by AMESCOTES</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Data Loading by AMESCOTES</td></tr>
             )}
             {users.map(u => {
               const isAdminRow = isAdminEmail(u.email);
@@ -172,6 +185,32 @@ export default function UserManagement() {
                   <td className="text-muted-foreground">{u.email}</td>
                   <td>
                     <span className="text-[13px] px-2 py-0.5 rounded-[6px] bg-[var(--fill-tertiary)] text-foreground">{u.role}</span>
+                  </td>
+                  <td>
+                    <select
+                      value={u.team || ''}
+                      onChange={async e => { await saveOrg(u.id, { team: e.target.value || null }); refetch(); }}
+                      className="h-7 text-[13px] border border-border rounded-md bg-card px-1.5"
+                    >
+                      <option value="">미지정</option>
+                      {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      defaultValue={u.rank || ''}
+                      onBlur={async e => { if (e.target.value !== (u.rank || '')) { await saveOrg(u.id, { rank: e.target.value || null }); refetch(); } }}
+                      placeholder="사원"
+                      className="h-7 w-16 text-[13px] border border-border rounded-md bg-card px-1.5"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      defaultValue={u.position || ''}
+                      onBlur={async e => { if (e.target.value !== (u.position || '')) { await saveOrg(u.id, { position: e.target.value || null }); refetch(); } }}
+                      placeholder="팀장"
+                      className="h-7 w-16 text-[13px] border border-border rounded-md bg-card px-1.5"
+                    />
                   </td>
                   <td className="text-muted-foreground">{u.created_at?.slice(0, 10)}</td>
                   <td>

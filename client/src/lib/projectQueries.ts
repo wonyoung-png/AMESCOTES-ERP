@@ -14,6 +14,10 @@ export interface ProjectItem {
   title: string;
   detail?: string;
   due?: string;
+  /** 담당 팀 — TEAMS 중 하나 */
+  team?: string;
+  /** 담당자 계정. 사외(소방서·세무)는 계정이 없어 owner에만 적는다 */
+  ownerUserId?: string;
   /** 사내 팀일 수도, 소방서·세무 같은 사외일 수도 있다 */
   owner?: string;
   budget?: number;
@@ -43,7 +47,8 @@ export interface Project {
 const rowToItem = (r: any): ProjectItem => ({
   id: r.id, projectId: r.project_id, phase: r.phase || '', area: r.area || '',
   title: r.title, detail: r.detail || undefined, due: r.due || undefined,
-  owner: r.owner || undefined, budget: r.budget ?? undefined,
+  owner: r.owner || undefined, team: r.team || undefined,
+  ownerUserId: r.owner_user_id || undefined, budget: r.budget ?? undefined,
   urgent: !!r.urgent, blocker: !!r.blocker, done: !!r.done,
   doneAt: r.done_at || undefined, sortNo: r.sort_no ?? 0,
 });
@@ -87,6 +92,7 @@ export async function upsertItems(items: ProjectItem[]) {
   const rows = items.map(i => filterForTable('project_items', {
     id: i.id, project_id: i.projectId, phase: i.phase, area: i.area,
     title: i.title, detail: i.detail, due: i.due || null, owner: i.owner,
+    team: i.team, owner_user_id: i.ownerUserId || null,
     budget: i.budget ?? null, urgent: i.urgent, blocker: i.blocker,
     done: i.done, done_at: i.doneAt || null, sort_no: i.sortNo,
   }));
@@ -106,4 +112,22 @@ export async function deleteProject(id: string) {
 export async function deleteItem(id: string) {
   const { error } = await supabase.from('project_items').delete().eq('id', id);
   if (error) throw error;
+}
+
+/** 회사 팀 구분 — 업무 담당을 이 안에서 고른다 */
+export const TEAMS = [
+  '국내영업', '해외영업', '비주얼컨텐츠', '디자인', '생산', '마케팅', '물류CS',
+] as const;
+
+export interface Member { id: string; name: string; team?: string; rank?: string; position?: string; }
+
+/** 담당자로 고를 수 있는 사람 = 가입된 계정 */
+export async function fetchMembers(): Promise<Member[]> {
+  const { data, error } = await supabase
+    .from('app_users').select('id,name,team,rank,position,is_active').eq('is_active', true);
+  if (error) throw error;
+  return (data || []).map((u: any) => ({
+    id: u.id, name: u.name, team: u.team || undefined,
+    rank: u.rank || undefined, position: u.position || undefined,
+  })).sort((a, b) => (a.team || 'zz').localeCompare(b.team || 'zz') || a.name.localeCompare(b.name));
 }
