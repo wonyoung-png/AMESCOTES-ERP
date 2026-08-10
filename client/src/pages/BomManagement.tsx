@@ -155,6 +155,7 @@ interface ExtBomLine {
   isNewVendor?: boolean;      // 새로 등록된 업체 (기본 정보 미입력)
   memo?: string;
   imageUrl?: string;          // 자재 이미지 (base64 또는 URL)
+  fromYard?: string;          // 소요량 계산에서 만든 줄 — 다시 만들 때 이것만 갈아끼운다
 }
 
 // ─── 상수 ───────────────────────────────────────────────────────────────────
@@ -1598,196 +1599,154 @@ function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void 
 }
 
 // ─── BOM 행 컴포넌트 ─────────────────────────────────────────────────────────
-// 포함: BomLineRow 소요량 계산기 미니 모달
-function CalcModal({ itemName, unit, onApply, onClose }: {
-  itemName: string;
-  unit: 'SF' | 'YD';
+/** 소요량 계산 탭과 같은 데이터를 쓰기 위한 통로.
+ *  BOM 행의 📎 계산 팝업에서 고친 값이 소요량 탭에 그대로 반영된다. */
+const YardCtx = React.createContext<{
+  rows: YardRow[];
+  setRows: React.Dispatch<React.SetStateAction<YardRow[]>>;
+  cfg: YardCfg;
+  setCfg: React.Dispatch<React.SetStateAction<YardCfg>>;
+} | null>(null);
+
+/** 자재 줄 → 소요량 종류. 소요량 탭에서 만든 줄이면 그때 쓴 종류를 그대로 쓴다 */
+function kindOfLine(line: ExtBomLine): YardKind {
+  if (line.fromYard && (YARD_KINDS as readonly string[]).includes(line.fromYard)) return line.fromYard as YardKind;
+  if (line.category === '보강재') return '보강재';
+  if (line.subPart === '안감') return '안감';
+  const u = line.customUnit || line.unit;
+  return u === 'YD' ? '원단' : u === 'M' ? '보강재' : '가죽';
+}
+
+// BOM 행의 소요량 계산 팝업 — 소요량 계산 탭의 그 자재 줄만 잘라서 보여준다
+function CalcModal({ line, onApply, onClose }: {
+  line: ExtBomLine;
   onApply: (qty: number) => void;
   onClose: () => void;
 }) {
-  const [calcType, setCalcType] = useState<'SF' | 'YD'>(unit);
-  const [rows, setRows] = useState<Array<{id: string; 부위: string; 가로: number; 세로: number; 수량: number}>>(
-    [{ id: Math.random().toString(36).slice(2), 부위: '', 가로: 0, 세로: 0, 수량: 1 }]
-  );
-  const [lossRate, setLossRate] = useState(10);
-  const [width, setWidth] = useState(150); // 원단 전용
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const ocrFileRef = useRef<HTMLInputElement>(null);
+  const ctx = React.useContext(YardCtx);
+  const kind = kindOfLine(line);
+  const part = kind === '보강재' ? '' : ((line.subPart as string) || '바디');
+  const unit = YARD_UNIT[kind];
 
-  const netSF = rows.reduce((s, r) => s + (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764, 0);
-  const netYD = width > 0 ? rows.reduce((s, r) => s + r.가로 * r.세로 * r.수량, 0) / width / 91.44 : 0;
-  const net = calcType === 'SF' ? netSF : netYD;
-  const final = net * (1 + lossRate / 100);
+  const all = ctx?.rows ?? [];
+  const cfg = ctx?.cfg?.[kind] ?? DEFAULT_YARD_CFG[kind];
+  const mine = all.filter(r => r.kind === kind && (kind === '보강재' || (r.part || '바디') === part));
 
-  const addRow = () => setRows(p => [...p, { id: Math.random().toString(36).slice(2), 부위: '', 가로: 0, 세로: 0, 수량: 1 }]);
-  const update = (id: string, field: string, val: string | number) =>
-    setRows(p => p.map(r => r.id === id ? { ...r, [field]: val } : r));
+  const upd = (id: string, f: string, v: string | number) =>
+    ctx?.setRows(p => p.map(r => r.id === id ? { ...r, [f]: v } : r));
+  const del = (id: string) => ctx?.setRows(p => p.filter(r => r.id !== id));
+  const add = () => ctx?.setRows(p => [...p, {
+    id: genId(), kind, part: kind === '보강재' ? '' : part, 패턴부위: '', 가로: 0, 세로: 0, 수량: 1,
+  }]);
+  const setCfgField = (f: '폭' | '로스', v: number) =>
+    ctx?.setCfg(c => ({ ...c, [kind]: { ...c[kind], [f]: v } }));
 
-  const runOcr = async (blob: Blob) => {
-    setOcrLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('image', blob);
-      const res = await fetch('/api/yardage/ocr', { method: 'POST', body: formData });
-      const data = await res.json() as { leather?: Array<{부위:string;가로:number;세로:number;수량:number}>; fabric?: Array<{부위:string;가로:number;세로:number;수량:number}> };
-      if (calcType === 'SF' && data.leather?.length) {
-        setRows(data.leather.map((r, i) => ({ id: String(i), ...r })));
-        toast.success(`OCR 완료 — 가죽 ${data.leather.length}행 입력됨`);
-      } else if (calcType === 'YD' && data.fabric?.length) {
-        setRows(data.fabric.map((r, i) => ({ id: String(i), ...r })));
-        toast.success(`OCR 완료 — 원단 ${data.fabric.length}행 입력됨`);
-      } else {
-        toast.error('OCR 결과가 없습니다. 이미지를 확인해주세요.');
-      }
-    } catch {
-      toast.error('OCR 처리 중 오류가 발생했습니다.');
-    } finally {
-      setOcrLoading(false);
-    }
+  const rowNet = (r: YardRow) => {
+    if (kind === '가죽') return (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764;
+    if (!cfg.폭) return 0;
+    const cm2 = r.가로 * r.세로 * r.수량;
+    return kind === '보강재' ? cm2 / cfg.폭 / 100 : cm2 / cfg.폭 / 91.44;
   };
+  const net = mine.reduce((s, r) => s + rowNet(r), 0);
+  const final = net * (1 + cfg.로스 / 100);
 
-  // 클립보드 붙여넣기 이벤트
-  useEffect(() => {
-    const handlePaste = async (e: ClipboardEvent) => {
-      const items = Array.from(e.clipboardData?.items || []);
-      const imageItem = items.find(item => item.type.startsWith('image/'));
-      if (!imageItem) return;
-      const blob = imageItem.getAsFile();
-      if (!blob) return;
-      e.preventDefault();
-      await runOcr(blob);
-    };
-    document.addEventListener('paste', handlePaste);
-    return () => document.removeEventListener('paste', handlePaste);
-  }, [calcType]);
-
-  const inputCls = 'w-full border border-border rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring';
-  const inputRO = 'w-full border border-border rounded px-1.5 py-1 text-xs text-center bg-[var(--fill-quaternary)] text-muted-foreground';
-  const accent = calcType === 'SF' ? 'amber' : 'sky';
+  const inp = 'w-full border border-border rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring';
+  const ro = 'w-full border border-border rounded px-1.5 py-1 text-xs text-center bg-[var(--fill-quaternary)] text-muted-foreground';
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-card rounded-lg shadow-2xl w-[640px] max-w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className={`px-4 py-3 border-b border-border flex items-center justify-between bg-muted`}>
-          <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5"><Ruler className="w-4 h-4" />소요량 계산 — {itemName || '자재'}</h3>
+      <div className="bg-card rounded-lg shadow-2xl w-[760px] max-w-[95vw] max-h-[88vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-muted">
+          <h3 className="text-sm font-bold flex items-center gap-1.5">
+            <Ruler className="w-4 h-4" />
+            소요량 계산 — {kind}{part ? ` · ${part}` : ''}
+            {line.itemName && <span className="text-muted-foreground font-normal">· {line.itemName}</span>}
+          </h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">×</button>
         </div>
-        <div className="p-4 space-y-3">
-          {/* 가죽/원단 탭 + OCR 버튼 */}
-          <div className="flex items-center justify-between">
-            <div className="flex gap-1">
-              <button
-                onClick={() => setCalcType('SF')}
-                className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-                  calcType === 'SF' ? 'bg-primary text-primary-foreground' : 'bg-[var(--fill-tertiary)] text-muted-foreground hover:bg-[var(--fill-secondary)]'
-                }`}
-              >가죽 (SF)</button>
-              <button
-                onClick={() => setCalcType('YD')}
-                className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-                  calcType === 'YD' ? 'bg-primary text-primary-foreground' : 'bg-[var(--fill-tertiary)] text-muted-foreground hover:bg-[var(--fill-secondary)]'
-                }`}
-              >원단 (YD)</button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">Ctrl+V로 이미지 붙여넣기</span>
-              <input ref={ocrFileRef} type="file" accept="image/*" className="hidden" onChange={async e => {
-                const file = e.target.files?.[0];
-                if (file) await runOcr(file);
-                if (ocrFileRef.current) ocrFileRef.current.value = '';
-              }} />
-              <button
-                onClick={() => ocrFileRef.current?.click()}
-                disabled={ocrLoading}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs border border-border text-muted-foreground hover:bg-[var(--fill-quaternary)] disabled:opacity-50"
-              >{ocrLoading ? '처리중...' : <><Camera className="w-3.5 h-3.5" />이미지로 입력</>}</button>
-            </div>
-          </div>
-          {/* 로스율 + (원단: 폭) */}
-          <div className="flex items-center gap-4">
-            {calcType === 'YD' && (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-semibold whitespace-nowrap">원단폭(cm)</span>
-                <input type="number" min="0" value={width} onChange={e => setWidth(parseFloat(e.target.value) || 150)}
-                  className="w-20 border border-border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring" />
+
+        <div className="px-4 py-2.5 bg-[var(--fill-quaternary)] border-b border-border flex items-center gap-4 flex-wrap text-xs">
+          <span className="text-muted-foreground">소요량 계산 탭과 같은 데이터입니다 — 여기서 고치면 탭에도 반영됩니다.</span>
+          <div className="flex items-center gap-3 ml-auto">
+            {kind !== '가죽' && (
+              <label className="flex items-center gap-1.5">폭 CM
+                <input type="number" min={1} placeholder="입력" value={cfg.폭 || ''}
+                  onChange={e => setCfgField('폭', parseFloat(e.target.value) || 0)}
+                  className="w-[72px] border border-border rounded px-2 py-1 text-right bg-card" />
               </label>
             )}
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="font-semibold whitespace-nowrap">로스율(%)</span>
-              <input type="number" min="0" value={lossRate} onChange={e => setLossRate(parseFloat(e.target.value) || 0)}
-                className="w-20 border border-border rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring" min={0} max={100} />
+            <label className="flex items-center gap-1.5">로스 %
+              <input type="number" min={0} max={100} value={cfg.로스}
+                onChange={e => setCfgField('로스', parseFloat(e.target.value) || 0)}
+                className="w-[72px] border border-border rounded px-2 py-1 text-right bg-card" />
             </label>
           </div>
-          {/* 행 테이블 */}
-          <div className="overflow-x-auto rounded-md border border-border">
-            <table className="data-table w-full min-w-[560px]">
-              <thead className={`bg-muted border-b border-border`}>
-                <tr>
-                  <th className="text-[11px] text-muted-foreground ctr">부위</th>
-                  {calcType === 'SF' ? (
-                    <>
-                      <th className="text-[11px] text-muted-foreground ctr">가로 CM</th>
-                      <th className="text-[11px] text-muted-foreground ctr">세로 CM</th>
-                      <th className="text-[11px] text-muted-foreground ctr">가로(+0.5)</th>
-                      <th className="text-[11px] text-muted-foreground ctr">세로(+0.5)</th>
-                    </>
-                  ) : (
-                    <>
-                      <th className="text-[11px] text-muted-foreground ctr">가로 CM</th>
-                      <th className="text-[11px] text-muted-foreground ctr">세로 CM</th>
-                    </>
-                  )}
-                  <th className="text-[11px] text-muted-foreground ctr">수량</th>
-                  <th className="text-[11px] text-muted-foreground ctr">{calcType === 'SF' ? 'NET(S/F)' : 'NET(YD)'}</th>
-                  <th className="w-6"></th>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          <table className="w-full text-xs table-fixed">
+            <colgroup>
+              <col style={{ width: '38%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} />
+              <col style={{ width: '11%' }} /><col style={{ width: '17%' }} /><col style={{ width: '6%' }} />
+            </colgroup>
+            <thead className="bg-card border-b border-border sticky top-0">
+              <tr>
+                <th className="text-[11px] text-muted-foreground font-semibold py-2 px-2 text-left">패턴부위</th>
+                <th className="text-[11px] text-muted-foreground font-semibold py-2 px-2">가로 CM</th>
+                <th className="text-[11px] text-muted-foreground font-semibold py-2 px-2">세로 CM</th>
+                <th className="text-[11px] text-muted-foreground font-semibold py-2 px-2">수량</th>
+                <th className="text-[11px] text-muted-foreground font-semibold py-2 px-2 text-right">NET</th>
+                <th className="py-2 px-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {mine.length === 0 && (
+                <tr><td colSpan={6} className="text-center text-xs text-muted-foreground py-6">
+                  이 자재에 잡힌 패턴부위가 없습니다. 아래 <b>+ 행 추가</b> 또는 소요량 계산 탭에서 CAD를 올리세요.
+                </td></tr>
+              )}
+              {mine.map(r => (
+                <tr key={r.id} className="border-b border-border">
+                  <td className="px-2 py-1">
+                    <input className={inp + ' !text-left'} placeholder="패턴부위" value={r.패턴부위 || ''}
+                      onChange={e => upd(r.id, '패턴부위', e.target.value)} />
+                  </td>
+                  <td className="px-2 py-1"><input className={inp} type="number" min="0" value={r.가로 || ''} onChange={e => upd(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
+                  <td className="px-2 py-1"><input className={inp} type="number" min="0" value={r.세로 || ''} onChange={e => upd(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
+                  <td className="px-2 py-1"><input className={inp} type="number" min="1" value={r.수량 || ''} onChange={e => upd(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
+                  <td className="px-2 py-1"><input className={ro + ' !text-right font-semibold text-primary'} readOnly value={`${rowNet(r).toFixed(3)} ${unit}`} /></td>
+                  <td className="px-2 py-1 text-center">
+                    <button onClick={() => del(r.id)} className="text-muted-foreground hover:text-[var(--system-red)] text-lg leading-none">×</button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {rows.map(r => {
-                  const rowNet = calcType === 'SF'
-                    ? (r.가로 + 0.5) * (r.세로 + 0.5) * r.수량 / 10000 * 10.764
-                    : (width > 0 ? r.가로 * r.세로 * r.수량 / width / 91.44 : 0);
-                  return (
-                    <tr key={r.id} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
-                      <td><input className={inputCls} value={r.부위} onChange={e => update(r.id, '부위', e.target.value)} placeholder="바디" /></td>
-                      <td><input className={inputCls} type="number" min="0" value={r.가로 || ''} onChange={e => update(r.id, '가로', parseFloat(e.target.value) || 0)} /></td>
-                      <td><input className={inputCls} type="number" min="0" value={r.세로 || ''} onChange={e => update(r.id, '세로', parseFloat(e.target.value) || 0)} /></td>
-                      {calcType === 'SF' && (
-                        <>
-                          <td><input className={inputRO} value={(r.가로 + 0.5).toFixed(1)} readOnly /></td>
-                          <td><input className={inputRO} value={(r.세로 + 0.5).toFixed(1)} readOnly /></td>
-                        </>
-                      )}
-                      <td><input className={inputCls} type="number" min="0" value={r.수량 || ''} onChange={e => update(r.id, '수량', parseInt(e.target.value) || 1)} /></td>
-                      <td><input className={inputRO + ' font-semibold text-foreground'} value={rowNet.toFixed(3)} readOnly /></td>
-                      <td className="ctr"><button onClick={() => setRows(p => p.filter(x => x.id !== r.id))} className="text-muted-foreground hover:text-[var(--system-red)]">×</button></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="px-4 py-2 border-t border-border">
+          <button onClick={add} className="text-xs text-primary hover:text-primary/80 font-semibold">+ 행 추가</button>
+        </div>
+
+        <div className="px-4 py-3 border-t border-border flex items-center justify-between gap-3 flex-wrap bg-[var(--fill-quaternary)]">
+          <div className="text-sm tabular-nums">
+            <span className="text-muted-foreground mr-2 text-xs">Net</span><span className="font-bold">{net.toFixed(3)} {unit}</span>
+            <span className="text-muted-foreground mx-2 text-xs">→ 최종 (+{cfg.로스}%)</span>
+            <span className="font-bold text-primary text-base">{final.toFixed(3)} {unit}</span>
           </div>
-          <button onClick={addRow} className="text-xs text-primary hover:underline font-semibold">+ 행 추가</button>
-          {/* 결과 */}
-          <div className="flex items-center justify-between pt-2 border-t border-border">
-            <div className="text-sm">
-              <span className="text-muted-foreground mr-2">Net</span><span className="font-bold text-foreground">{net.toFixed(3)} {calcType}</span>
-              <span className="text-muted-foreground mx-2">→</span>
-              <span className="text-muted-foreground mr-2">최종(+{lossRate}%)</span><span className="font-bold text-primary text-base">{final.toFixed(3)} {calcType}</span>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={onClose} className="px-3 py-1.5 rounded text-xs border border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]">취소</button>
-              <button
-                onClick={() => { onApply(Math.ceil(final * 1000) / 1000); onClose(); }}
-                className="px-4 py-1.5 rounded text-xs bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
-              >이 값 적용</button>
-            </div>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 rounded-md border border-border text-xs hover:bg-card">취소</button>
+            <button
+              onClick={() => { onApply(Math.ceil(final * 1000) / 1000); onClose(); }}
+              className="px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90"
+            >이 값 적용</button>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 
 // React.memo: 얕은 비교로 변경된 행만 리렌더 (부모에서 stable 콜백 + 행 데이터만 전달)
 const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cnyKrw, sectionKey = '원자재', accentColor = 'amber', showUsdHint = false, usdKrw = 1380 }: {
@@ -1900,8 +1859,7 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
       )}
       {showCalcModal && showCalcBtn && (
         <CalcModal
-          itemName={line.itemName}
-          unit={effectiveUnit as 'SF' | 'YD'}
+          line={line}
           onApply={(qty) => onChange(line.id, 'manualQty', qty)}
           onClose={() => setShowCalcModal(false)}
         />
@@ -2244,7 +2202,6 @@ export default function BomManagement() {
   const [cadLines, setCadLines] = useState<CadLine[]>([]);
   const [cadStyle, setCadStyle] = useState<string | undefined>();
   const [yardRows, setYardRows] = useState<YardRow[]>([]);
-  const [yardTarget, setYardTarget] = useState<Record<string, string>>({});
   const [yardCfg, setYardCfg] = useState<YardCfg>(DEFAULT_YARD_CFG);
   // 각 탭 내 활성 컬러 탭
   const [activePreColor, setActivePreColor] = useState<string>('');
@@ -3491,7 +3448,14 @@ export default function BomManagement() {
   ), [summary, editBom?.pnl, displayTotalCostKrw]);
   const cnyKrw = editBom?.snapshotCnyKrw || settings.cnyKrw;
 
+  // 소요량 계산 탭과 BOM 행의 계산 팝업이 같은 데이터를 본다
+  const yardCtxValue = useMemo(
+    () => ({ rows: yardRows, setRows: setYardRows, cfg: yardCfg, setCfg: setYardCfg }),
+    [yardRows, yardCfg],
+  );
+
   return (
+    <YardCtx.Provider value={yardCtxValue}>
     <div className="w-full max-w-[1440px] mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
       {/* 헤더 */}
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -5069,38 +5033,36 @@ export default function BomManagement() {
               return r.kind === '보강재' ? cm2 / w / 100 : cm2 / w / 91.44;                              // M / YD
             };
 
-            // 고른 원가구분·컬러의 자재 줄 하나에만 순소요량·로스율을 넣는다
-            const patchLine = (targetId: string, netQty: number, lossPct: number) => {
-              const patch = (ls: ExtBomLine[]) =>
-                ls.map(l => l.id === targetId
-                  ? { ...l, netQty: Math.ceil(netQty * 1000) / 1000, lossRate: lossPct / 100 }
-                  : l);
-              setEditBom(prev => {
-                if (!prev) return prev;
-                if (yardScope === 'post') {
-                  return { ...prev, postColorBoms: (prev.postColorBoms || []).map(cb => cb.color === yardColor ? { ...cb, lines: patch(cb.lines) } : cb) };
-                }
-                return { ...prev, colorBoms: (prev.colorBoms || []).map(cb => cb.color === yardColor ? { ...cb, lines: patch(cb.lines) } : cb) };
-              });
-            };
+            /** 한 종류의 패턴부위를 통째로 BOM 자재 명세에 만들어 넣는다.
+             *  소계 하나만 넣는 게 아니라 패턴부위마다 한 줄씩 — 사전·사후 양쪽 같이 맞춘다.
+             *  이미 이 종류로 만들어 둔 줄은 지우고 새로 쓰므로, 여러 번 눌러도 늘어나지 않는다. */
+            const syncToBom = (k: YardKind) => {
+              if (!editBom) return;
+              const rows = yardRows.filter(r => r.kind === k);
+              if (!rows.length) { toast.error(`${k} 행이 없습니다`); return; }
+              if (k !== '가죽' && !cfgOf(k).폭) { toast.error(`${k} 폭(cm)을 먼저 입력하세요`); return; }
 
-            const targetLines = ((yardScope === 'post' ? (editBom?.postColorBoms || []) : (editBom?.colorBoms || []))
-              .find(cb => cb.color === yardColor)?.lines || [])
-              .filter(l => ['원자재', '가죽', '원단', '보강재'].includes(l.category as string))
-              .map(l => ({
-                id: l.id,
-                label: `${l.subPart || '부위 미지정'} · ${l.itemName || '(자재명 없음)'}${l.spec ? ` / ${l.spec}` : ''} [${l.customUnit || l.unit}]`,
+              const loss = cfgOf(k).로스;
+              const category: BomCategory = k === '보강재' ? '보강재' : '원자재';
+              const made: ExtBomLine[] = rows.map(r => ({
+                ...newExtLine(category),
+                id: genId(),
+                fromYard: k,
+                subPart: k === '보강재' ? undefined : (k === '안감' ? '안감' : (r.part || '바디')) as BomSubPart,
+                itemName: r.패턴부위 || '',
+                unit: YARD_UNIT[k],
+                netQty: Math.ceil(rowNet(r) * 1000) / 1000,
+                lossRate: loss / 100,
               }));
 
-            const applySub = (k: YardKind, part: string, net: number) => {
-              if (!editBom) return;
-              const key = `${k}|${part}`;
-              const tid = yardTarget[key];
-              if (!tid) { toast.error('적용할 자재 줄을 고르세요'); return; }
-              if (!net) { toast.error(k === '가죽' ? '계산값이 0입니다' : '폭(cm)을 먼저 입력하세요'); return; }
-              const loss = cfgOf(k).로스;
-              patchLine(tid, net, loss);
-              toast.success(`${k}${part ? ` · ${part}` : ''} ${(net * (1 + loss / 100)).toFixed(3)} ${YARD_UNIT[k]} 적용 — 저장을 눌러 확정하세요`);
+              // 이 종류로 만든 줄만 갈아끼운다 — 손으로 넣은 줄은 그대로 둔다
+              const merge = (ls: ExtBomLine[]) => [...ls.filter(l => l.fromYard !== k), ...made];
+              setEditBom(prev => prev && ({
+                ...prev,
+                colorBoms: (prev.colorBoms || []).map(cb => cb.color === yardColor ? { ...cb, lines: merge(cb.lines) } : cb),
+                postColorBoms: (prev.postColorBoms || []).map(cb => cb.color === yardColor ? { ...cb, lines: merge(cb.lines) } : cb),
+              }));
+              toast.success(`${k} ${made.length}줄을 사전·사후 원가에 만들었습니다 — 저장을 눌러 확정하세요`);
             };
 
             const ocrFileRef = React.createRef<HTMLInputElement>();
@@ -5298,29 +5260,23 @@ export default function BomManagement() {
                         <button onClick={() => addRow(k)} className="text-xs text-primary hover:text-primary/80 font-semibold">+ {k} 행 추가</button>
                       </div>
 
-                      {/* 부위별 소계 → BOM 적용 */}
+                      {/* 부위별 소계 (참고) + 통째로 BOM 에 생성 */}
                       {rows.length > 0 && (
-                        <div className="border-t border-border divide-y divide-border">
+                        <div className="border-t border-border bg-primary/5 px-3 py-2 flex items-center gap-4 flex-wrap">
                           {parts.map(p => {
                             const net = rows.filter(r => k === '보강재' || (r.part || '바디') === p).reduce((s, r) => s + rowNet(r), 0);
-                            const key = `${k}|${p}`;
                             return (
-                              <div key={key} className="px-3 py-2 flex items-center gap-2 flex-wrap bg-primary/5">
-                                <span className="text-xs font-semibold min-w-[86px]">{k}{p ? ` · ${p}` : ''}</span>
-                                <span className="text-sm tabular-nums">
-                                  <span className="text-[11px] text-muted-foreground">Net </span>{net.toFixed(3)}
-                                  <span className="text-[11px] text-muted-foreground"> → 최종 (+{cfg.로스}%) </span>
-                                  <b>{(net * (1 + cfg.로스 / 100)).toFixed(3)} {YARD_UNIT[k]}</b>
-                                </span>
-                                <select value={yardTarget[key] || ''} onChange={e => setYardTarget(s => ({ ...s, [key]: e.target.value }))}
-                                  className="h-8 flex-1 min-w-[200px] rounded-md border border-border bg-card px-2 text-xs ml-auto">
-                                  <option value="">{targetLines.length ? '적용할 자재 줄…' : '자재 줄 없음 — BOM에 원자재를 먼저 추가하세요'}</option>
-                                  {targetLines.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                                </select>
-                                <Button size="sm" className="text-xs h-8" onClick={() => applySub(k, p, net)}>BOM에 적용</Button>
-                              </div>
+                              <span key={`${k}|${p}`} className="text-xs tabular-nums">
+                                <b className="mr-1.5">{k}{p ? ` · ${p}` : ''}</b>
+                                <span className="text-muted-foreground">Net </span>{net.toFixed(3)}
+                                <span className="text-muted-foreground"> → </span>
+                                <b>{(net * (1 + cfg.로스 / 100)).toFixed(3)} {YARD_UNIT[k]}</b>
+                              </span>
                             );
                           })}
+                          <Button size="sm" className="text-xs h-8 ml-auto" onClick={() => syncToBom(k)}>
+                            {k} {rows.length}줄 BOM에 생성 (사전·사후)
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -5738,5 +5694,6 @@ export default function BomManagement() {
         </Dialog>
       )}
     </div>
+    </YardCtx.Provider>
   );
 }
