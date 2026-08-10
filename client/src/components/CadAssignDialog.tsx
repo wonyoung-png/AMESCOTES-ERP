@@ -1,13 +1,16 @@
 // CAD 소요량표를 올리면 조각별 자재를 가죽/원단/안감/보강으로 배정하고
 // 폭·로스율을 넣어 소요량을 자동 계산한 뒤, BOM 자재 줄에 바로 적용한다.
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
-  ASSIGN_LABEL, calcLeatherSF, calcFabricYD, withLoss,
+  ASSIGN_LABEL, ASSIGN_MATERIAL, calcLeatherSF, calcFabricYD, withLoss,
   type Assign, type CadLine,
 } from '@/lib/cadYardage';
+import { store, genId, COMMON_BRAND, type Material, type MaterialCategory, type YardRow } from '@/lib/store';
+import { fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
 
 /** 계산 단위가 있는 버킷 — '제외'는 빠진다 */
 const BUCKETS: Assign[] = ['leather', 'outer', 'lining', 'interlining'];
@@ -16,8 +19,13 @@ const NEEDS_WIDTH = (b: Assign) => b === 'outer' || b === 'lining';
 
 export type CadTarget = { id: string; label: string };
 
+/** 배정 → 소요량 표의 종류. 안감은 원단으로 넣고 부위를 '안감' 으로 잡는다 */
+const KIND_OF: Record<Exclude<Assign, 'skip'>, '가죽' | '원단' | '보강재'> = {
+  leather: '가죽', outer: '원단', lining: '원단', interlining: '보강재',
+};
+
 export function CadAssignDialog({
-  open, onOpenChange, styleNo, lines, targets, scopeLabel, onApply,
+  open, onOpenChange, styleNo, lines, targets, scopeLabel, onApply, onFill,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -28,11 +36,16 @@ export function CadAssignDialog({
   scopeLabel: string;
   /** netQty 는 로스 제외한 순소요량, lossPct 는 % */
   onApply: (targetId: string, netQty: number, lossPct: number, unit: string) => void;
+  /** 배정 결과를 소요량 표에 그대로 옮긴다 */
+  onFill: (rows: Array<Omit<YardRow, 'id'>>) => void;
 }) {
   const [assign, setAssign] = useState<Record<string, Assign>>({});
   const [width, setWidth] = useState<Record<string, number>>({ outer: 150, lining: 150 });
   const [loss, setLoss] = useState<Record<string, number>>({ leather: 15, outer: 10, lining: 10, interlining: 10 });
   const [target, setTarget] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<Assign | null>(null);
+  const queryClient = useQueryClient();
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: fetchMaterials });
 
   // 파일을 새로 올릴 때마다 파서가 추정한 값으로 초기화
   useEffect(() => {
@@ -50,12 +63,68 @@ export function CadAssignDialog({
     return g;
   }, [lines, assign]);
 
+  const skipCount = lines.filter(l => (assign[l.id] ?? l.assign) === 'skip').length;
+
   const valueOf = (b: Assign) => {
     const ls = groups[b] || [];
     if (!ls.length) return 0;
     if (b === 'leather') return calcLeatherSF(ls);
     if (NEEDS_WIDTH(b)) return calcFabricYD(ls, width[b] || 0);
     return ls.reduce((s, l) => s + l.w * l.h * l.count, 0) / 10000; // ㎡
+  };
+
+  // 자재 마스터에 없는 자재명을 그대로 등록한다 — 카테고리·단위는 배정에서 나온다
+  // (예: 0.4 VXP → 보강재 / 공통 / 단위 M)
+  const registerMissing = async (b: Assign) => {
+    if (b === 'skip') return;
+    const spec = ASSIGN_MATERIAL[b];
+    const have = new Set((materials as Material[]).map(m => m.name?.trim().toLowerCase()));
+    const names = Array.from(new Set((groups[b] || []).map(l => l.material.trim())))
+      .filter(n => n && !have.has(n.toLowerCase()));
+    if (!names.length) { toast.info(`${ASSIGN_LABEL[b]} — 새로 등록할 자재가 없습니다`); return; }
+
+    setBusy(b);
+    try {
+      const list = [...(materials as Material[])];
+      for (const name of names) {
+        const m: Material = {
+          id: genId(),
+          itemCode: store.getNextItemCode(spec.category as MaterialCategory, list),
+          name,
+          category: spec.category as MaterialCategory,
+          subType: spec.subType,
+          brand: COMMON_BRAND,
+          unit: spec.unit,
+          createdAt: new Date().toISOString(),
+        } as Material;
+        await upsertMaterial(m);
+        list.push(m);
+      }
+      await queryClient.invalidateQueries({ queryKey: ['materials'] });
+      toast.success(`${ASSIGN_LABEL[b]} ${names.length}건 등록 — ${spec.category} / ${COMMON_BRAND} / 단위 ${spec.unit}`);
+    } catch (err) {
+      toast.error(`자재 등록 실패: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // 배정 결과를 소요량 표 행으로 옮긴다 — 트림이 있으면 트림1/트림2 부위가 그대로 따라간다
+  const fillTable = () => {
+    const rows = lines
+      .map(l => ({ l, a: assign[l.id] ?? l.assign }))
+      .filter(x => x.a !== 'skip')
+      .map(({ l, a }) => {
+        const kind = KIND_OF[a as Exclude<Assign, 'skip'>];
+        const part = kind === '보강재' ? ''
+          : a === 'lining' ? '안감'
+          : /트림\s*2/.test(l.part) ? '트림2'
+          : /트림/.test(l.part) ? '트림1'
+          : '바디';
+        return { kind, part, 가로: l.w, 세로: l.h, 폭: kind === '가죽' ? 0 : (width[a] || 150), 로스: loss[a] || 0, 수량: l.count };
+      });
+    if (!rows.length) { toast.error('표에 넣을 줄이 없습니다'); return; }
+    onFill(rows);
   };
 
   const applyOne = (b: Assign) => {
@@ -80,6 +149,7 @@ export function CadAssignDialog({
           <p className="text-xs text-muted-foreground">
             조각 이름에 섞여 있던 자재를 한 줄씩 분해했습니다. 분류가 틀린 줄만 고치고, 폭·로스율을 넣으면 자동 계산됩니다.
             적용 대상은 <b>{scopeLabel}</b> 입니다.
+            {skipCount > 0 && <> 기본패턴(기본형·닺지형·닷지형) <b>{skipCount}줄</b>은 소요량에서 제외했습니다.</>}
           </p>
         </DialogHeader>
 
@@ -119,6 +189,10 @@ export function CadAssignDialog({
                   </select>
                   <Button size="sm" className="text-xs h-8" disabled={!n} onClick={() => applyOne(b)}>적용</Button>
                 </div>
+                <Button size="sm" variant="outline" className="text-xs h-7 w-full"
+                  disabled={!n || busy === b} onClick={() => registerMissing(b)}>
+                  {busy === b ? '등록 중…' : `자재 마스터에 등록 (${ASSIGN_MATERIAL[b as Exclude<Assign, 'skip'>].category} · ${ASSIGN_MATERIAL[b as Exclude<Assign, 'skip'>].unit})`}
+                </Button>
               </div>
             );
           })}
@@ -171,6 +245,7 @@ export function CadAssignDialog({
         <DialogFooter className="shrink-0">
           <span className="text-[11px] text-muted-foreground mr-auto">적용 후 BOM 화면의 <b>저장</b>을 눌러야 확정됩니다.</span>
           <Button variant="outline" onClick={() => onOpenChange(false)}>닫기</Button>
+          <Button onClick={fillTable}>소요량 표에 채우기</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

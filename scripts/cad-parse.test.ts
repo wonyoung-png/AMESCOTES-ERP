@@ -36,4 +36,22 @@ assert.strictEqual(
   '별도 속고판 싱',
 );
 
+// 기본패턴은 소요량이 아니다 — 계산에서 뺀다
+for (const n of ['기본형', '몸판 닺지형 겉감 1EA', '닷지형']) {
+  assert.strictEqual(pick(n)[0].split(':')[0], 'skip', n);
+}
+
+// VXP · 스타롱 · S/L 은 보강재
+for (const n of ['0.4 VXP 1EA', '스타롱 1EA', '양면 S/L 1.0 1EA']) {
+  assert.strictEqual(pick(n)[0].split(':')[0], 'interlining', n);
+}
+
 console.log('ok');
+
+// 트림은 부위를 트림1 로 (트림2 는 유지)
+const partOf = (name: string, group = '겉감') =>
+  parseCadWorkbook(sheet(name, group, 1, 10, 10)).lines[0].part;
+assert.strictEqual(partOf('앞판 트림 1EA'), '트림1');
+assert.strictEqual(partOf('[트림] 앞판 1EA'), '트림1');
+assert.strictEqual(partOf('앞판 1EA', '트림2'), '트림2');
+console.log('ok2');

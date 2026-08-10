@@ -18,6 +18,14 @@ export const ASSIGN_LABEL: Record<Assign, string> = {
   skip: '제외',
 };
 
+/** 배정 → 자재 마스터 등록값. 보강재(VXP·스타롱·S/L 등)는 M 로 산다. */
+export const ASSIGN_MATERIAL: Record<Exclude<Assign, 'skip'>, { category: string; unit: string; subType?: string }> = {
+  leather: { category: '가죽', unit: 'SF' },
+  outer: { category: '원단', unit: 'YD', subType: '겉감용' },
+  lining: { category: '원단', unit: 'YD', subType: '안감용' },
+  interlining: { category: '보강재', unit: 'M' },
+};
+
 /** 자재 한 줄 = 배정 단위. 팝업에서 assign 을 바꿀 수 있다. */
 export type CadLine = {
   id: string;
@@ -41,11 +49,15 @@ const num = (v: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+/** 기본패턴 — 소요량이 아니라 패턴 자체다. 계산에서 뺀다 */
+const BASE_PATTERN_RE = /기본형|닺지형|닷지형/;
+
 /** 자재명·마커그룹으로 무엇으로 볼지 판정 */
-function classify(matName: string, group: string): { a: Assign; why: string } {
+function classify(matName: string, group: string, raw = ''): { a: Assign; why: string } {
   const t = String(matName).trim().toLowerCase();
   const g = (group || '').trim();
-  if (/vxp|부직포|접착|심지|보강|420d|eva|스펀지|폼|hdpe|pe판|철심|s\/l|싱지|양면/.test(t)) return { a: 'interlining', why: '자재명' };
+  if (BASE_PATTERN_RE.test(raw) || BASE_PATTERN_RE.test(matName)) return { a: 'skip', why: '기본패턴' };
+  if (/vxp|스타롱|부직포|접착|심지|보강|420d|eva|스펀지|폼|hdpe|pe판|철심|s\/l|싱지|양면/.test(t)) return { a: 'interlining', why: '자재명' };
   if (/우라|안감|里子|lining/.test(t)) return { a: 'lining', why: '자재명' };
   if (/원단|fabric|canvas|자카드|나일론|폴리/.test(t)) return { a: 'outer', why: '자재명' };
   if (/겉감|트림|self/.test(t)) {
@@ -62,7 +74,7 @@ function classify(matName: string, group: string): { a: Assign; why: string } {
 /** 자재를 가리키는 말 — 이 앞은 부위, 이 뒤는 자재로 본다 */
 const MAT_WORDS = [
   '겉감', '우라', '안감', '里子', '트림', '자재',
-  '양면\\s*S/L', 'S/L', 'VXP', '420D', '부직포', '접착', '심지', '보강', 'EVA', '스펀지', '폼',
+  '양면\\s*S/L', 'S/L', 'VXP', '스타롱', '420D', '부직포', '접착', '심지', '보강', 'EVA', '스펀지', '폼',
   'HDPE', 'PE판', '철심', '싱지', '원단',
 ];
 const MAT_RE = new RegExp('(' + MAT_WORDS.join('|') + ')', 'i');
@@ -106,6 +118,11 @@ function splitName(raw: string, group: string): { part: string; tag: string; mat
   });
 
   if (materials.length === 0) materials.push({ label: tag || group || '겉감', ea: 1 });
+
+  // "트림" 이라고만 적힌 것은 부위를 트림1 로 잡는다 (트림2 는 그대로 둔다)
+  const trim = [tag, group, clean].find(s => /트림/.test(s || ''));
+  if (trim) part = /트림\s*2/.test(trim) ? '트림2' : '트림1';
+
   return { part: part || clean, tag, materials };
 }
 
@@ -148,7 +165,7 @@ export function parseCadWorkbook(data: ArrayBuffer): { styleNo?: string; lines: 
   for (const p of pieces) {
     const { part, materials } = splitName(p.name, p.group);
     for (const m of materials) {
-      const cls = classify(m.label, p.group);
+      const cls = classify(m.label, p.group, p.name);
       lines.push({
         id: `${lines.length}`,
         raw: p.name, part, group: p.group,

@@ -87,6 +87,23 @@ export const MATERIAL_SUB_TYPES: Partial<Record<MaterialCategory, string[]>> = {
     '개고리', '지퍼 슬라이더', '자석', '오브제 장식 (키·볼·팁)', '봉장식 / 바장식',
   ],
 };
+/** 소요량 계산 — 자재 종류와 부위. 보강재는 부위를 쓰지 않는다. */
+export const YARD_KINDS = ['가죽', '원단', '보강재'] as const;
+export type YardKind = typeof YARD_KINDS[number];
+export const YARD_PARTS = ['바디', '트림1', '트림2', '안감'];
+/** 종류별 계산 단위 */
+export const YARD_UNIT: Record<YardKind, string> = { '가죽': 'SF', '원단': 'YD', '보강재': 'M' };
+/** 소요량 계산 표의 한 줄 */
+export type YardRow = {
+  id: string;
+  kind: YardKind;
+  part: string;      // 보강재는 빈 값
+  가로: number;      // cm
+  세로: number;      // cm
+  폭: number;        // cm — 원단·보강재만 쓴다
+  로스: number;      // %
+  수량: number;
+};
 /** 도금 컬러 — 장식 자재용 */
 export const PLATING_COLORS = ['니켈가랑', '골드가랑', '금가랑', '니켈', '니켈사틴', '바렐'];
 /** 자재 카테고리 → BOM 섹션 */
