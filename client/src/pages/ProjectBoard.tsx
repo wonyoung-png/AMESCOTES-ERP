@@ -12,7 +12,7 @@ import { Link } from 'wouter';
 import { phase1, type Campaign } from '@/lib/phase1';
 import {
   fetchProjects, upsertProject, upsertItems, deleteProject, deleteItem, fetchMembers,
-  TEAMS, type Project, type ProjectItem, type Member,
+  TEAMS, labelOfKind, type Project, type ProjectItem, type Member,
 } from '@/lib/projectQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -149,7 +149,7 @@ export default function ProjectBoard() {
   const [hideDone, setHideDone] = useState(false);
 
   const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState({ title: '', kind: '팝업·오픈', startDate: '', endDate: '', anchorLabel: '오픈' });
+  const [form, setForm] = useState({ title: '', kind: '팝업·오픈', startDate: '', endDate: '' });
   /** 항목 직접 입력·수정 — 이게 기본 경로다. 붙여넣기는 처음 한 번 옮길 때만 쓴다 */
   const [editing, setEditing] = useState<ProjectItem | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -239,12 +239,12 @@ export default function ProjectBoard() {
     try {
       await upsertProject({
         id, workspace: ws, title: form.title.trim(), kind: form.kind,
-        startDate: form.startDate || undefined, endDate: form.endDate || undefined, anchorLabel: form.anchorLabel,
+        startDate: form.startDate || undefined, endDate: form.endDate || undefined, anchorLabel: labelOfKind(form.kind),
         status: '진행',
       });
       toast.success('프로젝트가 생성되었습니다');
       setShowNew(false);
-      setForm({ title: '', kind: '팝업·오픈', startDate: '', endDate: '', anchorLabel: '오픈' });
+      setForm({ title: '', kind: '팝업·오픈', startDate: '', endDate: '' });
       await load();
       setSelId(id);
     } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
@@ -314,7 +314,7 @@ export default function ProjectBoard() {
               {/* 요약 — 남은 날과 막힌 것을 맨 앞에 */}
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <div className="bg-card border border-border rounded-lg p-3">
-                  <p className="text-[11px] text-muted-foreground">{project.anchorLabel || '마감'}까지</p>
+                  <p className="text-[11px] text-muted-foreground">{project.anchorLabel || labelOfKind(project.kind)}까지</p>
                   <p className="text-xl font-bold text-foreground font-mono">
                     {stat.dday === null ? '—' : stat.dday >= 0 ? `D-${stat.dday}` : `D+${-stat.dday}`}
                   </p>
@@ -435,19 +435,12 @@ export default function ProjectBoard() {
               <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                 placeholder="한남 플래그십 오픈" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>유형</Label>
-                <select value={form.kind} onChange={e => setForm(f => ({ ...f, kind: e.target.value }))}
-                  className="w-full h-9 text-sm border border-border rounded-md bg-card px-2">
-                  {['팝업·오픈', '시즌 런칭', '콜라보', '입점', '스토어 구축', '기타'].map(k => <option key={k}>{k}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>끝나는 날이 무슨 날인가요</Label>
-                <Input value={form.anchorLabel} onChange={e => setForm(f => ({ ...f, anchorLabel: e.target.value }))}
-                  placeholder="고객오픈 · 행사 종료" />
-              </div>
+            <div className="space-y-1.5">
+              <Label>유형</Label>
+              <select value={form.kind} onChange={e => setForm(f => ({ ...f, kind: e.target.value }))}
+                className="w-full h-9 text-sm border border-border rounded-md bg-card px-2">
+                {['팝업·오픈', '시즌 런칭', '콜라보', '입점', '스토어 구축', '기타'].map(k => <option key={k}>{k}</option>)}
+              </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">

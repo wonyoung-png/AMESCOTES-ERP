@@ -37,7 +37,7 @@ export interface Project {
   startDate?: string;
   /** 끝나는 날 = 오픈일. 여기서 D-day를 센다 */
   endDate?: string;
-  /** 끝나는 날이 무슨 날인지 — '고객오픈', '프레스데이' */
+  /** D-day 카드에 쓰는 말. 유형에서 자동으로 정한다 (KIND_LABEL) */
   anchorLabel?: string;
   status: ProjectStatus;
   owner?: string;
@@ -120,6 +120,13 @@ export async function deleteItem(id: string) {
 
 // 팀 목록은 phase1이 정본이다. 여기서 사본을 만들면 기획전과 프로젝트가 갈라진다.
 export { CAMPAIGN_TEAMS as TEAMS, normalizeTeam } from './phase1';
+
+/** 유형이 정해지면 'D-day 무엇까지'인지도 정해진다 — 따로 물을 일이 아니다 */
+export const KIND_LABEL: Record<string, string> = {
+  '팝업·오픈': '오픈', '시즌 런칭': '런칭', '콜라보': '출시',
+  '입점': '입점', '스토어 구축': '오픈', '기타': '마감',
+};
+export const labelOfKind = (kind?: string) => KIND_LABEL[kind || ''] || '마감';
 
 export interface Member { id: string; name: string; team?: string; rank?: string; position?: string; }
 

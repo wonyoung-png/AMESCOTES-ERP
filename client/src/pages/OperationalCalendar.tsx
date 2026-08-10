@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
-import { fetchProjects, upsertProject, type Project } from '@/lib/projectQueries';
+import { fetchProjects, upsertProject, labelOfKind, type Project } from '@/lib/projectQueries';
 import ProductDiscountSheet from '@/components/ProductDiscountSheet';
 import type { ProductDiscount, CategoryDiscount } from '@/lib/phase1';
 import { store } from '@/lib/store';
@@ -65,7 +65,7 @@ export default function OperationalCalendar() {
     () => Array.from(new Set(store.getItems().map((i: any) => i.erpCategory).filter(Boolean))).sort() as string[],
     [showNew],
   );
-  const [pForm, setPForm] = useState({ title: '', kind: '팝업·오픈', startDate: '', endDate: '', anchorLabel: '오픈' });
+  const [pForm, setPForm] = useState({ title: '', kind: '팝업·오픈', startDate: '', endDate: '' });
   const loadProjects = () => fetchProjects(ws).then(setProjects).catch(() => {});
   useEffect(() => { loadProjects(); /* eslint-disable-next-line */ }, [ws]);
 
@@ -77,11 +77,11 @@ export default function OperationalCalendar() {
     try {
       await upsertProject({
         id, workspace: ws, title: pForm.title.trim(), kind: pForm.kind,
-        startDate: pForm.startDate || undefined, endDate: pForm.endDate || undefined, anchorLabel: pForm.anchorLabel, status: '진행',
+        startDate: pForm.startDate || undefined, endDate: pForm.endDate || undefined, anchorLabel: labelOfKind(pForm.kind), status: '진행',
       });
       toast.success('프로젝트를 만들었습니다. 상세 업무는 프로젝트 탭에서 관리합니다');
       setShowNewProject(false);
-      setPForm({ title: '', kind: '팝업·오픈', startDate: '', endDate: '', anchorLabel: '오픈' });
+      setPForm({ title: '', kind: '팝업·오픈', startDate: '', endDate: '' });
       loadProjects();
     } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
   };
@@ -488,19 +488,12 @@ export default function OperationalCalendar() {
               <Input value={pForm.title} onChange={e => setPForm(f => ({ ...f, title: e.target.value }))}
                 placeholder="한남 플래그십 오픈" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>유형</Label>
-                <select value={pForm.kind} onChange={e => setPForm(f => ({ ...f, kind: e.target.value }))}
-                  className="w-full h-9 text-sm border border-border rounded-md bg-card px-2">
-                  {['팝업·오픈', '시즌 런칭', '콜라보', '입점', '스토어 구축', '기타'].map(k => <option key={k}>{k}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>끝나는 날이 무슨 날인가요</Label>
-                <Input value={pForm.anchorLabel} onChange={e => setPForm(f => ({ ...f, anchorLabel: e.target.value }))}
-                  placeholder="고객오픈 · 행사 종료" />
-              </div>
+            <div className="space-y-1.5">
+              <Label>유형</Label>
+              <select value={pForm.kind} onChange={e => setPForm(f => ({ ...f, kind: e.target.value }))}
+                className="w-full h-9 text-sm border border-border rounded-md bg-card px-2">
+                {['팝업·오픈', '시즌 런칭', '콜라보', '입점', '스토어 구축', '기타'].map(k => <option key={k}>{k}</option>)}
+              </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
