@@ -156,6 +156,7 @@ interface ExtBomLine {
   memo?: string;
   imageUrl?: string;          // 자재 이미지 (base64 또는 URL)
   fromYard?: string;          // 소요량 계산에서 만든 줄 — 다시 만들 때 이것만 갈아끼운다
+  fromYardKey?: string;       // 그 안에서의 구분 (부위 또는 패턴부위) — 자재명·단가를 이어 붙이는 열쇠
 }
 
 // ─── 상수 ───────────────────────────────────────────────────────────────────
@@ -188,7 +189,7 @@ const SECTION_SUB_PARTS: Record<string, string[]> = {
   '원자재': ['바디', '안감', '트림1', '트림2', '기타'],
   '지퍼': ['메인지퍼', '내부지퍼', '장식지퍼', '기타'],
   '장식': ['자석', '고리', 'D링', '버클', '리벳', '기타'],
-  '보강재': ['바디', '안감', '트림', '기타'],
+  '보강재': [],   // 보강재는 부위를 쓰지 않는다 (자재별로 줄이 나뉜다)
   '봉사·접착제': ['바디', '안감', '콤비', '기타'],
   '포장재': ['박스', '내포장', '라벨', '기타'],
   '후가공': ['칼라불박', '자수', '인쇄', '옴브레', '기타'],
@@ -1625,18 +1626,23 @@ function CalcModal({ line, onApply, onClose }: {
 }) {
   const ctx = React.useContext(YardCtx);
   const kind = kindOfLine(line);
-  const part = kind === '보강재' ? '' : ((line.subPart as string) || '바디');
+  const usesPart = kind === '가죽' || kind === '원단';
+  const part = usesPart ? ((line.subPart as string) || '바디') : '';
   const unit = YARD_UNIT[kind];
 
   const all = ctx?.rows ?? [];
   const cfg = ctx?.cfg?.[kind] ?? DEFAULT_YARD_CFG[kind];
-  const mine = all.filter(r => r.kind === kind && (kind === '보강재' || (r.part || '바디') === part));
+  // 보강재는 자재가 제각각이라 그 줄(패턴부위)만, 안감은 전체, 가죽·원단은 부위별
+  const mine = all.filter(r => r.kind !== kind ? false
+    : kind === '보강재' ? (!line.fromYardKey || r.패턴부위 === line.fromYardKey)
+    : usesPart ? (r.part || '바디') === part
+    : true);
 
   const upd = (id: string, f: string, v: string | number) =>
     ctx?.setRows(p => p.map(r => r.id === id ? { ...r, [f]: v } : r));
   const del = (id: string) => ctx?.setRows(p => p.filter(r => r.id !== id));
   const add = () => ctx?.setRows(p => [...p, {
-    id: genId(), kind, part: kind === '보강재' ? '' : part, 패턴부위: '', 가로: 0, 세로: 0, 수량: 1,
+    id: genId(), kind, part: usesPart ? part : '', 패턴부위: kind === '보강재' ? (line.fromYardKey || '') : '', 가로: 0, 세로: 0, 수량: 1,
   }]);
   const setCfgField = (f: '폭' | '로스', v: number) =>
     ctx?.setCfg(c => ({ ...c, [kind]: { ...c[kind], [f]: v } }));
@@ -1868,15 +1874,17 @@ const BomLineRow = React.memo(function BomLineRow({ line, onChange, onDelete, cn
       {/* 자재명 (부위 Select가 inline으로 포함됨) */}
       <td>
         <div className="flex items-center gap-1">
-          <Select value={line.subPart || ''} onValueChange={v => onChange(line.id, 'subPart', v as BomSubPart)}>
-            <SelectTrigger className={`${CELL_INPUT} border-border w-20 shrink-0`}>
-              <SelectValue placeholder="-" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none" className="text-xs text-muted-foreground">-</SelectItem>
-              {subPartOptions.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {subPartOptions.length > 0 && (
+            <Select value={line.subPart || ''} onValueChange={v => onChange(line.id, 'subPart', v as BomSubPart)}>
+              <SelectTrigger className={`${CELL_INPUT} border-border w-20 shrink-0`}>
+                <SelectValue placeholder="-" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" className="text-xs text-muted-foreground">-</SelectItem>
+                {subPartOptions.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <MaterialSearchPopover onSelect={handleMaterialSelect} defaultName={line.itemName} defaultUnit={line.unit} />
           <Input value={line.itemName} onChange={e => onChange(line.id, 'itemName', e.target.value)} className={`${CELL_INPUT} border-border bg-card min-w-[80px]`} placeholder="자재명" />
           {/* 이미지 기능 (원자재/장식 섹션에만) */}
@@ -5020,7 +5028,7 @@ export default function BomManagement() {
               setYardCfg(p => ({ ...p, [k]: { ...cfgOf(k), [f]: v } }));
 
             const addRow = (kind: YardKind) =>
-              setYardRows(p => [...p, { id: genId(), kind, part: kind === '보강재' ? '' : '바디', 패턴부위: '', 가로: 0, 세로: 0, 수량: 1 }]);
+              setYardRows(p => [...p, { id: genId(), kind, part: (kind === '가죽' || kind === '원단') ? '바디' : '', 패턴부위: '', 가로: 0, 세로: 0, 수량: 1 }]);
             const upd = (id: string, f: string, v: string | number) =>
               setYardRows(p => p.map(r => r.id === id ? { ...r, [f]: v } : r));
 
@@ -5033,9 +5041,11 @@ export default function BomManagement() {
               return r.kind === '보강재' ? cm2 / w / 100 : cm2 / w / 91.44;                              // M / YD
             };
 
-            /** 한 종류의 패턴부위를 통째로 BOM 자재 명세에 만들어 넣는다.
-             *  소계 하나만 넣는 게 아니라 패턴부위마다 한 줄씩 — 사전·사후 양쪽 같이 맞춘다.
-             *  이미 이 종류로 만들어 둔 줄은 지우고 새로 쓰므로, 여러 번 눌러도 늘어나지 않는다. */
+            /** 한 종류를 BOM 자재 명세에 만들어 넣는다 — 사전·사후 양쪽 같이.
+             *  · 가죽·원단 : 부위(바디/트림1/트림2)마다 한 줄, 소요량은 그 부위 합계
+             *  · 안감      : 부위를 안 쓰므로 한 줄, 소요량은 전체 합계
+             *  · 보강재    : 자재가 제각각이라 패턴부위마다 한 줄
+             *  자재명·단가·업체는 손으로 넣는 값이라, 다시 눌러도 지우지 않고 소요량만 갱신한다. */
             const syncToBom = (k: YardKind) => {
               if (!editBom) return;
               const rows = yardRows.filter(r => r.kind === k);
@@ -5044,19 +5054,40 @@ export default function BomManagement() {
 
               const loss = cfgOf(k).로스;
               const category: BomCategory = k === '보강재' ? '보강재' : '원자재';
-              const made: ExtBomLine[] = rows.map(r => ({
-                ...newExtLine(category),
-                id: genId(),
-                fromYard: k,
-                subPart: k === '보강재' ? undefined : (k === '안감' ? '안감' : (r.part || '바디')) as BomSubPart,
-                itemName: r.패턴부위 || '',
-                unit: YARD_UNIT[k],
-                netQty: Math.ceil(rowNet(r) * 1000) / 1000,
-                lossRate: loss / 100,
-              }));
 
-              // 이 종류로 만든 줄만 갈아끼운다 — 손으로 넣은 줄은 그대로 둔다
-              const merge = (ls: ExtBomLine[]) => [...ls.filter(l => l.fromYard !== k), ...made];
+              // 어떤 단위로 줄을 나눌지 — 보강재만 패턴부위, 나머지는 부위(안감은 하나)
+              const buckets: Array<{ key: string; subPart?: string; itemName: string; net: number }> =
+                k === '보강재'
+                  ? rows.map(r => ({ key: r.패턴부위 || r.id, itemName: r.패턴부위 || '', net: rowNet(r) }))
+                  : k === '안감'
+                    ? [{ key: '안감', subPart: '안감', itemName: '', net: rows.reduce((s, r) => s + rowNet(r), 0) }]
+                    : YARD_PARTS
+                        .filter(p => rows.some(r => (r.part || '바디') === p))
+                        .map(p => ({
+                          key: p, subPart: p, itemName: '',
+                          net: rows.filter(r => (r.part || '바디') === p).reduce((s, r) => s + rowNet(r), 0),
+                        }));
+
+              const merge = (ls: ExtBomLine[]) => {
+                const kept = ls.filter(l => l.fromYard !== k);
+                const made = buckets.map(b => {
+                  const prev = ls.find(l => l.fromYard === k && l.fromYardKey === b.key);
+                  return {
+                    ...(prev ?? newExtLine(category)),
+                    id: prev?.id ?? genId(),
+                    category,
+                    fromYard: k,
+                    fromYardKey: b.key,
+                    subPart: b.subPart as BomSubPart | undefined,
+                    itemName: prev?.itemName || b.itemName,
+                    unit: YARD_UNIT[k],
+                    netQty: Math.ceil(b.net * 1000) / 1000,
+                    lossRate: loss / 100,
+                  } as ExtBomLine;
+                });
+                return [...kept, ...made];
+              };
+              const made = buckets;
               setEditBom(prev => prev && ({
                 ...prev,
                 colorBoms: (prev.colorBoms || []).map(cb => cb.color === yardColor ? { ...cb, lines: merge(cb.lines) } : cb),
@@ -5180,7 +5211,8 @@ export default function BomManagement() {
                   const noWidth = needsWidth && !cfg.폭;
 
                   // 부위별 소계 — 보강재는 부위가 없어 한 덩어리
-                  const parts = k === '보강재' ? [''] : YARD_PARTS.filter(p => rows.some(r => (r.part || '바디') === p));
+                  const usesPart = k === '가죽' || k === '원단';
+                  const parts = usesPart ? YARD_PARTS.filter(p => rows.some(r => (r.part || '바디') === p)) : [''];
                   return (
                     <div key={k} className="bg-card rounded-lg border border-border overflow-hidden">
                       {/* 종류 헤더 — 폭·로스는 여기 하나씩 */}
@@ -5235,7 +5267,7 @@ export default function BomManagement() {
                                   onChange={e => upd(r.id, '패턴부위', e.target.value)} />
                               </td>
                               <td className={tdCls}>
-                                {k === '보강재'
+                                {!usesPart
                                   ? <span className="block text-center text-xs text-muted-foreground">—</span>
                                   : <select className={selCls} value={r.part || '바디'} onChange={e => upd(r.id, 'part', e.target.value)}>
                                       {YARD_PARTS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -5264,7 +5296,7 @@ export default function BomManagement() {
                       {rows.length > 0 && (
                         <div className="border-t border-border bg-primary/5 px-3 py-2 flex items-center gap-4 flex-wrap">
                           {parts.map(p => {
-                            const net = rows.filter(r => k === '보강재' || (r.part || '바디') === p).reduce((s, r) => s + rowNet(r), 0);
+                            const net = rows.filter(r => !usesPart || (r.part || '바디') === p).reduce((s, r) => s + rowNet(r), 0);
                             return (
                               <span key={`${k}|${p}`} className="text-xs tabular-nums">
                                 <b className="mr-1.5">{k}{p ? ` · ${p}` : ''}</b>

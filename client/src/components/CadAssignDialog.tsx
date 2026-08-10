@@ -144,7 +144,7 @@ export function CadAssignDialog({
         const k = kindOf(b as Bucket);
         return {
           kind: k,
-          part: k === '보강재' ? '' : (b === '안감' ? '바디' : (b as string)),
+          part: (k === '가죽' || k === '원단') ? (b as string) : '',
           패턴부위: l.lineName || l.material,
           가로: l.w, 세로: l.h,
           수량: l.count,
