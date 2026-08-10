@@ -57,7 +57,7 @@ function HeadRow() {
   return (
     <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border text-[11px] text-muted-foreground">
       <span className={COL.check} />
-      <span className="flex-1 min-w-0">할 일</span>
+      <span className="flex-1 min-w-0" />
       <span className={COL.team}>팀</span>
       <span className={COL.owner}>담당자</span>
       <span className={COL.due}>마감</span>
