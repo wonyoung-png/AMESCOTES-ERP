@@ -1,5 +1,6 @@
 // AMESCOTES ERP — 대시보드 (Phase 1 개편: 납기위험 중심)
 import { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
 import {
   store, formatKRW, formatNumber, calcDDay, dDayLabel, dDayColor,
@@ -8,7 +9,7 @@ import {
 import {
   AlertTriangle, TrendingUp,
   ArrowRight, ShoppingCart, FlaskConical, FileText,
-  Activity, Clock, Truck, Microscope, PackageSearch, File, FileSpreadsheet, Camera,
+  Activity, CheckCircle2, Clock, Plane, Ship, Truck, Microscope, PackageSearch, File, FileSpreadsheet, Camera,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -16,6 +17,9 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { getCurrentUser } from '@/lib/auth';
+import { confirmShippingPlan, fetchShippingPlans } from '@/lib/shippingPlans';
+import { toast } from 'sonner';
 
 // 문서 아이콘
 function DocIconSmall({ fileType }: { fileType: string }) {
@@ -34,6 +38,23 @@ const STAGE_COLOR: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
+  const today = new Date().toISOString().split('T')[0];
+  const { data: shippingPlans = [] } = useQuery({
+    queryKey: ['shippingPlans', today],
+    queryFn: () => fetchShippingPlans(today),
+    retry: false,
+  });
+
+  const checkShippingPlan = async (id: string) => {
+    try {
+      await confirmShippingPlan(id, getCurrentUser()?.name || '담당자');
+      await queryClient.invalidateQueries({ queryKey: ['shippingPlans'] });
+      toast.success('오늘 발송 건을 확인했습니다');
+    } catch (e: any) {
+      toast.error(`확인 처리 실패: ${e?.message || '알 수 없는 오류'}`);
+    }
+  };
   const orders = store.getOrders();
   const samples = store.getSamples();
   // 샘플자재구매 — 선택한 샘플 상세 모달
@@ -164,6 +185,35 @@ export default function Dashboard() {
         <p className="text-sm text-stone-500 mt-0.5">ATLM 제조 ERP — OEM 생산·납기·정산 현황</p>
       </div>
 
+      {shippingPlans.length > 0 && (
+        <section className="rounded-xl border-2 border-orange-300 bg-orange-50 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="font-bold text-stone-800">오늘 중국 발송이 있습니다</h2>
+              <p className="text-xs text-stone-500">항공 {shippingPlans.filter(p => p.method === 'air').length}건 · 해상 {shippingPlans.filter(p => p.method === 'sea').length}건</p>
+            </div>
+            <Link href="/receiving" className="text-xs font-medium text-orange-700 hover:underline">입고·출고에서 관리 →</Link>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {shippingPlans.map(plan => (
+              <div key={plan.id} className="flex items-center justify-between rounded-lg border border-orange-200 bg-white px-3 py-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  {plan.method === 'air' ? <Plane className="h-5 w-5 shrink-0 text-orange-600" /> : <Ship className="h-5 w-5 shrink-0 text-blue-700" />}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{plan.method === 'air' ? '항공(에어)' : '해상(배)'} · {plan.description}</p>
+                    <p className="text-xs text-stone-500">{plan.orderNo || '발주번호 없음'}{plan.qty > 0 ? ` · ${formatNumber(plan.qty)}개` : ''}</p>
+                  </div>
+                </div>
+                {plan.status === 'confirmed' ? (
+                  <span className="ml-2 flex shrink-0 items-center gap-1 text-xs font-medium text-green-700"><CheckCircle2 className="h-4 w-4" />{plan.confirmedBy || '확인완료'}</span>
+                ) : (
+                  <Button size="sm" className="ml-2 h-7 shrink-0 text-xs" onClick={() => checkShippingPlan(plan.id)}>확인</Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {/* ── KPI 7개 ── */}
       <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         <KpiCard

@@ -1,16 +1,18 @@
 // 입고 · OEM출고 · 3PL출고 — receipt_logs 기반 부분입고
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { store, formatNumber } from '@/lib/store';
+import { store, formatNumber, genId } from '@/lib/store';
 import { phase1, type ReceiptLogType } from '@/lib/phase1';
 import { fetchOrders } from '@/lib/supabaseQueries';
+import { getCurrentUser } from '@/lib/auth';
+import { confirmShippingPlan, fetchShippingPlans, upsertShippingPlan, type ShippingMethod } from '@/lib/shippingPlans';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Package, Truck, Warehouse } from 'lucide-react';
+import { CheckCircle2, Package, Plane, Ship, Truck, Warehouse } from 'lucide-react';
 
 const LOG_LABELS: Record<ReceiptLogType, string> = {
   inbound: '입고',
@@ -21,12 +23,40 @@ const LOG_LABELS: Record<ReceiptLogType, string> = {
 export default function ReceivingShipping() {
   const queryClient = useQueryClient();
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
+  const today = new Date().toISOString().split('T')[0];
+  const { data: shippingPlans = [] } = useQuery({
+    queryKey: ['shippingPlans'],
+    queryFn: () => fetchShippingPlans(),
+    retry: false,
+  });
   const [filter, setFilter] = useState<'all' | 'pending' | 'partial' | 'done'>('all');
   const [logFilter, setLogFilter] = useState<ReceiptLogType | 'all'>('all');
   const [modal, setModal] = useState<{ orderId: string; logType: ReceiptLogType } | null>(null);
+  const [shippingModal, setShippingModal] = useState(false);
+  const [shippingForm, setShippingForm] = useState({ shipDate: today, method: 'air' as ShippingMethod, orderNo: '', description: '', qty: 0, memo: '' });
   const [form, setForm] = useState({ qty: 0, defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '' });
   const [, tick] = useState(0);
   const refresh = () => { queryClient.invalidateQueries({ queryKey: ['orders'] }); tick(n => n + 1); };
+  const saveShippingPlan = async () => {
+    if (!shippingForm.description.trim()) { toast.error('발송 내용을 입력하세요'); return; }
+    try {
+      await upsertShippingPlan({ id: genId(), ...shippingForm, description: shippingForm.description.trim() });
+      await queryClient.invalidateQueries({ queryKey: ['shippingPlans'] });
+      setShippingModal(false);
+      setShippingForm({ shipDate: today, method: 'air', orderNo: '', description: '', qty: 0, memo: '' });
+      toast.success(`${shippingForm.method === 'air' ? '항공' : '해상'} 발송 알림을 등록했습니다`);
+    } catch (e: any) { toast.error(`발송 알림 저장 실패: ${e?.message || '알 수 없는 오류'}`); }
+  };
+
+  const checkShippingPlan = async (id: string) => {
+    try {
+      await confirmShippingPlan(id, getCurrentUser()?.name || '담당자');
+      await queryClient.invalidateQueries({ queryKey: ['shippingPlans'] });
+      toast.success('발송 확인 처리했습니다');
+    } catch (e: any) { toast.error(`확인 처리 실패: ${e?.message || '알 수 없는 오류'}`); }
+  };
+
+  const upcomingShippingPlans = shippingPlans.filter(p => p.shipDate >= today).slice(0, 20);
 
   const enriched = useMemo(() => orders.map(o => {
     const sum = phase1.getOrderReceiptSummary(o.id, o.qty);
@@ -104,6 +134,40 @@ export default function ReceivingShipping() {
         <p className="text-sm text-stone-500">부분입고 · OEM 직출고 · 3PL 입고 (receipt_logs)</p>
       </div>
 
+      <section className="rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-stone-800">중국 발송 일정</h2>
+            <p className="text-xs text-stone-500">오늘·예정된 항공·해상 발송 건을 전 직원이 함께 확인합니다.</p>
+          </div>
+          <Button size="sm" onClick={() => setShippingModal(true)}>발송 예정 등록</Button>
+        </div>
+        {upcomingShippingPlans.length === 0 ? (
+          <p className="rounded-lg bg-white/70 px-4 py-5 text-center text-sm text-stone-400">예정된 중국 발송 건이 없습니다.</p>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2">
+            {upcomingShippingPlans.map(plan => (
+              <div key={plan.id} className={`rounded-lg border bg-white p-3 ${plan.status === 'confirmed' ? 'border-green-200' : plan.method === 'air' ? 'border-orange-300' : 'border-blue-300'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex gap-2">
+                    {plan.method === 'air' ? <Plane className="mt-0.5 h-5 w-5 text-orange-600" /> : <Ship className="mt-0.5 h-5 w-5 text-blue-700" />}
+                    <div>
+                      <p className="text-sm font-semibold">{plan.shipDate === today ? '오늘' : plan.shipDate} · {plan.method === 'air' ? '항공(에어)' : '해상(배)'} · {plan.description}</p>
+                      <p className="text-xs text-stone-500">{plan.orderNo || '발주번호 없음'}{plan.qty > 0 ? ` · ${formatNumber(plan.qty)}개` : ''}</p>
+                      {plan.memo && <p className="mt-1 text-xs text-stone-400">{plan.memo}</p>}
+                    </div>
+                  </div>
+                  {plan.status === 'confirmed' ? (
+                    <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-green-700"><CheckCircle2 className="h-4 w-4" />{plan.confirmedBy || '확인완료'}</span>
+                  ) : (
+                    <Button size="sm" className="h-7 shrink-0 text-xs" onClick={() => checkShippingPlan(plan.id)}>오늘 발송 확인</Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
       <div className="flex flex-wrap gap-2">
         {(['all', 'pending', 'partial', 'done'] as const).map(f => (
           <Button key={f} size="sm" variant={filter === f ? 'default' : 'outline'}
@@ -209,6 +273,27 @@ export default function ReceivingShipping() {
             <Button variant="outline" onClick={() => setModal(null)}>취소</Button>
             <Button onClick={submitLog}>저장</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={shippingModal} onOpenChange={setShippingModal}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>중국 발송 예정 등록</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div><Label>발송일</Label><Input type="date" value={shippingForm.shipDate} onChange={e => setShippingForm(f => ({ ...f, shipDate: e.target.value }))} /></div>
+            <div>
+              <Label>운송 방식</Label>
+              <Select value={shippingForm.method} onValueChange={v => setShippingForm(f => ({ ...f, method: v as ShippingMethod }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="air">항공(에어)</SelectItem><SelectItem value="sea">해상(배)</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div><Label>내용</Label><Input placeholder="예: LUMEN 가방 부자재" value={shippingForm.description} onChange={e => setShippingForm(f => ({ ...f, description: e.target.value }))} /></div>
+            <div><Label>발주번호 (선택)</Label><Input value={shippingForm.orderNo} onChange={e => setShippingForm(f => ({ ...f, orderNo: e.target.value }))} /></div>
+            <div><Label>수량 (선택)</Label><Input type="number" min="0" value={shippingForm.qty} onChange={e => setShippingForm(f => ({ ...f, qty: Number(e.target.value) }))} /></div>
+            <div><Label>메모 (선택)</Label><Input value={shippingForm.memo} onChange={e => setShippingForm(f => ({ ...f, memo: e.target.value }))} /></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setShippingModal(false)}>취소</Button><Button onClick={saveShippingPlan}>등록</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
