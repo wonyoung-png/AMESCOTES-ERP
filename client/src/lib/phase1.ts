@@ -821,9 +821,11 @@ export const phase1 = {
    * 발주서는 공장 1곳에 1장이다. 두 공장이 든 발주서는 공장이 남의 물량을 보게 되므로
    * 발주서가 아니다. 여기서 나온 번호(LUM-260810-01-A)를 OEM이 PO로 그대로 받는다.
    */
+  /** 발주 — 담은 상품을 공장·경로별로 갈라 발주서를 낸다. 초안이면 바로 나간다 */
   issueBrandBatch: (batchId: string) => {
     const batch = phase1.getBrandBatch(batchId);
-    if (!batch || batch.status !== 'approved') return [];
+    if (!batch || (batch.status !== 'approved' && batch.status !== 'draft')) return [];
+    if (!batch.lines.length) return [];
     const byFactory = new Map<string, BrandOrderLine[]>();
     batch.lines.forEach(l => {
       const k = `${l.route || 'oem'}|${l.factoryId || '미지정'}`;
@@ -874,13 +876,20 @@ export const phase1 = {
   markPOAccepted: (poNo: string) => {
     const all = getAll<BrandOrderLine>(KEYS.brandLines);
     const now = new Date().toISOString();
+    const batchIds = new Set<string>();
     all.forEach((l, i) => {
       if (l.poNo === poNo) {
         all[i] = { ...l, acceptedAt: now };
+        batchIds.add(l.batchId);
         syncBrandLine(all[i]).catch(reportSyncFail('수주'));
       }
     });
     setAll(KEYS.brandLines, all);
+    // 발주서가 여러 장이면 마지막 한 장까지 받아야 끝난 것이다
+    batchIds.forEach(id => {
+      const rest = all.filter(l => l.batchId === id && (l.route || 'oem') !== 'direct');
+      if (rest.length && rest.every(l => l.acceptedAt)) phase1.updateBrandBatch(id, { status: 'split' });
+    });
   },
 
   getOrderReceiptSummary: (orderId: string, orderQty: number) =>

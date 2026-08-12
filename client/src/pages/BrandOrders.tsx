@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { store, formatNumber, type OrderStatus } from '@/lib/store';
 import {
-  phase1, pullBrandOrders, R3_STEPS, CHINA_CORP_VENDOR_CODE, CHINA_CORP_VENDOR_NAME,
+  phase1, pullBrandOrders, CHINA_CORP_VENDOR_CODE, CHINA_CORP_VENDOR_NAME,
   type BrandOrderBatch, type OrderDisplayStatus, type ReceiptDestination, type ReorderOrderRow,
 } from '@/lib/phase1';
 import { fetchOrders } from '@/lib/supabaseQueries';
@@ -18,7 +18,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner';
 import { Check, X, Send, Package, Factory } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
-import { getAssigneeForStep, R3_ROLE_LABEL, R3_STEP_ROLE } from '@/lib/orgChart';
 import StylePickerSheet, { type PickedLine } from '@/components/StylePickerSheet';
 
 const PIPELINE = ['발주', '진행중', '생산완료', '한국/중국입고', '미지급 등록', '공장결제'] as const;
@@ -103,9 +102,6 @@ export default function BrandOrders() {
 
   const detail = selected ? phase1.getBrandBatch(selected.id) : null;
   const actorName = getCurrentUser()?.name || '시스템';
-  const stepAssignee = detail
-    ? getAssigneeForStep(detail.approvalStep, ws)
-    : null;
 
   const board = useMemo(() => {
     const groups = phase1.getReorderOrderBoard(
@@ -198,13 +194,11 @@ export default function BrandOrders() {
     refresh();
   };
 
+  /** 발주가 지금 어디까지 왔는지 — 담는 중 → 발주 → 납기확정 → 분할 */
   const stepLabel = (batch: BrandOrderBatch) => {
-    if (batch.status === 'approved') return '승인완료';
-    if (batch.status === 'issued') return '발행완료';
-    if (batch.status === 'split') return '분할완료';
-    if (batch.status === 'draft') return '작성중';
-    const s = R3_STEPS.find(x => x.step === batch.approvalStep);
-    return s ? `${s.step}. ${s.label}` : `단계 ${batch.approvalStep}`;
+    if (batch.status === 'split') return '생산발주 완료';
+    if (batch.status === 'issued') return batch.expectedDely ? `납기 ${batch.expectedDely}` : '납기 대기';
+    return '작성중';
   };
 
   const openRecv = (row: ReorderOrderRow, color?: string) => {
@@ -491,98 +485,37 @@ export default function BrandOrders() {
                     <span className="text-xs bg-muted px-2 py-1 rounded">{stepLabel(detail)}</span>
                   </div>
 
-                  <div className="flex flex-wrap gap-1">
-                    {R3_STEPS.map(s => {
-                      const asg = getAssigneeForStep(s.step, ws);
-                      return (
-                        <span
-                          key={s.step}
-                          title={asg ? `담당: ${asg.name} (${R3_ROLE_LABEL[R3_STEP_ROLE[s.step]]})` : undefined}
-                          className={`text-[11px] px-2 py-1 rounded border ${
-                            detail.approvalStep > s.step ? 'bg-[var(--fill-quaternary)] border-border text-[var(--system-green)]' :
-                            detail.approvalStep === s.step && detail.status === 'in_approval' ? 'bg-primary/10 border-primary/30 font-bold' :
-                            'bg-[var(--fill-quaternary)] border-border text-muted-foreground'
-                          }`}
-                        >
-                          {s.step}.{s.label}
-                          {asg && !asg.isVacant ? ` · ${asg.name}` : ''}
-                        </span>
-                      );
-                    })}
-                  </div>
-
-                  {detail.status === 'in_approval' && stepAssignee && (
-                    <p className="text-xs text-foreground bg-[var(--fill-quaternary)] border border-border rounded-md px-3 py-2">
-                      현재 단계 담당(조직도): <b>{stepAssignee.name}</b> {stepAssignee.title}
-                      <span className="text-muted-foreground ml-1">· {R3_ROLE_LABEL[R3_STEP_ROLE[detail.approvalStep]]}</span>
-                      {detail.approvalStep === 2 && (
-                        <span className="block mt-1 text-muted-foreground">생산납기(예상입고일)는 이 단계에서 입력 · 조직도에서 담당 변경 가능</span>
-                      )}
-                    </p>
-                  )}
-
-                  {detail.status === 'in_approval' && detail.approvalStep === 2 && (
-                    <div className="flex flex-wrap items-end gap-2 border rounded-md p-3 bg-muted">
-                      <div className="space-y-1">
-                        <label className="text-[11px] text-muted-foreground">생산납기 · 예상입고일</label>
-                        <Input
-                          type="date"
-                          className="h-8 text-sm"
-                          value={detail.expectedDely || ''}
-                          onChange={e => {
-                            phase1.updateBrandBatch(detail.id, { expectedDely: e.target.value });
-                            refresh();
-                            setSelected(phase1.getBrandBatch(detail.id) || null);
-                          }}
-                        />
-                      </div>
-                      <p className="text-[11px] text-muted-foreground pb-1">저장되면 MD 화면에 참고 표시됩니다</p>
+                  {detail.status === 'issued' ? (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                      <span className="text-muted-foreground">
+                        발주 완료 · <b className="font-mono text-foreground">
+                          {[...new Set(detail.lines.map(l => l.poNo).filter(Boolean))].join(' · ')}
+                        </b>
+                      </span>
+                      {detail.expectedDely
+                        ? <span className="text-foreground">납기 확정 <b className="font-mono text-primary">{detail.expectedDely}</b></span>
+                        : <span className="text-[var(--system-orange)]">수주함에서 납기 회신 대기</span>}
+                      {(() => {
+                        // 수주함이 받으면 생산발주가 생긴다. 몇 건이 어디까지 갔는지 여기서 본다
+                        const pos = new Set(detail.lines.map(l => l.poNo).filter(Boolean));
+                        const linked = orders.filter(o => pos.has((o as any).poBatchNo));
+                        if (!linked.length) return null;
+                        return (
+                          <Link href="/orders" className="text-primary hover:underline">
+                            생산발주 {linked.length}건 · {[...new Set(linked.map(o => o.status))].join(' · ')} →
+                          </Link>
+                        );
+                      })()}
                     </div>
-                  )}
-
-                  {detail.expectedDely && (
-                    <p className="text-xs text-muted-foreground">
-                      등록된 생산납기: <b className="font-mono text-primary">{detail.expectedDely}</b>
-                    </p>
-                  )}
-
-                  {detail.status === 'draft' && (
-                    <Button size="sm" onClick={() => { phase1.submitBrandBatch(detail.id, actorName); refresh(); setSelected(phase1.getBrandBatch(detail.id) || null); }}>
-                      <Send className="w-3 h-3 mr-1" />승인 요청
-                    </Button>
-                  )}
-                  {detail.status === 'in_approval' && (
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => {
-                        if (detail.approvalStep === 2 && !detail.expectedDely) {
-                          toast.error('생산납기(예상입고일)를 먼저 입력하세요');
-                          return;
-                        }
-                        const name = stepAssignee?.name || actorName;
-                        phase1.approveBrandStep(detail.id, detail.approvalStep, name);
-                        refresh(); setSelected(phase1.getBrandBatch(detail.id) || null);
-                      }}><Check className="w-3 h-3 mr-1" />승인</Button>
-                      <Button size="sm" variant="outline" onClick={() => {
-                        phase1.rejectBrandStep(detail.id, detail.approvalStep, stepAssignee?.name || actorName, '수정 필요');
-                        refresh(); setSelected(phase1.getBrandBatch(detail.id) || null);
-                      }}><X className="w-3 h-3 mr-1" />반려</Button>
-                    </div>
-                  )}
-                  {detail.status === 'approved' && (
+                  ) : (
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Button size="sm" onClick={issue}>
-                        <Send className="w-3 h-3 mr-1" />발주서 발행
+                      <Button size="sm" onClick={issue} disabled={detail.lines.length === 0}>
+                        <Send className="w-3 h-3 mr-1" />발주
                       </Button>
                       <span className="text-[11px] text-muted-foreground">
-                        공장별로 1장씩 나가고, AMESCOTES 수주함으로 전달됩니다
+                        AMESCOTES 수주함으로 넘어갑니다. 납기는 수주함에서 회신됩니다
                       </span>
                     </div>
-                  )}
-                  {detail.status === 'issued' && (
-                    <p className="text-[11px] text-muted-foreground">
-                      발행 완료 —{' '}
-                      {[...new Set(detail.lines.map(l => l.poNo).filter(Boolean))].join(' · ')}
-                    </p>
                   )}
 
                   <div className="overflow-x-auto border rounded-md">
