@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Check, X, Send, Package, Factory } from 'lucide-react';
+import { Send, Package, Factory, Trash2, Undo2 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import StylePickerSheet, { type PickedLine } from '@/components/StylePickerSheet';
 
@@ -161,6 +161,33 @@ export default function BrandOrders() {
     setMainTab('approval');
     refresh();
     toast.success(`발주 생성 ${b.projectNo}`);
+  };
+
+  /** 발주 취소 — 수주함이 받기 전이면 초안으로 되돌린다 */
+  const cancelIssue = () => {
+    if (!detail) return;
+    if (!confirm(`${detail.projectNo} 발주를 취소합니다. 초안으로 되돌아갑니다.`)) return;
+    const r = phase1.cancelBrandIssue(detail.id);
+    if (!r.ok) { toast.error(r.reason || '취소 실패'); return; }
+    refresh(); setSelected(phase1.getBrandBatch(detail.id) || null);
+    toast.success('발주 취소 — 다시 수정할 수 있습니다');
+  };
+
+  /** 발주 삭제 — 안 나간 것만 */
+  const removeBatch = () => {
+    if (!detail) return;
+    if (!confirm(`${detail.projectNo}를 삭제합니다. 담은 상품도 함께 지워집니다.`)) return;
+    const r = phase1.deleteBrandBatch(detail.id);
+    if (!r.ok) { toast.error(r.reason || '삭제 실패'); return; }
+    setSelected(null); refresh();
+    toast.success('발주 삭제');
+  };
+
+  /** 담은 상품 1줄 빼기 */
+  const removeLine = (lineId: string) => {
+    if (!detail) return;
+    phase1.deleteBrandLine(lineId);
+    refresh(); setSelected(phase1.getBrandBatch(detail.id) || null);
   };
 
   /** 시트에서 담아 온 것들 — 한 번에 라인으로 만든다 */
@@ -338,7 +365,7 @@ export default function BrandOrders() {
       <Tabs value={mainTab} onValueChange={setMainTab}>
         <TabsList>
           <TabsTrigger value="mgmt">오더관리</TabsTrigger>
-          <TabsTrigger value="approval">승인 (R3)</TabsTrigger>
+          <TabsTrigger value="approval">발주 작성</TabsTrigger>
         </TabsList>
 
         {/* ── 오더관리 ── */}
@@ -506,6 +533,11 @@ export default function BrandOrders() {
                           </Link>
                         );
                       })()}
+                      {!detail.lines.some(l => l.acceptedAt) && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs ml-auto" onClick={cancelIssue}>
+                          <Undo2 className="w-3 h-3 mr-1" />발주 취소
+                        </Button>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 flex-wrap">
@@ -515,6 +547,10 @@ export default function BrandOrders() {
                       <span className="text-[11px] text-muted-foreground">
                         AMESCOTES 수주함으로 넘어갑니다. 납기는 수주함에서 회신됩니다
                       </span>
+                      <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs text-muted-foreground hover:text-[var(--system-red)]"
+                        onClick={removeBatch}>
+                        <Trash2 className="w-3 h-3 mr-1" />발주 삭제
+                      </Button>
                     </div>
                   )}
 
@@ -528,6 +564,7 @@ export default function BrandOrders() {
                         <th>공장</th>
                         <th>생산지</th>
                         <th>경로</th>
+                        <th className="w-10"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -541,6 +578,15 @@ export default function BrandOrders() {
                             <td>{i === 0 ? (l.factoryName || '—') : ''}</td>
                             <td>{i === 0 ? (l.productionOrigin === 'china' ? '중국' : '국내') : ''}</td>
                             <td>{i === 0 ? ((l.route || 'oem') === 'direct' ? '직발주' : 'AMESCOTES') : ''}</td>
+                            <td className="text-center">
+                              {i === 0 && detail.status === 'draft' && (
+                                <button type="button" onClick={() => removeLine(l.id)}
+                                  title="이 상품 빼기"
+                                  className="text-muted-foreground hover:text-[var(--system-red)] p-1">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </td>
                           </tr>
                         ));
                       })}
@@ -556,17 +602,6 @@ export default function BrandOrders() {
                     </div>
                   )}
 
-                  {phase1.getApprovalLogs(detail.id).length > 0 && (
-                    <div className="border-t pt-3">
-                      <p className="text-xs font-semibold text-muted-foreground mb-2">승인 이력</p>
-                      {phase1.getApprovalLogs(detail.id).map(l => (
-                        <p key={l.id} className="text-xs text-muted-foreground py-0.5">
-                          {l.createdAt.slice(0, 10)} · {l.step}단계 {l.action} · {l.actorName}
-                          {l.comment && ` — ${l.comment}`}
-                        </p>
-                      ))}
-                    </div>
-                  )}
                 </>
               )}
             </div>

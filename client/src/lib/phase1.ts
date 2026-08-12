@@ -773,6 +773,44 @@ export const phase1 = {
   },
   deleteBrandLine: (id: string) => {
     setAll(KEYS.brandLines, getAll<BrandOrderLine>(KEYS.brandLines).filter(l => l.id !== id));
+    // 서버에서도 지워야 한다. 안 지우면 다음 조회 때 되살아난다
+    supabase.from('brand_order_lines').delete().eq('id', id)
+      .then(({ error }) => { if (error) reportSyncFail('발주 라인 삭제')(error); });
+  },
+
+  /**
+   * 발주 취소 — 수주함이 아직 안 받은 발주만 되돌린다.
+   * 받은 뒤엔 상대가 이미 생산발주를 걸었으므로 여기서 무를 수 없다.
+   */
+  cancelBrandIssue: (batchId: string): { ok: boolean; reason?: string } => {
+    const batch = phase1.getBrandBatch(batchId);
+    if (!batch) return { ok: false, reason: '발주를 찾을 수 없습니다' };
+    if (batch.status !== 'issued') return { ok: false, reason: '발주된 상태가 아닙니다' };
+    if (batch.lines.some(l => l.acceptedAt)) {
+      return { ok: false, reason: '수주함이 이미 받았습니다 — 생산발주 탭에서 처리하세요' };
+    }
+    const all = getAll<BrandOrderLine>(KEYS.brandLines);
+    all.forEach((l, i) => {
+      if (l.batchId === batchId) {
+        all[i] = { ...l, poNo: undefined, issuedAt: undefined };
+        syncBrandLine(all[i]).catch(reportSyncFail('발주 취소'));
+      }
+    });
+    setAll(KEYS.brandLines, all);
+    phase1.updateBrandBatch(batchId, { status: 'draft', expectedDely: undefined });
+    return { ok: true };
+  },
+
+  /** 발주 통째로 삭제 — 아직 안 나간 것만 */
+  deleteBrandBatch: (batchId: string): { ok: boolean; reason?: string } => {
+    const batch = phase1.getBrandBatch(batchId);
+    if (!batch) return { ok: false, reason: '발주를 찾을 수 없습니다' };
+    if (batch.status !== 'draft') return { ok: false, reason: '발주를 먼저 취소하세요' };
+    batch.lines.forEach(l => phase1.deleteBrandLine(l.id));
+    setAll(KEYS.brandBatches, getAll<BrandOrderBatch>(KEYS.brandBatches).filter(b => b.id !== batchId));
+    supabase.from('brand_order_batches').delete().eq('id', batchId)
+      .then(({ error }) => { if (error) reportSyncFail('발주 삭제')(error); });
+    return { ok: true };
   },
 
   submitBrandBatch: (batchId: string, actorName: string) => {
@@ -824,7 +862,8 @@ export const phase1 = {
   /** 발주 — 담은 상품을 공장·경로별로 갈라 발주서를 낸다. 초안이면 바로 나간다 */
   issueBrandBatch: (batchId: string) => {
     const batch = phase1.getBrandBatch(batchId);
-    if (!batch || (batch.status !== 'approved' && batch.status !== 'draft')) return [];
+    // 이미 나간 것만 막는다. 옛 승인단계(in_approval)에 걸려 있던 발주도 그대로 내보낸다
+    if (!batch || batch.status === 'issued' || batch.status === 'split') return [];
     if (!batch.lines.length) return [];
     const byFactory = new Map<string, BrandOrderLine[]>();
     batch.lines.forEach(l => {
