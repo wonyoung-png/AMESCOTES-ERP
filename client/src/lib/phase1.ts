@@ -461,7 +461,8 @@ function generateProjectNo(workspace: Workspace, vendorCode?: string): string {
   const yy = String(d.getFullYear()).slice(2);
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
-  const projects = getAll<Project>(KEYS.projects);
+  // projects 테이블은 프로젝트 탭(대형 프로젝트)과 공유한다. 그쪽 행엔 projectNo가 없다
+  const projects = getAll<Project>(KEYS.projects).filter(p => !!p.projectNo);
   if (workspace === 'OEM') {
     const code = (vendorCode || 'NW').toUpperCase().slice(0, 4);
     const year = d.getFullYear();
