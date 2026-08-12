@@ -477,6 +477,17 @@ export async function saveConfirmedSalePrice(id: string, confirmedSalePrice: num
 export async function deleteItem(id: string) {
   const { error } = await supabase.from('items').delete().eq('id', id);
   if (error) throw error;
+  // upsertItem이 localStorage에도 복제해 두고 fetchItems가 그걸 병합하므로,
+  // 로컬 사본을 같이 지우지 않으면 삭제한 품목이 새로고침 때 되살아난다.
+  try {
+    const list = store.getItems();
+    const gone = list.find(x => x.id === id);
+    if (gone) {
+      store.setItems(list.filter(x => x.id !== id && !(gone.styleNo && x.styleNo === gone.styleNo)));
+    }
+  } catch (e) {
+    console.warn('[deleteItem] localStorage 사본 삭제 실패', e);
+  }
 }
 
 // ─────────────────────────────────────────────
