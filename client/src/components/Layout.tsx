@@ -80,7 +80,7 @@ const navGroups: NavGroup[] = [
       { path: '/trade-statement', label: '거래명세표', icon: <FileText size={17} />, table: 'trade_statements' },
       { path: '/settlement', label: '미수금 / 정산', icon: <Receipt size={17} />, table: 'settlements' },
       { path: '/payables', label: '미지급 · 불량차감', icon: <Wallet size={17} />, table: 'payables' },
-      { path: '/project-pl', label: '발주 손익', icon: <BarChart3 size={17} />, table: 'projects' },
+      { path: '/project-pl', label: '매출 · 영업이익', icon: <BarChart3 size={17} />, table: 'projects' },
       { path: '/documents', label: '서류 출력', icon: <FileText size={17} />, table: '공장PO · PI · PL' },
     ],
   },

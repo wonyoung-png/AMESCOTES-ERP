@@ -912,6 +912,11 @@ export default function ProductionOrders() {
             vendorId: existing.vendorId,
             vendorName: existing.vendorName,
             source: 'production',
+            workspace: existing.workspace || 'OEM',
+            deliveryMarket: 'b2b',
+            shippingCostKrw: 0,
+            platformFeeKrw: 0,
+            pgFeeKrw: 0,
           };
           store.addSalesRecord(salesRecord);
         }
@@ -3624,4 +3629,3 @@ export default function ProductionOrders() {
     </div>
   );
 }
-

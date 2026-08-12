@@ -739,6 +739,11 @@ export interface SalesRecord {
   vendorId?: string;
   vendorName?: string;
   source?: 'manual' | 'production';  // 수동 입력 vs 생산발주 자동
+  workspace?: 'OEM' | 'LUMEN' | 'AETALOOP';
+  deliveryMarket?: 'domestic' | 'b2b' | 'overseas';
+  shippingCostKrw?: number;
+  platformFeeKrw?: number;
+  pgFeeKrw?: number;
 }
 
 // ─── 시스템 설정 ───
@@ -1611,4 +1616,3 @@ export function getBomForOrderFromList(
   if (preBom) return { bom: preBom, type: 'pre' };
   return { bom: bomList[0], type: 'pre' };
 }
-

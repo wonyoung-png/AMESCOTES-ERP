@@ -6,6 +6,7 @@ export type Workspace = 'OEM' | 'LUMEN' | 'AETALOOP';
 export type ProductionOrigin = 'domestic' | 'china';
 export type ReceiptLogType = 'inbound' | 'outbound_oem' | 'outbound_3pl';
 export type ReceiptDestination = 'korea' | 'china';
+export type DeliveryMarket = 'domestic' | 'b2b' | 'overseas';
 export type BrandBatchStatus = 'draft' | 'in_approval' | 'approved' | 'split' | 'done';
 export type PayableStatus = 'pending' | 'partial' | 'paid';
 export type PayablePayeeType = 'factory_direct' | 'china_corp';
@@ -54,6 +55,7 @@ export interface ReceiptLog {
   color?: string;
   /** 생산완료 전 선입고 */
   isAdvance?: boolean;
+  deliveryMarket?: DeliveryMarket;
   createdAt: string;
 }
 
@@ -1373,6 +1375,7 @@ async function syncReceiptLog(log: ReceiptLog) {
     destination: log.destination,
     color: log.color,
     is_advance: log.isAdvance,
+    delivery_market: log.deliveryMarket,
     created_at: log.createdAt,
   });
 }

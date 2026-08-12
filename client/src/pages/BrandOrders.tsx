@@ -152,6 +152,25 @@ export default function BrandOrders() {
       });
   }, [orders, items, ws, progressFilter, categoryFilter, styleSearch, tick]);
 
+  const reorderSummary = useMemo(() => {
+    const logs = phase1.getReceiptLogs();
+    return board.map(group => {
+      const orderIds = new Set(group.rows.map(r => r.orderId));
+      const styleLogs = logs.filter(l => orderIds.has(l.orderId));
+      const inbound = styleLogs.filter(l => l.logType === 'inbound').reduce((n, l) => n + l.qty, 0);
+      const outbound = styleLogs.filter(l => l.logType !== 'inbound');
+      const shipped = outbound.reduce((n, l) => n + l.qty, 0);
+      const incoming = group.rows.reduce((n, r) => n + r.remaining, 0);
+      const demand = {
+        domestic: outbound.filter(l => l.deliveryMarket === 'domestic').reduce((n, l) => n + l.qty, 0),
+        b2b: outbound.filter(l => !l.deliveryMarket || l.deliveryMarket === 'b2b').reduce((n, l) => n + l.qty, 0),
+        overseas: outbound.filter(l => l.deliveryMarket === 'overseas').reduce((n, l) => n + l.qty, 0),
+      };
+      const currentStock = Math.max(0, inbound - shipped);
+      const totalDemand = demand.domestic + demand.b2b + demand.overseas;
+      return { ...group, currentStock, incoming, available: currentStock + incoming, demand, totalDemand, reorderQty: Math.max(0, totalDemand - currentStock - incoming) };
+    });
+  }, [board, tick]);
   const categories = useMemo(() => {
     const set = new Set<string>();
     items.forEach(i => { if (i.erpCategory) set.add(i.erpCategory); });
@@ -387,6 +406,12 @@ export default function BrandOrders() {
 
         {/* ── 오더관리 ── */}
         <TabsContent value="mgmt" className="mt-4 space-y-4">
+          <div className="bg-white rounded-xl border overflow-x-auto">
+            <div className="px-4 py-3 border-b"><p className="font-semibold text-sm">리오더 수량 판단</p><p className="text-xs text-stone-500">OEM·LUMEN 공통 상품코드 기준 · 현재고 + 입고예정과 배송처별 수량 비교</p></div>
+            <table className="w-full text-sm min-w-[760px]"><thead className="bg-stone-50 text-xs text-stone-500"><tr><th className="text-left px-3 py-2">상품</th><th className="text-right px-3 py-2">현재고</th><th className="text-right px-3 py-2">입고예정</th><th className="text-right px-3 py-2">가용합계</th><th className="text-right px-3 py-2">국내</th><th className="text-right px-3 py-2">B2B</th><th className="text-right px-3 py-2">해외</th><th className="text-right px-3 py-2">리오더 권장</th></tr></thead><tbody>
+              {reorderSummary.map(r => <tr key={r.styleNo} className="border-t"><td className="px-3 py-2"><span className="font-medium">{r.styleName}</span><span className="ml-2 font-mono text-xs text-amber-700">{r.styleNo}</span></td><td className="px-3 py-2 text-right">{formatNumber(r.currentStock)}</td><td className="px-3 py-2 text-right">{formatNumber(r.incoming)}</td><td className="px-3 py-2 text-right font-semibold">{formatNumber(r.available)}</td><td className="px-3 py-2 text-right">{formatNumber(r.demand.domestic)}</td><td className="px-3 py-2 text-right">{formatNumber(r.demand.b2b)}</td><td className="px-3 py-2 text-right">{formatNumber(r.demand.overseas)}</td><td className={`px-3 py-2 text-right font-bold ${r.reorderQty > 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatNumber(r.reorderQty)}</td></tr>)}
+            </tbody></table>
+          </div>
           <div className="flex flex-wrap gap-2 items-center">
             {([
               ['active', '진행중'],

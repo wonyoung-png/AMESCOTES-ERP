@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, formatNumber, genId } from '@/lib/store';
-import { phase1, type ReceiptLogType } from '@/lib/phase1';
+import { phase1, type DeliveryMarket, type ReceiptLogType } from '@/lib/phase1';
 import { fetchOrders } from '@/lib/supabaseQueries';
 import { getCurrentUser } from '@/lib/auth';
 import { confirmShippingPlan, fetchShippingPlans, upsertShippingPlan, type ShippingMethod } from '@/lib/shippingPlans';
@@ -34,7 +34,7 @@ export default function ReceivingShipping() {
   const [modal, setModal] = useState<{ orderId: string; logType: ReceiptLogType } | null>(null);
   const [shippingModal, setShippingModal] = useState(false);
   const [shippingForm, setShippingForm] = useState({ shipDate: today, method: 'air' as ShippingMethod, orderNo: '', description: '', qty: 0, memo: '' });
-  const [form, setForm] = useState({ qty: 0, defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '' });
+  const [form, setForm] = useState({ qty: 0, defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: 'domestic' as DeliveryMarket });
   const [, tick] = useState(0);
   const refresh = () => { queryClient.invalidateQueries({ queryKey: ['orders'] }); tick(n => n + 1); };
   const saveShippingPlan = async () => {
@@ -79,7 +79,7 @@ export default function ReceivingShipping() {
     const o = orders.find(x => x.id === orderId);
     const sum = phase1.getOrderReceiptSummary(orderId, o?.qty || 0);
     const remain = logType === 'inbound' ? o!.qty - sum.receivedQty : o!.qty - sum.shippedQty;
-    setForm({ qty: Math.max(0, remain), defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '' });
+    setForm({ qty: Math.max(0, remain), defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: logType === 'outbound_oem' ? 'b2b' : 'domestic' });
     setModal({ orderId, logType });
   };
 
@@ -97,10 +97,11 @@ export default function ReceivingShipping() {
       defectNote: form.defectNote,
       receivedDate: form.date,
       memo: form.memo,
+      deliveryMarket: modal.logType === 'inbound' ? undefined : form.deliveryMarket,
     });
     const sum = phase1.getOrderReceiptSummary(o.id, o.qty);
     const newReceived = sum.receivedQty;
-    const newShipped = sum.shippedQty + (modal.logType !== 'inbound' ? form.qty : 0);
+    const newShipped = sum.shippedQty;
     const updates: Record<string, unknown> = {
       receivedQty: newReceived,
       defectQty: sum.defectQty,
@@ -241,6 +242,7 @@ export default function ReceivingShipping() {
                 {l.destination === 'korea' && <span className="ml-1 text-[10px] text-amber-700">한국</span>}
                 {l.destination === 'china' && <span className="ml-1 text-[10px] text-blue-700">중국{l.color ? `·${l.color}` : ''}</span>}
                 {l.isAdvance && <span className="ml-1 text-[10px] text-orange-600">선입</span>}
+                {l.deliveryMarket && <span className="ml-1 text-[10px] text-violet-700">{l.deliveryMarket === 'domestic' ? '국내' : l.deliveryMarket === 'b2b' ? 'B2B' : '해외'}</span>}
                 {l.orderNo && <span className="ml-2 text-xs text-stone-400">{l.orderNo}</span>}
               </div>
               <div className="text-right">
@@ -266,7 +268,9 @@ export default function ReceivingShipping() {
                 <div><Label>불량 사유</Label><Input value={form.defectNote} onChange={e => setForm(f => ({ ...f, defectNote: e.target.value }))} /></div>
               </>
             )}
-            <div><Label>일자</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
+            {modal?.logType !== 'inbound' && (
+              <div><Label>배송 판매처</Label><Select value={form.deliveryMarket} onValueChange={v => setForm(f => ({ ...f, deliveryMarket: v as DeliveryMarket }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="domestic">국내</SelectItem><SelectItem value="b2b">B2B</SelectItem><SelectItem value="overseas">해외</SelectItem></SelectContent></Select></div>
+            )}            <div><Label>일자</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
             <div><Label>메모</Label><Input value={form.memo} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} /></div>
           </div>
           <DialogFooter>

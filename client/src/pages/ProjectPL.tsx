@@ -6,8 +6,11 @@ import { Button } from '@/components/ui/button';
 import { migrateLocalToSupabase } from '@/lib/phase1';
 import { toast } from 'sonner';
 import { Database } from 'lucide-react';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { Input } from '@/components/ui/input';
 
 export default function ProjectPL() {
+  const { workspace } = useWorkspace();
   const [, tick] = useState(0);
   const refresh = () => tick(n => n + 1);
   const orders = store.getOrders();
@@ -20,6 +23,25 @@ export default function ProjectPL() {
   }, [orders, tick]);
 
   const pl = selectedNo ? phase1.getProjectPL(selectedNo) : null;
+  const sales = store.getSalesRecords().filter(s => !s.workspace || s.workspace === workspace);
+  const salesSummary = sales.reduce((a, sale) => {
+    const order = orders.find(o => o.id === sale.orderId || o.orderNo === sale.orderNo);
+    const cogs = (order?.factoryUnitPriceKrw || 0) * sale.qty;
+    const shipping = sale.shippingCostKrw || 0;
+    const platform = sale.platformFeeKrw || 0;
+    const pg = sale.pgFeeKrw || 0;
+    a.revenue += sale.totalKrw;
+    a.cogs += cogs;
+    a.shipping += shipping;
+    a.platform += platform;
+    a.pg += pg;
+    a.profit += sale.totalKrw - cogs - shipping - platform - pg;
+    return a;
+  }, { revenue: 0, cogs: 0, shipping: 0, platform: 0, pg: 0, profit: 0 });
+  const updateSaleCost = (id: string, field: 'shippingCostKrw' | 'platformFeeKrw' | 'pgFeeKrw', value: number) => {
+    store.updateSalesRecord(id, { [field]: Math.max(0, value) });
+    refresh();
+  };
   const projOrders = orders.filter(o => o.orderNo === selectedNo);
 
   const syncToSupabase = async () => {
@@ -46,6 +68,14 @@ export default function ProjectPL() {
         </Button>
       </div>
 
+      <section className="space-y-3">
+        <div><h2 className="text-lg font-bold text-stone-800">매출 · 영업이익</h2><p className="text-xs text-stone-500">{workspace} · 상품코드로 OEM/LUMEN 생산원가 연동</p></div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"><Kpi label="매출" value={formatKRW(salesSummary.revenue)} /><Kpi label="매출원가" value={formatKRW(salesSummary.cogs)} /><Kpi label="배송비" value={formatKRW(salesSummary.shipping)} /><Kpi label="플랫폼 수수료" value={formatKRW(salesSummary.platform)} /><Kpi label="PG 수수료" value={formatKRW(salesSummary.pg)} /><Kpi label="영업이익" value={formatKRW(salesSummary.profit)} sub={salesSummary.profit >= 0 ? '흑자' : '적자'} /></div>
+        <div className="bg-white rounded-xl border overflow-x-auto"><table className="w-full text-sm min-w-[900px]"><thead className="bg-stone-50 text-xs text-stone-500"><tr><th className="text-left px-3 py-2">상품/판매처</th><th className="text-right px-3 py-2">수량</th><th className="text-right px-3 py-2">매출</th><th className="text-right px-3 py-2">배송비</th><th className="text-right px-3 py-2">플랫폼</th><th className="text-right px-3 py-2">PG</th><th className="text-right px-3 py-2">영업이익</th></tr></thead><tbody>
+          {sales.map(sale => { const order = orders.find(o => o.id === sale.orderId || o.orderNo === sale.orderNo); const cogs = (order?.factoryUnitPriceKrw || 0) * sale.qty; const profit = sale.totalKrw - cogs - (sale.shippingCostKrw || 0) - (sale.platformFeeKrw || 0) - (sale.pgFeeKrw || 0); return <tr key={sale.id} className="border-t"><td className="px-3 py-2"><span className="font-medium">{sale.styleName || sale.styleNo || '상품 미지정'}</span><span className="block text-xs text-stone-400">{sale.buyerName} · {sale.deliveryMarket === 'overseas' ? '해외' : sale.deliveryMarket === 'domestic' ? '국내' : 'B2B'}</span></td><td className="px-3 py-2 text-right">{sale.qty.toLocaleString()}</td><td className="px-3 py-2 text-right">{formatKRW(sale.totalKrw)}</td>{(['shippingCostKrw','platformFeeKrw','pgFeeKrw'] as const).map(field => <td key={field} className="px-2 py-1"><Input type="number" min="0" className="h-8 text-right" value={sale[field] || ''} onChange={e => updateSaleCost(sale.id, field, Number(e.target.value))} /></td>)}<td className={`px-3 py-2 text-right font-bold ${profit < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{formatKRW(profit)}</td></tr>; })}
+          {sales.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-stone-400">입고완료 또는 매출 데이터가 없습니다.</td></tr>}
+        </tbody></table></div>
+      </section>
       <div className="flex flex-wrap gap-2">
         {allOrderNos.length === 0 ? (
           <p className="text-sm text-stone-400">등록된 발주가 없습니다</p>
