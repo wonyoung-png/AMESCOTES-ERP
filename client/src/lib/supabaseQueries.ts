@@ -202,11 +202,15 @@ function convertBomFromDB(row: any) {
     postDeliveryPrice: row.post_delivery_price ?? undefined,
     postTotalCostKrw: row.post_total_cost_krw ?? undefined,
     postSubtotalKrw: row.post_subtotal_krw ?? undefined,
-    currency: row.currency ?? 'CNY',
-    exchangeRateCny: row.exchange_rate_cny ?? 191,
+    // 사전/사후는 통화·환율을 따로 쓴다. 예전엔 pre_currency/post_* 를 읽지 않아
+    // 저장한 뒤 다시 열면 사전원가가 CNY·사전환율로 되돌아가 보였다.
+    preCurrency: row.pre_currency ?? row.currency ?? 'CNY',
+    currency: row.post_currency ?? row.currency ?? 'CNY',
+    exchangeRateCny: row.post_exchange_rate_cny ?? row.exchange_rate_cny ?? 191,
     preExchangeRateCny: row.pre_exchange_rate_cny ?? row.exchange_rate_cny ?? 191,
     postExchangeRateCny: row.post_exchange_rate_cny ?? row.exchange_rate_cny ?? 191,
-    exchangeRateUsd: row.exchange_rate_usd ?? undefined,
+    preExchangeRateUsd: row.exchange_rate_usd ?? undefined,
+    exchangeRateUsd: row.post_exchange_rate_usd ?? row.exchange_rate_usd ?? undefined,
     snapshotCnyKrw: row.exchange_rate_cny ?? 191,
     customsRate: row.customs_rate ?? 0,
     productionMarginRate: row.production_margin_rate ?? 0.16,
@@ -523,7 +527,7 @@ const BOM_LIGHT_COLS = [
   // 사전원가 — 사후원가가 없는 품목은 사전원가로 컬러·원가를 보여줘야 한다
   'color_boms', 'pre_processing_fee', 'pre_currency', 'pre_exchange_rate_cny',
   'post_color_boms', 'post_materials', 'post_processing_fee', 'post_process_lines',
-  'post_exchange_rate_cny', 'post_delivery_price',
+  'post_currency', 'post_exchange_rate_cny', 'post_exchange_rate_usd', 'post_delivery_price',
   'post_subtotal_krw', 'post_total_cost_krw',
   'logistics_cost_krw', 'packaging_cost_krw', 'packing_cost_krw',
   'production_margin_rate', 'customs_rate',
@@ -555,7 +559,7 @@ export async function upsertBom(bom: any) {
     manufacturing_country: bom.manufacturingCountry,
     currency: bom.currency ?? bom.preCurrency ?? 'CNY',
     exchange_rate_cny: bom.exchangeRateCny ?? bom.snapshotCnyKrw,
-    exchange_rate_usd: bom.exchangeRateUsd,
+    exchange_rate_usd: bom.preExchangeRateUsd ?? bom.exchangeRateUsd,
     pre_materials: bom.lines ?? [],
     pre_processing_fee: bom.processingFee ?? 0,
     post_materials: bom.postMaterials ?? [],
@@ -575,6 +579,7 @@ export async function upsertBom(bom: any) {
     post_currency: bom.currency ?? 'CNY',
     pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
     post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny ?? bom.snapshotCnyKrw,
+    post_exchange_rate_usd: bom.exchangeRateUsd ?? bom.preExchangeRateUsd ?? null,
     pnl_data: (() => {
       const base = bom.pnl && typeof bom.pnl === 'object' ? { ...bom.pnl } : {};
       if (bom.packingItemId) {

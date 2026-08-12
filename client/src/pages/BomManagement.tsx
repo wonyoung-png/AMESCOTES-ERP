@@ -539,6 +539,7 @@ function syncBomToSupabase(bom: ExtBom) {
       post_currency: bom.currency ?? 'CNY',
       pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
       post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny ?? bom.snapshotCnyKrw,
+      post_exchange_rate_usd: bom.exchangeRateUsd ?? bom.preExchangeRateUsd ?? null,
       memo: bom.memo,
       updated_at: new Date().toISOString(),
     };
