@@ -76,6 +76,16 @@ function mergeByIdStyleNo<T extends { id?: string; styleNo?: string }>(
   for (const loc of local) {
     if (loc.id && remoteIds.has(loc.id)) continue;
     if (loc.styleNo && remoteStyles.has(loc.styleNo)) continue;
+    // 서버에 없는 로컬 행은 "서버에서 지운 것"으로 본다 — 되살리지 않는다.
+    // (이전엔 전부 다시 합쳐서, 삭제·중복정리한 품목이 새로고침 때 되살아났다)
+    // 예외: 서버 스키마에 없는 PACK(포장재) 품목만 로컬 전용으로 유지한다.
+    const L = loc as Record<string, unknown>;
+    const sn = String(loc.styleNo || '');
+    const isLocalOnlyPack =
+      L.erpCategory === 'PACK' ||
+      sn.startsWith('LPKG-') ||
+      String(L.memo || '').includes('[PACK]');
+    if (!isLocalOnlyPack) continue;
     merged.push(normalizePackFields(loc as any));
   }
   return merged;
@@ -510,6 +520,8 @@ export async function fetchBoms() {
 const BOM_LIGHT_COLS = [
   'id', 'style_no', 'style_id', 'style_name', 'season', 'erp_category',
   'currency', 'exchange_rate_cny', 'exchange_rate_usd',
+  // 사전원가 — 사후원가가 없는 품목은 사전원가로 컬러·원가를 보여줘야 한다
+  'color_boms', 'pre_processing_fee', 'pre_currency', 'pre_exchange_rate_cny',
   'post_color_boms', 'post_materials', 'post_processing_fee', 'post_process_lines',
   'post_exchange_rate_cny', 'post_delivery_price',
   'post_subtotal_krw', 'post_total_cost_krw',

@@ -170,15 +170,17 @@ type ColorCostRow = {
 
 /** 품목 컬러 + BOM 컬러 탭 합집합 (표시용, 품목 순서 우선) */
 function mergeDisplayColors(item: Item, mergedBom: any, colorCosts: ColorCostRow[]): string[] {
-  const fromItem = normalizeColors(item.colors || []).map(c => c.name).filter(Boolean);
-  const fromBom = [
-    ...((mergedBom?.postColorBoms || []) as any[]).map((t: any) => t.color),
-    ...((mergedBom?.colorBoms || []) as any[]).map((t: any) => t.color),
-  ].filter((c: string) => c && c !== '기본');
+  // BOM에 컬러가 등록돼 있으면 그게 실제 컬러다 — 사후 우선, 없으면 사전.
+  // 품목에 적힌 컬러(등록 시 기본으로 들어간 블랙/브라운/아이보리)는 BOM이 없을 때만 쓴다.
+  const post = bomColorNames(mergedBom?.postColorBoms);
+  const fromBom = post.length > 0 ? post : bomColorNames(mergedBom?.colorBoms);
   const fromCosts = colorCosts.map(c => c.color).filter(c => c && !['기본', '전체'].includes(c));
+  const source = fromBom.length > 0 || fromCosts.length > 0
+    ? [...fromBom, ...fromCosts]
+    : normalizeColors(item.colors || []).map(c => c.name).filter(Boolean);
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const n of [...fromItem, ...fromBom, ...fromCosts]) {
+  for (const n of source) {
     const key = String(n).trim().toUpperCase();
     if (!key || seen.has(key)) continue;
     seen.add(key);
@@ -200,25 +202,26 @@ function hasEffectiveBom(
   return false;
 }
 
-/** 발주/표시용 — 품목 colors + BOM 컬러를 ItemColor[]로 합침 */
+/** BOM 컬러 탭 이름만 뽑기 ('기본'·빈값 제외) */
+function bomColorNames(tabs: any): string[] {
+  return (Array.isArray(tabs) ? tabs : [])
+    .map((t: any) => String(t?.color || '').trim())
+    .filter((c: string) => c && c !== '기본');
+}
+
+/**
+ * 발주/표시용 컬러 — BOM에 등록된 컬러가 진짜다.
+ * 사후원가 컬러가 있으면 사후, 없으면 사전, 둘 다 없을 때만 품목에 적어둔 컬러.
+ * (품목 등록 시 기본으로 들어간 블랙/브라운/아이보리가 실제 컬러를 덮던 문제)
+ */
 function resolveItemColorsWithBom(item: Item, bom?: any | null): ItemColor[] {
   const fromItem = normalizeColors(item.colors || []);
+  const post = bomColorNames(bom?.postColorBoms);
+  const names = post.length > 0 ? post : bomColorNames(bom?.colorBoms);
+  if (names.length === 0) return fromItem;
+  // 품목에 같은 이름이 있으면 가죽컬러 등 부가정보를 살려 쓴다
   const byKey = new Map(fromItem.map(c => [c.name.trim().toUpperCase(), c]));
-  const bomNames = [
-    ...((bom?.postColorBoms || []) as any[]).map((t: any) => t.color),
-    ...((bom?.colorBoms || []) as any[]).map((t: any) => t.color),
-  ].filter((c: string) => c && String(c).trim() && c !== '기본');
-
-  const ordered: ItemColor[] = [...fromItem];
-  for (const raw of bomNames) {
-    const name = String(raw).trim();
-    const key = name.toUpperCase();
-    if (byKey.has(key)) continue;
-    const next = { name };
-    byKey.set(key, next);
-    ordered.push(next);
-  }
-  return ordered;
+  return names.map(n => byKey.get(n.toUpperCase()) || { name: n });
 }
 
 function findBomForItem(item: Item): any | null {
@@ -237,10 +240,12 @@ function calcBomCostsByColor(bom: any, isSelfBrand: boolean): ColorCostRow[] {
     const v = Math.round(bom.simplePostCostKrw);
     return [{ color: '전체', productCost: v, totalCostKrw: v, displayCost: v, factoryUnitCostKrw: v }];
   }
-  const tabs: any[] = Array.isArray(bom.postColorBoms) ? bom.postColorBoms : [];
-  const withData = tabs.filter((cb: any) =>
+  // 사후원가 컬러 탭이 있으면 사후, 없으면 사전(colorBoms)으로 원가를 낸다.
+  const filled = (tabs: any) => (Array.isArray(tabs) ? tabs : []).filter((cb: any) =>
     (cb.lines || []).some((l: any) => l.itemName || l.unitPriceCny > 0)
   );
+  const post = filled(bom.postColorBoms);
+  const withData = post.length > 0 ? post : filled(bom.colorBoms);
   if (withData.length > 0) {
     return withData.map((cb: any) => {
       const r = calcBomCostsFromMaterials(
