@@ -1,3 +1,4 @@
+import { upsertSalesRecord } from '@/lib/salesRecords';
 // AMESCOTES ERP — 생산 발주 관리 (BOM 연동)
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
@@ -1205,8 +1206,14 @@ export default function ProductionOrders() {
             vendorId: existing.vendorId,
             vendorName: existing.vendorName,
             source: 'production',
+            workspace: existing.workspace || 'OEM',
+            deliveryMarket: 'b2b',
+            shippingCostKrw: 0,
+            platformFeeKrw: 0,
+            pgFeeKrw: 0,
           };
           store.addSalesRecord(salesRecord);
+          upsertSalesRecord(salesRecord).catch(e => toast.error('매출 AWS 저장 실패: ' + e.message));
         }
         setShowReceiveModal(false);
         refresh();

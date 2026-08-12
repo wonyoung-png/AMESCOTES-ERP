@@ -1,11 +1,15 @@
 // 발주 손익 — 발주번호(orderNo) 기준 BOM vs 실제 · 품목/컬러 배분
 import { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { phase1 } from '@/lib/phase1';
 import { store, formatKRW } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { migrateLocalToSupabase } from '@/lib/phase1';
 import { toast } from 'sonner';
 import { Database } from 'lucide-react';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { Input } from '@/components/ui/input';
+import { fetchSalesRecords, upsertSalesRecord } from '@/lib/salesRecords';
 
 export default function ProjectPL() {
   const [, tick] = useState(0);
@@ -20,6 +24,20 @@ export default function ProjectPL() {
   }, [orders, tick]);
 
   const pl = selectedNo ? phase1.getProjectPL(selectedNo) : null;
+  const sales = remoteSales.filter(s => !s.workspace || s.workspace === workspace);
+  const salesSummary = sales.reduce((a, sale) => {
+    const order = orders.find(o => o.id === sale.orderId || o.orderNo === sale.orderNo || o.styleNo === sale.styleNo);
+    const cogs = (order?.factoryUnitPriceKrw || 0) * sale.qty;
+    a.revenue += sale.totalKrw; a.cogs += cogs; a.shipping += sale.shippingCostKrw || 0;
+    a.platform += sale.platformFeeKrw || 0; a.pg += sale.pgFeeKrw || 0;
+    a.profit += sale.totalKrw - cogs - (sale.shippingCostKrw || 0) - (sale.platformFeeKrw || 0) - (sale.pgFeeKrw || 0);
+    return a;
+  }, { revenue: 0, cogs: 0, shipping: 0, platform: 0, pg: 0, profit: 0 });
+  const updateSaleCost = async (id: string, field: 'shippingCostKrw' | 'platformFeeKrw' | 'pgFeeKrw', value: number) => {
+    const sale = sales.find(s => s.id === id); if (!sale) return;
+    await upsertSalesRecord({ ...sale, [field]: Math.max(0, value) });
+    await queryClient.invalidateQueries({ queryKey: ['salesRecords'] });
+  };
   const projOrders = orders.filter(o => o.orderNo === selectedNo);
 
   const syncToSupabase = async () => {
@@ -36,16 +54,24 @@ export default function ProjectPL() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-wrap justify-between items-start gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">발주 손익</h1>
+          <h1 className="text-2xl font-bold text-foreground">매출 · 영업이익</h1>
           <p className="text-sm text-muted-foreground">
             발주번호 — 자재·임가공(미지급) · 품목/컬러 배분 원가
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={syncToSupabase}>
-          <Database className="w-4 h-4 mr-1" />정산 → Supabase
+          <Database className="w-4 h-4 mr-1" />정산 → AWS
         </Button>
       </div>
 
+      <section className="space-y-3">
+        <div><h2 className="text-lg font-bold text-foreground">매출 · 영업이익</h2><p className="text-xs text-muted-foreground">{workspace} · OEM/LUMEN 상품코드 연동</p></div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"><Kpi label="매출" value={formatKRW(salesSummary.revenue)} /><Kpi label="매출원가" value={formatKRW(salesSummary.cogs)} /><Kpi label="배송비" value={formatKRW(salesSummary.shipping)} /><Kpi label="플랫폼 수수료" value={formatKRW(salesSummary.platform)} /><Kpi label="PG 수수료" value={formatKRW(salesSummary.pg)} /><Kpi label="영업이익" value={formatKRW(salesSummary.profit)} sub={salesSummary.profit >= 0 ? '흑자' : '적자'} /></div>
+        <div className="bg-card rounded-lg border overflow-x-auto"><table className="data-table w-full text-sm min-w-[900px]"><thead><tr><th>상품/판매처</th><th className="num">수량</th><th className="num">매출</th><th className="num">배송비</th><th className="num">플랫폼</th><th className="num">PG</th><th className="num">영업이익</th></tr></thead><tbody>
+          {sales.map(sale => { const order = orders.find(o => o.id === sale.orderId || o.orderNo === sale.orderNo || o.styleNo === sale.styleNo); const cogs = (order?.factoryUnitPriceKrw || 0) * sale.qty; const profit = sale.totalKrw - cogs - (sale.shippingCostKrw || 0) - (sale.platformFeeKrw || 0) - (sale.pgFeeKrw || 0); return <tr key={sale.id}><td><span className="font-medium">{sale.styleName || sale.styleNo || '상품 미지정'}</span><span className="block text-xs text-muted-foreground">{sale.buyerName} · {sale.deliveryMarket === 'overseas' ? '해외' : sale.deliveryMarket === 'domestic' ? '국내' : 'B2B'}</span></td><td className="num">{sale.qty.toLocaleString()}</td><td className="num">{formatKRW(sale.totalKrw)}</td>{(['shippingCostKrw','platformFeeKrw','pgFeeKrw'] as const).map(field => <td key={field}><Input type="number" min="0" className="h-8 text-right" defaultValue={sale[field] || ''} onBlur={e => updateSaleCost(sale.id, field, Number(e.target.value))} /></td>)}<td className={`num font-bold ${profit < 0 ? 'text-[var(--system-red)]' : 'text-[var(--system-green)]'}`}>{formatKRW(profit)}</td></tr>; })}
+          {sales.length === 0 && <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">매출 데이터가 없습니다.</td></tr>}
+        </tbody></table></div>
+      </section>
       <div className="flex flex-wrap gap-2">
         {allOrderNos.length === 0 ? (
           <p className="text-sm text-muted-foreground">등록된 발주가 없습니다</p>

@@ -2,8 +2,8 @@
 import { useMemo, useState } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { store, formatNumber } from '@/lib/store';
-import { phase1, type ReceiptLogType } from '@/lib/phase1';
+import { store, formatNumber, genId } from '@/lib/store';
+import { phase1, type DeliveryMarket, type ReceiptLogType } from '@/lib/phase1';
 import { fetchOrders } from '@/lib/supabaseQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Package, Truck, Warehouse } from 'lucide-react';
+import { CheckCircle2, Package, Plane, Ship, Truck, Warehouse } from 'lucide-react';
+import { getCurrentUser } from '@/lib/auth';
+import { confirmShippingPlan, fetchShippingPlans, upsertShippingPlan, type ShippingMethod } from '@/lib/shippingPlans';
 
 const LOG_LABELS: Record<ReceiptLogType, string> = {
   inbound: '입고',
@@ -22,11 +24,15 @@ const LOG_LABELS: Record<ReceiptLogType, string> = {
 export default function ReceivingShipping() {
   const queryClient = useQueryClient();
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: shippingPlans = [] } = useQuery({ queryKey: ['shippingPlans'], queryFn: () => fetchShippingPlans(), retry: false });
   const [filter, setFilter] = usePersistedState<'all' | 'pending' | 'partial' | 'done'>('receiving.filter', 'all');
   const [search, setSearch] = usePersistedState('receiving.search', '');
   const [logFilter, setLogFilter] = useState<ReceiptLogType | 'all'>('all');
   const [modal, setModal] = useState<{ orderId: string; logType: ReceiptLogType } | null>(null);
-  const [form, setForm] = useState({ qty: 0, defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '' });
+  const [form, setForm] = useState({ qty: 0, defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: 'domestic' as DeliveryMarket });
+  const [shippingOpen, setShippingOpen] = useState(false);
+  const [shippingForm, setShippingForm] = useState({ shipDate: today, method: 'air' as ShippingMethod, orderNo: '', description: '', qty: 0, memo: '' });
   const [, tick] = useState(0);
   const refresh = () => { queryClient.invalidateQueries({ queryKey: ['orders'] }); tick(n => n + 1); };
 
@@ -61,7 +67,7 @@ export default function ReceivingShipping() {
     const o = orders.find(x => x.id === orderId);
     const sum = phase1.getOrderReceiptSummary(orderId, o?.qty || 0);
     const remain = logType === 'inbound' ? o!.qty - sum.receivedQty : o!.qty - sum.shippedQty;
-    setForm({ qty: Math.max(0, remain), defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '' });
+    setForm({ qty: Math.max(0, remain), defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: logType === 'outbound_oem' ? 'b2b' : 'domestic' });
     setModal({ orderId, logType });
   };
 
@@ -86,6 +92,7 @@ export default function ReceivingShipping() {
       defectNote: form.defectNote,
       receivedDate: form.date,
       memo: form.memo,
+      deliveryMarket: modal.logType === 'inbound' ? undefined : form.deliveryMarket,
     });
     const sum = phase1.getOrderReceiptSummary(o.id, o.qty);
     const newReceived = sum.receivedQty;
@@ -116,6 +123,13 @@ export default function ReceivingShipping() {
     refresh();
   };
 
+  const savePlan = async () => {
+    if (!shippingForm.description.trim()) return toast.error('발송 내용을 입력하세요');
+    await upsertShippingPlan({ id: genId(), ...shippingForm, description: shippingForm.description.trim() });
+    await queryClient.invalidateQueries({ queryKey: ['shippingPlans'] }); setShippingOpen(false);
+  };
+  const checkPlan = async (id: string) => { await confirmShippingPlan(id, getCurrentUser()?.name || '담당자'); await queryClient.invalidateQueries({ queryKey: ['shippingPlans'] }); };
+  const upcomingPlans = shippingPlans.filter(p => p.shipDate >= today).slice(0, 20);
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div>
@@ -123,6 +137,10 @@ export default function ReceivingShipping() {
         <p className="text-sm text-muted-foreground">부분입고 · OEM 직출고 · 3PL 입고 (receipt_logs)</p>
       </div>
 
+      <section className="rounded-lg border bg-card p-4">
+        <div className="flex items-center justify-between gap-2 mb-3"><div><h2 className="font-semibold">중국 발송 일정</h2><p className="text-xs text-muted-foreground">오늘·예정 항공/해상 발송 공유</p></div><Button size="sm" onClick={() => setShippingOpen(true)}>발송 예정 등록</Button></div>
+        <div className="grid gap-2 md:grid-cols-2">{upcomingPlans.map(p => <div key={p.id} className="rounded-lg border p-3 flex justify-between gap-2"><div className="flex gap-2">{p.method === 'air' ? <Plane className="w-4 h-4" /> : <Ship className="w-4 h-4" />}<div><p className="text-sm font-medium">{p.shipDate === today ? '오늘' : p.shipDate} · {p.description}</p><p className="text-xs text-muted-foreground">{p.orderNo || '발주번호 없음'}{p.qty ? ` · ${formatNumber(p.qty)}개` : ''}</p></div></div>{p.status === 'confirmed' ? <span className="text-xs text-[var(--system-green)]"><CheckCircle2 className="inline w-4 h-4" /> {p.confirmedBy}</span> : <Button size="sm" variant="outline" onClick={() => checkPlan(p.id)}>확인</Button>}</div>)}{upcomingPlans.length === 0 && <p className="text-sm text-muted-foreground">예정된 발송이 없습니다.</p>}</div>
+      </section>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-card rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">미입고</p>
@@ -254,7 +272,7 @@ export default function ReceivingShipping() {
                 <div><Label>불량 사유</Label><Input value={form.defectNote} onChange={e => setForm(f => ({ ...f, defectNote: e.target.value }))} /></div>
               </>
             )}
-            <div><Label>일자</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
+            {modal?.logType !== 'inbound' && <div><Label>배송 판매처</Label><Select value={form.deliveryMarket} onValueChange={v => setForm(f => ({ ...f, deliveryMarket: v as DeliveryMarket }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="domestic">국내</SelectItem><SelectItem value="b2b">B2B</SelectItem><SelectItem value="overseas">해외</SelectItem></SelectContent></Select></div>}            <div><Label>일자</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
             <div><Label>메모</Label><Input value={form.memo} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} /></div>
           </div>
           <DialogFooter>
@@ -263,6 +281,6 @@ export default function ReceivingShipping() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      <Dialog open={shippingOpen} onOpenChange={setShippingOpen}><DialogContent><DialogHeader><DialogTitle>중국 발송 예정 등록</DialogTitle></DialogHeader><div className="space-y-3"><div><Label>발송일</Label><Input type="date" value={shippingForm.shipDate} onChange={e => setShippingForm(f => ({...f, shipDate:e.target.value}))} /></div><div><Label>방식</Label><Select value={shippingForm.method} onValueChange={v => setShippingForm(f => ({...f, method:v as ShippingMethod}))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="air">항공</SelectItem><SelectItem value="sea">해상</SelectItem></SelectContent></Select></div><div><Label>내용</Label><Input value={shippingForm.description} onChange={e => setShippingForm(f => ({...f, description:e.target.value}))} /></div><div><Label>발주번호</Label><Input value={shippingForm.orderNo} onChange={e => setShippingForm(f => ({...f, orderNo:e.target.value}))} /></div><div><Label>수량</Label><Input type="number" value={shippingForm.qty} onChange={e => setShippingForm(f => ({...f, qty:Number(e.target.value)}))} /></div></div><DialogFooter><Button variant="outline" onClick={() => setShippingOpen(false)}>취소</Button><Button onClick={savePlan}>저장</Button></DialogFooter></DialogContent></Dialog>    </div>
   );
 }

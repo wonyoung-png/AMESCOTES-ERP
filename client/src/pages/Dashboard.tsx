@@ -1,5 +1,6 @@
 // AMESCOTES ERP — 대시보드 (Phase 1 개편: 납기위험 중심)
 import { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
 import {
   store, formatKRW, formatNumber, calcDDay, dDayLabel, dDayColor,
@@ -8,7 +9,7 @@ import {
 import {
   AlertTriangle, TrendingUp,
   ArrowRight, ShoppingCart, FlaskConical, FileText,
-  Activity, Clock, Truck, Microscope, PackageSearch, File, FileSpreadsheet, Camera,
+  Activity, Clock, Truck, Microscope, PackageSearch, File, FileSpreadsheet, Camera, Plane, Ship, CheckCircle2,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -16,6 +17,8 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { confirmShippingPlan, fetchShippingPlans } from '@/lib/shippingPlans';
+import { getCurrentUser } from '@/lib/auth';
 
 // 문서 아이콘
 function DocIconSmall({ fileType }: { fileType: string }) {
@@ -34,6 +37,10 @@ const STAGE_COLOR: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
+  const nowDate = new Date();
+  const localToday = [nowDate.getFullYear(), String(nowDate.getMonth() + 1).padStart(2, '0'), String(nowDate.getDate()).padStart(2, '0')].join('-');
+  const { data: shippingPlans = [] } = useQuery({ queryKey: ['shippingPlans', localToday], queryFn: () => fetchShippingPlans(localToday), retry: false });
   const orders = store.getOrders();
   const samples = store.getSamples();
   // 샘플자재구매 — 선택한 샘플 상세 모달
@@ -195,6 +202,7 @@ export default function Dashboard() {
         <p className="text-sm text-muted-foreground mt-0.5">ATLM 제조 ERP — OEM 생산·납기·정산 현황</p>
       </div>
 
+      {shippingPlans.length > 0 && <section className="rounded-lg border border-[var(--system-orange)]/40 bg-card p-4"><div className="mb-3"><h2 className="font-semibold">오늘 중국 발송이 있습니다</h2><p className="text-xs text-muted-foreground">항공 {shippingPlans.filter(p => p.method === 'air').length}건 · 해상 {shippingPlans.filter(p => p.method === 'sea').length}건</p></div><div className="grid gap-2 md:grid-cols-2">{shippingPlans.map(p => <div key={p.id} className="flex items-center justify-between rounded-lg border p-3"><div className="flex items-center gap-2">{p.method === 'air' ? <Plane className="w-4 h-4" /> : <Ship className="w-4 h-4" />}<span className="text-sm">{p.description}{p.qty ? ` · ${formatNumber(p.qty)}개` : ''}</span></div>{p.status === 'confirmed' ? <span className="text-xs text-[var(--system-green)]"><CheckCircle2 className="inline w-4 h-4" /> {p.confirmedBy}</span> : <Button size="sm" onClick={async () => { await confirmShippingPlan(p.id, getCurrentUser()?.name || '담당자'); await queryClient.invalidateQueries({ queryKey: ['shippingPlans'] }); }}>오늘 발송 확인</Button>}</div>)}</div></section>}
       {/* ── 오늘 할 일 — 홈에서 바로 클릭해 들어간다 ── */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
