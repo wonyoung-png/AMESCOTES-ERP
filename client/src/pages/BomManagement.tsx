@@ -2352,9 +2352,19 @@ export default function BomManagement() {
 
     // styleId가 정확히 일치하는 BOM만 사용
     // [FIX] styleNo 조건 제거: item이 없을 때 styleNo==='' 조건이 모든 BOM을 필터링하는 문제 해결
-    const validStyleBoms = extBoms.filter(b =>
+    let validStyleBoms = extBoms.filter(b =>
       !!b.styleId && b.styleId === styleId
     );
+    // [FIX] styleId가 어긋난 BOM 구제 — 같은 스타일번호로 등록된 내용 있는 BOM을 찾는다.
+    // 같은 스타일번호로 품목이 중복 등록돼 있으면(현재 872품목 / 564스타일) BOM은 그중 한
+    // 품목에만 붙어 있어, 다른 쪽을 고르면 이미 작성한 BOM이 빈 화면으로 보였다.
+    // 여기서 찾아 열어주면 저장 시 styleId가 지금 고른 품목으로 다시 맞춰진다.
+    if (validStyleBoms.length === 0 && item?.styleNo) {
+      validStyleBoms = extBoms.filter(b =>
+        b.styleNo === item!.styleNo &&
+        ((b.lines || []).some(l => l.itemName) || (b.colorBoms || []).length > 0 || (b.postColorBoms || []).length > 0)
+      );
+    }
     let loadedBom: ExtBom;
     if (validStyleBoms.length > 0) {
       const loaded: ExtBom = JSON.parse(JSON.stringify(validStyleBoms.sort((a, b) => b.version - a.version)[0]));
