@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { VendorQuickAddDialog } from '@/components/VendorQuickAddDialog';
 import { toast } from 'sonner';
 import { onSaveFail } from '@/lib/saveGuard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -116,6 +117,7 @@ export default function MaterialMaster() {
   const [form, setForm] = useState<Partial<Material>>({ ...emptyForm });
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [vendorQuery, setVendorQuery] = useState('');
+  const [showVendorAdd, setShowVendorAdd] = useState(false);
   const [historyOf, setHistoryOf] = useState<Material | null>(null);
   const [history, setHistory] = useState<PriceHistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -869,7 +871,14 @@ export default function MaterialMaster() {
 
             {/* 공급업체 — 거래처 마스터의 자재거래처만 */}
             <div className="space-y-1.5">
-              <Label>공급업체</Label>
+              <div className="flex items-center justify-between">
+                <Label>공급업체</Label>
+                <button
+                  type="button"
+                  onClick={() => setShowVendorAdd(true)}
+                  className="text-[11px] text-primary hover:underline"
+                >+ 신규 등록</button>
+              </div>
               <SearchSelect
                 value={vendorQuery}
                 options={supplierNames}
@@ -929,6 +938,14 @@ export default function MaterialMaster() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 공급업체 신규 등록 — BOM 자재명세와 같은 팝업 */}
+      <VendorQuickAddDialog
+        open={showVendorAdd}
+        initialName={vendorQuery}
+        onOpenChange={setShowVendorAdd}
+        onCreated={v => { setVendorQuery(v.name); setForm(prev => ({ ...prev, vendorId: v.id })); }}
+      />
     </div>
   );
 }

@@ -19,6 +19,7 @@ import {
 import { fetchBoms, upsertBom, deleteBom as deleteBomSB, fetchItems, fetchVendors, fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
 import { PackBomEditor } from '@/components/PackBomEditor';
 import { MaterialQuickAddDialog } from '@/components/MaterialQuickAddDialog';
+import { VendorQuickAddDialog } from '@/components/VendorQuickAddDialog';
 import { CadAssignDialog } from '@/components/CadAssignDialog';
 import { parseCadWorkbook, type CadLine } from '@/lib/cadYardage';
 import { yardRowNet, buildYardBuckets, usesPart } from '@/lib/yardBom';
@@ -1424,6 +1425,7 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
   const [inputVal, setInputVal] = useState(value);
   const [suggestions, setSuggestions] = useState<Vendor[]>([]);
   const [open, setOpen] = useState(false);
+  const [showVendorDialog, setShowVendorDialog] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { data: allV = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
@@ -1455,6 +1457,7 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
     onChange(v.name, v.id, false);
   };
 
+  // 신규 업체는 이름만 넣고 끝내지 않는다 — 자재 등록과 같은 거래처 등록 팝업을 띄운다
   const registerNew = () => {
     const name = inputVal.trim();
     if (!name) {
@@ -1464,28 +1467,9 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
     }
     const existingInAll = allV.find((v: any) => v.name.trim() === name);
     if (existingInAll) { selectVendor(existingInAll as Vendor); return; }
-    const newVendor: Vendor = {
-      id: genId(),
-      name,
-      type: '자재거래처',
-      country: '한국',
-      currency: 'KRW',
-      contactHistory: [],
-      createdAt: new Date().toISOString(),
-      memo: 'BOM에서 신규 등록',
-    };
-    store.addVendor(newVendor);
-    import('@/lib/supabaseQueries').then(m => {
-      m.upsertVendor(newVendor)
-        .then(() => queryClient.invalidateQueries({ queryKey: ['vendors'] }))
-        .catch(onSaveFail('BOM'));
-    });
-    queryClient.invalidateQueries({ queryKey: ['vendors'] });
-    toast.success(`"${name}" 거래처 마스터에 등록됨`);
-    setInputVal(name);
     setSuggestions([]);
     setOpen(false);
-    onChange(name, newVendor.id, true);
+    setShowVendorDialog(true);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1568,6 +1552,12 @@ function VendorAutoComplete({ value, vendorId, isNewVendor, onChange }: {
           )}
         </div>
       )}
+      <VendorQuickAddDialog
+        open={showVendorDialog}
+        initialName={inputVal.trim()}
+        onOpenChange={setShowVendorDialog}
+        onCreated={v => { setInputVal(v.name); onChange(v.name, v.id, false); }}
+      />
     </div>
   );
 }
