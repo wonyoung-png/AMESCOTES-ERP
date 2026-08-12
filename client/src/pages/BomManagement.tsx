@@ -331,10 +331,12 @@ function resolvePackItemCostKrw(item: Item): number {
 // 사전원가 요약 계산 (통화/환율 반영)
 // colorBom이 주어지면 해당 컬러 BOM 데이터 사용
 function calcSummary(bom: ExtBom, settingsUsdKrw?: number, colorBom?: ExtColorBom) {
-  const preCur = bom.preCurrency || 'CNY';
+  // pre_* 가 비어 있으면 일반 통화/환율 필드로 폴백한다 — 변환 경로(서버·로컬캐시)에 따라
+  // pre_* 만 빠지는 경우가 있어, 사전원가가 CNY·고시환율로 되돌아가 보이던 원인이었다
+  const preCur = bom.preCurrency || bom.currency || 'CNY';
   // `||` 사용 — 환율 입력칸을 비우면 0이 들어오는데 `??`는 0을 통과시켜 총원가가 ₩0이 된다
   const cnyKrw = bom.preExchangeRateCny || bom.snapshotCnyKrw || 191;
-  const usdKrw = bom.preExchangeRateUsd || settingsUsdKrw || 1380;
+  const usdKrw = bom.preExchangeRateUsd || bom.exchangeRateUsd || settingsUsdKrw || 1380;
   // 입력 통화에 따른 KRW 환산 비율
   const toKrw = preCur === 'KRW' ? 1 : preCur === 'USD' ? usdKrw : cnyKrw;
 
@@ -590,9 +592,11 @@ interface QuoteRow {
 
 function buildQuoteRows(bom: ExtBom, tab: 'pre' | 'post' = 'pre', colorBom?: ExtColorBom): QuoteRow[] {
   // 환율 결정
-  const preCur = bom.preCurrency || 'CNY';
+  const preCur = bom.preCurrency || bom.currency || 'CNY';
   const cnyKrw = (tab === 'post' ? bom.exchangeRateCny : bom.preExchangeRateCny) || bom.snapshotCnyKrw || 191;
-  const usdKrw = (tab === 'post' ? bom.exchangeRateUsd : bom.preExchangeRateUsd) || 1380;
+  const usdKrw = (tab === 'post'
+    ? (bom.exchangeRateUsd || bom.preExchangeRateUsd)
+    : (bom.preExchangeRateUsd || bom.exchangeRateUsd)) || 1380;
   const toKrw = tab === 'post'
     ? ((bom.currency === 'KRW') ? 1 : (bom.currency === 'USD') ? usdKrw : cnyKrw)
     : (preCur === 'KRW' ? 1 : preCur === 'USD' ? usdKrw : cnyKrw);
@@ -3835,9 +3839,9 @@ export default function BomManagement() {
           ══════════════════════════════════════════════════════════════════ */}
           {mainTab === 'pre' && activeColorBom && (() => {
             const colorBom = activeColorBom;
-            const preCur = editBom.preCurrency || 'CNY';
+            const preCur = editBom.preCurrency || editBom.currency || 'CNY';
             const preCnyKrw = editBom.preExchangeRateCny ?? editBom.snapshotCnyKrw;
-            const preUsdKrw = editBom.preExchangeRateUsd ?? settings.usdKrw;
+            const preUsdKrw = editBom.preExchangeRateUsd || editBom.exchangeRateUsd || settings.usdKrw;
             const preRate = preCur === 'USD' ? preUsdKrw : preCur === 'KRW' ? 1 : preCnyKrw;
             const curSymbol = preCur === 'CNY' ? '¥' : preCur === 'USD' ? '$' : '₩';
             const otherColors = (editBom.colorBoms || []).filter(cb => cb.color !== colorBom.color);
@@ -3879,7 +3883,7 @@ export default function BomManagement() {
                     {/* 통화 선택 */}
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block font-medium">입력 통화</label>
-                      <Select value={editBom.preCurrency || 'CNY'} onValueChange={v => updateField('preCurrency', v)}>
+                      <Select value={preCur} onValueChange={v => updateField('preCurrency', v)}>
                         <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {CURRENCY_OPTIONS.map(cur => (
@@ -3891,17 +3895,17 @@ export default function BomManagement() {
                       </Select>
                     </div>
                     {/* 환율 CNY */}
-                    {(editBom.preCurrency || 'CNY') !== 'KRW' && (
+                    {preCur !== 'KRW' && (
                       <div>
                         <label className="text-xs text-muted-foreground mb-1 block font-medium">CNY→KRW 환율</label>
                         <Input type="number" min="0" value={editBom.preExchangeRateCny ?? editBom.snapshotCnyKrw} onChange={e => updateField('preExchangeRateCny', Number(e.target.value))} className="h-8 text-xs border-border text-right w-28" />
                       </div>
                     )}
                     {/* 환율 USD */}
-                    {(editBom.preCurrency || 'CNY') !== 'KRW' && (
+                    {preCur !== 'KRW' && (
                       <div>
                         <label className="text-xs text-muted-foreground mb-1 block font-medium">USD→KRW 환율</label>
-                        <Input type="number" min="0" value={editBom.preExchangeRateUsd ?? settings.usdKrw} onChange={e => updateField('preExchangeRateUsd', Number(e.target.value))} className="h-8 text-xs border-border text-right w-28" />
+                        <Input type="number" min="0" value={preUsdKrw} onChange={e => updateField('preExchangeRateUsd', Number(e.target.value))} className="h-8 text-xs border-border text-right w-28" />
                       </div>
                     )}
                     {/* 원가표 업로드 */}
