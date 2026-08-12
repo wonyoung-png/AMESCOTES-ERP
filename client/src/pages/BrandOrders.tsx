@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { store, formatNumber, normalizeColors, type OrderStatus } from '@/lib/store';
+import { store, formatNumber, type OrderStatus } from '@/lib/store';
 import {
   phase1, pullBrandOrders, R3_STEPS, CHINA_CORP_VENDOR_CODE, CHINA_CORP_VENDOR_NAME,
   type BrandOrderBatch, type OrderDisplayStatus, type ReceiptDestination, type ReorderOrderRow,
@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { Check, X, Send, Package, Factory } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { getAssigneeForStep, R3_ROLE_LABEL, R3_STEP_ROLE } from '@/lib/orgChart';
+import StylePickerSheet, { type PickedLine } from '@/components/StylePickerSheet';
 
 const PIPELINE = ['발주', '진행중', '생산완료', '한국/중국입고', '미지급 등록', '공장결제'] as const;
 
@@ -61,6 +62,7 @@ export default function BrandOrders() {
   const { data: remoteOrders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
   const { data: pulled = 0 } = useQuery({ queryKey: ['brandOrders'], queryFn: pullBrandOrders });
   const [tickN, tick] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['orders'] });
     queryClient.invalidateQueries({ queryKey: ['brandOrders'] });
@@ -81,11 +83,6 @@ export default function BrandOrders() {
   const [mainTab, setMainTab] = useState('mgmt');
   const [selected, setSelected] = useState<BrandOrderBatch | null>(null);
   const [newTitle, setNewTitle] = useState('');
-  const [lineForm, setLineForm] = useState({
-    styleNo: '', qty: 0, factoryId: '', productionOrigin: 'china' as 'domestic' | 'china',
-    route: 'oem' as 'oem' | 'direct',
-  });
-  const [lineColorQtys, setLineColorQtys] = useState<{ color: string; qty: number }[]>([]);
 
   const [progressFilter, setProgressFilter] = useState<'active' | 'done' | 'all'>('active');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -170,39 +167,24 @@ export default function BrandOrders() {
     toast.success(`발주 생성 ${b.projectNo}`);
   };
 
-  const addLine = () => {
-    if (!detail || !lineForm.styleNo) return;
-    const item = items.find(i => i.styleNo === lineForm.styleNo);
-    const colors = lineColorQtys.filter(c => c.color.trim() && c.qty > 0);
-    if (colors.length === 0) {
-      toast.error('컬러별 수량을 입력하세요');
-      return;
-    }
-    const qty = colors.reduce((s, c) => s + c.qty, 0);
-    phase1.addBrandLine(detail.id, {
-      styleNo: lineForm.styleNo,
-      styleName: item?.name || lineForm.styleNo,
-      colorQtys: colors.map(c => ({ color: c.color.trim(), qty: c.qty })),
-      factoryId: lineForm.factoryId,
-      factoryName: factories.find(f => f.id === lineForm.factoryId)?.name,
-      productionOrigin: lineForm.productionOrigin,
-      route: lineForm.route,
+  /** 시트에서 담아 온 것들 — 한 번에 라인으로 만든다 */
+  const addPicked = (lines: PickedLine[], factoryId: string, route: 'oem' | 'direct') => {
+    if (!detail) return;
+    const factoryName = factories.find(f => f.id === factoryId)?.name;
+    lines.forEach(l => phase1.addBrandLine(detail.id, {
+      styleNo: l.styleNo,
+      styleName: l.styleName,
+      colorQtys: l.colorQtys,
+      factoryId,
+      factoryName,
+      productionOrigin: 'china',
+      route,
       isEmployeePurchase: false,
-      qty,
-    });
-    setLineForm({ styleNo: '', qty: 0, factoryId: '', productionOrigin: 'china', route: 'oem' });
-    setLineColorQtys([]);
+      qty: l.colorQtys.reduce((s, c) => s + c.qty, 0),
+    }));
     refresh();
     setSelected(phase1.getBrandBatch(detail.id) || null);
-  };
-
-  const pickStyleForLine = (styleNo: string) => {
-    setLineForm(f => ({ ...f, styleNo }));
-    const item = items.find(i => i.styleNo === styleNo);
-    const colors = normalizeColors(item?.colors || []);
-    setLineColorQtys(colors.length
-      ? colors.map(c => ({ color: c.name, qty: 0 }))
-      : [{ color: '', qty: 0 }]);
+    toast.success(`${lines.length}개 품번 담았습니다`);
   };
 
   /** 발주서 발행 — 공장별로 1장. 이 번호가 AMESCOTES의 PO가 된다 */
@@ -350,6 +332,7 @@ export default function BrandOrders() {
 
 
   return (
+    <>
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -633,67 +616,10 @@ export default function BrandOrders() {
                   </div>
 
                   {detail.status === 'draft' && (
-                    <div className="border-t pt-4 space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground">SKU 추가 (컬러별 수량)</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <select className="border rounded h-9 px-2 text-sm" value={lineForm.styleNo}
-                          onChange={e => pickStyleForLine(e.target.value)}>
-                          <option value="">품목 선택</option>
-                          {items.map(i => <option key={i.id} value={i.styleNo}>{i.styleNo} {i.name}</option>)}
-                        </select>
-                        <select className="border rounded h-9 px-2 text-sm" value={lineForm.factoryId}
-                          onChange={e => setLineForm(f => ({ ...f, factoryId: e.target.value }))}>
-                          <option value="">공장</option>
-                          {factories.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                        </select>
-                      </div>
-                      {/* 패키지처럼 AMESCOTES를 안 거치는 건이 있다 */}
-                      <div className="flex items-center gap-2">
-                        <select className="border rounded h-9 px-2 text-sm flex-1" value={lineForm.route}
-                          onChange={e => setLineForm(f => ({ ...f, route: e.target.value as 'oem' | 'direct' }))}>
-                          <option value="oem">AMESCOTES 경유 (수주함으로)</option>
-                          <option value="direct">직발주 — 공장에 바로</option>
-                        </select>
-                        <span className="text-[11px] text-muted-foreground flex-1">
-                          {lineForm.route === 'direct'
-                            ? '수주함에 안 가고 이 발주서로 공장에 바로 나갑니다'
-                            : 'AMESCOTES가 받아 생산발주를 겁니다'}
-                        </span>
-                      </div>
-                      {lineForm.styleNo && (
-                        <div className="space-y-1.5 border rounded-md p-2 bg-muted">
-                          {lineColorQtys.map((cq, idx) => (
-                            <div key={idx} className="grid grid-cols-5 gap-1.5 items-center">
-                              <Input
-                                className="h-8 text-xs col-span-2"
-                                placeholder="컬러"
-                                value={cq.color}
-                                onChange={e => setLineColorQtys(prev => prev.map((x, i) => i === idx ? { ...x, color: e.target.value } : x))}
-                              />
-                              <Input
-                                className="h-8 text-xs col-span-2"
-                                type="number" min="0"
-                                placeholder="수량"
-                                value={cq.qty || ''}
-                                onChange={e => setLineColorQtys(prev => prev.map((x, i) => i === idx ? { ...x, qty: +e.target.value } : x))}
-                              />
-                              <Button type="button" size="sm" variant="ghost" className="h-8 text-xs"
-                                onClick={() => setLineColorQtys(prev => prev.filter((_, i) => i !== idx))}>삭제</Button>
-                            </div>
-                          ))}
-                          <div className="flex justify-between items-center pt-1">
-                            <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]"
-                              onClick={() => setLineColorQtys(prev => [...prev, { color: '', qty: 0 }])}>+ 컬러</Button>
-                            <span className="text-[11px] text-muted-foreground">
-                              합계 {lineColorQtys.reduce((s, c) => s + (c.qty || 0), 0).toLocaleString()} PCS
-                            </span>
-                          </div>
-                          {!normalizeColors(items.find(i => i.styleNo === lineForm.styleNo)?.colors || []).length && (
-                            <p className="text-[11px] text-[var(--system-orange)]">품목마스터에 컬러가 없습니다. 직접 입력하세요.</p>
-                          )}
-                        </div>
-                      )}
-                      <Button size="sm" variant="outline" onClick={addLine}>라인 추가</Button>
+                    <div className="border-t pt-4">
+                      <Button size="sm" onClick={() => setPickerOpen(true)}>
+                        <Package className="w-3 h-3 mr-1" />상품 담기
+                      </Button>
                     </div>
                   )}
 
@@ -898,5 +824,13 @@ export default function BrandOrders() {
         </DialogContent>
       </Dialog>
     </div>
+
+      <StylePickerSheet
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        factories={factories}
+        onAdd={addPicked}
+      />
+    </>
   );
 }
