@@ -32,14 +32,24 @@ function mintServiceToken(ttlSec = 60): string {
 
 router.use('/api/pixel', (req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, X-Pixel-Key');
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
   next();
 });
 
+// 픽셀 코드에 박힌 공개 키 — 비밀은 아니고(픽셀 소스는 공개) 무작위 스캐너의 스팸 insert만 거른다
+const PIXEL_KEY = 'atlm-ckfnl-2026';
+// ponytail: 전역 분당 카운터 — 실 트래픽(분당 수십 건) 대비 넉넉, 폭주 시 429
+let rlWindow = 0;
+let rlCount = 0;
+
 router.post('/api/pixel/checkout', express.json({ limit: '64kb' }), async (req: Request, res: Response) => {
   try {
+    if (req.headers['x-pixel-key'] !== PIXEL_KEY) { res.status(403).json({ error: 'forbidden' }); return; }
+    const now = Math.floor(Date.now() / 60_000);
+    if (now !== rlWindow) { rlWindow = now; rlCount = 0; }
+    if (++rlCount > 300) { res.status(429).json({ error: 'rate_limited' }); return; }
     const b = req.body || {};
     if (!EVENTS.has(String(b.event))) { res.status(400).json({ error: 'bad_event' }); return; }
     const row = {
@@ -83,7 +93,7 @@ router.get('/api/pixel/funnel', async (req: Request, res: Response) => {
     const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
     const since = new Date(Date.now() - days * 86400_000).toISOString();
     const r = await fetch(
-      `${PGRST_URL}/checkout_events?select=event,checkout_token,client_id,country,created_at&created_at=gte.${since}&limit=50000`,
+      `${PGRST_URL}/checkout_events?select=event,checkout_token,client_id,country,created_at&created_at=gte.${since}&order=created_at.desc&limit=50000`,
       { headers: { Authorization: `Bearer ${mintServiceToken()}` } },
     );
     if (!r.ok) throw new Error(`postgrest ${r.status}`);
@@ -103,9 +113,17 @@ router.get('/api/pixel/funnel', async (req: Request, res: Response) => {
       if (row.created_at < t.first) t.first = row.created_at;
     }
 
-    const steps = STEP_ORDER.map(ev => ({
+    // 누적 도달 방식 — 뒷단계 이벤트가 있으면 앞단계도 도달한 것으로 센다.
+    // (이벤트 유실·익스프레스 결제의 단계 건너뜀이 퍼널을 역전시키지 않게)
+    const maxStep = (t: { events: Set<string> }) => {
+      let m = -1;
+      STEP_ORDER.forEach((ev, i) => { if (t.events.has(ev)) m = i; });
+      return m;
+    };
+    const tokens = [...byToken.values()];
+    const steps = STEP_ORDER.map((ev, i) => ({
       event: ev,
-      count: [...byToken.values()].filter(t => t.events.has(ev)).length,
+      count: tokens.filter(t => maxStep(t) >= i).length,
     }));
     const countries: Record<string, { started: number; completed: number }> = {};
     const daily: Record<string, { started: number; completed: number }> = {};
