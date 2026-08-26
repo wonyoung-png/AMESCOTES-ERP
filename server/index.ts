@@ -12,6 +12,7 @@ import yardageOcrRouter from "./yardage-ocr.js";
 import sessionRouter from "./session.js";
 import dailyBridgeRouter from "./daily-bridge.js";
 import vendorOcrRouter from "./vendor-ocr.js";
+import pixelRouter from "./pixel.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,9 @@ async function startServer() {
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ ok: true, uptime: process.uptime() });
   });
+
+  // Shopify 웹픽셀 수집 — 외부 브라우저가 무인증 POST하므로 Basic Auth 게이트보다 먼저
+  app.use(pixelRouter);
 
   // ─── 공개 배포 접근 보호 (SHARE_PASS 설정 시에만 활성) ───
   // 외부 URL로 열 때 원가·거래처·재무 데이터 노출 방지용 1차 관문.
