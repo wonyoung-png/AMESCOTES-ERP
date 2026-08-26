@@ -90,10 +90,18 @@ const STEP_ORDER = [
 // 퍼널 집계 — 민감정보 없는 집계값이라 공개 GET (PMS 체크아웃 퍼널 탭이 호출)
 router.get('/api/pixel/funnel', async (req: Request, res: Response) => {
   try {
-    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
-    const since = new Date(Date.now() - days * 86400_000).toISOString();
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365);
+    const DATE = /^\d{4}-\d{2}-\d{2}$/;
+    const from = DATE.test(String(req.query.from)) ? String(req.query.from) : null;
+    const to = DATE.test(String(req.query.to)) ? String(req.query.to) : null;
+    // from/to(날짜)가 오면 그 범위, 없으면 최근 N일
+    let range = `created_at=gte.${new Date(Date.now() - days * 86400_000).toISOString()}`;
+    if (from) {
+      range = `created_at=gte.${from}T00:00:00Z`;
+      if (to) range += `&created_at=lte.${to}T23:59:59Z`;
+    }
     const r = await fetch(
-      `${PGRST_URL}/checkout_events?select=event,checkout_token,client_id,country,created_at&created_at=gte.${since}&order=created_at.desc&limit=50000`,
+      `${PGRST_URL}/checkout_events?select=event,checkout_token,client_id,country,created_at&${range}&order=created_at.desc&limit=50000`,
       { headers: { Authorization: `Bearer ${mintServiceToken()}` } },
     );
     if (!r.ok) throw new Error(`postgrest ${r.status}`);
@@ -136,7 +144,7 @@ router.get('/api/pixel/funnel', async (req: Request, res: Response) => {
       daily[d].started += 1;
       if (t.events.has('checkout_completed')) { countries[c].completed += 1; daily[d].completed += 1; }
     }
-    res.json({ days, total_checkouts: byToken.size, steps, countries, daily });
+    res.json({ days, from, to, total_checkouts: byToken.size, steps, countries, daily });
   } catch (e) {
     console.error('[pixel] 퍼널 집계 실패:', String(e).split('\n')[0]);
     res.status(502).json({ error: 'funnel_failed' });
