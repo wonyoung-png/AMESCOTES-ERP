@@ -67,4 +67,62 @@ router.post('/api/pixel/checkout', express.json({ limit: '64kb' }), async (req: 
   }
 });
 
+// 단계 순서 — 퍼널 표시용
+const STEP_ORDER = [
+  'checkout_started',
+  'checkout_contact_info_submitted',
+  'checkout_address_info_submitted',
+  'checkout_shipping_info_submitted',
+  'payment_info_submitted',
+  'checkout_completed',
+];
+
+// 퍼널 집계 — 민감정보 없는 집계값이라 공개 GET (PMS 체크아웃 퍼널 탭이 호출)
+router.get('/api/pixel/funnel', async (req: Request, res: Response) => {
+  try {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
+    const since = new Date(Date.now() - days * 86400_000).toISOString();
+    const r = await fetch(
+      `${PGRST_URL}/checkout_events?select=event,checkout_token,client_id,country,created_at&created_at=gte.${since}&limit=50000`,
+      { headers: { Authorization: `Bearer ${mintServiceToken()}` } },
+    );
+    if (!r.ok) throw new Error(`postgrest ${r.status}`);
+    const rows = (await r.json()) as {
+      event: string; checkout_token: string | null; client_id: string | null;
+      country: string | null; created_at: string;
+    }[];
+
+    // 체크아웃 1건 = checkout_token (없으면 client_id) 기준으로 이벤트 집합을 모은다
+    const byToken = new Map<string, { events: Set<string>; country: string | null; first: string }>();
+    for (const row of rows) {
+      const key = row.checkout_token || row.client_id || `anon-${row.created_at}`;
+      let t = byToken.get(key);
+      if (!t) { t = { events: new Set(), country: null, first: row.created_at }; byToken.set(key, t); }
+      t.events.add(row.event);
+      if (row.country) t.country = row.country;
+      if (row.created_at < t.first) t.first = row.created_at;
+    }
+
+    const steps = STEP_ORDER.map(ev => ({
+      event: ev,
+      count: [...byToken.values()].filter(t => t.events.has(ev)).length,
+    }));
+    const countries: Record<string, { started: number; completed: number }> = {};
+    const daily: Record<string, { started: number; completed: number }> = {};
+    for (const t of byToken.values()) {
+      const c = t.country || '(미입력)';
+      countries[c] = countries[c] || { started: 0, completed: 0 };
+      countries[c].started += 1;
+      const d = t.first.slice(0, 10);
+      daily[d] = daily[d] || { started: 0, completed: 0 };
+      daily[d].started += 1;
+      if (t.events.has('checkout_completed')) { countries[c].completed += 1; daily[d].completed += 1; }
+    }
+    res.json({ days, total_checkouts: byToken.size, steps, countries, daily });
+  } catch (e) {
+    console.error('[pixel] 퍼널 집계 실패:', String(e).split('\n')[0]);
+    res.status(502).json({ error: 'funnel_failed' });
+  }
+});
+
 export default router;

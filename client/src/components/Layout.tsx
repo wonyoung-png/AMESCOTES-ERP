@@ -138,6 +138,7 @@ const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
   { group: '콘텐츠 제작', label: '이미지 생성', icon: <ImageIcon size={17} /> },
   { group: '브랜드 인텔리전스', label: '브랜드 분석', icon: <Building2 size={17} /> },
   { group: '분석 & 진단', label: '매출분석', icon: <BarChart3 size={17} /> },
+  { group: '분석 & 진단', label: '체크아웃 퍼널', icon: <LineChart size={17} /> },
   { group: '분석 & 진단', label: '마케팅 대시보드', icon: <Percent size={17} /> },
   { group: '분석 & 진단', label: '채널 대조', icon: <ClipboardCheck size={17} /> },
   { group: '실행 & 일정', label: '할인 캠페인', icon: <Percent size={17} /> },
