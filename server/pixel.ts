@@ -15,6 +15,13 @@ const EVENTS = new Set([
   'checkout_shipping_info_submitted',
   'payment_info_submitted',
   'checkout_completed',
+  // 여정 이벤트 (2026-08-27 확장)
+  'page_viewed',
+  'collection_viewed',
+  'search_submitted',
+  'product_viewed',
+  'product_added_to_cart',
+  'cart_viewed',
 ]);
 
 function b64url(buf: Buffer): string {
@@ -49,7 +56,7 @@ router.post('/api/pixel/checkout', express.json({ limit: '64kb' }), async (req: 
     if (req.headers['x-pixel-key'] !== PIXEL_KEY) { res.status(403).json({ error: 'forbidden' }); return; }
     const now = Math.floor(Date.now() / 60_000);
     if (now !== rlWindow) { rlWindow = now; rlCount = 0; }
-    if (++rlCount > 300) { res.status(429).json({ error: 'rate_limited' }); return; }
+    if (++rlCount > 1200) { res.status(429).json({ error: 'rate_limited' }); return; }
     const b = req.body || {};
     if (!EVENTS.has(String(b.event))) { res.status(400).json({ error: 'bad_event' }); return; }
     const row = {
@@ -59,6 +66,7 @@ router.post('/api/pixel/checkout', express.json({ limit: '64kb' }), async (req: 
       country: String(b.country || '').slice(0, 8) || null,
       currency: String(b.currency || '').slice(0, 8) || null,
       total: Number.isFinite(Number(b.total)) ? Number(b.total) : null,
+      path: String(b.path || '').slice(0, 200) || null,
     };
     const r = await fetch(`${PGRST_URL}/checkout_events`, {
       method: 'POST',
@@ -148,6 +156,107 @@ router.get('/api/pixel/funnel', async (req: Request, res: Response) => {
   } catch (e) {
     console.error('[pixel] 퍼널 집계 실패:', String(e).split('\n')[0]);
     res.status(502).json({ error: 'funnel_failed' });
+  }
+});
+
+// 전체 여정 집계 — 방문(첫/재방문) → 상품뷰 → 카트담기 → 체크아웃 → 구매 (공개 GET, 집계값만)
+router.get('/api/pixel/journey', async (req: Request, res: Response) => {
+  try {
+    const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 90);
+    const since = new Date(Date.now() - days * 86400_000).toISOString();
+    const r = await fetch(
+      `${PGRST_URL}/checkout_events?select=event,client_id,path,total,created_at&created_at=gte.${since}&order=created_at.asc&limit=100000`,
+      { headers: { Authorization: `Bearer ${mintServiceToken()}` } },
+    );
+    if (!r.ok) throw new Error(`postgrest ${r.status}`);
+    const rows = (await r.json()) as { event: string; client_id: string | null; path: string | null; total: number | null; created_at: string }[];
+
+    // 기간 시작 전 이력 보유 브라우저 = 재방문 판정용 (client_first_seen 뷰)
+    const fsRes = await fetch(
+      `${PGRST_URL}/client_first_seen?select=client_id&first_seen=lt.${since}&limit=200000`,
+      { headers: { Authorization: `Bearer ${mintServiceToken()}` } },
+    );
+    const oldClients = new Set(
+      fsRes.ok ? ((await fsRes.json()) as { client_id: string }[]).map(x => x.client_id) : [],
+    );
+
+    const SESSION_GAP = 30 * 60_000; // 세션 = 30분 무활동 단절
+    const byClient = new Map<string, { id: string; events: Set<string>; lastTs: number; sessions: number }>();
+    const prod = new Map<string, { views: number; adds: number }>();
+    const searches = new Map<string, number>();
+    const daily = new Map<string, { visitors: Set<string>; adds: number; checkouts: number; completed: number }>();
+    for (const row of rows) {
+      const cid = row.client_id || 'anon';
+      const ts = Date.parse(row.created_at);
+      let c = byClient.get(cid);
+      if (!c) { c = { id: cid, events: new Set(), lastTs: 0, sessions: 0 }; byClient.set(cid, c); }
+      c.events.add(row.event);
+      if (ts - c.lastTs > SESSION_GAP) c.sessions += 1;
+      c.lastTs = ts;
+      const d = row.created_at.slice(0, 10);
+      let dd = daily.get(d);
+      if (!dd) { dd = { visitors: new Set(), adds: 0, checkouts: 0, completed: 0 }; daily.set(d, dd); }
+      dd.visitors.add(cid);
+      if (row.event === 'product_added_to_cart') dd.adds += 1;
+      if (row.event === 'checkout_started') dd.checkouts += 1;
+      if (row.event === 'checkout_completed') dd.completed += 1;
+      if (row.path && (row.event === 'product_viewed' || row.event === 'product_added_to_cart')) {
+        let p = prod.get(row.path);
+        if (!p) { p = { views: 0, adds: 0 }; prod.set(row.path, p); }
+        if (row.event === 'product_viewed') p.views += 1; else p.adds += 1;
+      }
+      if (row.path && row.event === 'search_submitted') {
+        searches.set(row.path, (searches.get(row.path) || 0) + 1);
+      }
+    }
+    const clients = [...byClient.values()];
+    const has = (ev: string) => clients.filter(c => c.events.has(ev)).length;
+    res.json({
+      days,
+      visitors: {
+        total: byClient.size, // 브라우저 기준 추정 방문자 (사파리 쿠키 제한으로 과대 가능)
+        returning: clients.filter(c => oldClients.has(c.id)).length,
+        sessions: clients.reduce((s, c) => s + c.sessions, 0),
+      },
+      steps: [
+        { step: 'visited', count: byClient.size },
+        { step: 'explored', count: clients.filter(c => c.events.has('collection_viewed') || c.events.has('search_submitted')).length },
+        { step: 'product_viewed', count: has('product_viewed') },
+        { step: 'added_to_cart', count: has('product_added_to_cart') },
+        { step: 'checkout_started', count: has('checkout_started') },
+        { step: 'completed', count: has('checkout_completed') },
+      ],
+      top_products: [...prod.entries()]
+        .map(([path, v]) => ({ path, ...v }))
+        .sort((a, b) => b.views - a.views).slice(0, 30),
+      top_searches: [...searches.entries()]
+        .map(([q, n]) => ({ q, n }))
+        .sort((a, b) => b.n - a.n).slice(0, 30),
+      daily: Object.fromEntries([...daily.entries()].map(([d, v]) => [d, {
+        visitors: v.visitors.size, adds: v.adds, checkouts: v.checkouts, completed: v.completed,
+      }])),
+    });
+  } catch (e) {
+    console.error('[pixel] journey 집계 실패:', String(e).split('\n')[0]);
+    res.status(502).json({ error: 'journey_failed' });
+  }
+});
+
+// 원시 이벤트 (AI 분석용) — 토큰은 앞 8자로 절단해 비식별화, 공개 GET
+router.get('/api/pixel/events', async (req: Request, res: Response) => {
+  try {
+    const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 90);
+    const since = new Date(Date.now() - days * 86400_000).toISOString();
+    const r = await fetch(
+      `${PGRST_URL}/checkout_events?select=event,checkout_token,country,total,created_at&created_at=gte.${since}&event=neq.page_viewed&order=created_at.asc&limit=2000`,
+      { headers: { Authorization: `Bearer ${mintServiceToken()}` } },
+    );
+    if (!r.ok) throw new Error(`postgrest ${r.status}`);
+    const rows = (await r.json()) as Record<string, unknown>[];
+    res.json(rows.map(row => ({ ...row, checkout_token: String(row.checkout_token || '').slice(0, 8) })));
+  } catch (e) {
+    console.error('[pixel] events 조회 실패:', String(e).split('\n')[0]);
+    res.status(502).json({ error: 'events_failed' });
   }
 });
 
