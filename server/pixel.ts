@@ -108,8 +108,10 @@ router.get('/api/pixel/funnel', async (req: Request, res: Response) => {
       range = `created_at=gte.${from}T00:00:00Z`;
       if (to) range += `&created_at=lte.${to}T23:59:59Z`;
     }
+    // 체크아웃 6종만 — v2 여정 이벤트(page/product/cart)가 퍼널에 섞이면 안 됨
+    const ckFilter = `event=in.(${STEP_ORDER.join(',')})`;
     const r = await fetch(
-      `${PGRST_URL}/checkout_events?select=event,checkout_token,client_id,country,created_at&${range}&order=created_at.desc&limit=50000`,
+      `${PGRST_URL}/checkout_events?select=event,checkout_token,client_id,country,created_at&${range}&${ckFilter}&order=created_at.desc&limit=50000`,
       { headers: { Authorization: `Bearer ${mintServiceToken()}` } },
     );
     if (!r.ok) throw new Error(`postgrest ${r.status}`);
