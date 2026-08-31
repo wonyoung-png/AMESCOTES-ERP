@@ -22,6 +22,7 @@ const EVENTS = new Set([
   'product_viewed',
   'product_added_to_cart',
   'cart_viewed',
+  'related_click', // 관련상품(GOOD MATCHS WITH 등) 클릭
 ]);
 
 function b64url(buf: Buffer): string {
