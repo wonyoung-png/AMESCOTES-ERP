@@ -67,6 +67,7 @@ router.post('/api/pixel/checkout', express.json({ limit: '64kb' }), async (req: 
       currency: String(b.currency || '').slice(0, 8) || null,
       total: Number.isFinite(Number(b.total)) ? Number(b.total) : null,
       path: String(b.path || '').slice(0, 200) || null,
+      shop: b.shop === 'kr' ? 'kr' : 'intl',
     };
     const r = await fetch(`${PGRST_URL}/checkout_events`, {
       method: 'POST',
@@ -109,7 +110,8 @@ router.get('/api/pixel/funnel', async (req: Request, res: Response) => {
       if (to) range += `&created_at=lte.${to}T23:59:59Z`;
     }
     // 체크아웃 6종만 — v2 여정 이벤트(page/product/cart)가 퍼널에 섞이면 안 됨
-    const ckFilter = `event=in.(${STEP_ORDER.join(',')})`;
+    const shop = req.query.shop === 'kr' ? 'kr' : 'intl';
+    const ckFilter = `event=in.(${STEP_ORDER.join(',')})&shop=eq.${shop}`;
     const r = await fetch(
       `${PGRST_URL}/checkout_events?select=event,checkout_token,client_id,country,created_at&${range}&${ckFilter}&order=created_at.desc&limit=50000`,
       { headers: { Authorization: `Bearer ${mintServiceToken()}` } },
@@ -165,9 +167,10 @@ router.get('/api/pixel/funnel', async (req: Request, res: Response) => {
 router.get('/api/pixel/journey', async (req: Request, res: Response) => {
   try {
     const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 90);
+    const shop = req.query.shop === 'kr' ? 'kr' : 'intl';
     const since = new Date(Date.now() - days * 86400_000).toISOString();
     const r = await fetch(
-      `${PGRST_URL}/checkout_events?select=event,client_id,path,total,created_at&created_at=gte.${since}&order=created_at.asc&limit=100000`,
+      `${PGRST_URL}/checkout_events?select=event,client_id,path,total,created_at&created_at=gte.${since}&shop=eq.${shop}&order=created_at.asc&limit=100000`,
       { headers: { Authorization: `Bearer ${mintServiceToken()}` } },
     );
     if (!r.ok) throw new Error(`postgrest ${r.status}`);
@@ -248,9 +251,10 @@ router.get('/api/pixel/journey', async (req: Request, res: Response) => {
 router.get('/api/pixel/events', async (req: Request, res: Response) => {
   try {
     const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 90);
+    const shop = req.query.shop === 'kr' ? 'kr' : 'intl';
     const since = new Date(Date.now() - days * 86400_000).toISOString();
     const r = await fetch(
-      `${PGRST_URL}/checkout_events?select=event,checkout_token,country,total,created_at&created_at=gte.${since}&event=neq.page_viewed&order=created_at.asc&limit=2000`,
+      `${PGRST_URL}/checkout_events?select=event,checkout_token,country,total,created_at&created_at=gte.${since}&shop=eq.${shop}&event=neq.page_viewed&order=created_at.asc&limit=2000`,
       { headers: { Authorization: `Bearer ${mintServiceToken()}` } },
     );
     if (!r.ok) throw new Error(`postgrest ${r.status}`);
