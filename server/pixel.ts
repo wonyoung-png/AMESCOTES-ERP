@@ -255,11 +255,12 @@ router.get('/api/pixel/events', async (req: Request, res: Response) => {
     const shop = req.query.shop === 'kr' ? 'kr' : 'intl';
     const since = new Date(Date.now() - days * 86400_000).toISOString();
     const r = await fetch(
-      `${PGRST_URL}/checkout_events?select=event,checkout_token,country,total,created_at&created_at=gte.${since}&shop=eq.${shop}&event=neq.page_viewed&order=created_at.asc&limit=2000`,
+      `${PGRST_URL}/checkout_events?select=event,checkout_token,country,total,created_at&created_at=gte.${since}&shop=eq.${shop}&event=neq.page_viewed&order=created_at.desc&limit=2000`,
       { headers: { Authorization: `Bearer ${mintServiceToken()}` } },
     );
     if (!r.ok) throw new Error(`postgrest ${r.status}`);
-    const rows = (await r.json()) as Record<string, unknown>[];
+    // 최신 2000건을 시간순으로 — asc+limit은 옛 데이터만 잘라 최신을 놓친다
+    const rows = ((await r.json()) as Record<string, unknown>[]).reverse();
     res.json(rows.map(row => ({ ...row, checkout_token: String(row.checkout_token || '').slice(0, 8) })));
   } catch (e) {
     console.error('[pixel] events 조회 실패:', String(e).split('\n')[0]);
