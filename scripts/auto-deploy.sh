@@ -50,7 +50,11 @@ fi
 
 cd /opt/app && docker compose up -d app
 sleep 8
-if curl -sf --max-time 10 http://localhost:4000/api/agent/health >/dev/null; then
+
+# 4000 포트는 호스트에 열려 있지 않다(Caddy가 도커 네트워크로 붙는다).
+# 컨테이너 IP를 찾아 직접 두드린다 — 바깥 DNS에 기대지 않는다
+CIP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' app-app-1 2>/dev/null | head -1)
+if [ -n "$CIP" ] && curl -sf --max-time 10 "http://$CIP:4000/api/agent/health" >/dev/null; then
   echo "$REMOTE" > "$STATE"
   log "배포 완료 ${REMOTE:0:7}"
   docker image prune -f >/dev/null 2>&1 || true
