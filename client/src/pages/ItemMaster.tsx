@@ -2871,7 +2871,7 @@ export default function ItemMaster() {
 
       {/* 등록/수정 모달 */}
       <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) handleModalClose(true); }}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEdit ? '품목 수정' : '품목 등록'}</DialogTitle>
           </DialogHeader>
@@ -2884,73 +2884,72 @@ export default function ItemMaster() {
 
           <TabsContent value="basic" className="space-y-5 mt-4">
             {/* 스타일번호 자동생성 */}
-            <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Wand2 size={15} className="text-primary" />
-                  <span className="text-sm font-semibold text-primary">스타일번호 자동생성</span>
-                </div>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Wand2 size={13} />스타일번호
+                </p>
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input type="checkbox" checked={manualStyleNo} onChange={e => {
                     setManualStyleNo(e.target.checked);
                     if (!e.target.checked) setEditItem(prev => ({ ...prev, styleNo: previewStyleNo }));
                   }} className="w-3.5 h-3.5 accent-primary" />
-                  <span className="text-xs text-primary">직접 입력</span>
+                  <span className="text-xs text-muted-foreground">직접 입력</span>
                 </label>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs text-primary">거래처 (바이어)</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">
+                    거래처 (바이어)
+                    {buyersWithoutCode > 0 && (
+                      <span className="text-muted-foreground font-normal"> 브랜드코드 없는 {buyersWithoutCode}곳 제외</span>
+                    )}
+                  </Label>
                   <BuyerPicker
                     buyers={brandVendors}
                     selectedId={selectedVendorId}
                     onSelect={setSelectedVendorId}
                   />
-                  {buyersWithoutCode > 0 && (
-                    <p className="text-[11px] text-muted-foreground">
-                      브랜드코드가 없는 바이어 {buyersWithoutCode}곳은 품번을 만들 수 없어 목록에서 빠집니다
-                    </p>
-                  )}
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-primary">등록일 (YYMM 기준)</Label>
-                  <Input type="date" value={registDate} onChange={e => setRegistDate(e.target.value)} className="h-8 text-sm bg-card" />
+                <div className="space-y-1.5">
+                  <Label className="text-xs">등록일 <span className="text-muted-foreground font-normal">YYMM 기준</span></Label>
+                  <Input type="date" value={registDate} onChange={e => setRegistDate(e.target.value)} className="text-sm" />
                 </div>
+                {!manualStyleNo ? (
+                  <div className="sm:col-span-2 flex items-center gap-2 px-3 py-2.5 rounded-md border border-primary/20 bg-primary/5">
+                    {previewStyleNo ? (
+                      <>
+                        <span className="text-xs text-muted-foreground">예상 품번:</span>
+                        <span className="font-mono font-bold text-primary text-base">{previewStyleNo}</span>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <AlertCircle size={13} />거래처와 카테고리를 선택하면 자동으로 생성됩니다
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-xs">스타일번호 <span className="text-muted-foreground font-normal">직접 입력</span></Label>
+                    <Input
+                      value={editItem.styleNo || ''}
+                      onChange={e => setEditItem({ ...editItem, styleNo: e.target.value.toUpperCase() })}
+                      placeholder="AT2603HB01"
+                      className="font-mono uppercase"
+                    />
+                  </div>
+                )}
               </div>
-              {!manualStyleNo ? (
-                <div className="flex items-center gap-2 p-2.5 bg-card border border-primary/20 rounded-md">
-                  {previewStyleNo ? (
-                    <>
-                      <span className="text-xs text-muted-foreground">예상 품번:</span>
-                      <span className="font-mono font-bold text-primary text-base">{previewStyleNo}</span>
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <AlertCircle size={13} />거래처와 카테고리를 선택하면 자동으로 생성됩니다
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <Label className="text-xs text-primary">스타일번호 (직접 입력)</Label>
-                  <Input
-                    value={editItem.styleNo || ''}
-                    onChange={e => setEditItem({ ...editItem, styleNo: e.target.value.toUpperCase() })}
-                    placeholder="AT2603HB01"
-                    className="font-mono uppercase bg-card"
-                  />
-                </div>
-              )}
             </div>
 
             {/* 기본 정보 */}
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground">기본 정보</p>
+            <div className="border-t border-border pt-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">기본 정보</p>
 
-              {/* 카테고리 */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* 카테고리 · 바이어 품번 */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
                 <div className="space-y-1.5">
-                  <Label>카테고리</Label>
+                  <Label className="text-xs">카테고리</Label>
                   <Select
                     value={editItem.erpCategory || 'HB'}
                     onValueChange={v => {
@@ -2981,7 +2980,7 @@ export default function ItemMaster() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>세부 카테고리</Label>
+                  <Label className="text-xs">세부 카테고리</Label>
                   <Select
                     value={editItem.category || (editItem.erpCategory === 'ACC' ? '파우치' : editItem.erpCategory === 'SHOES' ? '스니커즈' : editItem.erpCategory === 'PACK' ? '기타' : '숄더백')}
                     onValueChange={v => {
@@ -3005,39 +3004,38 @@ export default function ItemMaster() {
                     />
                   )}
                 </div>
-              </div>
 
-              {/* 바이어가 자체 품번을 주는 경우 — 내부 스타일번호는 그대로 두고 서류에만 이 번호를 쓴다 */}
-              <div className="space-y-1.5">
-                <Label>바이어 품번 <span className="text-muted-foreground text-xs font-normal">(바이어가 지정한 번호가 있을 때만)</span></Label>
-                <Input
-                  value={editItem.buyerStyleNo || ''}
-                  onChange={e => setEditItem({ ...editItem, buyerStyleNo: e.target.value })}
-                  placeholder="예: ABC-2026-001"
-                />
-                <p className="text-[11px] text-muted-foreground">발주서·거래명세표·라인시트에는 이 번호가 우선 표기됩니다. 검색도 됩니다.</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+                {/* 바이어가 자체 품번을 주는 경우 — 내부 스타일번호는 그대로 두고 서류에만 이 번호를 쓴다 */}
                 <div className="space-y-1.5">
-                  <Label>품명 (국문) *</Label>
+                  <Label className="text-xs">바이어 품번 <span className="text-muted-foreground font-normal">바이어 지정 번호가 있을 때만</span></Label>
+                  <Input
+                    value={editItem.buyerStyleNo || ''}
+                    onChange={e => setEditItem({ ...editItem, buyerStyleNo: e.target.value })}
+                    placeholder="예: ABC-2026-001"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">품명 (국문) <span className="text-[var(--system-red)]">*</span></Label>
                   <Input value={editItem.name || ''} onChange={e => setEditItem({ ...editItem, name: e.target.value })} placeholder="파니에 쁘띠 백" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>품명 (영문)</Label>
+                  <Label className="text-xs">품명 (영문)</Label>
                   <Input value={editItem.nameEn || ''} onChange={e => setEditItem({ ...editItem, nameEn: e.target.value })} placeholder="PANIER PETIT BAG" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div className="space-y-1.5">
-                  <Label>시즌</Label>
+                  <Label className="text-xs">시즌</Label>
                   <Select value={editItem.season || '26SS'} onValueChange={v => setEditItem({ ...editItem, season: v as Season })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>패킹사이즈</Label>
+                  <Label className="text-xs">패킹사이즈</Label>
                   <Select
                     value={editItem.packingSize || '_none'}
                     onValueChange={v => setEditItem({ ...editItem, packingSize: v === '_none' ? undefined : v as PackingSize })}
@@ -3050,15 +3048,9 @@ export default function ItemMaster() {
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                {editItem.erpCategory === 'PACK' ? (
-                  <div className="space-y-1.5 col-span-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
-                    PACK는 자재마스터(포장재)에서 구성품을 선택하면 <b>전체원가가 자동 합산</b>됩니다. 사전/사후원가 없음.
-                  </div>
-                ) : null}
-                {editItem.erpCategory === 'PACK' ? (
-                  <div className="space-y-1.5 col-span-2">
-                    <Label>패키지 구성 (자재마스터)</Label>
+              {editItem.erpCategory === 'PACK' ? (
+                  <div className="space-y-1.5 mt-4">
+                    <Label className="text-xs">패키지 구성 <span className="text-muted-foreground font-normal">자재마스터 포장재 선택 시 전체원가 자동 합산, 사전/사후원가 없음</span></Label>
                     <PackBomEditor
                       lines={packLines}
                       materials={materials}
@@ -3076,7 +3068,6 @@ export default function ItemMaster() {
                     />
                   </div>
                 ) : null}
-              </div>
             </div>
 
           </TabsContent>
@@ -3113,21 +3104,16 @@ export default function ItemMaster() {
                     className="text-[11px] text-[var(--system-red)] hover:underline">취소</button>
                 )}
               </div>
-              {costSheetData ? (
+              {costSheetData && (
                 <p className="text-[11px] text-[var(--system-green)]">
                   {costSheetName} — 자재 {costSheetData.materials.length}건 · 저장하면 {costSheetMode === 'pre' ? '사전' : '사후'}원가로 BOM에 반영됩니다
-                </p>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">
-                  엑셀을 올리면 BOM 페이지로 가지 않고 저장 시 원가가 자동 계산됩니다.
-                  컬러를 안 넣으면 '기본' 컬러로 등록됩니다.
                 </p>
               )}
             </div>
 
             {/* 가격 정보 — BOM이 등록되면 원가·컬러가 자동으로 따라온다 */}
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground">가격 정보</p>
+            <div className="border-t border-border pt-4 space-y-3">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">가격 정보</p>
 
               {/* BOM 원가 표시 영역 */}
               {(() => {
@@ -3180,7 +3166,7 @@ export default function ItemMaster() {
               })()}
 
               <div className="space-y-1.5">
-                <Label>납품가(KRW)</Label>
+                <Label className="text-xs">납품가(KRW) <span className="text-muted-foreground font-normal">BOM 등록 시 마진 자동 계산</span></Label>
                 <Input
                   type="number" min="0"
                   value={editItem.deliveryPrice ?? editItem.targetSalePrice ?? ''}
@@ -3190,7 +3176,6 @@ export default function ItemMaster() {
                   }}
                   placeholder="바이어 납품가 입력 (예: 85000)"
                 />
-                <p className="text-[11px] text-muted-foreground">※ BOM이 등록된 경우 납품가 입력 시 마진이 자동 계산됩니다</p>
               </div>
 
               {/* 마진 자동 계산 표시 (BOM 원가 연동) */}
@@ -3221,7 +3206,6 @@ export default function ItemMaster() {
                         <span className={`text-xs px-2 py-1 rounded-full font-medium ${rate >= 30 ? 'bg-success/15 text-success' : rate >= 15 ? 'bg-warning/15 text-warning' : 'bg-destructive/15 text-destructive'}`}>
                           {rate >= 30 ? '양호' : rate >= 15 ? '주의' : '위험'}
                         </span>
-                        <p className="text-[11px] text-muted-foreground mt-1">마진율 = (납품가 - BOM원가) / 납품가 × 100</p>
                       </div>
                     </div>
                   </div>
@@ -3230,8 +3214,10 @@ export default function ItemMaster() {
             </div>
 
             {/* 컬러 목록 */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1.5"><Palette size={14} />컬러 목록</Label>
+            <div className="border-t border-border pt-4 space-y-2">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Palette size={13} />컬러 목록
+              </p>
               <div className="flex gap-2">
                 <Input
                   value={colorInput}
@@ -3243,7 +3229,7 @@ export default function ItemMaster() {
                 <Button type="button" variant="outline" size="sm" onClick={addColor} className="h-9 px-3">추가</Button>
               </div>
               {normalizeColors(editItem.colors || []).length > 0 && (
-                <div className="space-y-2 p-2 bg-[var(--fill-quaternary)] rounded-md border border-border">
+                <div className="space-y-2 pt-1">
                   {normalizeColors(editItem.colors || []).map((c, idx) => (
                     <div key={idx} className="bg-card border border-border rounded-md overflow-hidden">
                       {/* 컬러 헤더 */}
@@ -3287,7 +3273,7 @@ export default function ItemMaster() {
                       </div>
                       {/* 세부 정보 */}
                       {colorDetailOpen === idx && (
-                        <div className="px-3 pb-3 grid grid-cols-2 gap-2 border-t border-border pt-2">
+                        <div className="px-3 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-2 border-t border-border pt-2">
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">가죽/원단 컬러</Label>
                             <Input
@@ -3332,20 +3318,22 @@ export default function ItemMaster() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>담당 디자이너</Label>
-                <Input value={editItem.designer || ''} onChange={e => setEditItem({ ...editItem, designer: e.target.value })} placeholder="디자이너 이름" />
+            <div className="border-t border-border pt-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">부가 정보</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">담당 디자이너</Label>
+                  <Input value={editItem.designer || ''} onChange={e => setEditItem({ ...editItem, designer: e.target.value })} placeholder="디자이너 이름" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">메모</Label>
+                  <Input value={editItem.memo || ''} onChange={e => setEditItem({ ...editItem, memo: e.target.value })} placeholder="비고" />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>메모</Label>
-                <Input value={editItem.memo || ''} onChange={e => setEditItem({ ...editItem, memo: e.target.value })} placeholder="비고" />
-              </div>
-            </div>
 
             {/* 대표 이미지 업로드 */}
-            <div className="space-y-2">
-              <Label>대표 이미지</Label>
+            <div className="space-y-2 mt-4">
+              <Label className="text-xs">대표 이미지 <span className="text-muted-foreground font-normal">최대 800px, JPEG 자동 변환</span></Label>
               <div className="flex items-center gap-3">
                 <div
                   className="w-20 h-20 rounded-lg border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary transition-colors overflow-hidden"
@@ -3371,10 +3359,10 @@ export default function ItemMaster() {
                       삭제
                     </Button>
                   )}
-                  <p className="text-xs text-muted-foreground">최대 800px, JPEG 자동 변환</p>
                 </div>
               </div>
               <input ref={imageFileRef} type="file" accept="image/*" className="hidden" onChange={handleItemImageUpload} />
+            </div>
             </div>
           </TabsContent>
           </Tabs>
@@ -3999,9 +3987,9 @@ function MultiBulkOrderModal({
 
         <div className="space-y-5">
           {/* 공장 / 날짜 */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <Label>공장 선택 *</Label>
+              <Label className="text-xs">공장 선택 <span className="text-[var(--system-red)]">*</span></Label>
               <Select value={factoryId} onValueChange={setFactoryId}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="공장 선택" />

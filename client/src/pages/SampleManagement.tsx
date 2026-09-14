@@ -1467,14 +1467,15 @@ export default function SampleManagement() {
 
       {/* ── 등록/수정 모달 ── */}
       <Dialog open={showModal} onOpenChange={(open) => { if (!open) handleModalClose(true); }}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editId ? '샘플 수정' : '샘플 접수'}</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-5 py-2">
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* 스타일 — 바이어·스타일번호·품명을 한 화면에서 본다 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* 바이어 (맨 위) */}
-              <div className="col-span-2 space-y-1.5">
-                <Label>바이어</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs">바이어</Label>
                 <Select value={form.buyerId || 'none'} onValueChange={v => setForm(f => ({ ...f, buyerId: v === 'none' ? undefined : v }))}>
                   <SelectTrigger><SelectValue placeholder="바이어 선택 (선택사항)" /></SelectTrigger>
                   <SelectContent>
@@ -1485,8 +1486,8 @@ export default function SampleManagement() {
               </div>
 
               {/* 스타일 — 품목마스터와 같은 자동채번. 기존 스타일 연결도 여기서 */}
-              <div className="col-span-2 space-y-2">
-                <Label>기존 스타일 연결 <span className="text-muted-foreground font-normal text-xs">(선택 — 비우면 새 스타일번호가 자동 생성됩니다)</span></Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs">기존 스타일 연결 <span className="text-muted-foreground font-normal">비우면 자동 생성</span></Label>
                 <Select value={form.styleId || 'none'} onValueChange={v => {
                   if (v === 'none') { setForm(f => ({ ...f, styleId: undefined, styleNo: '' })); return; }
                   const item = items.find(i => i.id === v);
@@ -1500,7 +1501,7 @@ export default function SampleManagement() {
                     }));
                   }
                 }}>
-                  <SelectTrigger className="text-xs h-8"><SelectValue placeholder="선택 안 함 (새 스타일)" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="선택 안 함 (새 스타일)" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">선택 안 함 (새 스타일)</SelectItem>
                     {items
@@ -1512,109 +1513,120 @@ export default function SampleManagement() {
                     ))}
                   </SelectContent>
                 </Select>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">스타일번호 *</Label>
-                      {!form.styleId && !editId && (
-                        <label className="flex items-center gap-1 cursor-pointer text-[11px] text-primary">
-                          <input type="checkbox" checked={manualStyleNo}
-                            onChange={e => setManualStyleNo(e.target.checked)} className="w-3 h-3 accent-primary" />
-                          직접 입력
-                        </label>
-                      )}
-                    </div>
-                    <Input
-                      value={form.styleId ? (form.styleNo || '') : (manualStyleNo ? (form.styleNo || '') : previewStyleNo)}
-                      onChange={e => setForm(f => ({ ...f, styleNo: e.target.value }))}
-                      readOnly={!!form.styleId || !manualStyleNo}
-                      placeholder="바이어를 선택하면 자동 생성됩니다"
-                      className={`h-8 text-xs font-mono ${(!!form.styleId || !manualStyleNo) ? 'bg-[var(--fill-tertiary)] text-muted-foreground' : ''}`}
-                    />
-                    {!form.styleId && !manualStyleNo && !previewStyleNo && (
-                      <p className="text-[11px] text-muted-foreground">바이어를 먼저 선택하세요</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">품명 *</Label>
-                    <Input value={form.styleName || ''} onChange={e => setForm(f => ({ ...f, styleName: e.target.value }))} placeholder="예: 파니에 쁘띠 백" className="h-8 text-xs" />
-                  </div>
-                </div>
-              </div>
-
-              {/* 컬러 */}
-              <div className="col-span-2 space-y-1.5">
-                <Label>컬러 <span className="text-muted-foreground text-xs">(선택)</span></Label>
-                <Input value={form.color || ''} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} placeholder="예: 블랙, 카멜, RED" className="h-9" />
               </div>
 
               <div className="space-y-1.5">
-                <Label>시즌</Label>
+                <div className="flex items-center justify-between min-h-[1.25rem]">
+                  <Label className="text-xs">스타일번호 <span className="text-[var(--system-red)]">*</span></Label>
+                  {!form.styleId && !editId && (
+                    <label className="flex items-center gap-1 cursor-pointer text-[11px] text-primary">
+                      <input type="checkbox" checked={manualStyleNo}
+                        onChange={e => setManualStyleNo(e.target.checked)} className="w-3 h-3 accent-primary" />
+                      직접 입력
+                    </label>
+                  )}
+                </div>
+                <Input
+                  value={form.styleId ? (form.styleNo || '') : (manualStyleNo ? (form.styleNo || '') : previewStyleNo)}
+                  onChange={e => setForm(f => ({ ...f, styleNo: e.target.value }))}
+                  readOnly={!!form.styleId || !manualStyleNo}
+                  placeholder="바이어를 선택하면 자동 생성됩니다"
+                  className={`text-sm font-mono ${(!!form.styleId || !manualStyleNo) ? 'bg-[var(--fill-tertiary)] text-muted-foreground' : ''}`}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">품명 <span className="text-[var(--system-red)]">*</span></Label>
+                <Input value={form.styleName || ''} onChange={e => setForm(f => ({ ...f, styleName: e.target.value }))} placeholder="예: 파니에 쁘띠 백" className="text-sm" />
+              </div>
+
+              {/* 컬러 */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">컬러 <span className="text-muted-foreground font-normal">선택</span></Label>
+                <Input value={form.color || ''} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} placeholder="예: 블랙, 카멜, RED" className="text-sm" />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">시즌</Label>
                 <Select value={form.season || '26SS'} onValueChange={v => setForm(f => ({ ...f, season: v as Season }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              {/* 단계 — 신규 등록은 항상 1차. 2차 이후는 목록의 '다음 차수' 버튼으로 만든다 */}
-              {editId ? (
+            </div>
+
+            {/* 진행 — 단계·작업방식·장소는 같이 고르는 것이라 한 줄에 둔다 */}
+            <div className="border-t border-border pt-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">진행</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* 단계 — 신규 등록은 항상 1차. 2차 이후는 목록의 '다음 차수' 버튼으로 만든다 */}
+                {editId ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">단계</Label>
+                    <Select value={form.stage || '1차'} onValueChange={v => setForm(f => ({ ...f, stage: v as SampleStage }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">단계 <span className="text-muted-foreground font-normal">신규는 1차 고정</span></Label>
+                    <div className="h-9 flex items-center px-3 rounded-md border border-border bg-[var(--fill-tertiary)] text-sm text-muted-foreground">
+                      1차
+                    </div>
+                  </div>
+                )}
+                {/* 작업방식 (단계 바로 다음) */}
                 <div className="space-y-1.5">
-                  <Label>단계</Label>
-                  <Select value={form.stage || '1차'} onValueChange={v => setForm(f => ({ ...f, stage: v as SampleStage }))}>
+                  <Label className="text-xs">작업방식 <span className="text-muted-foreground font-normal">선택</span></Label>
+                  <Input
+                    value={form.roundName || ''}
+                    onChange={e => setForm(f => ({ ...f, roundName: e.target.value }))}
+                    placeholder="예: 가봉, 직봉, 수정 직봉"
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">샘플 장소</Label>
+                  <Select value={form.location || '내부개발실'} onValueChange={v => setForm(f => ({ ...f, location: v as SampleLocation }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    <SelectContent>{LOCATIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-              ) : (
+              </div>
+            </div>
+
+            {/* 담당 · 일정 */}
+            <div className="border-t border-border pt-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">담당 · 일정</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label>단계</Label>
-                  <div className="h-9 flex items-center px-3 rounded-md border border-border bg-[var(--fill-tertiary)] text-sm text-muted-foreground">
-                    1차 (신규는 항상 1차)
-                  </div>
+                  <Label className="text-xs">작업담당자</Label>
+                  <Input value={form.assignee || ''} onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))} placeholder="작업담당자명 (내부)" className="text-sm" />
                 </div>
-              )}
-              {/* 작업방식 (단계 바로 다음) */}
-              <div className="space-y-1.5">
-                <Label>작업방식 <span className="text-muted-foreground text-xs">(선택)</span></Label>
-                <Input
-                  value={form.roundName || ''}
-                  onChange={e => setForm(f => ({ ...f, roundName: e.target.value }))}
-                  placeholder="예: 가봉, 직봉, 수정 직봉"
-                />
+                <div className="space-y-1.5">
+                  <Label className="text-xs">영업담당자</Label>
+                  <Input value={form.salesPerson || ''} onChange={e => setForm(f => ({ ...f, salesPerson: e.target.value }))} placeholder="영업담당자명 (외부/영업)" className="text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">의뢰일 <span className="text-[var(--system-red)]">*</span></Label>
+                  <Input type="date" value={form.requestDate || ''} onChange={e => setForm(f => ({ ...f, requestDate: e.target.value }))} className="text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">목표 완료일</Label>
+                  <Input type="date" value={form.expectedDate || ''} onChange={e => setForm(f => ({ ...f, expectedDate: e.target.value }))} className="text-sm" />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>샘플 장소</Label>
-                <Select value={form.location || '내부개발실'} onValueChange={v => setForm(f => ({ ...f, location: v as SampleLocation }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{LOCATIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>작업담당자</Label>
-                <Input value={form.assignee || ''} onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))} placeholder="작업담당자명 (내부)" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>영업담당자</Label>
-                <Input value={form.salesPerson || ''} onChange={e => setForm(f => ({ ...f, salesPerson: e.target.value }))} placeholder="영업담당자명 (외부/영업)" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>의뢰일 *</Label>
-                <Input type="date" value={form.requestDate || ''} onChange={e => setForm(f => ({ ...f, requestDate: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>목표 완료일</Label>
-                <Input type="date" value={form.expectedDate || ''} onChange={e => setForm(f => ({ ...f, expectedDate: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5 col-span-2">
-                <Label>비고</Label>
-                <Input value={form.memo || ''} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="비고" />
+              <div className="space-y-1.5 mt-4">
+                <Label className="text-xs">비고</Label>
+                <Input value={form.memo || ''} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="비고" className="text-sm" />
               </div>
             </div>
 
             {/* 자재 요청 목록 */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>자재 요청 목록</Label>
+            <div className="border-t border-border pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">자재 요청</p>
                 <Button
                   type="button" variant="outline" size="sm" className="h-7 text-xs"
                   onClick={() => setForm(f => ({
@@ -1626,7 +1638,7 @@ export default function SampleManagement() {
                 </Button>
               </div>
               {(form.materialRequests || []).length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-2">자재 요청 없음 (행 추가 버튼으로 추가)</p>
+                <p className="text-xs text-muted-foreground text-center py-2">자재 요청 없음</p>
               ) : (
                 <div className="space-y-2">
                   {/* 헤더 */}
@@ -1782,11 +1794,10 @@ export default function SampleManagement() {
                 </div>
               )}
             </div>
-          </div>
             {/* 파일/이미지 업로드 */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>파일/이미지 첨부 <span className="text-xs text-muted-foreground font-normal">(이미지 최대 5장 + 문서 최대 5개)</span></Label>
+            <div className="border-t border-border pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">파일 · 이미지 첨부 <span className="normal-case tracking-normal">이미지 5장 · 문서 5개</span></p>
                 <Button
                   type="button" variant="outline" size="sm" className="h-7 text-xs gap-1"
                   onClick={() => docFileRef.current?.click()}
@@ -1806,9 +1817,9 @@ export default function SampleManagement() {
               />
               {/* 이미지 미리보기 */}
               {(form.imageUrls || []).length > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">이미지 ({(form.imageUrls || []).length}/5)</p>
-                  <div className="flex flex-wrap gap-2 p-2 bg-[var(--fill-quaternary)] rounded-md border border-border">
+                <div className="mb-3">
+                  <p className="text-xs text-muted-foreground mb-1.5">이미지 {(form.imageUrls || []).length}/5</p>
+                  <div className="flex flex-wrap gap-2">
                     {(form.imageUrls || []).map((url, idx) => (
                       <div key={idx} className="relative group">
                         <img
@@ -1830,7 +1841,7 @@ export default function SampleManagement() {
               {/* 문서 목록 */}
               {(form.documents || []).length > 0 && (
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">첨부 문서 ({(form.documents || []).length}/5)</p>
+                  <p className="text-xs text-muted-foreground mb-1.5">첨부 문서 {(form.documents || []).length}/5</p>
                   <div className="space-y-1">
                     {(form.documents || []).map((doc, idx) => (
                       <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-[var(--fill-quaternary)] rounded-md border border-border group">
@@ -1855,10 +1866,12 @@ export default function SampleManagement() {
               )}
               {(form.imageUrls || []).length === 0 && (form.documents || []).length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-3 border border-dashed border-border rounded-md">
-                  파일 없음 — 위 버튼으로 이미지·PDF·엑셀을 추가하세요
+                  파일 없음
                 </p>
               )}
             </div>
+
+          </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => handleModalClose(true)}>취소</Button>
@@ -2119,22 +2132,22 @@ export default function SampleManagement() {
               <p className="text-xs text-muted-foreground">
                 {nextRoundTarget.stage} → <span className="text-foreground font-medium">
                   {((nextRoundTarget.round || parseInt(String(nextRoundTarget.stage).replace(/[^0-9]/g, ''), 10) || 1) + 1)}차
-                </span> 로 새 샘플이 만들어집니다. 스타일·바이어·시즌은 그대로 복사됩니다.
+                </span>
               </p>
 
               <div className="space-y-1.5">
-                <Label>수정 요청 내용</Label>
+                <Label className="text-xs">수정 요청 내용</Label>
                 <Input value={nextRoundNote} onChange={e => setNextRoundNote(e.target.value)}
                   placeholder="예: 손잡이 길이 2cm 단축, 금장 → 은장" />
               </div>
 
               <div className="space-y-1.5">
-                <Label>작업담당자 <span className="text-muted-foreground text-xs font-normal">(이 사람에게 전달됩니다)</span></Label>
+                <Label className="text-xs">작업담당자 <span className="text-muted-foreground font-normal">이 사람에게 전달</span></Label>
                 <Input value={nextRoundAssignee} onChange={e => setNextRoundAssignee(e.target.value)} placeholder="담당자명" />
               </div>
 
               <div className="space-y-1.5">
-                <Label>업체 수정 요청 파일 <span className="text-muted-foreground text-xs font-normal">(이미지 · PDF · 엑셀)</span></Label>
+                <Label className="text-xs">업체 수정 요청 파일 <span className="text-muted-foreground font-normal">이미지 · PDF · 엑셀</span></Label>
                 <input
                   type="file" multiple accept="image/*,.pdf,.xlsx,.xls"
                   className="block w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-border file:bg-card file:text-xs"

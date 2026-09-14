@@ -652,15 +652,15 @@ export default function MaterialMaster() {
       </Dialog>
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editId ? '자재 수정' : '자재 등록'}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            {/* 이미지 업로드 */}
+          <div className="space-y-5 py-2">
+            {/* 이미지 업로드 — 행동을 유도하는 한 덩어리라 그대로 둔다 */}
             <div className="space-y-2">
-              <Label>이미지</Label>
+              <Label className="text-xs">이미지 <span className="text-muted-foreground font-normal">끌어다 놓기 가능 · 최대 800px, JPEG 자동 변환</span></Label>
               <div className="flex items-center gap-3">
                 <div
                   className={`w-20 h-20 rounded-lg border border-dashed flex items-center justify-center cursor-pointer transition-colors overflow-hidden ${dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary'}`}
@@ -684,176 +684,116 @@ export default function MaterialMaster() {
                       삭제
                     </Button>
                   )}
-                  <p className="text-xs text-muted-foreground">끌어다 놓기도 가능 · 최대 800px, JPEG 자동 변환</p>
                 </div>
               </div>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
             </div>
 
-            {/* 카테고리 + 세부 타입 (가죽·장식만) */}
-            <div className={subTypeOptions.length > 0 ? 'grid grid-cols-2 gap-3' : 'space-y-1.5'}>
-              <div className="space-y-1.5">
-                <Label>카테고리 *</Label>
-                <Select value={form.category || '가죽'} onValueChange={v => {
-                  const cat = v as MaterialCategory;
-                  // 카테고리가 바뀌면 이전 카테고리의 세부 타입은 무효 → 비운다
-                  setForm(prev => ({ ...prev, category: cat, subType: '', itemCode: editId ? prev.itemCode : nextCode(cat, prev.brand) }));
-                }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {MATERIAL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              {subTypeOptions.length > 0 && (
+            {/* 기본 정보 */}
+            <div className="border-t border-border pt-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">기본 정보</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                {/* 카테고리 + 세부 타입 (가죽·장식만) */}
                 <div className="space-y-1.5">
-                  <Label>{form.category === '장식' ? '장식 분류' : '가죽 타입'}</Label>
-                  <SearchSelect
-                    value={form.subType || ''}
-                    options={subTypeOptions}
-                    placeholder={form.category === '장식' ? '버클 / 링 / 프레임 …' : '소가죽 / 양가죽 …'}
-                    onChange={v => setForm(prev => ({ ...prev, subType: v }))}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* 브랜드 — 공통 / 브랜드 전용(바이어 검색 선택) */}
-            <div className="space-y-1.5">
-              <Label>브랜드</Label>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-1.5 text-sm cursor-pointer whitespace-nowrap">
-                  <input type="radio" checked={isCommonBrand} onChange={() => setForm(prev => ({ ...prev, brand: COMMON_BRAND, itemCode: editId ? prev.itemCode : nextCode((prev.category as MaterialCategory) || '가죽') }))} className="w-4 h-4 accent-primary" />
-                  공통
-                </label>
-                <label className="flex items-center gap-1.5 text-sm cursor-pointer whitespace-nowrap">
-                  <input type="radio" checked={!isCommonBrand} onChange={() => setForm(prev => ({ ...prev, brand: '' }))} className="w-4 h-4 accent-primary" />
-                  브랜드 전용
-                </label>
-                <div className="flex-1">
-                  <SearchSelect
-                    value={isCommonBrand ? '' : (form.brand || '')}
-                    options={buyerNames}
-                    placeholder="바이어 선택"
-                    disabled={isCommonBrand}
-                    onChange={v => setForm(prev => ({ ...prev, brand: v, itemCode: editId ? prev.itemCode : nextCode((prev.category as MaterialCategory) || '가죽', v) }))}
-                  />
-                </div>
-              </div>
-              {buyerNames.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  <Link href="/vendors" className="underline">거래처 마스터</Link>에 바이어를 먼저 등록하세요
-                </p>
-              )}
-            </div>
-
-            {/* 품번 — 카테고리별 자동채번 (가죽 L01 · 원단 W01 · 장식 H01 …) */}
-            <div className="space-y-1.5">
-              <Label>품번</Label>
-              <div className="flex gap-2">
-                <Input value={form.itemCode || ''} onChange={e => setForm(prev => ({ ...prev, itemCode: e.target.value }))} placeholder="L2608-01" className="w-36 font-mono" />
-                <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setForm(prev => ({ ...prev, itemCode: nextCode((prev.category as MaterialCategory) || '가죽', prev.brand) }))}>다시 생성</Button>
-              </div>
-            </div>
-            {/* 자재명 */}
-            <div className="space-y-1.5">
-              <Label>자재명 *</Label>
-              <Input value={form.name || ''} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} placeholder="소가죽 (블랙)" />
-            </div>
-
-            {/* 스펙 */}
-            <div className="space-y-1.5">
-              <Label>스펙</Label>
-              <Input value={form.spec || ''} onChange={e => setForm(prev => ({ ...prev, spec: e.target.value }))} placeholder="두께 1.2mm / 폭 54인치" />
-            </div>
-
-            {/* 단위 + 단가 */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <Label>단위 *</Label>
-                <Select value={form.unit || 'YD'} onValueChange={v => setForm(prev => ({ ...prev, unit: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5 col-span-2">
-                <Label>단가</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number" min="0" step="0.01" className="flex-1"
-                    value={priceOf(form) ?? ''}
-                    onChange={e => setPrice(e.target.value === '' ? undefined : Number(e.target.value), currencyOf(form))}
-                    placeholder="0"
-                  />
-                  <Select value={currencyOf(form)} onValueChange={v => setPrice(priceOf(form), v as PriceCurrency)}>
-                    <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                  <Label className="text-xs">카테고리 <span className="text-[var(--system-red)]">*</span></Label>
+                  <Select value={form.category || '가죽'} onValueChange={v => {
+                    const cat = v as MaterialCategory;
+                    // 카테고리가 바뀌면 이전 카테고리의 세부 타입은 무효 → 비운다
+                    setForm(prev => ({ ...prev, category: cat, subType: '', itemCode: editId ? prev.itemCode : nextCode(cat, prev.brand) }));
+                  }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      {MATERIAL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
+                {subTypeOptions.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{form.category === '장식' ? '장식 분류' : '가죽 타입'}</Label>
+                    <SearchSelect
+                      value={form.subType || ''}
+                      options={subTypeOptions}
+                      placeholder={form.category === '장식' ? '버클 / 링 / 프레임 …' : '소가죽 / 양가죽 …'}
+                      onChange={v => setForm(prev => ({ ...prev, subType: v }))}
+                    />
+                  </div>
+                )}
+
+                {/* 브랜드 — 공통 / 브랜드 전용(바이어 검색 선택) */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs">브랜드</Label>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-1.5 text-sm cursor-pointer whitespace-nowrap">
+                      <input type="radio" checked={isCommonBrand} onChange={() => setForm(prev => ({ ...prev, brand: COMMON_BRAND, itemCode: editId ? prev.itemCode : nextCode((prev.category as MaterialCategory) || '가죽') }))} className="w-4 h-4 accent-primary" />
+                      공통
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm cursor-pointer whitespace-nowrap">
+                      <input type="radio" checked={!isCommonBrand} onChange={() => setForm(prev => ({ ...prev, brand: '' }))} className="w-4 h-4 accent-primary" />
+                      브랜드 전용
+                    </label>
+                    <div className="flex-1">
+                      <SearchSelect
+                        value={isCommonBrand ? '' : (form.brand || '')}
+                        options={buyerNames}
+                        placeholder="바이어 선택"
+                        disabled={isCommonBrand}
+                        onChange={v => setForm(prev => ({ ...prev, brand: v, itemCode: editId ? prev.itemCode : nextCode((prev.category as MaterialCategory) || '가죽', v) }))}
+                      />
+                    </div>
+                  </div>
+                  {buyerNames.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      <Link href="/vendors" className="underline">거래처 마스터</Link>에 바이어를 먼저 등록하세요
+                    </p>
+                  )}
+                </div>
+
+                {/* 품번 — 카테고리별 자동채번 (가죽 L01 · 원단 W01 · 장식 H01 …) */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">품번</Label>
+                  <div className="flex gap-2">
+                    <Input value={form.itemCode || ''} onChange={e => setForm(prev => ({ ...prev, itemCode: e.target.value }))} placeholder="L2608-01" className="w-36 font-mono" />
+                    <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setForm(prev => ({ ...prev, itemCode: nextCode((prev.category as MaterialCategory) || '가죽', prev.brand) }))}>다시 생성</Button>
+                  </div>
+                </div>
+
+                {/* 자재명 */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">자재명 <span className="text-[var(--system-red)]">*</span></Label>
+                  <Input value={form.name || ''} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} placeholder="소가죽 (블랙)" />
+                </div>
+
+                {/* 스펙 */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs">스펙</Label>
+                  <Input value={form.spec || ''} onChange={e => setForm(prev => ({ ...prev, spec: e.target.value }))} placeholder="두께 1.2mm / 폭 54인치" />
+                </div>
               </div>
             </div>
 
-            {/* 장식 전용 — 도금컬러별 단가 · 금형비 · 시즌 */}
-            {form.category === '장식' && (
-              <>
-              {/* 도금 컬러별 단가 — 자재는 하나인데 컬러마다 단가가 다르다 */}
-              <div className="space-y-1.5">
-                <Label>도금 컬러별 단가</Label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <SearchSelect
-                      value={platingPick}
-                      options={PLATING_COLORS.filter(c => !(form.platingPrices || []).some(p => p.color === c))}
-                      placeholder="컬러 선택 후 추가"
-                      onChange={setPlatingPick}
-                    />
-                  </div>
-                  <Button type="button" variant="outline" onClick={addPlatingColor}>추가</Button>
-                </div>
-                {(form.platingPrices || []).length > 0 && (
-                  <div className="space-y-1.5 p-2 rounded-md bg-[var(--fill-quaternary)] border border-border">
-                    {(form.platingPrices || []).map((row, i) => (
-                      <div key={row.color} className="flex items-center gap-2">
-                        <span className="text-sm flex-1 truncate">{row.color}</span>
-                        <Input
-                          type="number" min="0" step="0.01" className="w-32 h-8"
-                          value={row.price ?? ''}
-                          placeholder="단가"
-                          onChange={e => updatePlating(i, { price: e.target.value === '' ? undefined : Number(e.target.value) })}
-                        />
-                        <Select value={row.currency || currencyOf(form)} onValueChange={v => updatePlating(i, { currency: v })}>
-                          <SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <button type="button" onClick={() => removePlating(i)}
-                          className="text-muted-foreground hover:text-[var(--system-red)] px-1">×</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <p className="text-[11px] text-muted-foreground">컬러를 추가하면 컬러마다 단가를 따로 넣을 수 있습니다.</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            {/* 단가 */}
+            <div className="border-t border-border pt-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">단가</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <Label>금형비</Label>
+                  <Label className="text-xs">단위 <span className="text-[var(--system-red)]">*</span></Label>
+                  <Select value={form.unit || 'YD'} onValueChange={v => setForm(prev => ({ ...prev, unit: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs">단가</Label>
                   <div className="flex gap-2">
                     <Input
                       type="number" min="0" step="0.01" className="flex-1"
-                      value={form.moldCostAmount ?? ''}
-                      onChange={e => setForm(prev => ({ ...prev, moldCostAmount: e.target.value === '' ? undefined : Number(e.target.value) }))}
+                      value={priceOf(form) ?? ''}
+                      onChange={e => setPrice(e.target.value === '' ? undefined : Number(e.target.value), currencyOf(form))}
                       placeholder="0"
                     />
-                    <Select
-                      value={form.moldCostCurrency || currencyOf(form)}
-                      onValueChange={v => setForm(prev => ({ ...prev, moldCostCurrency: v }))}
-                    >
+                    <Select value={currencyOf(form)} onValueChange={v => setPrice(priceOf(form), v as PriceCurrency)}>
                       <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -861,73 +801,145 @@ export default function MaterialMaster() {
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>시즌</Label>
-                  <Input value={form.season || ''} onChange={e => setForm(prev => ({ ...prev, season: e.target.value }))} placeholder="27ss" />
-                </div>
               </div>
-              </>
-            )}
 
-            {/* 공급업체 — 거래처 마스터의 자재거래처만 */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label>공급업체</Label>
-                <button
-                  type="button"
-                  onClick={() => setShowVendorAdd(true)}
-                  className="text-[11px] text-primary hover:underline"
-                >+ 신규 등록</button>
-              </div>
-              <SearchSelect
-                value={vendorQuery}
-                options={supplierNames}
-                placeholder="공급업체 선택"
-                onChange={name => {
-                  setVendorQuery(name);
-                  const hit = allVendors.find((v: Vendor) => v.name === name);
-                  setForm(prev => ({ ...prev, vendorId: hit ? hit.id : '' }));
-                }}
-              />
-              {supplierNames.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  <Link href="/vendors" className="underline">거래처 마스터</Link>에 자재거래처를 먼저 등록하세요
-                </p>
+              {/* 장식 전용 — 도금컬러별 단가 · 금형비 · 시즌 */}
+              {form.category === '장식' && (
+                <>
+                {/* 도금 컬러별 단가 — 자재는 하나인데 컬러마다 단가가 다르다 */}
+                <div className="space-y-1.5 mt-4">
+                  <Label className="text-xs">도금 컬러별 단가 <span className="text-muted-foreground font-normal">컬러마다 따로 입력</span></Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <SearchSelect
+                        value={platingPick}
+                        options={PLATING_COLORS.filter(c => !(form.platingPrices || []).some(p => p.color === c))}
+                        placeholder="컬러 선택 후 추가"
+                        onChange={setPlatingPick}
+                      />
+                    </div>
+                    <Button type="button" variant="outline" onClick={addPlatingColor}>추가</Button>
+                  </div>
+                  {(form.platingPrices || []).length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      {(form.platingPrices || []).map((row, i) => (
+                        <div key={row.color} className="flex items-center gap-2">
+                          <span className="text-sm flex-1 truncate">{row.color}</span>
+                          <Input
+                            type="number" min="0" step="0.01" className="w-32 h-8"
+                            value={row.price ?? ''}
+                            placeholder="단가"
+                            onChange={e => updatePlating(i, { price: e.target.value === '' ? undefined : Number(e.target.value) })}
+                          />
+                          <Select value={row.currency || currencyOf(form)} onValueChange={v => updatePlating(i, { currency: v })}>
+                            <SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <button type="button" onClick={() => removePlating(i)}
+                            className="text-muted-foreground hover:text-[var(--system-red)] px-1">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">금형비</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number" min="0" step="0.01" className="flex-1"
+                        value={form.moldCostAmount ?? ''}
+                        onChange={e => setForm(prev => ({ ...prev, moldCostAmount: e.target.value === '' ? undefined : Number(e.target.value) }))}
+                        placeholder="0"
+                      />
+                      <Select
+                        value={form.moldCostCurrency || currencyOf(form)}
+                        onValueChange={v => setForm(prev => ({ ...prev, moldCostCurrency: v }))}
+                      >
+                        <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">시즌</Label>
+                    <Input value={form.season || ''} onChange={e => setForm(prev => ({ ...prev, season: e.target.value }))} placeholder="27ss" />
+                  </div>
+                </div>
+                </>
               )}
             </div>
 
-            {/* 공장 보유 재고 — 재고를 쌓아두진 않지만 가죽·장식은 남는다.
-                발주 전에 공장에 확인한 결과를 적어두면 다음 발주 때 덜 시킬 수 있다 */}
-            <div className="space-y-1.5">
-              <Label>공장 보유 <span className="opt">확인한 경우만</span></Label>
-              <div className="grid grid-cols-[1fr_auto] gap-2">
-                <Input
-                  type="number" step="0.001" min="0"
-                  value={form.factoryStockQty ?? ''}
-                  onChange={e => setForm(prev => ({
-                    ...prev,
-                    factoryStockQty: e.target.value === '' ? undefined : Number(e.target.value),
-                    factoryStockCheckedAt: e.target.value === '' ? undefined : (prev.factoryStockCheckedAt || new Date().toISOString().split('T')[0]),
-                  }))}
-                  placeholder={`남은 수량 (${form.unit || ''})`}
-                />
-                <Input
-                  type="date" className="w-40"
-                  value={form.factoryStockCheckedAt || ''}
-                  onChange={e => setForm(prev => ({ ...prev, factoryStockCheckedAt: e.target.value || undefined }))}
-                  title="확인한 날"
-                />
+            {/* 공급 · 재고 */}
+            <div className="border-t border-border pt-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">공급 · 재고</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                {/* 공급업체 — 거래처 마스터의 자재거래처만 */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">공급업체</Label>
+                    <button
+                      type="button"
+                      onClick={() => setShowVendorAdd(true)}
+                      className="text-[11px] text-primary hover:underline"
+                    >+ 신규 등록</button>
+                  </div>
+                  <SearchSelect
+                    value={vendorQuery}
+                    options={supplierNames}
+                    placeholder="공급업체 선택"
+                    onChange={name => {
+                      setVendorQuery(name);
+                      const hit = allVendors.find((v: Vendor) => v.name === name);
+                      setForm(prev => ({ ...prev, vendorId: hit ? hit.id : '' }));
+                    }}
+                  />
+                  {supplierNames.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      <Link href="/vendors" className="underline">거래처 마스터</Link>에 자재거래처를 먼저 등록하세요
+                    </p>
+                  )}
+                </div>
+
+                {/* 공장 보유 재고 — 재고를 쌓아두진 않지만 가죽·장식은 남는다.
+                    발주 전에 공장에 확인한 결과를 적어두면 다음 발주 때 덜 시킬 수 있다 */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">공장 보유 <span className="text-muted-foreground font-normal">확인한 경우만</span></Label>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <Input
+                      type="number" step="0.001" min="0"
+                      value={form.factoryStockQty ?? ''}
+                      onChange={e => setForm(prev => ({
+                        ...prev,
+                        factoryStockQty: e.target.value === '' ? undefined : Number(e.target.value),
+                        factoryStockCheckedAt: e.target.value === '' ? undefined : (prev.factoryStockCheckedAt || new Date().toISOString().split('T')[0]),
+                      }))}
+                      placeholder={`남은 수량 (${form.unit || ''})`}
+                    />
+                    <Input
+                      type="date" className="w-40"
+                      value={form.factoryStockCheckedAt || ''}
+                      onChange={e => setForm(prev => ({ ...prev, factoryStockCheckedAt: e.target.value || undefined }))}
+                      title="확인한 날"
+                    />
+                  </div>
+                  <Input
+                    value={form.factoryStockNote || ''}
+                    onChange={e => setForm(prev => ({ ...prev, factoryStockNote: e.target.value }))}
+                    placeholder="예: 블랙만 남음 / 다음 발주까지 보관 요청"
+                  />
+                </div>
               </div>
-              <Input
-                value={form.factoryStockNote || ''}
-                onChange={e => setForm(prev => ({ ...prev, factoryStockNote: e.target.value }))}
-                placeholder="예: 블랙만 남음 / 다음 발주까지 보관 요청"
-              />
             </div>
 
             {/* 메모 */}
-            <div className="space-y-1.5">
-              <Label>메모</Label>
+            <div className="border-t border-border pt-4 space-y-1.5">
+              <Label className="text-xs">메모</Label>
               <Input value={form.memo || ''} onChange={e => setForm(prev => ({ ...prev, memo: e.target.value }))} placeholder="비고" />
             </div>
           </div>
