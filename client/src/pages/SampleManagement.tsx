@@ -554,11 +554,17 @@ export default function SampleManagement() {
     }
   }, [isDirty]);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('삭제하시겠습니까?')) return;
-    deleteSampleSB(id)
-      .then(() => { refresh(); toast.success('삭제되었습니다'); })
-      .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
+    // 서버만 지우면 localStorage에 남은 것이 다음 조회 때 되살아난다 — 양쪽을 지운다
+    store.deleteSample(id);
+    try {
+      await deleteSampleSB(id);
+    } catch (e: any) {
+      toast.error(`서버 삭제 실패: ${e?.message || e}`);
+    }
+    refresh();
+    toast.success('삭제되었습니다');
   };
 
   // 체크박스 다중 선택 관련
@@ -587,9 +593,10 @@ export default function SampleManagement() {
     if (selectedIds.size === 0) return;
     if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
       const count = selectedIds.size;
-      Promise.all([...selectedIds].map(id => deleteSampleSB(id)))
-        .then(() => { setSelectedIds(new Set()); refresh(); toast.success(`${count}개 항목이 삭제되었습니다`); })
-        .catch((e: Error) => toast.error(`삭제 실패: ${e.message}`));
+      const ids = [...selectedIds];
+      ids.forEach(id => store.deleteSample(id));
+      Promise.allSettled(ids.map(id => deleteSampleSB(id)))
+        .then(() => { setSelectedIds(new Set()); refresh(); toast.success(`${count}개 항목이 삭제되었습니다`); });
     }
   };
 

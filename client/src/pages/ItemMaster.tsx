@@ -54,6 +54,85 @@ const PACKING_SIZES: PackingSize[] = ['SS', 'S', 'M', 'L', 'XL'];
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 
+/**
+ * 검색되는 드롭다운. 기본 Select는 타이핑이 안 돼 바이어가 수십 곳이면 못 찾는다.
+ * cmdk를 새로 넣지 않고 Popover + 입력칸으로 끝낸다.
+ */
+function SearchableSelect({
+  value, onChange, options, allLabel, placeholder, width = 'w-36',
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string; sub?: string }[];
+  allLabel: string;
+  placeholder: string;
+  width?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const hit = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return options;
+    return options.filter(o => `${o.label} ${o.sub || ''}`.toLowerCase().includes(t));
+  }, [options, q]);
+  const current = options.find(o => o.value === value);
+
+  return (
+    <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) setQ(''); }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={`${width} h-9 px-3 rounded-md border border-border bg-card text-sm text-left flex items-center gap-1 hover:bg-[var(--fill-quaternary)]`}
+        >
+          <span className={`flex-1 min-w-0 truncate ${current ? 'text-foreground' : 'text-muted-foreground'}`}>
+            {current ? current.label : allLabel}
+          </span>
+          <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-56 p-0">
+        <div className="p-2 border-b border-border">
+          <Input
+            autoFocus
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder={placeholder}
+            className="h-8 text-sm"
+          />
+        </div>
+        <div className="max-h-64 overflow-y-auto py-1">
+          <button
+            type="button"
+            onClick={() => { onChange('전체'); setOpen(false); }}
+            className="w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--fill-quaternary)]"
+          >
+            {allLabel}
+          </button>
+          {hit.map(o => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => { onChange(o.value); setOpen(false); }}
+              className="w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--fill-quaternary)] flex items-baseline gap-2"
+            >
+              <span className="truncate">{o.label}</span>
+              {o.sub && <span className="text-xs text-muted-foreground truncate">{o.sub}</span>}
+            </button>
+          ))}
+          {hit.length === 0 && (
+            <p className="px-3 py-4 text-xs text-muted-foreground text-center">찾는 결과가 없습니다</p>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** 아는 카테고리만 한글을 붙인다. 새로 생긴 코드는 코드 그대로 보여준다 */
+const ERP_CATEGORY_LABEL: Record<string, string> = {
+  HB: 'HB (핸드백)', ACC: 'ACC (소품)', SHOES: 'SHOES (슈즈)', PACK: 'PACK (패키지)',
+};
+
 // 카테고리 → 제품유형코드 매핑
 const ERP_CAT_COLOR: Record<ErpCategory, string> = {
   'HB':   'bg-[var(--fill-tertiary)] text-foreground border-border',
@@ -472,6 +551,8 @@ export default function ItemMaster() {
   const [colorInput, setColorInput] = useState('');
   const [colorDetailOpen, setColorDetailOpen] = useState<number | null>(null); // 열린 컬러 세부정보 인덱스
   const [filterBuyer, setFilterBuyer] = usePersistedState('items.filterBuyer', '전체');
+  /** 컬러를 펼쳐 둔 품목. 접힌 상태가 기본이라 한 행이 한 줄로 유지된다 */
+  const [expandedColors, setExpandedColors] = useState<Set<string>>(new Set());
   const [filterNoBom, setFilterNoBom] = usePersistedState('items.filterNoBom', false);
   const [sortField, setSortField] = useState<'styleNo' | 'name' | 'season' | 'createdAt' | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -1042,6 +1123,40 @@ export default function ItemMaster() {
       { duration: 8000 }
     );
   };
+
+  /**
+   * 필터 목록은 등록된 품목에서 직접 뽑는다.
+   * 고정 배열을 쓰면 새 시즌(28SS)이나 새 세부카테고리를 등록해도 필터에 안 나와,
+   * 등록은 됐는데 찾을 수 없는 상태가 된다.
+   * 기준 목록(SEASONS 등)은 항상 포함해 비어 있어도 고를 수 있게 둔다.
+   */
+  const seasonOptions = useMemo(() => {
+    const set = new Set<string>(SEASONS);
+    items.forEach(i => { if (i.season) set.add(String(i.season)); });
+    // 25FW → 26SS → 26FW 순. 연도 먼저, 같은 해면 SS가 앞
+    return [...set].sort((a, b) => {
+      const ya = parseInt(a) || 0, yb = parseInt(b) || 0;
+      if (ya !== yb) return ya - yb;
+      return a.localeCompare(b);
+    });
+  }, [items]);
+
+  const subCategoryOptions = useMemo(() => {
+    const base = [...HB_CATEGORIES, ...ACC_CATEGORIES, ...SHOES_CATEGORIES, ...PACK_CATEGORIES];
+    const set = new Set<string>(base);
+    items.forEach(i => {
+      // 직접 입력한 세부 카테고리(customCategory)도 필터에 올라와야 한다
+      if (i.category) set.add(String(i.category));
+      if ((i as any).customCategory) set.add(String((i as any).customCategory));
+    });
+    return [...set].filter(Boolean).sort();
+  }, [items]);
+
+  const erpCategoryOptions = useMemo(() => {
+    const set = new Set<string>(['HB', 'ACC', 'SHOES', 'PACK']);
+    items.forEach(i => { if (i.erpCategory) set.add(String(i.erpCategory)); });
+    return [...set];
+  }, [items]);
 
   // 현재 선택된 erpCategory에 따른 세부 카테고리 옵션
   const subCategories =
@@ -2097,13 +2212,17 @@ export default function ItemMaster() {
                 className="pl-8 h-9 text-sm"
               />
             </div>
-            <Select value={filterBuyer} onValueChange={setFilterBuyer}>
-              <SelectTrigger className="w-36 h-9"><SelectValue placeholder="바이어" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="전체">전체 바이어</SelectItem>
-                {buyerVendors.map(v => <SelectItem key={v.id} value={v.id}>{v.code || v.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={filterBuyer}
+              onChange={setFilterBuyer}
+              allLabel="전체 바이어"
+              placeholder="바이어명 · 코드 검색"
+              options={buyerVendors.map(v => ({
+                value: v.id,
+                label: v.code || v.name,
+                sub: v.code ? v.name : undefined,
+              }))}
+            />
             <button
               onClick={resetFilters}
               className="h-9 px-3 rounded-md border border-border text-xs font-medium text-muted-foreground hover:bg-[var(--fill-quaternary)] flex items-center gap-1.5 whitespace-nowrap"
@@ -2122,26 +2241,23 @@ export default function ItemMaster() {
               <SelectTrigger className="w-32 h-9"><SelectValue placeholder="카테고리" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="전체">전체 카테고리</SelectItem>
-                <SelectItem value="HB">HB (핸드백)</SelectItem>
-                <SelectItem value="ACC">ACC (소품)</SelectItem>
-                <SelectItem value="SHOES">SHOES (슈즈)</SelectItem>
-                <SelectItem value="PACK">PACK (패키지)</SelectItem>
+                {erpCategoryOptions.map(c => (
+                  <SelectItem key={c} value={c}>{ERP_CATEGORY_LABEL[c] || c}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={filterSeason} onValueChange={setFilterSeason}>
               <SelectTrigger className="w-28 h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="전체">전체 시즌</SelectItem>
-                {SEASONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {seasonOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={filterCategory} onValueChange={setFilterCategory}>
               <SelectTrigger className="w-32 h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="전체">세부 카테고리</SelectItem>
-                {[...HB_CATEGORIES, ...ACC_CATEGORIES, ...SHOES_CATEGORIES, ...PACK_CATEGORIES].filter((c, i, a) => a.indexOf(c) === i).map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
+                {subCategoryOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
             <button
@@ -2387,9 +2503,10 @@ export default function ItemMaster() {
                 const aggregateOnlyFactory = showColorCostRows
                   && colorRows.every(r => r.factoryUnitCostKrw <= 0)
                   && factoryUnitCostKrw > 0;
-                const COLOR_CHIP_MAX = 3;
-                const visibleColorRows = colorRows.slice(0, COLOR_CHIP_MAX);
-                const extraColorCount = Math.max(0, colorRows.length - COLOR_CHIP_MAX);
+                // 컬러는 한 줄만 보이고 +로 펼친다. 세 컬러가 늘 펼쳐져 있으면 한 행이 3줄이 된다
+                const isColorOpen = expandedColors.has(item.id);
+                const visibleColorRows = isColorOpen ? colorRows : colorRows.slice(0, 1);
+                const extraColorCount = Math.max(0, colorRows.length - 1);
                 const months = monthsSinceLastOrder(item);
                 const isChecked = selectedIds.has(item.id);
                 return (
@@ -2474,12 +2591,18 @@ export default function ItemMaster() {
                               </button>
                             ))}
                             {extraColorCount > 0 && (
-                              <span
-                                className="h-6 text-xs px-1.5 text-muted-foreground inline-flex items-center"
-                                title={colorRows.slice(COLOR_CHIP_MAX).map(r => r.name).join(', ')}
+                              <button
+                                type="button"
+                                onClick={() => setExpandedColors(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+                                  return next;
+                                })}
+                                className="h-5 text-[11px] px-1.5 text-muted-foreground hover:text-foreground inline-flex items-center rounded hover:bg-[var(--fill-quaternary)]"
+                                title={isColorOpen ? '접기' : colorRows.slice(1).map(r => r.name).join(', ')}
                               >
-                                +{extraColorCount}
-                              </span>
+                                {isColorOpen ? '접기' : `+${extraColorCount}`}
+                              </button>
                             )}
                           </div>
                         ) : <span className="text-muted-foreground text-xs">—</span>}
