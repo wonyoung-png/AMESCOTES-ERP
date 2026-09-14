@@ -1003,7 +1003,7 @@ export default function VendorMaster() {
 
       {/* 등록/수정 모달 */}
       <Dialog open={showModal} onOpenChange={(open) => { if (!open) handleModalClose(true); }}>
-        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{isEdit ? '거래처 수정' : '거래처 등록'}</DialogTitle></DialogHeader>
           <div className="space-y-5 py-2">
 
@@ -1036,11 +1036,6 @@ export default function VendorMaster() {
                   );
                 })}
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                {editRegion === '국내'
-                  ? '사업자등록번호 · 세금계산서 정보를 입력합니다.'
-                  : '국가 · 통화 · 해외 송금 계좌(SWIFT)를 입력합니다.'}
-              </p>
             </div>
 
             {/* 사업자등록증 / 거래처정보 업로드 (국내 전용 — 해외는 사업자등록증이 없다) */}
@@ -1068,13 +1063,13 @@ export default function VendorMaster() {
                   <><Paperclip className="w-4 h-4" />사업자등록증 / 거래처정보 업로드</>
                 )}
               </Button>
-              <p className="text-xs text-muted-foreground">이미지·PDF → 사업자등록증 OCR | 엑셀(.xlsx/.xls) → 거래처 정보 자동 매핑</p>
+              <p className="text-xs text-muted-foreground">회사명·번호·주소가 자동으로 채워집니다</p>
             </div>
             )}
 
-            {/* 코드 + 회사명 섹션 */}
-            <div className="p-3 bg-[var(--fill-quaternary)] border border-border rounded-md">
-              <p className="text-xs font-medium text-muted-foreground mb-3">식별 정보</p>
+            {/* 사업자 정보 — 회색 박스 대신 구분선 하나로 묶는다 */}
+            <div className="border-t border-border pt-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">사업자 정보</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">코드 <span className="text-muted-foreground font-normal">(자동생성)</span></Label>
@@ -1173,9 +1168,12 @@ export default function VendorMaster() {
               </div>
             </div>
 
-            {/* 거래처 유형 */}
+            {/* 분류 — 유형과 자재유형은 같이 고르는 것이라 한 줄에 둔다 */}
+            <div className="border-t border-border pt-4">
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">분류</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
             <div className="space-y-1.5">
-              <Label>거래처 유형 <span className="text-[var(--system-red)]">*</span></Label>
+              <Label className="text-xs">거래처 유형 <span className="text-[var(--system-red)]">*</span></Label>
               <Select value={editVendor.type === '해외공장' ? '공장' : (editVendor.type || '바이어')} onValueChange={v => update('type', v as VendorType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -1200,7 +1198,7 @@ export default function VendorMaster() {
             {/* 자재 유형 (자재거래처만 표시) */}
             {editVendor.type === '자재거래처' && (
               <div className="space-y-1.5">
-                <Label>자재 유형 <span className="text-muted-foreground text-xs font-normal">(복수 선택 가능)</span></Label>
+                <Label className="text-xs">자재 유형 <span className="text-muted-foreground font-normal">복수 선택</span></Label>
                 <div className="flex items-center gap-2 flex-wrap">
                   {MATERIAL_TYPE_OPTIONS.map(mt => {
                     const isSelected = (editVendor.materialTypes || []).includes(mt);
@@ -1235,15 +1233,15 @@ export default function VendorMaster() {
                     className="mt-1.5 text-sm"
                   />
                 )}
-                <p className="text-[11px] text-muted-foreground">장식, 원단, 가죽, 기타 중 해당 유형을 모두 선택해주세요</p>
               </div>
             )}
+            </div>
 
             {/* 거래처명 입력칸은 없앴다 — 사업자 회사명이 곧 거래처명이라 저장 시 그대로 복사한다 */}
 
-            {/* 브랜드명 — 한 회사가 여러 브랜드를 운영할 수 있어 여러 개 등록한다. 검색에도 걸린다 */}
-            <div className="space-y-1.5">
-              <Label>브랜드명 <span className="text-muted-foreground text-xs font-normal">(여러 개 등록 가능)</span></Label>
+            {/* 브랜드명 — 회사명이 달라도 이 이름으로 목록에서 찾힌다 */}
+            <div className="space-y-1.5 mt-4">
+              <Label className="text-xs">브랜드명 <span className="text-muted-foreground font-normal">회사명이 달라도 이 이름으로 검색됩니다</span></Label>
               <div className="flex gap-2">
                 <Input
                   value={brandInput}
@@ -1264,23 +1262,24 @@ export default function VendorMaster() {
                   ))}
                 </div>
               )}
-              <p className="text-[11px] text-muted-foreground">회사명이 달라도 여기 적은 브랜드명으로 거래처 목록에서 검색됩니다.</p>
             </div>
 
-            {/* 담당자 정보 */}
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground">담당자 정보</p>
-              <div className="grid grid-cols-2 gap-3">
+            </div>
+
+            {/* 담당자 — 이름·전화·이메일은 한 줄에 들어간다 */}
+            <div className="border-t border-border pt-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">담당자</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <Label>담당자명</Label>
+                  <Label className="text-xs">이름</Label>
                   <Input value={editVendor.contactName || ''} onChange={e => update('contactName', e.target.value)} placeholder="홍길동" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>전화번호</Label>
+                  <Label className="text-xs">전화번호</Label>
                   <Input value={editVendor.contactPhone || ''} onChange={e => update('contactPhone', e.target.value)} placeholder="010-0000-0000" />
                 </div>
-                <div className="space-y-1.5 col-span-2">
-                  <Label>담당자 이메일</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">이메일</Label>
                   <Input value={editVendor.contactEmail || ''} onChange={e => update('contactEmail', e.target.value)} placeholder="contact@example.com" />
                 </div>
               </div>
@@ -1288,19 +1287,14 @@ export default function VendorMaster() {
 
             {/* 계산서 발행 이메일 (국내 전용 — 해외는 세금계산서 대상이 아님) */}
             {editRegion === '국내' && (
-            <div className="p-3 bg-primary/5 border border-primary/20 rounded-md space-y-2">
-              <p className="text-xs font-medium text-primary">계산서 / 세금계산서 발행 정보</p>
-              <div className="space-y-1.5">
-                <Label className="text-xs">세금계산서 수신 이메일 <span className="text-muted-foreground font-normal">(담당자 이메일과 다를 경우 별도 입력)</span></Label>
+              <div className="space-y-1.5 mt-4">
+                <Label className="text-xs">세금계산서 수신 이메일 <span className="text-muted-foreground font-normal">비우면 담당자 이메일로 발송</span></Label>
                 <Input
                   value={editVendor.billingEmail || ''}
                   onChange={e => update('billingEmail', e.target.value)}
-                  placeholder="billing@example.com (비우면 담당자 이메일 사용)"
-                  className="bg-card text-sm"
+                  placeholder="billing@example.com"
                 />
-                <p className="text-[11px] text-muted-foreground">비워두면 담당자 이메일로 발송됩니다.</p>
               </div>
-            </div>
             )}
 
             {/* 해외 송금 계좌정보 (해외 업체 전용) */}
@@ -1413,9 +1407,11 @@ export default function VendorMaster() {
             )}
 
             {/* 거래 조건 */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="border-t border-border pt-4">
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-3">거래 조건</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>청구 방식</Label>
+                <Label className="text-xs">청구 방식</Label>
                 <Select value={editVendor.billingType || 'none'} onValueChange={v => update('billingType', v === 'none' ? undefined : v as BillingType)}>
                   <SelectTrigger><SelectValue placeholder="선택" /></SelectTrigger>
                   <SelectContent>
@@ -1425,9 +1421,10 @@ export default function VendorMaster() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>결제 조건</Label>
+                <Label className="text-xs">결제 조건</Label>
                 <Input value={editVendor.settlementCycle || ''} onChange={e => update('settlementCycle', e.target.value)} placeholder="예: 익월 15일, T/T 30일" />
               </div>
+            </div>
             </div>
 
             
