@@ -2645,8 +2645,9 @@ export default function ItemMaster() {
                                 </span>
                               </button>
                             ))}
+                            {/* 펼치면 +N 대신 빈 칸을 남긴다. 여기만 한 줄 짧아지면 컬러 열과 어긋난다 */}
                             {extraColorCount > 0 && (
-                              <span className="h-6 px-1 inline-flex items-center text-muted-foreground">+{extraColorCount}</span>
+                              <span className="h-6 px-1 inline-flex items-center text-muted-foreground">{isColorOpen ? '' : `+${extraColorCount}`}</span>
                             )}
                           </div>
                         ) : bomCost > 0 ? (
@@ -2669,8 +2670,9 @@ export default function ItemMaster() {
                                 </span>
                               </div>
                             ))}
+                            {/* 펼치면 +N 대신 빈 칸을 남긴다. 여기만 한 줄 짧아지면 컬러 열과 어긋난다 */}
                             {extraColorCount > 0 && (
-                              <span className="h-6 px-1 inline-flex items-center text-muted-foreground">+{extraColorCount}</span>
+                              <span className="h-6 px-1 inline-flex items-center text-muted-foreground">{isColorOpen ? '' : `+${extraColorCount}`}</span>
                             )}
                           </div>
                         ) : factoryUnitCostKrw > 0 ? (
