@@ -12,3 +12,6 @@ dist/
 # 코덱스 작업 프롬프트 (임시)
 .codex_task_prompt.txt
 *.diff
+
+# graphify 산출물
+graphify-out/
