@@ -1430,7 +1430,21 @@ export const store = {
   setSamples: (v: Sample[]) => setAll(KEYS.samples, v),
   addSample: (v: Sample) => { const a = getAll<Sample>(KEYS.samples); a.push(v); setAll(KEYS.samples, a); sbUpsert('samples', v); },
   updateSample: (id: string, u: Partial<Sample>) => { const a = getAll<Sample>(KEYS.samples); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.samples, a); sbUpdate('samples', id, u); } },
-  deleteSample: (id: string) => { setAll(KEYS.samples, getAll<Sample>(KEYS.samples).filter(x => x.id !== id)); sbDelete('samples', id); },
+  /**
+   * 샘플 삭제 — 로컬을 먼저 지우고 서버 삭제 결과를 돌려준다.
+   * 서버가 실패해도 화면에서는 사라지므로, 호출부가 결과를 보고 사용자에게 알려야 한다.
+   */
+  deleteSample: async (id: string): Promise<{ ok: boolean; error?: string }> => {
+    setAll(KEYS.samples, getAll<Sample>(KEYS.samples).filter(x => x.id !== id));
+    try {
+      const { error } = await supabase.from('samples').delete().eq('id', id);
+      if (error) { reportSbFailure('samples', 'delete', error.message); return { ok: false, error: error.message }; }
+      return { ok: true };
+    } catch (e: any) {
+      reportSbFailure('samples', 'delete', String(e));
+      return { ok: false, error: String(e?.message || e) };
+    }
+  },
 
   // Post Costs
   getPostCosts: () => getAll<PostCost>(KEYS.postCosts),

@@ -10,7 +10,7 @@ import {
   type SampleMaterialRequest, type SampleDocument,
   type Item, type TradeStatement, type TradeStatementLine,
 } from '@/lib/store';
-import { fetchSamples, upsertSample as upsertSampleSB, deleteSample as deleteSampleSB, fetchItems, fetchVendors, upsertItem as upsertItemSB } from '@/lib/supabaseQueries';
+import { fetchSamples, upsertSample as upsertSampleSB, fetchItems, fetchVendors, upsertItem as upsertItemSB } from '@/lib/supabaseQueries';
 import { generateStyleNo } from '@/lib/styleNo';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -556,15 +556,11 @@ export default function SampleManagement() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('삭제하시겠습니까?')) return;
-    // 서버만 지우면 localStorage에 남은 것이 다음 조회 때 되살아난다 — 양쪽을 지운다
-    store.deleteSample(id);
-    try {
-      await deleteSampleSB(id);
-    } catch (e: any) {
-      toast.error(`서버 삭제 실패: ${e?.message || e}`);
-    }
+    // 삭제 주인은 store 하나다. 로컬을 지우고 서버 결과까지 받아온다
+    const r = await store.deleteSample(id);
     refresh();
-    toast.success('삭제되었습니다');
+    if (r.ok) toast.success('삭제되었습니다');
+    else toast.error(`화면에서만 지워졌습니다 — 서버 삭제 실패: ${r.error}`);
   };
 
   // 체크박스 다중 선택 관련
@@ -592,11 +588,14 @@ export default function SampleManagement() {
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
     if (confirm(`${selectedIds.size}개 항목을 삭제하시겠습니까?`)) {
-      const count = selectedIds.size;
-      const ids = [...selectedIds];
-      ids.forEach(id => store.deleteSample(id));
-      Promise.allSettled(ids.map(id => deleteSampleSB(id)))
-        .then(() => { setSelectedIds(new Set()); refresh(); toast.success(`${count}개 항목이 삭제되었습니다`); });
+      const ids = Array.from(selectedIds);
+      Promise.all(ids.map(id => store.deleteSample(id))).then(results => {
+        setSelectedIds(new Set());
+        refresh();
+        const failed = results.filter(r => !r.ok).length;
+        if (failed === 0) toast.success(`${ids.length}개 항목이 삭제되었습니다`);
+        else toast.error(`${ids.length}개 중 ${failed}개가 서버에서 안 지워졌습니다 — 새로고침 후 다시 시도하세요`);
+      });
     }
   };
 

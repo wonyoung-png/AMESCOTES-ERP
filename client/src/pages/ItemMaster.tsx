@@ -70,12 +70,25 @@ function SearchableSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
+  const [active, setActive] = useState(0);
   const hit = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return options;
     return options.filter(o => `${o.label} ${o.sub || ''}`.toLowerCase().includes(t));
   }, [options, q]);
   const current = options.find(o => o.value === value);
+  // 전체 + 걸린 항목들. 화살표는 이 목록을 훑는다
+  const rows = useMemo(() => [{ value: '전체', label: allLabel }, ...hit], [hit, allLabel]);
+
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(i => Math.min(i + 1, rows.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(i => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const pick = rows[active];
+      if (pick) { onChange(pick.value); setOpen(false); }
+    }
+  };
 
   return (
     <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) setQ(''); }}>
@@ -93,33 +106,33 @@ function SearchableSelect({
       <PopoverContent align="start" className="w-56 p-0">
         <div className="p-2 border-b border-border">
           <Input
-            autoFocus
+            /* 폰에서는 열자마자 키보드가 올라와 목록을 덮는다 — 마우스 환경에서만 자동 포커스 */
+            autoFocus={typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches}
             value={q}
-            onChange={e => setQ(e.target.value)}
+            onChange={e => { setQ(e.target.value); setActive(0); }}
+            onKeyDown={onKey}
             placeholder={placeholder}
             className="h-8 text-sm"
           />
         </div>
-        <div className="max-h-64 overflow-y-auto py-1">
-          <button
-            type="button"
-            onClick={() => { onChange('전체'); setOpen(false); }}
-            className="w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--fill-quaternary)]"
-          >
-            {allLabel}
-          </button>
-          {hit.map(o => (
+        <div className="max-h-64 overflow-y-auto py-1" role="listbox">
+          {rows.map((o, i) => (
             <button
               key={o.value}
               type="button"
+              role="option"
+              aria-selected={o.value === value}
+              onMouseEnter={() => setActive(i)}
               onClick={() => { onChange(o.value); setOpen(false); }}
-              className="w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--fill-quaternary)] flex items-baseline gap-2"
+              className={`w-full text-left px-3 py-1.5 text-sm flex items-baseline gap-2 ${
+                i === active ? 'bg-[var(--fill-quaternary)]' : ''
+              }`}
             >
               <span className="truncate">{o.label}</span>
-              {o.sub && <span className="text-xs text-muted-foreground truncate">{o.sub}</span>}
+              {(o as any).sub && <span className="text-xs text-muted-foreground truncate">{(o as any).sub}</span>}
             </button>
           ))}
-          {hit.length === 0 && (
+          {rows.length <= 1 && q.trim() && (
             <p className="px-3 py-4 text-xs text-muted-foreground text-center">찾는 결과가 없습니다</p>
           )}
         </div>
@@ -1134,7 +1147,7 @@ export default function ItemMaster() {
     const set = new Set<string>(SEASONS);
     items.forEach(i => { if (i.season) set.add(String(i.season)); });
     // 25FW → 26SS → 26FW 순. 연도 먼저, 같은 해면 SS가 앞
-    return [...set].sort((a, b) => {
+    return Array.from(set).sort((a, b) => {
       const ya = parseInt(a) || 0, yb = parseInt(b) || 0;
       if (ya !== yb) return ya - yb;
       return a.localeCompare(b);
@@ -1149,13 +1162,13 @@ export default function ItemMaster() {
       if (i.category) set.add(String(i.category));
       if ((i as any).customCategory) set.add(String((i as any).customCategory));
     });
-    return [...set].filter(Boolean).sort();
+    return Array.from(set).filter(Boolean).sort();
   }, [items]);
 
   const erpCategoryOptions = useMemo(() => {
     const set = new Set<string>(['HB', 'ACC', 'SHOES', 'PACK']);
     items.forEach(i => { if (i.erpCategory) set.add(String(i.erpCategory)); });
-    return [...set];
+    return Array.from(set);
   }, [items]);
 
   // 현재 선택된 erpCategory에 따른 세부 카테고리 옵션
@@ -2598,7 +2611,7 @@ export default function ItemMaster() {
                                   if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
                                   return next;
                                 })}
-                                className="h-5 text-[11px] px-1.5 text-muted-foreground hover:text-foreground inline-flex items-center rounded hover:bg-[var(--fill-quaternary)]"
+                                className="h-6 text-[11px] px-1.5 text-muted-foreground hover:text-foreground inline-flex items-center rounded hover:bg-[var(--fill-quaternary)]"
                                 title={isColorOpen ? '접기' : colorRows.slice(1).map(r => r.name).join(', ')}
                               >
                                 {isColorOpen ? '접기' : `+${extraColorCount}`}
