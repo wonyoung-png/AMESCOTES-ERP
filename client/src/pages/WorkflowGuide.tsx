@@ -119,7 +119,7 @@ const OEM_PRE: FlowNode[] = [
   { id: 'vendors', label: '거래처', sub: '바이어 · 공장 · 자재처', path: '/vendors', icon: <Building2 size={16} />, tone: 'master' },
   { id: 'samples', label: '샘플', sub: '개발 · 승인', path: '/samples', icon: <FlaskConical size={16} />, tone: 'master' },
   { id: 'items', label: '품목', sub: '스타일 · 컬러', path: '/items', icon: <Package size={16} />, tone: 'master' },
-  { id: 'bom', label: 'BOM / 원가', sub: '사후원가 우선', path: '/bom', icon: <ClipboardList size={16} />, tone: 'master' },
+  { id: 'bom', label: 'BOM / 원가 / 견적', sub: '원가 산출 후 견적서 출력', path: '/bom', icon: <ClipboardList size={16} />, tone: 'master' },
 ];
 
 const OEM_MAIN: FlowNode[] = [
@@ -135,11 +135,11 @@ const OEM_FACTORY_ONLY: FlowNode = {
 };
 
 const OEM_AFTER: FlowNode[] = [
-  { id: 'recv', label: '입고 · 출고', sub: '부분입고 · 직출고', path: '/receiving', icon: <Truck size={16} />, tone: 'produce' },
+  { id: 'recv', label: '입고 · 출고 · 선적', sub: '부분입고 · 직출고 · 선적계획', path: '/receiving', icon: <Truck size={16} />, tone: 'produce' },
   { id: 'trade', label: '거래명세표', sub: '청구 · 세금계산서', path: '/trade-statement', icon: <FileText size={16} />, tone: 'settle' },
   { id: 'settle', label: '미수금 / 정산', sub: '수금 · D-day', path: '/settlement', icon: <Receipt size={16} />, tone: 'settle' },
   { id: 'pay', label: '미지급 · 불량차감', sub: '자재·임가공 결제', path: '/payables', icon: <Wallet size={16} />, tone: 'settle' },
-  { id: 'pl', label: '프로젝트 손익', sub: '품목·컬러 원가', path: '/project-pl', icon: <BarChart3 size={16} />, tone: 'settle' },
+  { id: 'pl', label: '매출 · 영업이익', sub: '품목·컬러 원가', path: '/project-pl', icon: <BarChart3 size={16} />, tone: 'settle' },
 ];
 
 const BRAND_PRE: FlowNode[] = [

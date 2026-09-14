@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Network,
   GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight,
-  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp, Inbox,
+  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp, Inbox, Warehouse,
 } from 'lucide-react';
 
 interface NavItem {
@@ -55,6 +55,7 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/projects', label: '프로젝트', icon: <ClipboardList size={17} />, table: 'projects' },
       { path: '/calendar', label: '운영 캘린더 · 기획전', icon: <CalendarDays size={17} />, table: 'campaigns' },
+      { path: '/line-sheet', label: '라인시트', icon: <FileSpreadsheet size={17} />, table: 'items', lumenOnly: true },
     ],
   },
   {
@@ -74,7 +75,15 @@ const navGroups: NavGroup[] = [
       { path: '/inbound-po', label: '수주함', icon: <Inbox size={17} />, table: 'brand_order_lines', oemOnly: true },
       { path: '/orders', label: '생산 발주', icon: <Factory size={17} />, table: 'production_orders', oemOnly: true },
       { path: '/brand-orders', label: '오더관리', icon: <Factory size={17} />, table: 'production_orders', lumenOnly: true },
+      { path: '/receiving', label: '입고 · 출고 · 선적', icon: <Truck size={17} />, table: 'receipt_logs' },
       { path: '/deadlines', label: '납기 캘린더', icon: <CalendarClock size={17} />, table: 'milestones', oemOnly: true },
+    ],
+  },
+  {
+    label: '물류',
+    brandOnly: true,
+    items: [
+      { path: '/china-warehouse', label: '중국창고', icon: <Warehouse size={17} />, table: 'china_stock' },
     ],
   },
   {

@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { onSaveFail } from '@/lib/saveGuard';
 import {
-  Plus, Search, Trash2, Camera, FileText,
+  Plus, Search, Trash2, Camera, FileText, ClipboardList,
   ClipboardCheck, Eye, PackagePlus, FileSpreadsheet, File, Paperclip,
   List, CalendarDays, ChevronLeft, ChevronRight,
 } from 'lucide-react';
@@ -1336,8 +1336,12 @@ export default function SampleManagement() {
                             <PackagePlus className="w-3 h-3 mr-1" />품목등록
                           </Button>
                         ) : (
-                          /* 품목 등록 완료(ACTIVE) → 버튼 없음, 텍스트만 표시 */
-                          <span className="text-xs text-[var(--system-green)] font-medium px-1">✓ 품목등록완료</span>
+                          /* 품목까지 등록됐으면 다음은 BOM이다 — 여기서 바로 넘어간다 */
+                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-primary hover:text-primary"
+                            onClick={() => navigate(`/bom?styleNo=${encodeURIComponent(registeredItem.styleNo)}`)}
+                            title={`${registeredItem.styleNo} BOM 작성`}>
+                            <ClipboardList className="w-3 h-3 mr-1" />BOM 작성
+                          </Button>
                         );
                       })()}
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
