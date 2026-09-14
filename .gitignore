@@ -8,3 +8,7 @@ dist/
 !.claude/hooks/
 !.claude/hooks/**
 !.claude/settings.json
+
+# 코덱스 작업 프롬프트 (임시)
+.codex_task_prompt.txt
+*.diff
