@@ -23,6 +23,18 @@ export type BrandBatchStatus = 'draft' | 'in_approval' | 'approved' | 'issued' |
 export type PayableStatus = 'pending' | 'partial' | 'paid';
 export type PayablePayeeType = 'factory_direct' | 'china_corp';
 export type DefectStatus = 'pending' | 'applied';
+/**
+ * 불량 처리 방법.
+ *   deduct  차감   — 공장 대금에서 뺀다 (기본)
+ *   rework  재작업 — 공장이 다시 만들어 보낸다. 대금은 그대로
+ *   repair  수정   — 우리가 손봐서 쓴다. 대금은 그대로
+ * 재작업·수정은 금액을 깎지 않으므로 차감 합계에서 빠진다.
+ */
+export type DefectDisposition = 'deduct' | 'rework' | 'repair';
+
+export const DEFECT_DISPOSITION_LABEL: Record<DefectDisposition, string> = {
+  deduct: '차감', rework: '재작업', repair: '수정',
+};
 
 /** 오더관리 파생 상태 */
 export type OrderProdAxis = 'ordered' | 'in_progress' | 'produced';
@@ -79,8 +91,12 @@ export interface DefectCarryover {
   vendorId?: string;
   vendorName: string;
   amountKrw: number;
+  /** 불량 수량 — 재작업·수정은 금액이 아니라 수량으로 관리한다 */
+  qty?: number;
   reason: string;
   defectDate: string;
+  /** 차감 / 재작업 / 수정. 없으면 예전 데이터라 차감으로 본다 */
+  disposition?: DefectDisposition;
   status: DefectStatus;
   appliedStatementId?: string;
   createdAt: string;
@@ -1548,6 +1564,8 @@ async function syncDefect(d: DefectCarryover) {
     vendor_id: d.vendorId,
     vendor_name: d.vendorName,
     amount_krw: d.amountKrw,
+    qty: d.qty,
+    disposition: d.disposition || 'deduct',
     reason: d.reason,
     defect_date: d.defectDate,
     status: d.status,
@@ -1779,6 +1797,8 @@ export async function syncPhase1FromSupabase() {
         vendorId: r.vendor_id,
         vendorName: r.vendor_name,
         amountKrw: r.amount_krw,
+        qty: r.qty ?? undefined,
+        disposition: r.disposition || 'deduct',
         reason: r.reason,
         defectDate: r.defect_date,
         status: r.status,

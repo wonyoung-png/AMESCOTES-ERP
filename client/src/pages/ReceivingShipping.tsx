@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, formatNumber, genId } from '@/lib/store';
-import { phase1, type DeliveryMarket, type ReceiptLogType } from '@/lib/phase1';
+import { phase1, DEFECT_DISPOSITION_LABEL, type DeliveryMarket, type ReceiptLogType, type DefectDisposition } from '@/lib/phase1';
 import { fetchOrders } from '@/lib/supabaseQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,7 +30,7 @@ export default function ReceivingShipping() {
   const [search, setSearch] = usePersistedState('receiving.search', '');
   const [logFilter, setLogFilter] = useState<ReceiptLogType | 'all'>('all');
   const [modal, setModal] = useState<{ orderId: string; logType: ReceiptLogType } | null>(null);
-  const [form, setForm] = useState({ qty: 0, defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: 'domestic' as DeliveryMarket });
+  const [form, setForm] = useState({ qty: 0, defectQty: 0, defectNote: '', defectDisposition: 'deduct' as DefectDisposition, date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: 'domestic' as DeliveryMarket });
   const [shippingOpen, setShippingOpen] = useState(false);
   const [shippingForm, setShippingForm] = useState({ shipDate: today, method: 'air' as ShippingMethod, orderNo: '', description: '', qty: 0, memo: '' });
   const [, tick] = useState(0);
@@ -67,7 +67,7 @@ export default function ReceivingShipping() {
     const o = orders.find(x => x.id === orderId);
     const sum = phase1.getOrderReceiptSummary(orderId, o?.qty || 0);
     const remain = logType === 'inbound' ? o!.qty - sum.receivedQty : o!.qty - sum.shippedQty;
-    setForm({ qty: Math.max(0, remain), defectQty: 0, defectNote: '', date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: logType === 'outbound_oem' ? 'b2b' : 'domestic' });
+    setForm({ qty: Math.max(0, remain), defectQty: 0, defectNote: '', defectDisposition: 'deduct', date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: logType === 'outbound_oem' ? 'b2b' : 'domestic' });
     setModal({ orderId, logType });
   };
 
@@ -113,7 +113,10 @@ export default function ReceivingShipping() {
         projectNo: (o as { projectNo?: string }).projectNo,
         vendorId: o.vendorId,
         vendorName: o.vendorName,
-        amountKrw: unit * form.defectQty,
+        // 재작업·수정은 대금을 깎지 않는다. 수량만 남겨 추적한다
+        amountKrw: form.defectDisposition === 'deduct' ? unit * form.defectQty : 0,
+        qty: form.defectQty,
+        disposition: form.defectDisposition,
         reason: form.defectNote || '입고 불량',
         defectDate: form.date,
       });
@@ -270,6 +273,31 @@ export default function ReceivingShipping() {
               <>
                 <div><Label>불량 수량</Label><Input type="number" min="0" value={form.defectQty} onChange={e => setForm(f => ({ ...f, defectQty: +e.target.value }))} /></div>
                 <div><Label>불량 사유</Label><Input value={form.defectNote} onChange={e => setForm(f => ({ ...f, defectNote: e.target.value }))} /></div>
+                {form.defectQty > 0 && (
+                  <div className="col-span-2 space-y-1.5">
+                    <Label>불량 처리</Label>
+                    <div className="flex gap-2">
+                      {(['deduct', 'rework', 'repair'] as DefectDisposition[]).map(d => (
+                        <button key={d} type="button"
+                          onClick={() => setForm(f => ({ ...f, defectDisposition: d }))}
+                          className={`flex-1 h-9 rounded-md border text-sm transition-colors ${
+                            form.defectDisposition === d
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-card text-muted-foreground border-border hover:border-primary/40'
+                          }`}>
+                          {DEFECT_DISPOSITION_LABEL[d]}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {form.defectDisposition === 'deduct'
+                        ? '공장 대금에서 뺍니다 — 미지급·불량차감에 올라갑니다'
+                        : form.defectDisposition === 'rework'
+                          ? '공장이 다시 만들어 보냅니다 — 대금은 그대로입니다'
+                          : '우리가 손봐서 씁니다 — 대금은 그대로입니다'}
+                    </p>
+                  </div>
+                )}
               </>
             )}
             {modal?.logType !== 'inbound' && <div><Label>배송 판매처</Label><Select value={form.deliveryMarket} onValueChange={v => setForm(f => ({ ...f, deliveryMarket: v as DeliveryMarket }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="domestic">국내</SelectItem><SelectItem value="b2b">B2B</SelectItem><SelectItem value="overseas">해외</SelectItem></SelectContent></Select></div>}            <div><Label>일자</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>

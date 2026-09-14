@@ -1,8 +1,8 @@
 // 미지급 · 불량 차감 이월
 import { useMemo, useState } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { phase1 } from '@/lib/phase1';
-import { store, formatKRW } from '@/lib/store';
+import { phase1, DEFECT_DISPOSITION_LABEL } from '@/lib/phase1';
+import { store, formatKRW, formatNumber } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -76,7 +76,7 @@ export default function PayablesManagement() {
       <div className="flex flex-wrap justify-between items-start gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground">미지급 · 불량차감</h1>
-          <p className="text-sm text-muted-foreground">매입 미지급 · 불량 차감 이월 (다음 명세 자동 반영)</p>
+          <p className="text-sm text-muted-foreground">매입 미지급 · 불량 차감 이월 · 재작업/수정 추적</p>
         </div>
         <Button onClick={() => setPayModal(true)}>+ 미지급 등록</Button>
       </div>
@@ -201,6 +201,8 @@ export default function PayablesManagement() {
             <tr>
               <th className="nw">발주번호</th>
               <th>거래처</th>
+              <th className="nw">처리</th>
+              <th className="num">수량</th>
               <th className="num">차감액</th>
               <th>사유</th>
               <th className="nw">상태</th>
@@ -208,7 +210,7 @@ export default function PayablesManagement() {
           </thead>
           <tbody>
             {shownDefects.length === 0 && (
-              <tr><td colSpan={5} className="text-center py-10 text-muted-foreground text-sm">
+              <tr><td colSpan={7} className="text-center py-10 text-muted-foreground text-sm">
                 {filterOn ? '조건에 맞는 차감이 없습니다' : '불량 차감 이월이 없습니다'}
               </td></tr>
             )}
@@ -222,7 +224,17 @@ export default function PayablesManagement() {
                   </Link>
                 </td>
                 <td className="font-medium">{d.vendorName}</td>
-                <td className="num text-[var(--system-red)]">{formatKRW(d.amountKrw)}</td>
+                <td className="nw">
+                  <span className={`text-[11px] px-1.5 py-0.5 rounded border ${
+                    (d.disposition || 'deduct') === 'deduct'
+                      ? 'border-[var(--system-red)]/30 text-[var(--system-red)] bg-[var(--system-red)]/5'
+                      : 'border-border text-muted-foreground bg-[var(--fill-quaternary)]'
+                  }`}>
+                    {DEFECT_DISPOSITION_LABEL[d.disposition || 'deduct']}
+                  </span>
+                </td>
+                <td className="num text-muted-foreground">{d.qty ? formatNumber(d.qty) : '—'}</td>
+                <td className="num text-[var(--system-red)]">{d.amountKrw > 0 ? formatKRW(d.amountKrw) : '—'}</td>
                 <td className="text-muted-foreground">{d.reason}</td>
                 <td>
                   <span className={`text-xs px-2 py-0.5 rounded ${d.status === 'applied' ? 'bg-[var(--fill-quaternary)] text-[var(--system-green)]' : 'bg-[var(--fill-quaternary)] text-[var(--system-orange)]'}`}>
