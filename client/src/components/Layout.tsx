@@ -1,7 +1,7 @@
 // ATLM ERP — Layout (Phase 1: 제조/OEM)
 // 기존 AMESCOTES 생산 기능 유지 · 브랜드운영·AI 메뉴는 Phase 2
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useLocation, Link } from 'wouter';
 import { store } from '@/lib/store';
 import { getCurrentUser, logout, isAdminEmail } from '@/lib/auth';
@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Network,
   GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight,
-  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp, Inbox, Warehouse,
+  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp, Inbox, Warehouse, Star,
 } from 'lucide-react';
 
 interface NavItem {
@@ -22,7 +22,7 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   table?: string;
-  /** LUMEN 워크스페이스에서만 표시 */
+  /** 브랜드 워크스페이스(LUMEN·AETALOOF)에서만 표시 — OEM 탭에서는 숨김 (이름은 LUMEN 만 있던 시절의 것) */
   lumenOnly?: boolean;
   /** OEM 워크스페이스에서만 표시 */
   oemOnly?: boolean;
@@ -175,6 +175,58 @@ interface LayoutProps {
   onLogout?: () => void;
 }
 
+/**
+ * 사이드바 한 줄 — 즐겨찾기 구역과 본 목록이 같은 모양을 쓴다.
+ * Layout 안에서 만들면 렌더마다 새 타입이 되어 별을 누를 때마다 메뉴가 통째로 다시 붙는다 (코덱스 지적).
+ */
+const SideLink = React.memo(function SideLink({ item, active, fav, collapsed, onToggleFav, onNavigate }: {
+  item: NavItem;
+  active: boolean;
+  fav: boolean;
+  collapsed: boolean;
+  onToggleFav: (path: string) => void;
+  onNavigate: () => void;
+}) {
+  return (
+    <div className="relative group/item">
+      <Link
+        href={item.path}
+        onClick={onNavigate}
+        className={`
+          relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 mb-0.5 outline-none focus-visible:outline-none
+          ${active
+            ? 'bg-[var(--fill-quaternary)] text-foreground font-medium'
+            : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'
+          }
+          ${collapsed ? 'justify-center px-2' : 'pr-8'}
+        `}
+      >
+        {active && (
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-[var(--accent-mint)]" />
+        )}
+        <span className={`shrink-0 ${active ? 'text-sidebar-primary' : ''}`}>{item.icon}</span>
+        {!collapsed && <span className="flex-1 min-w-0 truncate">{item.label}</span>}
+      </Link>
+      {/* 별은 평소에 숨어 있다가 줄에 마우스를 올리면 나온다. 이미 찍은 것은 계속 보인다 */}
+      {!collapsed && (
+        <button
+          type="button"
+          aria-label={fav ? `${item.label} 즐겨찾기 해제` : `${item.label} 즐겨찾기`}
+          title={fav ? '즐겨찾기 해제' : '즐겨찾기에 추가'}
+          onClick={() => onToggleFav(item.path)}
+          className={`absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded transition-opacity
+            ${fav
+              ? 'opacity-100 text-[var(--accent-mint)]'
+              // 폰에는 마우스 올리기가 없다. 좁은 화면에서는 흐리게라도 늘 보여야 누를 수 있다
+              : 'opacity-0 max-md:opacity-50 group-hover/item:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-foreground'}`}
+        >
+          <Star size={13} fill={fav ? 'currentColor' : 'none'} />
+        </button>
+      )}
+    </div>
+  );
+});
+
 export default function Layout({ children, onLogout }: LayoutProps) {
   const [location] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -185,6 +237,20 @@ export default function Layout({ children, onLogout }: LayoutProps) {
   const toggleGroup = (label: string) => setClosedGroups(prev => {
     const next = prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label];
     localStorage.setItem('nav_closed_groups', JSON.stringify(next));
+    return next;
+  });
+  // 즐겨찾기 — 자주 쓰는 메뉴를 맨 위로 끌어올린다. 쓰는 사람마다 다르니 이 브라우저에만 둔다
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    // 사생활 보호 모드면 읽기부터 막히고, 남이 넣어둔 값이 배열이 아닐 수도 있다 (코덱스 지적)
+    try {
+      const v = JSON.parse(localStorage.getItem('nav_favorites') || '[]');
+      return Array.isArray(v) ? v.filter((p): p is string => typeof p === 'string') : [];
+    } catch { return []; }
+  });
+  const toggleFavorite = (path: string) => setFavorites(prev => {
+    const next = prev.includes(path) ? prev.filter(p => p !== path) : [...prev, path];
+    // 저장이 막혀도 이번 화면에서는 동작해야 한다 — 실패는 조용히 넘긴다
+    try { localStorage.setItem('nav_favorites', JSON.stringify(next)); } catch { /* 저장 불가 */ }
     return next;
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -204,6 +270,27 @@ export default function Layout({ children, onLogout }: LayoutProps) {
   };
 
   const isBrand = workspace !== 'OEM';
+
+  /** 이 워크스페이스·이 사람에게 보이는 메뉴인가 */
+  const visible = (i: NavItem) =>
+    !(i.oemOnly && isBrand) && !(i.lumenOnly && !isBrand) && !(i.adminOnly && !isAdminEmail(currentUser?.email));
+
+  /** 즐겨찾기로 찍어둔 메뉴 — 저장한 순서대로, 지금 안 보이는 것은 빼고 */
+  const favItems = favorites
+    .map(p => navGroups.flatMap(g => g.items).find(i => i.path === p))
+    .filter((i): i is NavItem => !!i && visible(i));
+
+  const sideLink = (item: NavItem) => (
+    <SideLink
+      key={item.path}
+      item={item}
+      active={isActive(item.path)}
+      fav={favorites.includes(item.path)}
+      collapsed={collapsed}
+      onToggleFav={toggleFavorite}
+      onNavigate={() => setSidebarOpen(false)}
+    />
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -276,6 +363,21 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3 px-2">
+          {/* 즐겨찾기 — 찍어둔 게 있을 때만 맨 위에 붙는다 */}
+          {favItems.length > 0 && (
+            <div className="mb-1">
+              {collapsed ? (
+                <div className="my-2 mx-2 h-px bg-border" />
+              ) : (
+                <div className="px-3 pt-1 pb-1.5 flex items-center gap-1.5">
+                  <Star size={11} className="text-[var(--accent-mint)]" fill="currentColor" />
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase">즐겨찾기</span>
+                </div>
+              )}
+              {favItems.map(sideLink)}
+              {!collapsed && <div className="mt-2 mx-3 h-px bg-border" />}
+            </div>
+          )}
           {navGroups.map((group, gi) => {
             // oemOnly: LUMEN/AETALOOF에서 숨김 · brandOnly: OEM에서 숨김
             if (group.oemOnly && isBrand) return null;
@@ -300,37 +402,9 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                 </button>
               )}
               {group.label && collapsed && <div className="my-2 mx-2 h-px bg-border" />}
-              {(group.label && !collapsed && closedGroups.includes(group.label) ? [] : group.items).map((item) => {
-                if (item.oemOnly && isBrand) return null;
-                if (item.lumenOnly && !isBrand) return null;
-                if (item.adminOnly && !isAdminEmail(currentUser?.email)) return null;
-                const active = isActive(item.path);
-                return (
-                  <Link
-                    key={item.path}
-                    href={item.path}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`
-                      relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 mb-0.5 outline-none focus-visible:outline-none
-                      ${active
-                        ? 'bg-[var(--fill-quaternary)] text-foreground font-medium'
-                        : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'
-                      }
-                      ${collapsed ? 'justify-center px-2' : ''}
-                    `}
-                  >
-                    {active && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-[var(--accent-mint)]" />
-                    )}
-                    <span className={`shrink-0 ${active ? 'text-sidebar-primary' : ''}`}>
-                      {item.icon}
-                    </span>
-                    {!collapsed && (
-                      <span className="flex-1 min-w-0 truncate">{item.label}</span>
-                    )}
-                  </Link>
-                );
-              })}
+              {(group.label && !collapsed && closedGroups.includes(group.label) ? [] : group.items)
+                .filter(visible)
+                .map(sideLink)}
             </div>
             );
           })}
