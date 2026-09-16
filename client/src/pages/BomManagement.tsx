@@ -4363,7 +4363,15 @@ export default function BomManagement() {
                           const linkedItem = items.find(i => i.id === editBom.styleId);
                           const deliveryPrice = linkedItem?.deliveryPrice || linkedItem?.targetSalePrice;
                           if (!deliveryPrice || deliveryPrice <= 0) return null;
-                          const marginAmt = deliveryPrice - displayTotalCostKrw;
+                          /*
+                           * 생산마진도 우리 마진이다. 총원가액(생산마진 포함)에서 빼면
+                           * 납품가를 더 받아 생긴 '추가마진'만 남아 실제보다 낮게 나온다.
+                           *   총마진 = 납품가 - 실원가(subTotal) = 생산마진 + 추가마진
+                           */
+                          const preProductionMarginKrw = summary?.productionMarginKrw || 0;
+                          const preRealCost = summary?.subTotal ?? displayTotalCostKrw;
+                          const extraMarginAmt = deliveryPrice - displayTotalCostKrw;
+                          const marginAmt = deliveryPrice - preRealCost;
                           const marginPct = (marginAmt / deliveryPrice) * 100;
                           const marginClass = marginPct < 15 ? 'text-[var(--system-red)]' : marginPct < 20 ? 'text-[var(--system-orange)]' : marginPct <= 30 ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]';
                           const marginBg = marginPct < 15 ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20' : marginPct < 30 ? 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20';
@@ -4377,8 +4385,18 @@ export default function BomManagement() {
                               <tr>
                                 <td colSpan={4} className="px-4 py-2">
                                   <div className={`flex items-center justify-between px-4 py-2.5 rounded-lg border ${marginBg}`}>
-                                    <div className="flex items-center gap-4">
-                                      <span className="text-xs text-muted-foreground">마진금액</span>
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                      {preProductionMarginKrw > 0 && (
+                                        <>
+                                          <span className="text-xs text-muted-foreground">생산마진</span>
+                                          <span className="font-mono text-sm text-muted-foreground">{fmtKrw(preProductionMarginKrw)}</span>
+                                          <span className="text-muted-foreground">+</span>
+                                          <span className="text-xs text-muted-foreground">추가마진</span>
+                                          <span className="font-mono text-sm text-muted-foreground">{fmtKrw(extraMarginAmt)}</span>
+                                          <span className="text-muted-foreground">=</span>
+                                        </>
+                                      )}
+                                      <span className="text-xs text-muted-foreground">총마진</span>
                                       <span className={`font-mono font-bold text-sm ${marginClass}`}>{fmtKrw(marginAmt)}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -4914,7 +4932,14 @@ export default function BomManagement() {
                 const postTotalWithMarginKrw = ps.totalCostKrw + postProductionMarginKrw;
                 const deliveryPrice = editBom.postDeliveryPrice || linkedItem?.deliveryPrice || linkedItem?.targetSalePrice || 0;
                 const finalCost = postMarginRate > 0 ? postTotalWithMarginKrw : ps.totalCostKrw;
-                const marginAmt = deliveryPrice > 0 ? deliveryPrice - finalCost : 0;
+                /*
+                 * 생산마진도 우리가 챙기는 마진이다. 그런데 총원가액(생산마진 포함)에서 빼면
+                 * 납품가를 더 받아 생긴 '추가마진'만 남아 실제보다 낮게 나왔다.
+                 *   총마진 = 납품가 - 실원가(생산마진 전) = 생산마진 + 추가마진
+                 * 총원가액·발주·견적은 생산마진 포함 값을 그대로 쓴다. 여기는 표시만 바꾼다.
+                 */
+                const extraMarginAmt = deliveryPrice > 0 ? deliveryPrice - finalCost : 0;
+                const marginAmt = deliveryPrice > 0 ? deliveryPrice - ps.totalCostKrw : 0;
                 const marginPct = deliveryPrice > 0 ? (marginAmt / deliveryPrice) * 100 : 0;
                 const marginClass = marginPct < 15 ? 'text-[var(--system-red)]' : marginPct < 20 ? 'text-[var(--system-orange)]' : marginPct <= 30 ? 'text-[var(--system-green)]' : 'text-[var(--system-orange)]';
                 const marginBg = marginPct < 15 ? 'bg-[var(--system-red)]/10 border-[var(--system-red)]/20' : marginPct < 30 ? 'bg-[var(--system-orange)]/10 border-[var(--system-orange)]/20' : 'bg-[var(--system-green)]/10 border-[var(--system-green)]/20';
@@ -5059,8 +5084,18 @@ export default function BomManagement() {
                             <tr>
                               <td colSpan={4} className="px-4 py-2">
                                 <div className={`flex items-center justify-between px-4 py-2.5 rounded-lg border ${marginBg}`}>
-                                  <div className="flex items-center gap-4">
-                                    <span className="text-xs text-muted-foreground">마진금액</span>
+                                  <div className="flex items-center gap-3 flex-wrap">
+                                    {postProductionMarginKrw > 0 && (
+                                      <>
+                                        <span className="text-xs text-muted-foreground">생산마진</span>
+                                        <span className="font-mono text-sm text-muted-foreground">{fmtKrw(postProductionMarginKrw)}</span>
+                                        <span className="text-muted-foreground">+</span>
+                                        <span className="text-xs text-muted-foreground">추가마진</span>
+                                        <span className="font-mono text-sm text-muted-foreground">{fmtKrw(extraMarginAmt)}</span>
+                                        <span className="text-muted-foreground">=</span>
+                                      </>
+                                    )}
+                                    <span className="text-xs text-muted-foreground">총마진</span>
                                     <span className={`font-mono font-bold text-sm ${marginClass}`}>{fmtKrw(marginAmt)}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
