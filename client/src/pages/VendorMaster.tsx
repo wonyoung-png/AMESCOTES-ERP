@@ -299,6 +299,23 @@ export default function VendorMaster() {
       if (dup) { toast.error(`코드 '${code}'는 이미 '${dup.name}'에서 사용 중입니다`); return; }
     }
 
+    // 거래처 코드가 브랜드 코드와 겹치면 품번 앞자리가 같아져 구분이 안 된다.
+    // 거래처끼리만 견주면 나중에 코드를 브랜드 코드와 같게 바꿔도 통과한다
+    for (const [label, val] of [['코드', editVendor.code], ['거래처코드', editVendor.vendorCode]] as const) {
+      const c = (val || '').toUpperCase();
+      if (!c) continue;
+      const hit = vendors.find(v => normalizeBrands(v.brands).some(b => (b.code || '').toUpperCase() === c));
+      if (hit) {
+        toast.error(`${label} '${c}'는 '${hit.name}'의 브랜드 코드로 쓰고 있습니다`);
+        return;
+      }
+      const selfHit = normalizeBrands(editVendor.brands).find(b => (b.code || '').toUpperCase() === c);
+      if (selfHit) {
+        toast.error(`${label} '${c}'는 이 거래처의 브랜드 '${selfHit.name}' 코드와 같습니다`);
+        return;
+      }
+    }
+
     // vendorCode 코드 중복 검사 (하위 호환)
     if (editVendor.vendorCode) {
       const code = editVendor.vendorCode.toUpperCase();
@@ -684,26 +701,56 @@ export default function VendorMaster() {
   const editRegion: VendorRegion = editVendor.region ?? (editVendor.type === '해외공장' ? '해외' : '국내');
 
   /**
+   * 이미 쓰고 있는 코드인가 — 거래처 코드·전표코드·다른 브랜드 코드 전부와 견준다.
+   * 하나라도 겹치면 품번 앞자리가 같아져 어느 브랜드 것인지 알 수 없다.
+   */
+  const isCodeTaken = (code: string) => {
+    const c = code.toUpperCase();
+    if (!c) return false;
+    const inOthers = vendors.some(v =>
+      (v.code || '').toUpperCase() === c ||
+      (v.vendorCode || '').toUpperCase() === c ||
+      (v.id !== editVendor.id && normalizeBrands(v.brands).some(x => (x.code || '').toUpperCase() === c)));
+    const inSelf = normalizeBrands(editVendor.brands).some(x => (x.code || '').toUpperCase() === c);
+    return inOthers || inSelf;
+  };
+
+  /**
+   * 브랜드 코드 자동 부여 — 영문 두 글자 (대표 지정).
+   * 거래처 코드가 2~7자로 제각각이라 거기 순번을 붙이면 품번 길이가 또 갈린다.
+   * 두 글자로 고정하면 기존 품번(AT2603HB01)과 같은 길이가 된다.
+   *
+   * 브랜드명에 영문이 있으면 앞 두 글자를 먼저 쓰고, 안 되면 AA·AB… 로 훑는다.
+   * 거래처 코드·전표 코드·다른 브랜드 코드와 겹치는 것은 건너뛴다.
+   */
+  const nextBrandCode = (brandName = '') => {
+    const letters = brandName.toUpperCase().replace(/[^A-Z]/g, '');
+    if (letters.length >= 2 && !isCodeTaken(letters.slice(0, 2))) return letters.slice(0, 2);
+    const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    for (const a of A) {
+      for (const b of A) {
+        if (!isCodeTaken(a + b)) return a + b;
+      }
+    }
+    return '';
+  };
+
+  /**
    * 브랜드 추가 — 이름과 코드를 같이 받는다.
    * 코드는 신규 품목의 품번 접두어가 된다. 무신사처럼 한 거래처에 브랜드가 여럿이면
    * 코드를 나눠야 품번으로 구분된다. 비워 두면 거래처 코드를 그대로 쓴다.
    */
   const addBrand = () => {
     const name = brandInput.trim();
-    const code = brandCodeInput.trim().toUpperCase();
     if (!name) return;
     const cur = normalizeBrands(editVendor.brands);
     if (cur.some(x => x.name === name)) { toast.error('이미 있는 브랜드입니다'); return; }
-    if (code) {
-      // 품번이 겹치면 어느 브랜드 것인지 알 수 없다 — 회사 전체에서 유일해야 한다
-      // 거래처 코드는 자기 자신 것도 겹치면 안 된다 — 품번 접두어가 같아진다
-      const used = vendors.some(v =>
-        (v.code || '').toUpperCase() === code ||
-        (v.id !== editVendor.id && normalizeBrands(v.brands).some(x => (x.code || '').toUpperCase() === code)));
-      if (used || cur.some(x => (x.code || '').toUpperCase() === code)) {
-        toast.error(`코드 ${code} 는 이미 쓰고 있습니다`); return;
-      }
-    }
+    // 비워 두면 영문 두 글자로 지어 준다
+    const typed = brandCodeInput.trim().toUpperCase();
+    if (typed && !/^[A-Z]{2}$/.test(typed)) { toast.error('코드는 영문 두 글자입니다'); return; }
+    const code = typed || nextBrandCode(name);
+    if (!code) { toast.error('쓸 수 있는 코드가 없습니다'); return; }
+    if (isCodeTaken(code)) { toast.error(`코드 ${code} 는 이미 쓰고 있습니다`); return; }
     update('brands', [...cur, { name, code }]);
     setBrandInput(''); setBrandCodeInput('');
   };
@@ -1259,7 +1306,7 @@ export default function VendorMaster() {
 
             {/* 브랜드명 — 회사명이 달라도 이 이름으로 목록에서 찾힌다 */}
             <div className="space-y-1.5 mt-4">
-              <Label className="text-xs">브랜드 <span className="text-muted-foreground font-normal">코드는 품번 앞자리가 됩니다 · 비우면 거래처 코드를 씁니다</span></Label>
+              <Label className="text-xs">브랜드 <span className="text-muted-foreground font-normal">코드는 품번 앞자리가 됩니다 · 비우면 자동으로 지어 줍니다</span></Label>
               <div className="flex gap-2">
                 <Input
                   value={brandInput}
@@ -1272,9 +1319,9 @@ export default function VendorMaster() {
                   value={brandCodeInput}
                   onChange={e => setBrandCodeInput(e.target.value.toUpperCase())}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addBrand(); } }}
-                  placeholder="코드 (예: YH)"
-                  className="w-28 font-mono"
-                  maxLength={4}
+                  placeholder="자동"
+                  className="w-24 font-mono"
+                  maxLength={2}
                 />
                 <Button type="button" variant="outline" onClick={addBrand}>추가</Button>
               </div>
