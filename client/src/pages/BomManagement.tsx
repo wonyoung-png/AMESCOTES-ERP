@@ -506,73 +506,7 @@ function saveExtBoms(boms: ExtBom[]) {
   localStorage.setItem('ames_boms', JSON.stringify(boms));
 }
 
-// BOM을 Supabase에 저장하는 함수
-function syncBomToSupabase(bom: ExtBom) {
-  if (!bom.id) return;
-  try {
-    // 실제 Supabase boms 테이블 컬럼에 맞게 명시적 매핑
-    // (snapshot_cny_krw 같은 존재하지 않는 컬럼명 제거, 실제 컬럼명 사용)
-    const snakeBom = {
-      id: bom.id,
-      style_no: bom.styleNo,
-      style_id: bom.styleId ?? null, // items.id 참조 (BOM-아이템 연결 키)
-      style_name: bom.styleName,
-      season: bom.season,
-      erp_category: bom.erpCategory,
-      designer: bom.designer,
-      line_name: bom.lineName,
-      manufacturing_country: bom.manufacturingCountry,
-      currency: bom.preCurrency ?? bom.currency ?? 'CNY',
-      exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
-      exchange_rate_usd: bom.preExchangeRateUsd ?? bom.exchangeRateUsd,
-      pre_materials: bom.lines ?? [],
-      pre_processing_fee: bom.processingFee ?? 0,
-      post_materials: bom.postMaterials ?? [],
-      post_processing_fee: bom.postProcessingFee ?? 0,
-      logistics_cost_krw: bom.logisticsCostKrw ?? 0,
-      packaging_cost_krw: bom.packagingCostKrw ?? 0,
-      packing_cost_krw: bom.packingCostKrw ?? 0,
-      production_margin_rate: bom.productionMarginRate ?? 0.16,
-      customs_rate: bom.customsRate ?? 0,
-      color_boms: bom.colorBoms ?? [],
-      post_color_boms: bom.postColorBoms ?? [],
-      post_process_lines: bom.postProcessLines ?? [],
-      post_delivery_price: bom.postDeliveryPrice ?? null,
-      post_total_cost_krw: (bom as any).postTotalCostKrw ?? null,
-      post_subtotal_krw: (bom as any).postSubtotalKrw ?? null,
-      pre_currency: bom.preCurrency ?? bom.currency ?? 'CNY',
-      post_currency: bom.currency ?? 'CNY',
-      pre_exchange_rate_cny: bom.preExchangeRateCny ?? bom.snapshotCnyKrw,
-      post_exchange_rate_cny: bom.postExchangeRateCny ?? bom.exchangeRateCny ?? bom.snapshotCnyKrw,
-      post_exchange_rate_usd: bom.exchangeRateUsd ?? bom.preExchangeRateUsd ?? null,
-      memo: bom.memo,
-      updated_at: new Date().toISOString(),
-    };
-
-    const SUPABASE_URL = 'https://linzfvhgswrnoukssqyi.supabase.co/rest/v1';
-    const SUPABASE_KEY = 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2';
-    const HEADERS = {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-    };
-
-    // UPSERT (POST + Prefer: resolution=merge-duplicates)로 insert/update 동시 처리
-    // PATCH는 0 rows affected여도 r.ok=true라 신규 BOM 감지 불가 → POST upsert가 더 안전
-    fetch(`${SUPABASE_URL}/boms`, {
-      method: 'POST',
-      headers: { ...HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(snakeBom),
-    }).then(async r => {
-      if (!r.ok) {
-        const errText = await r.text().catch(() => '');
-        console.warn('[syncBomToSupabase] Supabase upsert 실패:', r.status, errText);
-      } else {
-        console.log('[syncBomToSupabase] BOM 저장 완료:', bom.styleNo, bom.id);
-      }
-    }).catch(e => console.warn('[syncBomToSupabase] 네트워크 오류:', e));
-  } catch(e) { console.warn('[syncBomToSupabase] 오류:', e); }
-}
+// (제거) syncBomToSupabase — 어디서도 부르지 않는데 이관 전 Supabase 주소로 BOM 을 쓰고 있었다
 
 // ─── 업체용 견적서 모달 ────────────────────────────────────────────────────────
 interface QuoteRow {

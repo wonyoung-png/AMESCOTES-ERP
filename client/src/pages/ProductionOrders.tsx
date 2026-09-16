@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems, fetchMaterials, upsertMaterial, fetchPurchaseItems, upsertPurchaseItem } from '@/lib/supabaseQueries';
 import { phase1 } from '@/lib/phase1';
 import { confirmMaterialOrder } from '@/lib/confirmMaterialOrder';
+import { addHqMaterialsToCart, pickBomForOrder, hqGroups, hqMaterialsForDisplay } from '@/lib/hqMaterialCart';
 import { nextOrderNo } from '@/lib/orderNo';
 import {
   store, genId, calcDDay, dDayLabel, dDayColor, formatNumber, formatKRW, normalizeColors,
@@ -178,7 +179,7 @@ export default function ProductionOrders() {
 
   // 발주 완료 후 액션 팝업 상태
   const [postOrderModal, setPostOrderModal] = useState(false);
-  const [postOrderInfo, setPostOrderInfo] = useState<{ order: ProductionOrder; bomMaterials: Array<any> } | null>(null);
+  const [postOrderInfo, setPostOrderInfo] = useState<{ order: ProductionOrder; bomMaterials: Array<any>; ambiguous?: boolean } | null>(null);
   const [materialImagePreview, setMaterialImagePreview] = useState<string | null>(null);
 
   // 자재 장바구니 모달 상태
@@ -893,6 +894,8 @@ export default function ProductionOrders() {
     const known = [...(orders as any[])];
     const created: ProductionOrder[] = [];
     let ok = 0;
+    let hqAdded = 0;
+    const hqAmbiguous: string[] = [];
     for (const [itemId, row] of picked) {
       const item = (items as Item[]).find(i => i.id === itemId);
       if (!item) continue;
@@ -925,12 +928,25 @@ export default function ProductionOrders() {
         known.push(order as any);
         created.push(order);
         ok += 1;
+        // 본사제공 자재는 우리가 사서 보낸다 — 발주와 동시에 자재 장바구니에 담는다.
+        // 여기에 이게 없어서 일괄 발주한 건은 자재구매로 넘어가지 않았다
+        const { bom: hqBom, ambiguous } = pickBomForOrder(boms as Bom[], item.styleNo, item.id, order.colorQtys, order.qty);
+        if (ambiguous) hqAmbiguous.push(item.styleNo);
+        else hqAdded += addHqMaterialsToCart(hqGroups(hqBom, order.colorQtys, order.qty), item.styleNo, item.name);
       } catch (e) {
         toast.error(`${item.styleNo} 발주 실패: ${(e as Error).message}`);
       }
     }
     if (ok > 0) {
       toast.success(`발주 ${ok}건 등록 · 묶음 ${batchNo}`);
+      if (hqAdded > 0) {
+        refreshCart();
+        toast.info(`본사제공 자재 ${hqAdded}건이 자재 장바구니에 담겼습니다`);
+      }
+      if (hqAmbiguous.length > 0) {
+        // 어느 BOM 이 맞는지 코드로 가릴 수 없다. 조용히 아무거나 담으면 엉뚱한 자재를 산다
+        toast.warning(`자재가 다른 BOM 이 여러 개라 자재를 담지 않았습니다: ${hqAmbiguous.join(', ')}`);
+      }
       setBulkRows({});
       setBulkSearch('');
       setBulkOpen(false);
@@ -1054,98 +1070,24 @@ export default function ProductionOrders() {
     refresh();
     setShowModal(false);
 
-    // 발주 완료 후 액션 팝업: BOM 자재 목록 계산
-    const bomMaterials: Array<any> = [];
-    let _bomForCart: any = null;  // 장바구니 담기용 bom 참조
-    if (form.styleNo) {
-      const { bom } = getBomForOrderFromList(boms as Bom[], form.styleNo);
-      _bomForCart = bom;  // 외부 스코프로 전달
-      if (bom) {
-        // postColorBoms 우선 → 선택된 컬러만 → postMaterials → lines 순서로 확인
-        const postColorBoms = (bom as any).postColorBoms || [];
-        // 선택된 컬러 목록 - 저장된 order의 colorQtys 사용 (폼 초기화 후에도 유지)
-        const orderColorQtys = order.colorQtys || [];
-        const selectedColors = orderColorQtys.filter(cq => cq.qty > 0).map(cq => cq.color.trim());
-        let allLines: any[] = [];
-        if (postColorBoms.length > 0) {
-          if (selectedColors.length > 0) {
-            // 선택된 컬러에 해당하는 BOM lines만 가져옴
-            allLines = postColorBoms
-              .filter((cb: any) => selectedColors.includes(cb.color?.trim()))
-              .flatMap((cb: any) => cb.lines || []);
-            // 선택된 컬러 BOM 없으면 첫 번째 컬러로 폴백
-            if (allLines.length === 0) {
-              allLines = (postColorBoms[0]?.lines || []);
-            }
-          } else {
-            allLines = postColorBoms[0]?.lines || [];
-          }
-        } else if (bom.postMaterials && bom.postMaterials.length > 0) {
-          allLines = bom.postMaterials;
-        } else {
-          allLines = bom.lines || [];
-        }
-        // bomMaterials는 팝업용 (중복 제거)
-        const seen = new Set<string>();
-        for (const l of allLines) {
-          if (l.isHqProvided && !seen.has(l.itemName)) {
-            seen.add(l.itemName);
-            bomMaterials.push({
-              itemName: l.itemName,
-              spec: l.spec,
-              unit: l.unit,
-              netQty: l.netQty,
-              lossRate: l.lossRate,
-              vendorName: l.vendorName,
-              isHqProvided: true,
-              imageUrl: l.imageUrl,
-              unitPriceCny: (l as any).unitPriceCny ?? (l as any).unitPrice ?? 0,
-            });
-          }
-        }
-      }
-    }
+    // 발주 완료 후 액션 팝업 + 자재 장바구니 — 같은 함수로 뽑는다.
+    // 예전엔 팝업과 장바구니가 서로 다른 규칙을 써서, 보여준 자재와 담긴 자재가 달랐다 (코덱스 지적).
+    // 장바구니 쪽은 이관 전 Supabase 주소를 직접 읽고 있었다. 그 인스턴스가 아직 살아 있어
+    // 실패가 아니라 "얼어붙은 옛 BOM"을 조용히 읽었다. 이미 메모리에 있는 BOM 을 쓴다
+    const { bom: _hqBom, ambiguous: _hqAmbiguous } =
+      pickBomForOrder(boms as Bom[], form.styleNo || order.styleNo, form.styleId || order.styleId, order.colorQtys, totalQty);
+    const _hqGroups = hqGroups(_hqBom, order.colorQtys, totalQty);
+    const bomMaterials = hqMaterialsForDisplay(_hqGroups);
 
-    // 본사제공 자재 자동 장바구니 저장 - Supabase REST API raw 데이터 직접 조회 (await)
-    try {
-      const _sbUrl = 'https://linzfvhgswrnoukssqyi.supabase.co/rest/v1';
-      const _sbKey = 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2';
-      const _rawRes = await fetch(`${_sbUrl}/boms?style_no=eq.${order.styleNo}&select=post_color_boms`, {
-        headers: { 'apikey': _sbKey, 'Authorization': `Bearer ${_sbKey}` }
-      });
-      const _rawBoms: any[] = await _rawRes.json();
-      const _rawBom = _rawBoms?.[0];
-      const _postColorBoms = _rawBom?.post_color_boms || [];
-      const _orderColorQtys = order.colorQtys || [];
-      if (_postColorBoms.length > 0 && _orderColorQtys.length > 0) {
-        for (const cq of _orderColorQtys) {
-          if (!cq.qty || cq.qty <= 0) continue;
-          const _cb = _postColorBoms.find((cb: any) => cb.color?.trim() === cq.color?.trim());
-          if (!_cb) continue;
-          const _mats = (_cb.lines || [])
-            .filter((l: any) => l.isHqProvided)
-            .map((l: any) => ({
-              itemName: l.itemName ?? '',
-              spec: l.spec ?? '',
-              unit: l.unit ?? '',
-              netQty: l.netQty ?? 0,
-              lossRate: l.lossRate ?? 0,
-              vendorName: l.vendorName ?? '',
-              isHqProvided: true,
-              imageUrl: l.imageUrl,
-              unitPriceCny: l.unitPriceCny ?? 0,
-            }));
-          if (_mats.length > 0) {
-            store.addToMaterialCart(order.styleNo, order.styleName, _mats, cq.qty);
-          }
-        }
-      } else if (bomMaterials.length > 0) {
-        store.addToMaterialCart(order.styleNo, order.styleName, bomMaterials, totalQty);
-      }
-    } catch { /* ignore */ }
+    if (_hqAmbiguous) {
+      // 어느 BOM 이 맞는지 코드로 가릴 수 없다. 조용히 아무거나 담으면 엉뚱한 자재를 산다
+      toast.warning(`${order.styleNo} 는 자재가 다른 BOM 이 여러 개입니다. 자재는 직접 담아주세요`);
+    } else {
+      addHqMaterialsToCart(_hqGroups, order.styleNo, order.styleName);
+    }
     refreshCart();
 
-    setPostOrderInfo({ order, bomMaterials });
+    setPostOrderInfo({ order, bomMaterials, ambiguous: _hqAmbiguous });
     setPostOrderModal(true);
 
     {
@@ -3487,7 +3429,16 @@ export default function ProductionOrders() {
                   </div>
                 </button>
                 {/* 자재 장바구니 자동 저장 안내 */}
-                {postOrderInfo.bomMaterials.length > 0 ? (
+                {postOrderInfo.ambiguous ? (
+                  // 담지 않았는데 "저장 완료"라고 하면 안 된다 (코덱스 지적)
+                  <div className="w-full flex items-center gap-3 p-3 rounded-md border border-[var(--system-orange)]/30 bg-[var(--system-orange)]/10 text-left">
+                    <AlertTriangle className="w-5 h-5 text-[var(--system-orange)]" />
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--system-orange)]">자재를 담지 않았습니다</p>
+                      <p className="text-xs text-muted-foreground">이 스타일은 자재가 서로 다른 BOM 이 여러 개입니다. BOM / 원가에서 정리한 뒤 자재구매에서 직접 담아주세요</p>
+                    </div>
+                  </div>
+                ) : postOrderInfo.bomMaterials.length > 0 ? (
                   <div className="w-full flex items-center gap-3 p-3 rounded-md border border-primary/20 bg-primary/10 text-left">
                     <CheckCircle2 className="w-5 h-5 text-primary" />
                     <div>

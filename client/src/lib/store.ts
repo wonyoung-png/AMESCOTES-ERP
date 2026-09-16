@@ -4,6 +4,19 @@
 import { supabase } from './supabase';
 import { filterForTable, toSnakeCase } from './tableColumns';
 
+/**
+ * PostgREST 직접 호출용 — supabase.ts 와 같은 곳을 본다.
+ * 예전엔 이관 전 Supabase 클라우드 주소가 소스에 박혀 있었다.
+ * 그 인스턴스가 아직 살아 있어서, 실패가 아니라 얼어붙은 옛 DB 를 조용히 읽고 있었다.
+ */
+const restUrl = () =>
+  `${(import.meta.env.VITE_SUPABASE_URL as string) || window.location.origin}/rest/v1`;
+const restHeaders = () => {
+  const key = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
+  const token = localStorage.getItem('erp_token') || key;
+  return { apikey: key, Authorization: `Bearer ${token}` } as Record<string, string>;
+};
+
 // ─────────────────────────────────────────────
 // Supabase 쓰기 실패 알림
 //
@@ -1137,13 +1150,11 @@ export const store = {
     return { bom: bomList[0], type: 'pre' };
   },
 
-  // Supabase에서 최신 BOM 직접 패치 (localStorage 동기화용)
+  // 운영 DB에서 최신 BOM 직접 패치 (localStorage 동기화용)
   fetchAndCacheBom: async (styleNo: string): Promise<void> => {
     try {
-      const SURL = 'https://linzfvhgswrnoukssqyi.supabase.co/rest/v1';
-      const SKEY = 'sb_publishable_-cxAP3_Gkq4XkBfc55OymA_ozoSEEH2';
-      const res = await fetch(`${SURL}/boms?style_no=eq.${encodeURIComponent(styleNo)}&select=*`, {
-        headers: { 'apikey': SKEY, 'Authorization': `Bearer ${SKEY}` }
+      const res = await fetch(`${restUrl()}/boms?style_no=eq.${encodeURIComponent(styleNo)}&select=*`, {
+        headers: restHeaders(),
       });
       if (!res.ok) return;
       const rows = await res.json();
