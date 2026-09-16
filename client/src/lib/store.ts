@@ -183,8 +183,10 @@ export interface VendorBrand {
 
 /** 옛 데이터(문자열 배열)와 새 데이터(객체 배열)를 한 모양으로 */
 export function normalizeBrands(list?: unknown): VendorBrand[] {
-  if (!Array.isArray(list)) return [];
-  return list
+  // 브랜드가 하나뿐일 때 배열이 아니라 객체 하나로 저장된 거래처가 실제로 있다 (창성).
+  // 배열만 받으면 그런 거래처의 브랜드가 통째로 사라진다
+  const arr = Array.isArray(list) ? list : (list && typeof list === 'object' ? [list] : []);
+  return arr
     .map(b => {
       if (typeof b === 'string') return { name: b, code: '' };
       if (b && typeof b === 'object' && typeof (b as any).name === 'string') {

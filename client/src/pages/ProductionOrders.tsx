@@ -29,7 +29,7 @@ import { printDoc, copyDocAsImage, saveDocAsImage } from '@/lib/docExport';
 import { PurchaseOrderDoc } from '@/components/PurchaseOrderDoc';
 import { WorkOrderDoc } from '@/components/WorkOrderDoc';
 import { SignatureDialog, type Signature } from '@/components/SignaturePad';
-import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera, MoreHorizontal, ChevronRight, ChevronDown, Layers } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Package, FileText, AlertTriangle, CheckCircle2, Factory, ShoppingCart, Printer, X, Pencil, Download, Mail, Receipt, Camera, MoreHorizontal, ChevronRight, ChevronDown, Layers, Image as ImageIcon } from 'lucide-react';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 
@@ -699,14 +699,35 @@ export default function ProductionOrders() {
     orderDate: string; deliveryDate: string; vendorId: string;
   }>>({});
 
-  /** 발주 등록 목록에서 쓰는 브랜드명 (브랜드 우선, 없으면 회사명) */
-  const brandOfItem = (i: Item) => {
-    const b: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
-    return normalizeBrands(b?.brands)[0]?.name || b?.nameEn || b?.name || '';
+  /**
+   * 발주 등록 목록에 띄울 이름.
+   *
+   * 거래처 하나에 브랜드가 여럿이다 (무신사 = 유희 · 튜드먼트). 그래서 품목이 들고 있는
+   * brandCode 로 골라야 한다. 앞서는 brands[0] 을 집어, 튜드먼트 품목도 "유희"로 나왔다.
+   * 브랜드를 아직 안 정한 품목은 브랜드명이 없으니 거래처명으로 대신 적고, 화면에서 흐리게 둔다.
+   */
+  const brandOfItem = (i: Item): { label: string; isBrand: boolean } => {
+    const v: any = allVendors.find((x: any) => x.id === (i as any).buyerId);
+    if (!v) return { label: '', isBrand: false };
+    const list = normalizeBrands(v.brands);
+    const code = ((i as any).brandCode || '').trim().toUpperCase();
+    const hit = code ? list.find(b => (b.code || '').toUpperCase() === code) : undefined;
+    // 브랜드가 하나뿐인 거래처는 코드가 없어도 그 브랜드가 맞다.
+    // 단 코드가 박혀 있는데 안 맞는 경우는 다르다 — 지워진 브랜드를 가리키는 것이니
+    // 멀쩡한 브랜드인 척 하면 안 된다 (코덱스 지적)
+    const only = !code && list.length === 1 ? list[0] : undefined;
+    const brand = hit || only;
+    if (brand) return { label: brand.name, isBrand: true };
+    // 브랜드 미지정 — 회사명으로 대신한다. nameEn 을 먼저 보면 안 된다.
+    // 무신사처럼 nameEn 칸에 브랜드명이 적혀 있는 거래처가 있어, 브랜드인 척 보인다
+    const name = v.name || v.nameEn || '';
+    // 코드는 박혀 있는데 그런 브랜드가 없다 = 브랜드가 지워졌다. 미지정과 같아 보이면 원인을 못 찾는다
+    return { label: code ? `${name} · 없는코드 ${code}` : name, isBrand: false };
   };
+  const brandLabelOf = (i: Item) => brandOfItem(i).label;
 
   const bulkBrandOptions = useMemo(
-    () => Array.from(new Set((items as Item[]).map(brandOfItem).filter(Boolean))).sort(),
+    () => Array.from(new Set((items as Item[]).map(brandLabelOf).filter(Boolean))).sort(),
     [items, allVendors],
   );
   const bulkSeasonOptions = useMemo(
@@ -722,7 +743,7 @@ export default function ProductionOrders() {
     const q = bulkSearch.trim().toLowerCase();
     return (items as Item[])
       .filter(i => {
-        if (bulkBrand !== 'all' && brandOfItem(i) !== bulkBrand) return false;
+        if (bulkBrand !== 'all' && brandLabelOf(i) !== bulkBrand) return false;
         if (bulkSeason !== 'all' && i.season !== bulkSeason) return false;
         if (bulkCat !== 'all' && i.erpCategory !== bulkCat) return false;
         if (!q) return true;
@@ -731,10 +752,13 @@ export default function ProductionOrders() {
         return [i.styleNo, (i as any).buyerStyleNo, i.name, i.nameEn, ...brands]
           .some(f => (f || '').toLowerCase().includes(q));
       })
-      // 브랜드 → 스타일번호 순으로 정렬해 같은 브랜드가 붙어 보이게 한다
+      // 브랜드 → 스타일번호 순으로 정렬해 같은 브랜드가 붙어 보이게 한다.
+      // 브랜드가 붙은 품목을 앞에 둔다 — 브랜드 없는 자사 품목이 521건이라
+      // 뒤로 밀면 브랜드 품목이 목록 끝에 처박힌다 (튜드먼트가 안 보이던 이유)
       .sort((a, b) => {
         const ba = brandOfItem(a), bb = brandOfItem(b);
-        if (ba !== bb) return ba.localeCompare(bb);
+        if (ba.isBrand !== bb.isBrand) return ba.isBrand ? -1 : 1;
+        if (ba.label !== bb.label) return ba.label.localeCompare(bb.label);
         return (a.styleNo || '').localeCompare(b.styleNo || '');
       });
   }, [items, allVendors, bulkSearch, bulkBrand, bulkSeason, bulkCat]);
@@ -2006,8 +2030,7 @@ export default function ProductionOrders() {
                 return <p className="p-8 text-center text-sm text-muted-foreground">일치하는 스타일이 없습니다</p>;
               }
               return list.map(i => {
-                const buyer: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
-                const brand = normalizeBrands(buyer?.brands)[0]?.name || buyer?.nameEn || buyer?.name || '';
+                const { label: brand } = brandOfItem(i);   // 같은 규칙을 쓴다 — 여기도 brands[0] 이었다 (코덱스 지적)
                 return (
                   <button
                     key={i.id}
@@ -2065,7 +2088,8 @@ export default function ProductionOrders() {
               </div>
               <select value={bulkBrand} onChange={e => setBulkBrand(e.target.value)}
                 className="h-9 text-xs border border-border rounded-md bg-card px-2">
-                <option value="all">전체 브랜드</option>
+                {/* 브랜드가 없는 품목은 거래처명으로 걸러야 해 둘이 한 목록에 섞인다. 라벨을 그대로 적는다 */}
+                <option value="all">브랜드 · 거래처 전체</option>
                 {bulkBrandOptions.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
               <select value={bulkSeason} onChange={e => setBulkSeason(e.target.value)}
@@ -2090,14 +2114,14 @@ export default function ProductionOrders() {
               <span className="flex-1 min-w-0">품명</span>
               <span className="w-14 shrink-0 text-right">시즌</span>
             </div>
-            <div className="max-h-64 overflow-y-auto divide-y divide-border">
+            {/* 전부 그린다. 200건에서 잘라내던 탓에 뒤쪽 브랜드 품목이 아예 안 보였다 */}
+            <div className="max-h-[22rem] overflow-y-auto divide-y divide-border">
               {bulkCandidates.length === 0 && (
                 <p className="p-6 text-center text-xs text-muted-foreground">일치하는 스타일이 없습니다</p>
               )}
-              {bulkCandidates.slice(0, 200).map(i => {
+              {bulkCandidates.map(i => {
                 const picked = !!bulkRows[i.id];
-                const buyer: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
-                const brand = normalizeBrands(buyer?.brands)[0]?.name || buyer?.nameEn || buyer?.name || '';
+                const { label, isBrand } = brandOfItem(i);
                 return (
                   <button
                     key={i.id}
@@ -2109,9 +2133,14 @@ export default function ProductionOrders() {
                     {i.imageUrl ? (
                       <img src={i.imageUrl} alt="" className="w-9 h-9 rounded object-cover border border-border" />
                     ) : (
-                      <div className="w-9 h-9 rounded bg-[var(--fill-tertiary)] border border-border" />
+                      <div className="w-9 h-9 rounded bg-[var(--fill-tertiary)] border border-border flex items-center justify-center">
+                        <ImageIcon className="w-3.5 h-3.5 text-muted-foreground/50" />
+                      </div>
                     )}
-                    <span className="w-28 shrink-0 truncate text-xs text-muted-foreground">{brand || '—'}</span>
+                    {/* 브랜드가 정해진 것만 진하게. 거래처명으로 대신 적은 것은 흐리게 둔다 */}
+                    <span className={`w-28 shrink-0 truncate text-xs ${isBrand ? 'text-foreground' : 'text-muted-foreground/60'}`}>
+                      {label || '—'}
+                    </span>
                     <span className="w-36 shrink-0 truncate text-sm font-mono">{i.styleNo}</span>
                     <span className="flex-1 min-w-0 truncate text-sm">{i.name}</span>
                     <span className="w-14 shrink-0 text-right text-[11px] text-muted-foreground">{i.season || ''}</span>
@@ -2120,6 +2149,12 @@ export default function ProductionOrders() {
               })}
             </div>
             </div>
+            <p className="text-[11px] text-muted-foreground -mt-2">
+              {bulkCandidates.length === (items as Item[]).length
+                ? `전체 ${bulkCandidates.length.toLocaleString()}건`
+                : `${(items as Item[]).length.toLocaleString()}건 중 ${bulkCandidates.length.toLocaleString()}건`}
+              {Object.keys(bulkRows).length > 0 && ` · 선택 ${Object.keys(bulkRows).length}건`}
+            </p>
 
             {/* 선택된 스타일 — 스타일마다 카드 1장. 컬러별 수량을 넣는다 */}
             {Object.keys(bulkRows).length > 0 && (
