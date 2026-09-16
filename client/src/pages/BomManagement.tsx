@@ -2467,6 +2467,7 @@ export default function BomManagement() {
     }
 
     setEditBom(loadedBom);
+    editBomRef.current = loadedBom;   // 상태와 같이 박는다 - effect 만 믿으면 한 박자 늦다
     setIsDirty(false);
     // 다른 스타일을 열었다 — 사진을 바꾼 적 없는 상태로 되돌린다.
     // 안 풀면 앞 품목에서 켠 플래그가 남아 이 품목 사진을 덮어쓴다
@@ -2592,17 +2593,46 @@ export default function BomManagement() {
   }, [editBom, applyProductPhoto]);
 
   /**
+   * 지금 화면에 떠 있는 BOM — 비동기 작업이 끝난 뒤 "아직 같은 스타일인가"를 묻는 용도.
+   * 렌더 뒤 effect 로만 채우면 setEditBom 직후에는 아직 앞 BOM 이라, 정상 업로드까지 막힌다 (코덱스 지적).
+   * 그래서 스타일이 바뀌는 자리(로드 effect·엑셀 업로드)에서 상태와 같이 동기로 박고,
+   * 아래 effect 는 그 밖의 경로를 받치는 용도로만 둔다.
+   */
+  const editBomRef = useRef<ExtBom | null>(null);
+  useEffect(() => { editBomRef.current = editBom; });
+  /** 어느 BOM 인지 가리는 표 — 스타일이 아직 안 붙은 BOM 도 서로 구별되도록 id 를 같이 쓴다 */
+  const bomKeyOf = (b?: ExtBom | null) => `${b?.id ?? ''}|${b?.styleId ?? ''}`;
+
+  /**
    * 원가표 엑셀에 박힌 제품사진을 꺼내 채운다.
    * 사람이 올린 사진을 공장 파일이 덮으면 안 되므로, 사진이 없을 때만 넣는다.
+   * 사진을 꺼내는 동안 화면이 다른 BOM 으로 넘어갈 수 있어, 넣기 직전에 같은 BOM 인지 다시 본다.
    * 못 꺼내도 조용히 넘어간다 — 자재 파싱이 본체고 사진은 덤이다.
    */
-  const pickPhotoFromExcel = useCallback(async (file: File) => {
-    const linked = items.find(i => i.id === editBom?.styleId);
-    if (editBom?.productImage || linked?.imageUrl) return;   // 이미 있으면 건드리지 않는다
+  const pickPhotoFromExcel = useCallback(async (file: File, bom?: ExtBom | null) => {
+    // 부른 쪽이 BOM 을 통째로 갈아끼웠다면 그걸 넘겨받아야 한다.
+    // 클로저의 editBom 은 갈아끼우기 전 값이라, 앞 품목에 사진이 있으면 엉뚱하게 건너뛴다 (코덱스 지적)
+    const cur = bom ?? editBom;
+    const linked = items.find(i => i.id === cur?.styleId);
+    if (cur?.productImage || linked?.imageUrl) {
+      toast.info('이미 제품사진이 있어 원가표 사진은 건너뜁니다');
+      return;
+    }
+    // styleId 만으로는 아직 스타일이 안 붙은 BOM 끼리 구별이 안 된다 — id 도 같이 본다 (코덱스 지적)
+    const target = bomKeyOf(cur);
     const img = await extractProductImage(file);
-    if (!img) return;
-    if (await applyProductPhoto(img)) toast.success('원가표의 제품사진을 가져왔습니다');
-  }, [items, editBom, applyProductPhoto]);
+    // 조용히 넘어가면 기능이 돈 건지 아닌지 쓰는 사람이 알 수가 없다. 못 찾았으면 못 찾았다고 한다
+    if (!img) { toast.info('원가표에서 제품사진을 찾지 못했습니다. 직접 넣어주세요'); return; }
+    let dataUrl: string;
+    try { dataUrl = await resizeImage(img); }
+    catch { toast.error('원가표의 제품사진을 읽지 못했습니다'); return; }
+    // 꺼내고 줄이는 사이에 다른 스타일로 옮겨갔으면 남의 BOM 에 붙이지 않는다 (코덱스 지적).
+    // 넣기 직전에 본다 — 중간에 보면 그 뒤 구간이 그대로 구멍이다
+    if (bomKeyOf(editBomRef.current) !== target) return;
+    updateField('productImage', dataUrl);
+    setPhotoChanged(true);
+    toast.success('원가표의 제품사진을 가져왔습니다');
+  }, [items, editBom, updateField]);
 
   const selectPackingItem = useCallback((itemId: string) => {
     if (!itemId || itemId === '_none') {
@@ -3388,8 +3418,10 @@ export default function BomManagement() {
       nb.sourceFileName = file.name;
       if (item) setSelectedStyleId(item.id);
       setEditBom(nb);
+      editBomRef.current = nb;
       setIsDirty(true);
       toast.success(`엑셀 파싱 완료: ${lines.length}개 자재 행 로드됨`);
+      await pickPhotoFromExcel(file, nb);   // 방금 만든 BOM 을 넘긴다 — 클로저 값은 아직 앞 BOM 이다
     } catch (err) {
       // console.error(err);
       toast.error('엑셀 파싱 실패. 파일 형식을 확인해주세요.');
