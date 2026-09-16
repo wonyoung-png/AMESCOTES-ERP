@@ -1659,7 +1659,7 @@ function CalcModal({ line, onApply, onClose }: {
   const ro = 'w-full border border-border rounded px-1.5 py-1 text-xs text-center bg-[var(--fill-quaternary)] text-muted-foreground';
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div role="dialog" aria-modal="true" data-state="open" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-card rounded-lg shadow-2xl w-[760px] max-w-[95vw] max-h-[88vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-muted">
           <h3 className="text-sm font-bold flex items-center gap-1.5">
@@ -2546,15 +2546,40 @@ export default function BomManagement() {
 
   /** 제품사진 — 고르든 끌어놓든 붙여넣든 여기 하나로 들어온다 (600px로 줄여 저장) */
   const [photoDragOver, setPhotoDragOver] = useState(false);
-  const applyProductPhoto = useCallback(async (file?: File | null) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { toast.error('이미지 파일만 넣을 수 있습니다'); return; }
+  const applyProductPhoto = useCallback(async (file?: File | null): Promise<boolean> => {
+    if (!file) return false;
+    if (!file.type.startsWith('image/')) { toast.error('이미지 파일만 넣을 수 있습니다'); return false; }
     try {
       updateField('productImage', await resizeImage(file));
+      return true;
     } catch {
       toast.error('이미지를 읽지 못했습니다');
+      return false;
     }
   }, [updateField]);
+
+  /**
+   * 화면 어디서든 Ctrl+V 로 제품사진을 넣는다.
+   * 사진 칸에만 onPaste 를 달면 안 먹는다 — 클릭하는 순간 파일 선택창이 포커스를 가져간다.
+   * 글자를 치고 있을 때(입력칸·편집영역)는 가로채지 않는다.
+   */
+  useEffect(() => {
+    if (!editBom) return;
+    const onPaste = async (e: ClipboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      // 팝업이 떠 있으면 그쪽 일이다 — 뒤에 있는 BOM 사진을 바꾸면 안 된다
+      if (el?.closest('[role="dialog"], [data-radix-popper-content-wrapper]')) return;
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return;
+      const f = Array.from(e.clipboardData?.items || [])
+        .find(i => i.type.startsWith('image/'))?.getAsFile();
+      if (!f) return;
+      e.preventDefault();
+      if (await applyProductPhoto(f)) toast.success('제품사진을 붙여넣었습니다');
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [editBom, applyProductPhoto]);
 
   const selectPackingItem = useCallback((itemId: string) => {
     if (!itemId || itemId === '_none') {
@@ -3576,9 +3601,9 @@ export default function BomManagement() {
 
       {/* 스타일 선택 */}
       <div className="bg-card rounded-lg border border-border p-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <div className="flex flex-wrap items-end gap-3">
           {/* 스타일 선택 — 검색·바이어필터·선택을 콤보박스 하나로 합쳤다 */}
-          <div className="col-span-2 md:col-span-3 lg:col-span-4">
+          <div className="min-w-[18rem] flex-1">
             <label className="text-xs text-muted-foreground mb-1 block font-medium">스타일</label>
             <StylePicker
               options={styleOptions}
@@ -3591,8 +3616,8 @@ export default function BomManagement() {
           </div>
 
           {/* 스타일 546개를 검색 하나로 찾기는 어렵다 — 좁혀 놓고 고른다 */}
-          <div className="col-span-2 md:col-span-1 lg:col-span-2 grid grid-cols-2 gap-2">
-            <div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="w-28">
               <label className="text-xs text-muted-foreground mb-1 block font-medium">바이어</label>
               <select value={filterBuyerBom} onChange={e => setFilterBuyerBom(e.target.value)} className="w-full h-8 text-xs border border-border rounded-md bg-card px-2 hover:border-primary/40">
                 <option value="all">전체 바이어</option>
@@ -3601,21 +3626,21 @@ export default function BomManagement() {
                 ))}
               </select>
             </div>
-            <div>
+            <div className="w-28">
               <label className="text-xs text-muted-foreground mb-1 block font-medium">시즌</label>
               <select value={filterSeasonBom} onChange={e => setFilterSeasonBom(e.target.value)} className="w-full h-8 text-xs border border-border rounded-md bg-card px-2 hover:border-primary/40">
                 <option value="all">전체 시즌</option>
                 {bomSeasonOptions.map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
-            <div>
+            <div className="w-28">
               <label className="text-xs text-muted-foreground mb-1 block font-medium">카테고리</label>
               <select value={filterCatBom} onChange={e => setFilterCatBom(e.target.value)} className="w-full h-8 text-xs border border-border rounded-md bg-card px-2 hover:border-primary/40">
                 <option value="all">전체 카테고리</option>
                 {bomCatOptions.map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
-            <div>
+            <div className="w-28">
               <label className="text-xs text-muted-foreground mb-1 block font-medium">원가 상태</label>
               <select value={filterBomState} onChange={e => setFilterBomState(e.target.value as any)} className="w-full h-8 text-xs border border-border rounded-md bg-card px-2 hover:border-primary/40">
                 <option value="all">전체</option>
@@ -3624,45 +3649,49 @@ export default function BomManagement() {
                 <option value="post">사후원가 있음</option>
               </select>
             </div>
-            <div className="col-span-2 flex items-center justify-between">
-              <span className="text-[11px] text-muted-foreground">{styleOptions.length}개</span>
+            <div className="flex items-center gap-2 h-8">
+              <span className="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">{styleOptions.length}개</span>
               {(filterBuyerBom !== 'all' || filterSeasonBom !== 'all' || filterCatBom !== 'all' || filterBomState !== 'all') && (
                 <button type="button"
                   onClick={() => { setFilterBuyerBom('all'); setFilterSeasonBom('all'); setFilterCatBom('all'); setFilterBomState('all'); }}
                   className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2">
-                  필터 해제
+                  해제
                 </button>
               )}
             </div>
           </div>
+        </div>
+
+        {/* 고른 스타일 — 사진·속성·환율을 한 줄에. 찾는 줄과 섞으면 사진이 빈칸에 뜬다 */}
+        <div className="flex flex-wrap items-center gap-4 pt-3 mt-3 border-t border-border">
           {editBom && (
             <>
               {/* 선택한 품목에서 따라오는 값들 — 읽기 전용이라 배지 한 줄로 줄였다 */}
-              <div className="col-span-2 lg:col-span-2 flex flex-wrap items-end gap-1.5 pb-1">
+              <div className="flex flex-wrap items-center gap-1.5 order-2">
                 {[editBom.season, editBom.erpCategory, editBom.designer].filter(Boolean).map((v, i) => (
                   <Badge key={i} variant="outline" className="text-[11px] font-normal text-muted-foreground border-border">{v}</Badge>
                 ))}
               </div>
               {/* 제품이미지 업로드 (품목 imageUrl 폴백) */}
-              <div className="col-span-2">
-                <label className="text-xs text-muted-foreground mb-1 block font-medium">제품사진</label>
+              <div className="order-1">
+
                 <div className="flex items-center gap-3">
                   {(() => {
                     const linkedItemImg = items.find(i => i.id === editBom.styleId)?.imageUrl;
                     const productPhoto = editBom.productImage || linkedItemImg;
                     return (
                   <>
-                  <div
-                    className={`w-20 h-20 border-2 border-dashed rounded-md flex flex-col items-center justify-center cursor-pointer transition-colors overflow-hidden flex-shrink-0 outline-none ${
+                  <button
+                    type="button"
+                    aria-label="제품사진 — 클릭해 고르거나 화면에서 Ctrl+V"
+                    className={`w-16 h-16 border-2 border-dashed rounded-md flex items-center justify-center cursor-pointer transition-colors overflow-hidden flex-shrink-0 outline-none ${
                       photoDragOver ? 'border-primary bg-primary/10' : 'border-border hover:border-primary hover:bg-primary/10'
                     } focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30`}
                     onClick={() => document.getElementById('bom-product-img-input')?.click()}
-                    onPaste={e => { const f = Array.from(e.clipboardData?.items || []).find(i => i.type.startsWith('image/'))?.getAsFile(); if (f) { e.preventDefault(); applyProductPhoto(f); } }}
                     onDragOver={e => { e.preventDefault(); setPhotoDragOver(true); }}
                     onDragLeave={() => setPhotoDragOver(false)}
                     onDrop={e => { e.preventDefault(); setPhotoDragOver(false); applyProductPhoto(e.dataTransfer.files?.[0]); }}
-                    title="클릭해 고르거나, 여기에 끌어다 놓거나, 눌러서 Ctrl+V"
-                    tabIndex={0}
+                    title="클릭해 고르거나, 끌어다 놓거나, 화면 아무데서나 Ctrl+V"
                   >
                     {productPhoto ? (
                       <HoverZoomImage
@@ -3675,7 +3704,7 @@ export default function BomManagement() {
                     ) : (
                       <Camera className="w-5 h-5 text-muted-foreground" />
                     )}
-                  </div>
+                  </button>
                   <input id="bom-product-img-input" type="file" accept="image/*" className="hidden"
                     onChange={e => { applyProductPhoto(e.target.files?.[0]); e.target.value = ''; }} />
                   {editBom.productImage && (
@@ -3686,7 +3715,7 @@ export default function BomManagement() {
                   )}
                   {!productPhoto && (
                     <span className="text-[11px] text-muted-foreground leading-tight">
-                      클릭해 고르기<br />끌어다 놓기<br />눌러서 Ctrl+V
+                      클릭해 고르기<br />끌어다 놓기<br />화면에서 Ctrl+V
                     </span>
                   )}
                   </>
@@ -3694,7 +3723,7 @@ export default function BomManagement() {
                   })()}
                 </div>
               </div>
-              <div><label className="text-xs text-muted-foreground mb-1 block font-medium">환율 CNY→KRW</label><Input type="number" min="0" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 text-xs border-border text-right" /></div>
+              <div className="ml-auto order-3 flex items-center gap-2"><label className="text-xs text-muted-foreground font-medium whitespace-nowrap">환율 CNY→KRW</label><Input type="number" min="0" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 w-28 text-xs border-border text-right" /></div>
             </>
           )}
         </div>
@@ -5476,7 +5505,8 @@ export default function BomManagement() {
             const postPnlResultSheet = editBom.pnl ? calcPnl(finalCostSheet, editBom.pnl) : null;
             const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
             return (
-              <div id="cost-sheet-modal-wrap" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div id="cost-sheet-modal-wrap" role="dialog" aria-modal="true" data-state="open"
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
                 <style>{`@media print {
                   @page { size: A4; margin: 10mm; }
                   body * { visibility: hidden; }
