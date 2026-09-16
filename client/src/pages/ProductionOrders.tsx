@@ -13,8 +13,7 @@ import {
   type ProductionOrder, type OrderStatus, type Season, type Item, type Bom,
   type HqSupplyItem, type ColorQty, type CartItem,
   type TradeStatement, type TradeStatementLine,
-  type ExpenseType, type ExpenseCategory, type SalesRecord,
-} from '@/lib/store';
+  type ExpenseType, type ExpenseCategory, type SalesRecord, normalizeBrands } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -703,7 +702,7 @@ export default function ProductionOrders() {
   /** 발주 등록 목록에서 쓰는 브랜드명 (브랜드 우선, 없으면 회사명) */
   const brandOfItem = (i: Item) => {
     const b: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
-    return b?.brands?.[0] || b?.nameEn || b?.name || '';
+    return normalizeBrands(b?.brands)[0]?.name || b?.nameEn || b?.name || '';
   };
 
   const bulkBrandOptions = useMemo(
@@ -728,7 +727,7 @@ export default function ProductionOrders() {
         if (bulkCat !== 'all' && i.erpCategory !== bulkCat) return false;
         if (!q) return true;
         const buyer: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
-        const brands = [buyer?.name, buyer?.companyName, buyer?.nameEn, ...((buyer?.brands as string[]) || [])];
+        const brands = [buyer?.name, buyer?.companyName, buyer?.nameEn, ...normalizeBrands(buyer?.brands).map(b => b.name)];
         return [i.styleNo, (i as any).buyerStyleNo, i.name, i.nameEn, ...brands]
           .some(f => (f || '').toLowerCase().includes(q));
       })
@@ -1999,7 +1998,7 @@ export default function ProductionOrders() {
               const list = (items as Item[]).filter(i => {
                 if (!q) return true;
                 const buyer: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
-                const brands = [buyer?.name, buyer?.companyName, buyer?.nameEn, ...((buyer?.brands as string[]) || [])];
+                const brands = [buyer?.name, buyer?.companyName, buyer?.nameEn, ...normalizeBrands(buyer?.brands).map(b => b.name)];
                 return [i.styleNo, (i as any).buyerStyleNo, i.name, i.nameEn, ...brands]
                   .some(f => (f || '').toLowerCase().includes(q));
               }).slice(0, 300);
@@ -2008,7 +2007,7 @@ export default function ProductionOrders() {
               }
               return list.map(i => {
                 const buyer: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
-                const brand = buyer?.brands?.[0] || buyer?.nameEn || buyer?.name || '';
+                const brand = normalizeBrands(buyer?.brands)[0]?.name || buyer?.nameEn || buyer?.name || '';
                 return (
                   <button
                     key={i.id}
@@ -2098,7 +2097,7 @@ export default function ProductionOrders() {
               {bulkCandidates.slice(0, 200).map(i => {
                 const picked = !!bulkRows[i.id];
                 const buyer: any = allVendors.find((v: any) => v.id === (i as any).buyerId);
-                const brand = buyer?.brands?.[0] || buyer?.nameEn || buyer?.name || '';
+                const brand = normalizeBrands(buyer?.brands)[0]?.name || buyer?.nameEn || buyer?.name || '';
                 return (
                   <button
                     key={i.id}

@@ -3,7 +3,7 @@ import { useState, useMemo, useRef, useCallback } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
-import { store, genId, type Vendor, type VendorType, type VendorRegion, type Currency, type BillingType } from '@/lib/store';
+import { store, genId, normalizeBrands, type Vendor, type VendorType, type VendorRegion, type Currency, type BillingType } from '@/lib/store';
 import { fetchVendors, upsertVendor, deleteVendor as deleteVendorSB } from '@/lib/supabaseQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,6 +90,7 @@ export default function VendorMaster() {
   const [addrBase, setAddrBase] = useState('');
   const [addrDetail, setAddrDetail] = useState('');
   const [brandInput, setBrandInput] = useState('');
+  const [brandCodeInput, setBrandCodeInput] = useState('');
   const addrDetailRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isOcrLoading, setIsOcrLoading] = useState(false);
@@ -214,7 +215,8 @@ export default function VendorMaster() {
     if (search) {
       const q = search.trim().toLowerCase();
       list = list.filter(v =>
-        [v.name, v.companyName, v.nameEn, v.nameCn, v.vendorCode, v.code, v.contactName, v.memo, ...(v.brands || [])]
+        [v.name, v.companyName, v.nameEn, v.nameCn, v.vendorCode, v.code, v.contactName, v.memo,
+       ...normalizeBrands(v.brands).flatMap(b => [b.name, b.code])]
           .some(f => (f || '').toLowerCase().includes(q))
       );
     }
@@ -253,7 +255,7 @@ export default function VendorMaster() {
 
   const openAdd = () => {
     setEditVendor({ ...EMPTY_VENDOR, code: genVendorCode('국내') });
-    setAddrBase(''); setAddrDetail(''); setBrandInput('');
+    setAddrBase(''); setAddrDetail(''); setBrandInput(''); setBrandCodeInput('');
     setIsEdit(false); setIsDirty(false); setShowModal(true);
   };
   const openEdit = (v: Vendor) => {
@@ -263,11 +265,11 @@ export default function VendorMaster() {
     setEditVendor({
       ...v,
       companyName: v.companyName || v.name,
-      brands: v.brands?.length ? v.brands : (v.nameEn ? [v.nameEn] : []),
+      brands: v.brands?.length ? normalizeBrands(v.brands) : (v.nameEn ? [{ name: v.nameEn, code: '' }] : []),
     });
     // DB에는 주소 한 줄로만 저장한다 — 수정 화면에서는 저장된 값을 기본주소 칸에 그대로 놓고,
     // 상세주소는 비워 둔 뒤 새로 적는 만큼만 뒤에 붙인다
-    setAddrBase(v.address || ''); setAddrDetail(''); setBrandInput('');
+    setAddrBase(v.address || ''); setAddrDetail(''); setBrandInput(''); setBrandCodeInput('');
     setIsEdit(true); setIsDirty(false); setShowModal(true);
   };
 
@@ -681,13 +683,29 @@ export default function VendorMaster() {
   /** 모달에서 편집 중인 거래처의 국내/해외 (레거시 '해외공장'도 해외로 인식) */
   const editRegion: VendorRegion = editVendor.region ?? (editVendor.type === '해외공장' ? '해외' : '국내');
 
-  /** 브랜드명 추가 — 중복은 무시한다 */
+  /**
+   * 브랜드 추가 — 이름과 코드를 같이 받는다.
+   * 코드는 신규 품목의 품번 접두어가 된다. 무신사처럼 한 거래처에 브랜드가 여럿이면
+   * 코드를 나눠야 품번으로 구분된다. 비워 두면 거래처 코드를 그대로 쓴다.
+   */
   const addBrand = () => {
-    const b = brandInput.trim();
-    if (!b) return;
-    const cur = editVendor.brands || [];
-    if (!cur.includes(b)) update('brands', [...cur, b]);
-    setBrandInput('');
+    const name = brandInput.trim();
+    const code = brandCodeInput.trim().toUpperCase();
+    if (!name) return;
+    const cur = normalizeBrands(editVendor.brands);
+    if (cur.some(x => x.name === name)) { toast.error('이미 있는 브랜드입니다'); return; }
+    if (code) {
+      // 품번이 겹치면 어느 브랜드 것인지 알 수 없다 — 회사 전체에서 유일해야 한다
+      // 거래처 코드는 자기 자신 것도 겹치면 안 된다 — 품번 접두어가 같아진다
+      const used = vendors.some(v =>
+        (v.code || '').toUpperCase() === code ||
+        (v.id !== editVendor.id && normalizeBrands(v.brands).some(x => (x.code || '').toUpperCase() === code)));
+      if (used || cur.some(x => (x.code || '').toUpperCase() === code)) {
+        toast.error(`코드 ${code} 는 이미 쓰고 있습니다`); return;
+      }
+    }
+    update('brands', [...cur, { name, code }]);
+    setBrandInput(''); setBrandCodeInput('');
   };
 
   /** 기본주소 + 상세주소를 합쳐 vendors.address 한 칸에 저장한다 (DB 컬럼 추가 없이) */
@@ -1241,22 +1259,33 @@ export default function VendorMaster() {
 
             {/* 브랜드명 — 회사명이 달라도 이 이름으로 목록에서 찾힌다 */}
             <div className="space-y-1.5 mt-4">
-              <Label className="text-xs">브랜드명 <span className="text-muted-foreground font-normal">회사명이 달라도 이 이름으로 검색됩니다</span></Label>
+              <Label className="text-xs">브랜드 <span className="text-muted-foreground font-normal">코드는 품번 앞자리가 됩니다 · 비우면 거래처 코드를 씁니다</span></Label>
               <div className="flex gap-2">
                 <Input
                   value={brandInput}
                   onChange={e => setBrandInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addBrand(); } }}
-                  placeholder="브랜드명 입력 후 Enter (예: 아뜰리에 드 루멘)"
+                  placeholder="브랜드명 (예: 유희)"
+                  className="flex-1"
+                />
+                <Input
+                  value={brandCodeInput}
+                  onChange={e => setBrandCodeInput(e.target.value.toUpperCase())}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addBrand(); } }}
+                  placeholder="코드 (예: YH)"
+                  className="w-28 font-mono"
+                  maxLength={4}
                 />
                 <Button type="button" variant="outline" onClick={addBrand}>추가</Button>
               </div>
-              {(editVendor.brands || []).length > 0 && (
+              {normalizeBrands(editVendor.brands).length > 0 && (
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  {(editVendor.brands || []).map(b => (
-                    <span key={b} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--fill-tertiary)] border border-border text-xs">
-                      {b}
-                      <button type="button" onClick={() => update('brands', (editVendor.brands || []).filter(x => x !== b))}
+                  {normalizeBrands(editVendor.brands).map(b => (
+                    <span key={b.name} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[var(--fill-tertiary)] border border-border text-xs">
+                      {b.code && <span className="font-mono text-[11px] text-primary">{b.code}</span>}
+                      {b.name}
+                      <button type="button"
+                        onClick={() => update('brands', normalizeBrands(editVendor.brands).filter(x => x.name !== b.name))}
                         className="text-muted-foreground hover:text-[var(--system-red)]">×</button>
                     </span>
                   ))}

@@ -5,7 +5,7 @@ import { useLocation, useSearch } from 'wouter';
 import { calcPostSummary } from '@/lib/costing';
 import { nextOrderNo, parseRevision } from '@/lib/orderNo';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type PackingSize, type ProductionOrder, type ColorQty, type Vendor } from '@/lib/store';
+import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type PackingSize, type ProductionOrder, type ColorQty, type Vendor, normalizeBrands } from '@/lib/store';
 import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, fetchBomsLight, updateItemCostData, saveConfirmedSalePrice, fetchMaterials, fetchOrders } from '@/lib/supabaseQueries';
 import { PackBomEditor } from '@/components/PackBomEditor';
 import {
@@ -14,7 +14,7 @@ import {
 import { seedLumenPackingData, hasPackageKitItems, isLegacyPackConsumable } from '@/lib/seedLumenPacking';
 import { seedLumen27ssRrp, hasLumen27ssItems } from '@/lib/seedLumen27ssRrp';
 import { parseExcelBomSheet } from '@/lib/bomExcelParser';
-import { generateStyleNo, CATEGORY_CODE_MAP } from '@/lib/styleNo';
+import { generateStyleNo, prefixCodeOf, CATEGORY_CODE_MAP } from '@/lib/styleNo';
 import { resizeImage } from '@/lib/utils';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -477,14 +477,14 @@ function BuyerPicker({ buyers, selectedId, onSelect }: {
   const sel = buyers.find(b => b.id === selectedId);
   const query = q.trim().toLowerCase();
   const list = query
-    ? buyers.filter(b => [b.code, b.name, b.companyName, b.nameEn, ...(b.brands || [])]
+    ? buyers.filter(b => [b.code, b.name, b.companyName, b.nameEn, ...normalizeBrands(b.brands).flatMap(x => [x.name, x.code])]
         .some(f => (f || '').toLowerCase().includes(query)))
     : buyers;
   const line = (b: Vendor) => (
     <>
       <span className="font-mono font-bold text-primary mr-2">[{b.code}]</span>
       <span>{b.name}</span>
-      {(b.brands?.length ? b.brands : (b.nameEn ? [b.nameEn] : []))
+      {(normalizeBrands(b.brands).length ? normalizeBrands(b.brands).map(x => x.name) : (b.nameEn ? [b.nameEn] : []))
         .filter(x => x !== b.name)
         .map(x => <span key={x} className="text-muted-foreground"> · {x}</span>)}
     </>
@@ -1565,12 +1565,15 @@ export default function ItemMaster() {
   useEffect(() => {
     if (manualStyleNo) return;
     const vendor = vendors.find(v => v.id === selectedVendorId);
-    if (!vendor?.code || !editItem.category) { setPreviewStyleNo(''); return; }
+    // 무신사처럼 한 거래처에 브랜드가 여럿이면 브랜드 코드로 품번을 가른다
+    const brand = normalizeBrands(vendor?.brands).find(b => b.code === editItem.brandCode);
+    const prefix = prefixCodeOf(vendor?.code, brand?.code);
+    if (!prefix || !editItem.category) { setPreviewStyleNo(''); return; }
     const date = registDate ? new Date(registDate) : new Date();
-    const generated = generateStyleNo(vendor.code, date, editItem.category as Category, items as Item[], isEdit ? editItem.id : undefined, editItem.erpCategory);
+    const generated = generateStyleNo(prefix, date, editItem.category as Category, items as Item[], isEdit ? editItem.id : undefined, editItem.erpCategory);
     setPreviewStyleNo(generated);
     setEditItem(prev => ({ ...prev, styleNo: generated }));
-  }, [selectedVendorId, registDate, editItem.category, editItem.erpCategory, manualStyleNo, isEdit, editItem.id, vendors, items]);
+  }, [selectedVendorId, editItem.brandCode, registDate, editItem.category, editItem.erpCategory, manualStyleNo, isEdit, editItem.id, vendors, items]);
 
   const openAdd = (prefill?: { styleNo?: string; buyerId?: string; season?: string; styleName?: string; imageUrl?: string }) => {
     // 샘플에서 넘어온 prefill 확인
@@ -3038,7 +3041,7 @@ export default function ItemMaster() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
                 <div className="space-y-1.5">
                   <Label className="text-xs">
-                    거래처 (바이어)
+                    거래처 · 브랜드
                     {buyersWithoutCode > 0 && (
                       <span className="text-muted-foreground font-normal"> 브랜드코드 없는 {buyersWithoutCode}곳 제외</span>
                     )}
@@ -3046,9 +3049,30 @@ export default function ItemMaster() {
                   <BuyerPicker
                     buyers={brandVendors}
                     selectedId={selectedVendorId}
-                    onSelect={setSelectedVendorId}
+                    onSelect={v => { setSelectedVendorId(v); setEditItem(prev => ({ ...prev, brandCode: undefined })); }}
                   />
+                  {/* 브랜드 — 거래처와 한 칸에 둔다. 칸을 따로 내면 홀수가 돼 등록일이 혼자 남는다 */}
+                  {(() => {
+                    const vb = normalizeBrands(vendors.find(v => v.id === selectedVendorId)?.brands);
+                    if (vb.length === 0) return null;
+                    return (
+                      <select
+                        value={editItem.brandCode || ''}
+                        onChange={e => setEditItem(prev => ({ ...prev, brandCode: e.target.value || undefined }))}
+                        className="w-full h-9 text-sm border border-border rounded-md bg-card px-2"
+                        title="브랜드를 고르면 품번 앞자리가 바뀝니다"
+                      >
+                        <option value="">브랜드 없음 (거래처 코드 사용)</option>
+                        {vb.map(b => (
+                          <option key={b.name} value={b.code}>
+                            {b.code ? `[${b.code}] ${b.name}` : `${b.name} (코드 없음)`}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  })()}
                 </div>
+
                 <div className="space-y-1.5">
                   <Label className="text-xs">등록일 <span className="text-muted-foreground font-normal">YYMM 기준</span></Label>
                   <Input type="date" value={registDate} onChange={e => setRegistDate(e.target.value)} className="text-sm" />

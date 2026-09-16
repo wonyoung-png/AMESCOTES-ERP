@@ -174,6 +174,27 @@ export interface ItemColor {
   girimaeColor?: string;  // 기리매 컬러
 }
 
+/** 거래처 아래 브랜드. 코드는 신규 품번의 접두어로 쓰인다 */
+export interface VendorBrand {
+  name: string;
+  /** 품번 접두어. 비어 있으면 거래처 코드를 쓴다 */
+  code: string;
+}
+
+/** 옛 데이터(문자열 배열)와 새 데이터(객체 배열)를 한 모양으로 */
+export function normalizeBrands(list?: unknown): VendorBrand[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map(b => {
+      if (typeof b === 'string') return { name: b, code: '' };
+      if (b && typeof b === 'object' && typeof (b as any).name === 'string') {
+        return { name: (b as any).name, code: String((b as any).code || '') };
+      }
+      return null;
+    })
+    .filter((b): b is VendorBrand => !!b && !!b.name);
+}
+
 export interface Item {
   id: string;
   styleNo: string;
@@ -202,6 +223,8 @@ export interface Item {
   marginRate?: number;             // 마진율 = 마진금액 / 납품가 × 100
   colors?: ItemColor[];            // 컬러 목록
   buyerId?: string;                // 바이어 1:1 연결
+  /** 브랜드 코드 — 거래처 아래 어느 브랜드인지. 이름은 거래처에서 찾아 쓴다 */
+  brandCode?: string;
   imageUrl?: string;
   hasBom: boolean;
   createdAt: string;
@@ -451,6 +474,8 @@ export interface SampleDocument {
 }
 
 export interface Sample {
+  /** 거래처 아래 어느 브랜드인지. 품목을 만들 때 품번 접두어가 된다 */
+  brandCode?: string;
   id: string;
   styleId: string;
   styleNo: string;
@@ -600,7 +625,12 @@ export interface Vendor {
   address?: string;          // 사업장 주소 (퀵/택배 발송용)         // 사업자등록번호 (000-00-00000 형식)
   vendorCode?: string;       // 거래처 코드 (전표번호용, 예: LLL)
   type: VendorType;
-  brands?: string[];         // 브랜드명 (한 회사가 여러 브랜드를 운영할 수 있다)
+  /**
+   * 브랜드 — 한 회사(무신사)가 여러 브랜드를 운영한다.
+   * 코드는 품번 접두어가 된다. 예전 데이터는 이름만 있는 문자열 배열이라
+   * 읽을 때 normalizeBrands 로 {name, code:''} 로 맞춰 쓴다.
+   */
+  brands?: (VendorBrand | string)[];
   region?: VendorRegion;     // 국내 / 해외 — 입력 항목과 목록 탭을 가르는 기준 (기본 국내)
   customType?: string;       // 거래처 유형 "기타" 선택 시 직접 입력값
   materialTypes?: ('장식' | '원단' | '가죽' | '기타')[];  // 자재거래처 자재 유형 (복수 선택)

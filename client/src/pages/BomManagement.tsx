@@ -14,8 +14,7 @@ import { calcQty, calcLineAmt, ceil10, calcPostSummary, calcActualMultiple, type
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   store, genId, normalizeColors, MATERIAL_CATEGORIES, YARD_KINDS, YARD_PARTS, YARD_UNIT, DEFAULT_YARD_CFG,
-  type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material, type Vendor, type YardKind, type YardRow, type YardCfg,
-} from '@/lib/store';
+  type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material, type Vendor, type YardKind, type YardRow, type YardCfg, normalizeBrands } from '@/lib/store';
 import { fetchBoms, upsertBom, deleteBom as deleteBomSB, fetchItems, fetchVendors, fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
 import { PackBomEditor } from '@/components/PackBomEditor';
 import { MaterialQuickAddDialog } from '@/components/MaterialQuickAddDialog';
@@ -2333,7 +2332,7 @@ export default function BomManagement() {
         item,
         buyerName: (() => {
           const b: any = buyers.find(v => v.id === item.buyerId);
-          return b?.brands?.[0] || b?.nameEn || b?.name || '';
+          return normalizeBrands(b?.brands)[0]?.name || b?.nameEn || b?.name || '';
         })(),
         bomCost: item.hasBom ? store.getBomTotalCost(item.styleNo) : 0,
       }));
@@ -2560,19 +2559,27 @@ export default function BomManagement() {
 
   /**
    * 화면 어디서든 Ctrl+V 로 제품사진을 넣는다.
+   *
    * 사진 칸에만 onPaste 를 달면 안 먹는다 — 클릭하는 순간 파일 선택창이 포커스를 가져간다.
-   * 글자를 치고 있을 때(입력칸·편집영역)는 가로채지 않는다.
+   * 그렇다고 "입력칸에 포커스가 있으면 건너뛴다"로 막으면 이 화면에선 거의 항상 걸린다.
+   * 숫자 입력칸이 널려 있어 어디를 눌러도 포커스가 그리로 간다.
+   *
+   * 기준은 포커스가 아니라 클립보드다. 이미지가 들어 있으면 받는다 —
+   * 숫자칸이나 금액칸에 이미지를 붙여 넣을 일은 없다.
+   * 글을 쓰는 곳(textarea·서식 편집기)과 팝업만 비켜준다.
    */
   useEffect(() => {
     if (!editBom) return;
     const onPaste = async (e: ClipboardEvent) => {
       const el = document.activeElement as HTMLElement | null;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      if (el && (el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
       // 팝업이 떠 있으면 그쪽 일이다 — 뒤에 있는 BOM 사진을 바꾸면 안 된다
       if (el?.closest('[role="dialog"], [data-radix-popper-content-wrapper]')) return;
       if (document.querySelector('[role="dialog"][data-state="open"]')) return;
-      const f = Array.from(e.clipboardData?.items || [])
-        .find(i => i.type.startsWith('image/'))?.getAsFile();
+      const cd = e.clipboardData;
+      const f = Array.from(cd?.items || []).find(i => i.type.startsWith('image/'))?.getAsFile()
+        // 탐색기에서 파일을 복사하면 items 가 비어 있고 files 에만 들어오는 브라우저가 있다
+        || Array.from(cd?.files || []).find(x => x.type.startsWith('image/'));
       if (!f) return;
       e.preventDefault();
       if (await applyProductPhoto(f)) toast.success('제품사진을 붙여넣었습니다');
@@ -3723,7 +3730,7 @@ export default function BomManagement() {
                   })()}
                 </div>
               </div>
-              <div className="ml-auto order-3 flex items-center gap-2"><label className="text-xs text-muted-foreground font-medium whitespace-nowrap">환율 CNY→KRW</label><Input type="number" min="0" value={editBom.snapshotCnyKrw} onChange={e => updateField('snapshotCnyKrw', Number(e.target.value))} className="h-8 w-28 text-xs border-border text-right" /></div>
+
             </>
           )}
         </div>

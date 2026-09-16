@@ -10,8 +10,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import {
   store, genId, MATERIAL_CATEGORIES, MATERIAL_SUB_TYPES, COMMON_BRAND,
-  type Material, type MaterialCategory, type Vendor,
-} from '@/lib/store';
+  type Material, type MaterialCategory, type Vendor, normalizeBrands } from '@/lib/store';
 import { fetchMaterials, fetchVendors, upsertMaterial } from '@/lib/supabaseQueries';
 
 const UNITS = ['SF', 'YD', 'M', 'EA', 'L', '콘', 'KG', 'SET', '장', '개', 'PC', 'CM'];
@@ -134,7 +133,7 @@ export function MaterialQuickAddDialog({ open, onOpenChange, defaultName, defaul
                   <SelectTrigger className="h-9"><SelectValue placeholder="바이어 선택" /></SelectTrigger>
                   <SelectContent>
                     {buyers.map(b => (
-                      <SelectItem key={b.id} value={b.name}>{b.brands?.[0] || b.nameEn || b.name}</SelectItem>
+                      <SelectItem key={b.id} value={b.name}>{normalizeBrands(b.brands)[0]?.name || b.nameEn || b.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

@@ -233,7 +233,12 @@ alter table vendors
   add column if not exists contact_history jsonb;
 
 -- ─── 브랜드 다중 등록 · 바이어 지정 품번 (2026-08-07) ───
-alter table vendors add column if not exists brands text[];   -- 한 회사가 여러 브랜드 운영
+-- 브랜드: 한 회사(무신사)가 여러 브랜드를 운영한다. {name, code}[] — code 는 품번 접두어
+-- 예전엔 이름만 담은 text[] 였다. 아래 전환은 이미 운영 DB에 적용됨 (2026-09-16)
+alter table vendors add column if not exists brands jsonb;
+alter table vendors alter column brands type jsonb using to_jsonb(brands);
+alter table items   add column if not exists brand_code text;   -- 거래처 아래 어느 브랜드인지 (품번 접두어)
+alter table samples add column if not exists brand_code text;   -- 샘플이 만드는 품목의 브랜드
 alter table items   add column if not exists buyer_style_no text;  -- 바이어가 지정한 품번
 
 -- ─── 자재/샘플 누락 컬럼 (2026-08-07) ───

@@ -8,10 +8,9 @@ import {
   type Sample, type SampleStage, type Season, type SampleBillingStatus,
   type SampleLocation, type SampleRevisionNote, type SampleMaterialCheckItem,
   type SampleMaterialRequest, type SampleDocument,
-  type Item, type TradeStatement, type TradeStatementLine,
-} from '@/lib/store';
+  type Item, type TradeStatement, type TradeStatementLine, normalizeBrands } from '@/lib/store';
 import { fetchSamples, upsertSample as upsertSampleSB, fetchItems, fetchVendors, upsertItem as upsertItemSB } from '@/lib/supabaseQueries';
-import { generateStyleNo } from '@/lib/styleNo';
+import { generateStyleNo, prefixCodeOf } from '@/lib/styleNo';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,11 +74,15 @@ function createLinkedItem(
   season: Season,
   buyerCode: string,
   existingItems: Item[],
+  brandCode?: string,
 ): Item {
   const now = new Date();
+  // 무신사처럼 한 거래처에 브랜드가 여럿이면 브랜드 코드로 품번을 가른다
+  const prefix = prefixCodeOf(buyerCode, brandCode) || 'ATL';
   return {
     id: genId(),
-    styleNo: generateStyleNo(buyerCode || 'ATL', now, '숄더백', existingItems, undefined, 'HB'),
+    brandCode: brandCode || undefined,
+    styleNo: generateStyleNo(prefix, now, '숄더백', existingItems, undefined, 'HB'),
     name: styleName,
     nameEn: '',
     season,
@@ -140,9 +143,10 @@ export default function SampleManagement() {
   /** 품목마스터와 같은 규칙으로 만든 스타일번호 미리보기 (바이어 코드 + YYMM + 타입 + 일련) */
   const previewStyleNo = useMemo(() => {
     const buyer: any = vendors.find((v: any) => v.id === form.buyerId);
-    if (!buyer?.code) return '';
-    return generateStyleNo(buyer.code, new Date(), '숄더백', items as Item[], undefined, 'HB');
-  }, [vendors, items, form.buyerId]);
+    const prefix = prefixCodeOf(buyer?.code, form.brandCode);
+    if (!prefix) return '';
+    return generateStyleNo(prefix, new Date(), '숄더백', items as Item[], undefined, 'HB');
+  }, [vendors, items, form.buyerId, form.brandCode]);
   // 변경사항 추적
   const [isDirty, setIsDirty] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -360,7 +364,7 @@ export default function SampleManagement() {
   /** 운영은 브랜드명 기준 — 브랜드가 있으면 브랜드명, 없으면 회사명 */
   const buyerLabel = (v?: { name?: string; brands?: string[]; nameEn?: string } | null) => {
     if (!v) return '';
-    const brand = v.brands?.[0] || v.nameEn;
+    const brand = normalizeBrands(v.brands)[0]?.name || v.nameEn;
     return brand || v.name || '';
   };
   const buyerLabelById = (id?: string) => buyerLabel(vendors.find((x: any) => x.id === id) as any);
@@ -464,9 +468,10 @@ export default function SampleManagement() {
       const finalStyleNo = (manualStyleNo ? (form.styleNo || '').trim() : previewStyleNo).trim();
       if (!finalStyleNo) { toast.error('바이어를 선택하거나 스타일번호를 직접 입력하세요'); return; }
       const newItem: Item = {
-        ...createLinkedItem(name, form.season || '26SS', 'ATL', items as Item[]),
+        ...createLinkedItem(name, form.season || '26SS', 'ATL', items as Item[], form.brandCode),
         styleNo: finalStyleNo,
         buyerId: form.buyerId,
+        brandCode: form.brandCode || undefined,
       };
       upsertItemSB(newItem as any).catch((e: Error) => toast.error(`품목 생성 실패: ${e.message}`));
       styleId = newItem.id;
@@ -499,6 +504,7 @@ export default function SampleManagement() {
           styleNo: form.styleNo || styleNo || '',
           styleName: form.styleName || styleName || '',
           buyerId: form.buyerId,
+          brandCode: form.brandCode,
           season: form.season || '26SS',
           stage: form.stage || '1차',
           location: form.location,
@@ -1485,15 +1491,38 @@ export default function SampleManagement() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* 바이어 (맨 위) */}
               <div className="space-y-1.5">
-                <Label className="text-xs">바이어</Label>
-                <Select value={form.buyerId || 'none'} onValueChange={v => setForm(f => ({ ...f, buyerId: v === 'none' ? undefined : v }))}>
+                <Label className="text-xs">바이어 · 브랜드</Label>
+                <Select value={form.buyerId || 'none'}
+                  onValueChange={v => setForm(f => ({ ...f, buyerId: v === 'none' ? undefined : v, brandCode: undefined }))}>
                   <SelectTrigger><SelectValue placeholder="바이어 선택 (선택사항)" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">미지정</SelectItem>
                     {vendors.map(v => <SelectItem key={v.id} value={v.id}>{buyerLabel(v as any)}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {/* 브랜드 — 바이어와 한 칸에 둔다. 칸을 따로 내면 홀수가 돼 마지막 줄이 비뚤어진다 */}
+                {(() => {
+                  const vb = normalizeBrands(vendors.find((v: any) => v.id === form.buyerId)?.brands);
+                  if (vb.length === 0) return null;
+                  return (
+                    <select
+                      value={form.brandCode || ''}
+                      onChange={e => setForm(f => ({ ...f, brandCode: e.target.value || undefined }))}
+                      className="w-full h-9 text-sm border border-border rounded-md bg-card px-2"
+                      title="브랜드를 고르면 품번 앞자리가 바뀝니다"
+                    >
+                      <option value="">브랜드 없음 (거래처 코드 사용)</option>
+                      {vb.map(b => (
+                        <option key={b.name} value={b.code}>
+                          {b.code ? `[${b.code}] ${b.name}` : `${b.name} (코드 없음)`}
+                        </option>
+                      ))}
+                    </select>
+                  );
+                })()}
               </div>
+
+
 
               {/* 스타일 — 품목마스터와 같은 자동채번. 기존 스타일 연결도 여기서 */}
               <div className="space-y-1.5">

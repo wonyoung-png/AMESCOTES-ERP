@@ -8,7 +8,7 @@ import { useLocation } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchBoms, fetchItems, fetchVendors } from '@/lib/supabaseQueries';
 import { CATEGORY_CODE_MAP } from '@/lib/styleNo';
-import type { Category } from '@/lib/store';
+import { normalizeBrands, type Category } from '@/lib/store';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -104,7 +104,7 @@ export default function CostComparison() {
       const item = itemMap.get(bom.styleId) || itemMap.get(bom.styleNo);
       const isSimple = !!(bom as any).isSimpleCost;
       const buyer: any = item?.buyerId ? vendorMap.get(item.buyerId) : undefined;
-      const brandText = [buyer?.name, buyer?.companyName, buyer?.nameEn, ...(buyer?.brands || []), item?.buyerStyleNo]
+      const brandText = [buyer?.name, buyer?.companyName, buyer?.nameEn, ...normalizeBrands(buyer?.brands).map(b => b.name), item?.buyerStyleNo]
         .filter(Boolean).join(' ');
 
       // 사전원가
@@ -202,7 +202,7 @@ export default function CostComparison() {
   )).sort(), [costRows, filterCat]);
   const brandOptions = useMemo(
     () => Array.from(new Set((vendors as any[]).filter(v => v.type === '바이어')
-      .flatMap(v => (v.brands?.length ? v.brands : [v.nameEn || v.name])).filter(Boolean))).sort(),
+      .flatMap(v => (normalizeBrands(v.brands).length ? normalizeBrands(v.brands).map(b => b.name) : [v.nameEn || v.name])).filter(Boolean))).sort(),
     [vendors],
   );
 

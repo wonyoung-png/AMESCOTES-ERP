@@ -10,6 +10,15 @@ export const CATEGORY_CODE_MAP: Partial<Record<Category, string>> = {
   '기타': 'ETC',
 };
 
+/**
+ * 품번 접두어로 쓸 코드를 고른다.
+ * 무신사처럼 한 거래처가 여러 브랜드를 가지면 브랜드 코드로 갈라야 한다.
+ * 브랜드를 안 골랐으면 예전처럼 거래처 코드를 쓴다.
+ */
+export function prefixCodeOf(vendorCode?: string, brandCode?: string): string {
+  return (brandCode || '').trim() || (vendorCode || '').trim();
+}
+
 export function generateStyleNo(
   brandCode: string,
   registDate: Date,
