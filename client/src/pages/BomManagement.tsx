@@ -29,6 +29,7 @@ import {
 } from '@/lib/packBom';
 import { DEFAULT_GLOBAL_MARKUP, SALES_PRICE_LABELS } from '@/lib/salesPricing';
 import { parseExcelBomSheet } from '@/lib/bomExcelParser';
+import { extractProductImage } from '@/lib/xlsxImage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -2594,6 +2595,19 @@ export default function BomManagement() {
     return () => window.removeEventListener('paste', onPaste);
   }, [editBom, applyProductPhoto]);
 
+  /**
+   * 원가표 엑셀에 박힌 제품사진을 꺼내 채운다.
+   * 사람이 올린 사진을 공장 파일이 덮으면 안 되므로, 사진이 없을 때만 넣는다.
+   * 못 꺼내도 조용히 넘어간다 — 자재 파싱이 본체고 사진은 덤이다.
+   */
+  const pickPhotoFromExcel = useCallback(async (file: File) => {
+    const linked = items.find(i => i.id === editBom?.styleId);
+    if (editBom?.productImage || linked?.imageUrl) return;   // 이미 있으면 건드리지 않는다
+    const img = await extractProductImage(file);
+    if (!img) return;
+    if (await applyProductPhoto(img)) toast.success('원가표의 제품사진을 가져왔습니다');
+  }, [items, editBom, applyProductPhoto]);
+
   const selectPackingItem = useCallback((itemId: string) => {
     if (!itemId || itemId === '_none') {
       setEditBom(prev => prev ? {
@@ -3427,7 +3441,8 @@ export default function BomManagement() {
         };
       });
       markDirty();
-      toast.success(`원가표 파싱 완료: ${preMaterials.length}개 자재 행, 후가공 ${parsedPostLines.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
+      toast.success(`원가표 파싱 완료: ${preMaterials.length}개 자재 행, 후가공 ${parsedPostLines.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
+      await pickPhotoFromExcel(file);
     } catch (err) {
       // console.error(err);
       toast.error('원가표 파싱 실패. 파일 형식을 확인해주세요.');
@@ -3480,7 +3495,8 @@ export default function BomManagement() {
         };
       });
       markDirty();
-      toast.success(`공장 원가표 파싱 완료: ${postMaterials.length}개 자재 행, 후가공 ${parsedPostLines2.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
+      toast.success(`공장 원가표 파싱 완료: ${postMaterials.length}개 자재 행, 후가공 ${parsedPostLines2.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
+      await pickPhotoFromExcel(file);
     } catch (err) {
       // console.error(err);
       toast.error('공장 원가표 파싱 실패. 파일 형식을 확인해주세요.');

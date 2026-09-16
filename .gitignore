@@ -15,3 +15,6 @@ dist/
 
 # graphify 산출물
 graphify-out/
+
+codex_*.txt
+q_chk.txt
