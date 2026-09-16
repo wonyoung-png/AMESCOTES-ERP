@@ -38,6 +38,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge';
 import { HoverZoomImage } from '@/components/HoverZoomImage';
 import { toast } from 'sonner';
+import { resizeImage } from '@/lib/utils';
 import { onSaveFail } from '@/lib/saveGuard';
 import {
   Plus, Trash2, Upload, FileText, Download, ChevronDown, ChevronRight,
@@ -95,6 +96,8 @@ interface ExtBom {
   boxSize?: string;
   version: number;
   season: Season;
+  /** 제품사진 — 없으면 품목 마스터의 imageUrl 로 폴백한다 */
+  productImage?: string;
   // 사전원가
   lines: ExtBomLine[];
   postProcessLines: PostProcessLine[];
@@ -2276,15 +2279,50 @@ export default function BomManagement() {
   });
   const [filterBuyerBom, setFilterBuyerBom] = useState<string>('all');
   const [styleSearch, setStyleSearch] = useState<string>('');
+  const [filterSeasonBom, setFilterSeasonBom] = useState<string>('all');
+  const [filterCatBom, setFilterCatBom] = useState<string>('all');
+  /** BOM 진행상태 — 원가 담당자는 '아직 안 만든 것'부터 찾는다 */
+  const [filterBomState, setFilterBomState] = useState<'all' | 'none' | 'pre' | 'post'>('all');
   const debouncedStyleSearch = useDebouncedValue(styleSearch, 300);
   // 스타일 셀렉트 옵션 — 키 입력마다 전체 items × getBomTotalCost(localStorage 파싱) 재실행 방지
   /**
    * 스타일 검색 = 스타일번호 · 품명 · 브랜드(바이어)명을 한 칸에서 찾는다.
    * 브랜드명을 치면 그 브랜드로 등록된 품목만 남으므로 별도 바이어 필터가 필요 없다.
    */
+  /**
+   * 스타일 -> 최신 BOM. 매번 546개 x extBoms 를 훑으면 필터 하나 바꿀 때마다 수만 번 비교가 돈다.
+   *
+   * 키에 id:/no: 를 붙여 갈라놓는다. 한 통에 담으면 어떤 스타일의 styleNo 가
+   * 다른 스타일의 styleId 와 같을 때 서로 무관한 BOM끼리 덮어쓴다.
+   */
+  const latestBomOf = useMemo(() => {
+    const m = new Map<string, any>();
+    const better = (a: any, b: any) => (Number(a?.version) || 0) >= (Number(b?.version) || 0) ? a : b;
+    const put = (k: string, b: any) => m.set(k, m.has(k) ? better(b, m.get(k)) : b);
+    (extBoms as any[]).forEach(b => {
+      if (b.styleId) put(`id:${b.styleId}`, b);
+      if (b.styleNo) put(`no:${b.styleNo}`, b);
+    });
+    return m;
+  }, [extBoms]);
+
   const styleOptions = useMemo(() => {
     const q = debouncedStyleSearch.trim().toLowerCase();
     return items
+      .filter(item => filterBuyerBom === 'all' || item.buyerId === filterBuyerBom)
+      .filter(item => filterSeasonBom === 'all' || item.season === filterSeasonBom)
+      .filter(item => filterCatBom === 'all' || item.erpCategory === filterCatBom)
+      .filter(item => {
+        if (filterBomState === 'all') return true;
+        // 편집 화면과 같은 기준으로 고른 BOM을 본다 (styleId 우선 → 최신 version)
+        // 편집 화면과 같은 순서 — id 로 먼저 찾고, 없을 때만 styleNo 로 되짚는다
+        const b: any = latestBomOf.get(`id:${item.id}`) || latestBomOf.get(`no:${item.styleNo}`);
+        const hasPost = !!(b?.postColorBoms?.length || b?.postMaterials?.length || b?.simplePostCostKrw);
+        const hasPre = !!(b?.colorBoms?.length || b?.preMaterials?.length || b?.simpleCostKrw);
+        if (filterBomState === 'none') return !hasPre && !hasPost;
+        if (filterBomState === 'pre') return hasPre && !hasPost;
+        return hasPost;
+      })
       .filter(item => {
         if (!q) return true;
         const buyer = buyers.find(b => b.id === item.buyerId);
@@ -2299,7 +2337,22 @@ export default function BomManagement() {
         })(),
         bomCost: item.hasBom ? store.getBomTotalCost(item.styleNo) : 0,
       }));
-  }, [items, buyers, debouncedStyleSearch, extBoms]);
+  }, [items, buyers, debouncedStyleSearch, extBoms, latestBomOf, filterBuyerBom, filterSeasonBom, filterCatBom, filterBomState]);
+
+  /** 필터 목록은 등록된 품목에서 뽑는다. 고정 배열이면 새 시즌이 안 나온다 */
+  const bomSeasonOptions = useMemo(
+    () => Array.from(new Set(items.map(i => i.season).filter(Boolean) as string[]))
+      .sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0) || a.localeCompare(b)),
+    [items],
+  );
+  const bomCatOptions = useMemo(
+    () => Array.from(new Set(items.map(i => i.erpCategory).filter(Boolean) as string[])).sort(),
+    [items],
+  );
+  const bomBuyerOptions = useMemo(() => {
+    const used = new Set(items.map(i => i.buyerId).filter(Boolean));
+    return buyers.filter(b => used.has(b.id));
+  }, [items, buyers]);
   const [editBom, setEditBom] = useState<ExtBom | null>(null);
   const [showQuote, setShowQuote] = useState(false);
   const [showCopyModal, setShowCopyModal] = useState(false);
@@ -2490,6 +2543,18 @@ export default function BomManagement() {
     setEditBom(prev => prev ? { ...prev, [field]: val } : prev);
     markDirty();
   }, []);
+
+  /** 제품사진 — 고르든 끌어놓든 붙여넣든 여기 하나로 들어온다 (600px로 줄여 저장) */
+  const [photoDragOver, setPhotoDragOver] = useState(false);
+  const applyProductPhoto = useCallback(async (file?: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('이미지 파일만 넣을 수 있습니다'); return; }
+    try {
+      updateField('productImage', await resizeImage(file));
+    } catch {
+      toast.error('이미지를 읽지 못했습니다');
+    }
+  }, [updateField]);
 
   const selectPackingItem = useCallback((itemId: string) => {
     if (!itemId || itemId === '_none') {
@@ -3524,6 +3589,52 @@ export default function BomManagement() {
               fmtKrw={fmtKrw}
             />
           </div>
+
+          {/* 스타일 546개를 검색 하나로 찾기는 어렵다 — 좁혀 놓고 고른다 */}
+          <div className="col-span-2 md:col-span-1 lg:col-span-2 grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block font-medium">바이어</label>
+              <select value={filterBuyerBom} onChange={e => setFilterBuyerBom(e.target.value)} className="w-full h-8 text-xs border border-border rounded-md bg-card px-2 hover:border-primary/40">
+                <option value="all">전체 바이어</option>
+                {bomBuyerOptions.map(b => (
+                  <option key={b.id} value={b.id}>{(b as any).code || b.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block font-medium">시즌</label>
+              <select value={filterSeasonBom} onChange={e => setFilterSeasonBom(e.target.value)} className="w-full h-8 text-xs border border-border rounded-md bg-card px-2 hover:border-primary/40">
+                <option value="all">전체 시즌</option>
+                {bomSeasonOptions.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block font-medium">카테고리</label>
+              <select value={filterCatBom} onChange={e => setFilterCatBom(e.target.value)} className="w-full h-8 text-xs border border-border rounded-md bg-card px-2 hover:border-primary/40">
+                <option value="all">전체 카테고리</option>
+                {bomCatOptions.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block font-medium">원가 상태</label>
+              <select value={filterBomState} onChange={e => setFilterBomState(e.target.value as any)} className="w-full h-8 text-xs border border-border rounded-md bg-card px-2 hover:border-primary/40">
+                <option value="all">전체</option>
+                <option value="none">미작성</option>
+                <option value="pre">사전원가만</option>
+                <option value="post">사후원가 있음</option>
+              </select>
+            </div>
+            <div className="col-span-2 flex items-center justify-between">
+              <span className="text-[11px] text-muted-foreground">{styleOptions.length}개</span>
+              {(filterBuyerBom !== 'all' || filterSeasonBom !== 'all' || filterCatBom !== 'all' || filterBomState !== 'all') && (
+                <button type="button"
+                  onClick={() => { setFilterBuyerBom('all'); setFilterSeasonBom('all'); setFilterCatBom('all'); setFilterBomState('all'); }}
+                  className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2">
+                  필터 해제
+                </button>
+              )}
+            </div>
+          </div>
           {editBom && (
             <>
               {/* 선택한 품목에서 따라오는 값들 — 읽기 전용이라 배지 한 줄로 줄였다 */}
@@ -3542,9 +3653,15 @@ export default function BomManagement() {
                     return (
                   <>
                   <div
-                    className="w-20 h-20 border-2 border-dashed border-border rounded-md flex flex-col items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/10 transition-colors overflow-hidden flex-shrink-0"
+                    className={`w-20 h-20 border-2 border-dashed rounded-md flex flex-col items-center justify-center cursor-pointer transition-colors overflow-hidden flex-shrink-0 outline-none ${
+                      photoDragOver ? 'border-primary bg-primary/10' : 'border-border hover:border-primary hover:bg-primary/10'
+                    } focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30`}
                     onClick={() => document.getElementById('bom-product-img-input')?.click()}
-                    onPaste={e => { const pasteItems = Array.from(e.clipboardData?.items || []); const img = pasteItems.find(i => i.type.startsWith('image/')); if (img) { const blob = img.getAsFile(); if (blob) { const reader = new FileReader(); reader.onload = ev => updateField('productImage', ev.target?.result as string); reader.readAsDataURL(blob); } } }}
+                    onPaste={e => { const f = Array.from(e.clipboardData?.items || []).find(i => i.type.startsWith('image/'))?.getAsFile(); if (f) { e.preventDefault(); applyProductPhoto(f); } }}
+                    onDragOver={e => { e.preventDefault(); setPhotoDragOver(true); }}
+                    onDragLeave={() => setPhotoDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setPhotoDragOver(false); applyProductPhoto(e.dataTransfer.files?.[0]); }}
+                    title="클릭해 고르거나, 여기에 끌어다 놓거나, 눌러서 Ctrl+V"
                     tabIndex={0}
                   >
                     {productPhoto ? (
@@ -3559,12 +3676,18 @@ export default function BomManagement() {
                       <Camera className="w-5 h-5 text-muted-foreground" />
                     )}
                   </div>
-                  <input id="bom-product-img-input" type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = ev => updateField('productImage', ev.target?.result as string); reader.readAsDataURL(file); e.target.value = ''; }} />
+                  <input id="bom-product-img-input" type="file" accept="image/*" className="hidden"
+                    onChange={e => { applyProductPhoto(e.target.files?.[0]); e.target.value = ''; }} />
                   {editBom.productImage && (
                     <button onClick={() => updateField('productImage', undefined)} className="text-[11px] text-[var(--system-red)] hover:text-[var(--system-red)]">× 삭제</button>
                   )}
                   {!editBom.productImage && linkedItemImg && (
                     <span className="text-[11px] text-muted-foreground">품목 사진</span>
+                  )}
+                  {!productPhoto && (
+                    <span className="text-[11px] text-muted-foreground leading-tight">
+                      클릭해 고르기<br />끌어다 놓기<br />눌러서 Ctrl+V
+                    </span>
                   )}
                   </>
                     );
