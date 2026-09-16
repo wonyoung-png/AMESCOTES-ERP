@@ -446,7 +446,7 @@ export async function upsertItem(item: Record<string, any>) {
     name_en: item.nameEn,
     erp_category: item.erpCategory === 'PACK' ? 'ACC' : item.erpCategory,
     sub_category: item.category,
-    buyer_id: item.buyerId,
+    buyer_id: item.buyerId || null,   // 빈 문자열은 외래키가 막는다
     brand_code: item.brandCode ?? null,
     season: item.season,
     designer: item.designer,
@@ -552,7 +552,7 @@ export async function upsertBom(bom: any) {
   const snakeBom: Record<string, any> = {
     id: bom.id,
     style_no: bom.styleNo,
-    style_id: bom.styleId ?? null, // items.id 참조 (BOM-아이템 연결 키)
+    style_id: bom.styleId || null, // items.id 참조 (BOM-아이템 연결 키)
     style_name: bom.styleName,
     season: bom.season,
     erp_category: bom.erpCategory,
@@ -672,7 +672,7 @@ export async function upsertSample(sample: Record<string, any>) {
     id: sample.id,
     style_no: sample.styleNo,
     style_name: sample.styleName,
-    buyer_id: sample.buyerId,
+    buyer_id: sample.buyerId || null,
     brand_code: sample.brandCode ?? null,
     season: sample.season,
     stage: sample.stage,
@@ -686,7 +686,7 @@ export async function upsertSample(sample: Record<string, any>) {
     material_requests: sample.materialRequests,
     documents: sample.documents,
     memo: sample.memo,
-    style_id: sample.styleId,
+    style_id: sample.styleId || null,
     location: sample.location,
     round: sample.round,
     round_name: sample.roundName,
@@ -784,8 +784,10 @@ export async function upsertOrder(order: Record<string, any>) {
     id: order.id,
     style_no: order.styleNo,
     style_name: order.styleName,
-    buyer_id: order.buyerId,
-    vendor_id: order.vendorId,
+    // 빈 문자열을 그대로 보내면 외래키가 막는다 ("violates foreign key constraint").
+    // 공장을 '미지정'으로 두고 발주하면 여기서 터졌다 — 안 고른 건 null 로 보낸다
+    buyer_id: order.buyerId || null,
+    vendor_id: order.vendorId || null,
     quantity: order.qty,
     unit_price: order.factoryUnitPriceKrw ?? order.factoryUnitPriceCny ?? 0,
     currency: order.factoryCurrency ?? 'KRW',
