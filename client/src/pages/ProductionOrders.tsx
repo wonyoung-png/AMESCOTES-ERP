@@ -708,26 +708,44 @@ export default function ProductionOrders() {
    */
   const brandOfItem = (i: Item): { label: string; isBrand: boolean } => {
     const v: any = allVendors.find((x: any) => x.id === (i as any).buyerId);
-    if (!v) return { label: '', isBrand: false };
+    if (!v) return { label: '미지정', isBrand: false };
+    // 거래처명을 브랜드명으로 돌려쓰지 않는다 (2026-09-16 대표 지시).
+    // 둘은 따로 등록하는 값이다 — 거래처마스터에 브랜드가 없으면 여기서도 비어 보이는 게 맞다
     const list = normalizeBrands(v.brands);
     const code = ((i as any).brandCode || '').trim().toUpperCase();
-    const hit = code ? list.find(b => (b.code || '').toUpperCase() === code) : undefined;
-    // 브랜드가 하나뿐인 거래처는 코드가 없어도 그 브랜드가 맞다.
-    // 단 코드가 박혀 있는데 안 맞는 경우는 다르다 — 지워진 브랜드를 가리키는 것이니
-    // 멀쩡한 브랜드인 척 하면 안 된다 (코덱스 지적)
-    const only = !code && list.length === 1 ? list[0] : undefined;
-    const brand = hit || only;
-    if (brand) return { label: brand.name, isBrand: true };
-    // 브랜드 미지정 — 회사명으로 대신한다. nameEn 을 먼저 보면 안 된다.
-    // 무신사처럼 nameEn 칸에 브랜드명이 적혀 있는 거래처가 있어, 브랜드인 척 보인다
-    const name = v.name || v.nameEn || '';
-    // 코드는 박혀 있는데 그런 브랜드가 없다 = 브랜드가 지워졌다. 미지정과 같아 보이면 원인을 못 찾는다
-    return { label: code ? `${name} · 없는코드 ${code}` : name, isBrand: false };
+    const byCode = code ? list.find(b => (b.code || '').toUpperCase() === code) : undefined;
+    if (byCode) return { label: byCode.name, isBrand: true };
+
+    // 품번 접두가 곧 브랜드코드다 (styleNo = [코드][YY][MM][타입][일련]).
+    // brandCode 칸이 비어 있는 옛 품목을 여기서 건진다
+    // 코드 뒤에는 연·월 네 자리가 붙는다. startsWith 만 보면 ALPHA... 도 AL 로 걸린다 (코덱스 지적)
+    const pre = (i.styleNo || '').toUpperCase();
+    const byPrefix = list.find(b => {
+      if (!b.code) return false;
+      // 옛 코드에 특수문자가 섞여 있으면 정규식이 엉뚱하게 돈다 (코덱스 지적)
+      const esc = b.code.toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`^${esc}\\d{4}`).test(pre);
+    });
+    if (byPrefix) return { label: byPrefix.name, isBrand: true };
+
+    // 코드가 없고 브랜드가 하나뿐이면 그게 맞다.
+    // 코드가 박혀 있는데 안 맞으면 폴백하지 않는다 — 지워진 브랜드다 (코덱스 지적)
+    if (!code && list.length === 1) return { label: list[0].name, isBrand: true };
+    return { label: code ? `브랜드 미지정 · 없는코드 ${code}` : '브랜드 미지정', isBrand: false };
   };
   const brandLabelOf = (i: Item) => brandOfItem(i).label;
 
+  /** 실제 브랜드만 고른다. '미지정' 부류가 브랜드인 양 목록에 끼면 안 된다 (코덱스 지적) */
   const bulkBrandOptions = useMemo(
-    () => Array.from(new Set((items as Item[]).map(brandLabelOf).filter(Boolean))).sort(),
+    () => Array.from(new Set(
+      (items as Item[]).map(brandOfItem).filter(b => b.isBrand).map(b => b.label),
+    )).sort(),
+    [items, allVendors],
+  );
+  /** 브랜드를 못 가린 품목이 하나라도 있으면 그것만 따로 거를 수 있게 한다 */
+  const BRAND_NONE = '__none__';
+  const hasUnbranded = useMemo(
+    () => (items as Item[]).some(i => !brandOfItem(i).isBrand),
     [items, allVendors],
   );
   const bulkSeasonOptions = useMemo(
@@ -743,7 +761,8 @@ export default function ProductionOrders() {
     const q = bulkSearch.trim().toLowerCase();
     return (items as Item[])
       .filter(i => {
-        if (bulkBrand !== 'all' && brandLabelOf(i) !== bulkBrand) return false;
+        if (bulkBrand === BRAND_NONE) { if (brandOfItem(i).isBrand) return false; }
+        else if (bulkBrand !== 'all' && brandLabelOf(i) !== bulkBrand) return false;
         if (bulkSeason !== 'all' && i.season !== bulkSeason) return false;
         if (bulkCat !== 'all' && i.erpCategory !== bulkCat) return false;
         if (!q) return true;
@@ -2088,9 +2107,9 @@ export default function ProductionOrders() {
               </div>
               <select value={bulkBrand} onChange={e => setBulkBrand(e.target.value)}
                 className="h-9 text-xs border border-border rounded-md bg-card px-2">
-                {/* 브랜드가 없는 품목은 거래처명으로 걸러야 해 둘이 한 목록에 섞인다. 라벨을 그대로 적는다 */}
-                <option value="all">브랜드 · 거래처 전체</option>
+                <option value="all">전체 브랜드</option>
                 {bulkBrandOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                {hasUnbranded && <option value={BRAND_NONE}>브랜드 미지정</option>}
               </select>
               <select value={bulkSeason} onChange={e => setBulkSeason(e.target.value)}
                 className="h-9 text-xs border border-border rounded-md bg-card px-2">
@@ -2137,9 +2156,9 @@ export default function ProductionOrders() {
                         <ImageIcon className="w-3.5 h-3.5 text-muted-foreground/50" />
                       </div>
                     )}
-                    {/* 브랜드가 정해진 것만 진하게. 거래처명으로 대신 적은 것은 흐리게 둔다 */}
+                    {/* 브랜드를 가린 것만 진하게. 못 가린 것은 흐리게 둬 채워 넣으라고 알린다 */}
                     <span className={`w-28 shrink-0 truncate text-xs ${isBrand ? 'text-foreground' : 'text-muted-foreground/60'}`}>
-                      {label || '—'}
+                      {label}
                     </span>
                     <span className="w-36 shrink-0 truncate text-sm font-mono">{i.styleNo}</span>
                     <span className="flex-1 min-w-0 truncate text-sm">{i.name}</span>

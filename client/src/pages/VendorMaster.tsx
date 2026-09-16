@@ -161,6 +161,12 @@ export default function VendorMaster() {
     if (!name) { toast.error('거래처명이 없습니다. 수정 후 저장하세요'); return; }
     const dup = vendors.find((v: Vendor) => v.name.trim() === name);
     if (dup) { toast.error(`'${name}'은(는) 이미 등록된 거래처입니다`); return; }
+    // AI 서류 등록은 브랜드를 뽑아내지 못한다. 이 길로 브랜드 없는 바이어가 들어오면
+    // 손으로 넣을 때 막아둔 게 무의미해진다 (코덱스 지적)
+    if (aiType === '바이어') {
+      toast.error('바이어는 브랜드를 같이 등록해야 합니다. 직접 등록으로 넣어주세요');
+      return;
+    }
 
     const country = (aiDraft.country as string) || '한국';
     const currency = (aiDraft.currency as Currency) || (country === '중국' ? 'CNY' : country === '미국' ? 'USD' : 'KRW');
@@ -287,6 +293,13 @@ export default function VendorMaster() {
     const companyName = (editVendor.companyName || '').trim();
     if (!companyName) { toast.error('회사명을 입력해주세요'); return; }
     if (!editVendor.type) { toast.error('거래처 유형을 선택해주세요'); return; }
+
+    // 거래처명과 브랜드명은 따로 등록한다 (2026-09-16 대표 지시).
+    // 안 채워두면 품목·발주 화면이 거래처명을 브랜드인 양 돌려쓰게 된다 — 그래서 바이어는 막는다
+    if (editVendor.type === '바이어' && normalizeBrands(editVendor.brands).length === 0) {
+      toast.error('바이어는 브랜드를 1개 이상 등록해야 합니다 (거래처명과 별개입니다)');
+      return;
+    }
 
     // 거래처명 중복 검사 (신규/수정 모두)
     const dupName = vendors.find((v: Vendor) => v.name.trim() === companyName && v.id !== editVendor.id);
@@ -704,13 +717,19 @@ export default function VendorMaster() {
    * 이미 쓰고 있는 코드인가 — 거래처 코드·전표코드·다른 브랜드 코드 전부와 견준다.
    * 하나라도 겹치면 품번 앞자리가 같아져 어느 브랜드 것인지 알 수 없다.
    */
-  const isCodeTaken = (code: string) => {
+  /** 브랜드 이름 비교용 — 대소문자·공백·유니코드 표기 차이는 같은 이름으로 본다 (코덱스 지적) */
+  const brandKey = (n: string) => n.normalize('NFC').replace(/\s+/g, '').toUpperCase();
+
+  const isCodeTaken = (code: string, brandName = '') => {
     const c = code.toUpperCase();
     if (!c) return false;
+    // 한 브랜드를 거래처 두 곳에 걸어둘 수 있다 (아뜰리에드루멘 = LUMEN).
+    // 같은 브랜드면 코드도 같아야 품번 앞자리가 갈리지 않는다 — 그건 충돌이 아니다
+    const same = (n: string) => !!brandName && brandKey(n) === brandKey(brandName);
     const inOthers = vendors.some(v =>
       (v.code || '').toUpperCase() === c ||
       (v.vendorCode || '').toUpperCase() === c ||
-      (v.id !== editVendor.id && normalizeBrands(v.brands).some(x => (x.code || '').toUpperCase() === c)));
+      (v.id !== editVendor.id && normalizeBrands(v.brands).some(x => (x.code || '').toUpperCase() === c && !same(x.name))));
     const inSelf = normalizeBrands(editVendor.brands).some(x => (x.code || '').toUpperCase() === c);
     return inOthers || inSelf;
   };
@@ -724,6 +743,12 @@ export default function VendorMaster() {
    * 거래처 코드·전표 코드·다른 브랜드 코드와 겹치는 것은 건너뛴다.
    */
   const nextBrandCode = (brandName = '') => {
+    // 같은 이름의 브랜드가 다른 거래처에 이미 있으면 그 코드를 물려받는다.
+    // 새 코드를 지어 주면 한 브랜드가 품번 두 체계로 갈린다 (코덱스 지적)
+    const twin = vendors
+      .flatMap(v => normalizeBrands(v.brands))
+      .find(b => b.code && brandKey(b.name) === brandKey(brandName));
+    if (twin) return twin.code.toUpperCase();
     const letters = brandName.toUpperCase().replace(/[^A-Z]/g, '');
     if (letters.length >= 2 && !isCodeTaken(letters.slice(0, 2))) return letters.slice(0, 2);
     const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -744,13 +769,19 @@ export default function VendorMaster() {
     const name = brandInput.trim();
     if (!name) return;
     const cur = normalizeBrands(editVendor.brands);
-    if (cur.some(x => x.name === name)) { toast.error('이미 있는 브랜드입니다'); return; }
+    // 완전일치로 보면 "Lumen" 옆에 "LU MEN" 이 따로 들어간다 (코덱스 지적)
+    if (cur.some(x => brandKey(x.name) === brandKey(name))) { toast.error('이미 있는 브랜드입니다'); return; }
     // 비워 두면 영문 두 글자로 지어 준다
     const typed = brandCodeInput.trim().toUpperCase();
     if (typed && !/^[A-Z]{2}$/.test(typed)) { toast.error('코드는 영문 두 글자입니다'); return; }
     const code = typed || nextBrandCode(name);
     if (!code) { toast.error('쓸 수 있는 코드가 없습니다'); return; }
-    if (isCodeTaken(code)) { toast.error(`코드 ${code} 는 이미 쓰고 있습니다`); return; }
+    // 같은 이름의 브랜드가 다른 거래처에 있으면 그 코드를 같이 쓰는 게 맞다.
+    // 여기서 걸리면 이 거래처의 다른 브랜드가 그 코드를 쥐고 있다는 뜻 — 손으로 다른 코드를 받는다
+    if (isCodeTaken(code, name)) {
+      toast.error(`코드 ${code} 는 이미 쓰고 있습니다. 코드 칸에 다른 영문 두 글자를 넣어주세요`);
+      return;
+    }
     update('brands', [...cur, { name, code }]);
     setBrandInput(''); setBrandCodeInput('');
   };
