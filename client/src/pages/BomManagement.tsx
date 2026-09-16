@@ -2471,6 +2471,10 @@ export default function BomManagement() {
     // 다른 스타일을 열었다 — 사진을 바꾼 적 없는 상태로 되돌린다.
     // 안 풀면 앞 품목에서 켠 플래그가 남아 이 품목 사진을 덮어쓴다
     setPhotoChanged(false);
+    // 열어둔 컬러 추가 모달은 품목을 바꾸면 닫는다.
+    // 안 닫으면 앞 품목에서 치던 컬러명이 새 품목 위에 그대로 떠 있다 (코덱스 지적)
+    setShowAddColorModal(false);
+    setNewColorName('');
 
     if (item?.erpCategory === 'PACK') {
       setMainTab('pack');
@@ -2483,16 +2487,8 @@ export default function BomManagement() {
     // 사전원가 컬러 탭 자동 활성화
     const colors = loadedBom.colorBoms || [];
     const postColors = loadedBom.postColorBoms || [];
-    if (colors.length > 0) {
-      setActivePreColor(colors[0].color);
-    } else if (postColors.length === 0) {
-      // 사전·사후 모두 비어 있을 때만 컬러 추가 모달을 띄운다
-      setActivePreColor('');
-      setAddColorForTab('pre');
-      setShowAddColorModal(true);
-    } else {
-      setActivePreColor('');
-    }
+    // 컬러가 없어도 모달을 띄우지 않는다. 빈 화면의 "첫 번째 컬러 추가" 를 누르게 둔다
+    setActivePreColor(colors.length > 0 ? colors[0].color : '');
     // 사후원가 컬러 탭 자동 활성화
     if (postColors.length > 0) {
       setActivePostColor(postColors[0].color);
@@ -2501,7 +2497,7 @@ export default function BomManagement() {
     }
     // 사후원가만 있는 BOM(품목등록에서 사후로 올린 경우)은 사후원가 탭으로 열어준다
     if (colors.length === 0 && postColors.length > 0) setMainTab('post');
-    else if (colors.length > 0) setMainTab('pre');
+    else setMainTab('pre');   // 둘 다 비었을 때 앞 품목의 탭이 남던 것도 여기서 정리된다
     // [FIX] extBoms 의존성 추가: 방금 등록한 BOM처럼 서버 데이터가 늦게 도착하는 경우
     // (선택 시점엔 비어 있어 빈 BOM으로 열리고 이후 갱신되지 않던 문제)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2776,7 +2772,7 @@ export default function BomManagement() {
         else setActivePostColor('');
       } else {
         if (newColors.length > 0) setActivePreColor(newColors[0].color);
-        else { setActivePreColor(''); setAddColorForTab('pre'); setShowAddColorModal(true); }
+        else setActivePreColor('');
       }
       const updated = { ...prev, [bomKey]: newColors };
       // [FIX] 자동 저장 제거 — 저장 버튼을 눌러야만 DB에 반영됨
@@ -3441,7 +3437,7 @@ export default function BomManagement() {
         };
       });
       markDirty();
-      toast.success(`원가표 파싱 완료: ${preMaterials.length}개 자재 행, 후가공 ${parsedPostLines.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
+      toast.success(`원가표 파싱 완료: ${preMaterials.length}개 자재 행, 후가공 ${parsedPostLines.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
       await pickPhotoFromExcel(file);
     } catch (err) {
       // console.error(err);
@@ -3495,7 +3491,7 @@ export default function BomManagement() {
         };
       });
       markDirty();
-      toast.success(`공장 원가표 파싱 완료: ${postMaterials.length}개 자재 행, 후가공 ${parsedPostLines2.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
+      toast.success(`공장 원가표 파싱 완료: ${postMaterials.length}개 자재 행, 후가공 ${parsedPostLines2.length}개, 임가공 ${parsedProcessingFee}, 환율 ${parsedRate}`);
       await pickPhotoFromExcel(file);
     } catch (err) {
       // console.error(err);
