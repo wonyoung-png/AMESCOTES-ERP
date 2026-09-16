@@ -2467,6 +2467,9 @@ export default function BomManagement() {
 
     setEditBom(loadedBom);
     setIsDirty(false);
+    // 다른 스타일을 열었다 — 사진을 바꾼 적 없는 상태로 되돌린다.
+    // 안 풀면 앞 품목에서 켠 플래그가 남아 이 품목 사진을 덮어쓴다
+    setPhotoChanged(false);
 
     if (item?.erpCategory === 'PACK') {
       setMainTab('pack');
@@ -2545,11 +2548,14 @@ export default function BomManagement() {
 
   /** 제품사진 — 고르든 끌어놓든 붙여넣든 여기 하나로 들어온다 (600px로 줄여 저장) */
   const [photoDragOver, setPhotoDragOver] = useState(false);
+  /** 이 화면에서 사진을 직접 바꿨나 — 품목으로 올릴지 가르는 기준 */
+  const [photoChanged, setPhotoChanged] = useState(false);
   const applyProductPhoto = useCallback(async (file?: File | null): Promise<boolean> => {
     if (!file) return false;
     if (!file.type.startsWith('image/')) { toast.error('이미지 파일만 넣을 수 있습니다'); return false; }
     try {
       updateField('productImage', await resizeImage(file));
+      setPhotoChanged(true);
       return true;
     } catch {
       toast.error('이미지를 읽지 못했습니다');
@@ -3114,6 +3120,12 @@ export default function BomManagement() {
       ...(postCostKrw > 0 ? { postCostKrw } : {}),
       ...(editBom.pnl?.confirmedSalePrice ? { confirmedSalePrice: editBom.pnl.confirmedSalePrice } : {}),
       hasBom: true,
+      /*
+       * 사진은 품목이 주인이다. 이 화면에서 바꿨을 때만 올린다.
+       * currentItem 을 통째로 펼치므로 imageUrl 이 늘 딸려 들어간다 — 안 바꿨으면 원래 값으로 되돌린다.
+       * 지웠을 때는 undefined 가 아니라 null 을 보낸다. undefined 는 전송에서 빠져 DB 값이 남는다.
+       */
+      imageUrl: photoChanged ? (editBom.productImage ?? null) : currentItem?.imageUrl,
       ...(newColors.length > 0 ? {
         colors: [
           ...normalizeColors(currentItem?.colors || []),
@@ -3136,6 +3148,7 @@ export default function BomManagement() {
       }
     });
     setIsDirty(false);
+    setPhotoChanged(false);
     toast.success('BOM이 저장되었습니다' + (newColors.length > 0 ? ` (컬러 ${newColors.length}개 품목에 추가됨)` : ''));
   };
 
@@ -3715,7 +3728,7 @@ export default function BomManagement() {
                   <input id="bom-product-img-input" type="file" accept="image/*" className="hidden"
                     onChange={e => { applyProductPhoto(e.target.files?.[0]); e.target.value = ''; }} />
                   {editBom.productImage && (
-                    <button onClick={() => updateField('productImage', undefined)} className="text-[11px] text-[var(--system-red)] hover:text-[var(--system-red)]">× 삭제</button>
+                    <button onClick={() => { updateField('productImage', undefined); setPhotoChanged(true); }} className="text-[11px] text-[var(--system-red)] hover:text-[var(--system-red)]">× 삭제</button>
                   )}
                   {!editBom.productImage && linkedItemImg && (
                     <span className="text-[11px] text-muted-foreground">품목 사진</span>
