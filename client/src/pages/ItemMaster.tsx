@@ -1664,7 +1664,9 @@ export default function ItemMaster() {
     }
     setIsEdit(true); setManualStyleNo(true);
     setRegistDate(item.createdAt.split('T')[0]);
-    setSelectedVendorId(''); setPreviewStyleNo(item.styleNo); setColorInput('');
+    // 브랜드 드롭다운이 이 값으로 목록을 만든다. 비우면 브랜드 칸이 사라지고 선택이 날아간다
+    setSelectedVendorId(item.buyerId || '');
+    setPreviewStyleNo(item.styleNo); setColorInput('');
     setCustomCategory(item.customCategory || '');
     setColorDetailOpen(null);
     setIsDirty(false);
