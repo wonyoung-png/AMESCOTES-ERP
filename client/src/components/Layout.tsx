@@ -135,6 +135,7 @@ const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
   { group: '데이터 & 점검', label: '채널별 매출', icon: <LineChart size={17} /> },
   { group: '데이터 & 점검', label: '상품 성과', icon: <TrendingUp size={17} /> },
   { group: '데이터 & 점검', label: '리오더', icon: <Package size={17} /> },
+  { group: '데이터 & 점검', label: '시즌 계획', icon: <CalendarDays size={17} /> },
   { group: '데이터 & 점검', label: '주문관리', icon: <Truck size={17} /> },
   { group: '데이터 & 점검', label: '국가별 주간', icon: <Globe size={17} /> },
   { group: '데이터 & 점검', label: '주간·일회성', icon: <FileSpreadsheet size={17} /> },

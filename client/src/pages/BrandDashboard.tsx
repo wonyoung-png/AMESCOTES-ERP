@@ -119,7 +119,9 @@ export default function BrandDashboard({ brand }: { brand: string }) {
   });
   const [goalOpen, setGoalOpen] = useState(false);
   const [goalInput, setGoalInput] = useState('');
-  const month = new Date().toISOString().slice(0, 7);
+  // 한국은 UTC+9 — 새벽엔 toISOString()이 전월을 준다. 로컬 달력으로 만든다
+  const _d = new Date();
+  const month = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}`;
   useEffect(() => { if (data?.sales.mtd.goal) setGoalInput(String(data.sales.mtd.goal)); }, [data]);
 
   async function saveGoal() {
@@ -215,8 +217,34 @@ export default function BrandDashboard({ brand }: { brand: string }) {
         )}
       </Section>
 
-      {/* 3단 · 상품 */}
-      <div className="grid gap-4 xl:grid-cols-3">
+      {/* 3단 · 발주 액션 — 리오더 관련은 여기 한 곳에만 */}
+      <Section title="발주 액션" sub={`마감 임박 ${ro.now.length + ro.soon.length} · 승인 대기 ${ro.approve.length} · 이번 주 입고 ${ro.eta_week.length} · B2B 납품 ${ro.b2b_week.length} · 예정일 지남 ${ro.late}`} tab="리오더">
+        <div className="grid gap-4 md:grid-cols-2">
+          <table className="w-full text-xs">
+            <thead><tr className="text-muted-foreground"><th className="text-left font-normal pb-1">발주 마감 임박</th><th className="text-right font-normal pb-1">마감 · 권장</th><th /></tr></thead>
+            <tbody>
+              {[...ro.now, ...ro.soon].slice(0, 8).map(r => (
+                <tr key={r.sku} className="border-t border-border">
+                  <td className="py-1.5 pr-2"><div className="text-foreground truncate max-w-[220px]">{r.name}</div><div className="text-muted-foreground">재고 {r.stock} · 미입고 {r.on_order} · 일 {r.per_day}</div></td>
+                  <td className="py-1.5 text-right whitespace-nowrap"><div className="text-[var(--system-red)] font-medium">{r.order_by}</div><div className="text-muted-foreground">권장 {formatNumber(r.reco)}</div></td>
+                  <td className="py-1.5 pl-2 text-right">{(r as { approval?: string }).approval ? <Badge variant="outline" className="text-[10px]">{(r as { approval?: string }).approval}</Badge> : null}</td>
+                </tr>
+              ))}
+              {!ro.now.length && !ro.soon.length && <tr><td className="py-3 text-muted-foreground" colSpan={3}>2주 안에 발주할 상품이 없습니다.</td></tr>}
+            </tbody>
+          </table>
+          <ul className="text-xs space-y-1.5">
+            <li className="text-muted-foreground pb-1">승인 · 입고 · 납품</li>
+            {ro.approve.map(o => <li key={'a' + o.id} className="flex justify-between gap-2 border-t border-border pt-1.5"><span className="truncate"><Badge variant="outline" className="text-[10px] mr-1">승인</Badge>{o.name}</span><span className="whitespace-nowrap">{formatNumber(o.qty)}개</span></li>)}
+            {ro.eta_week.map(o => <li key={'e' + o.id} className="flex justify-between gap-2 border-t border-border pt-1.5"><span className="truncate"><span className="text-muted-foreground mr-1">{o.eta.slice(5)} 입고</span>{o.name}</span><span className="whitespace-nowrap">{formatNumber(o.qty - o.received)}개</span></li>)}
+            {ro.b2b_week.map(o => <li key={'b' + o.id} className="flex justify-between gap-2 border-t border-border pt-1.5"><span className="truncate"><Badge className="text-[10px] mr-1">B2B</Badge>{o.partner} · {o.name}</span><span className="whitespace-nowrap">{formatNumber(o.qty - o.received)}개</span></li>)}
+            {!ro.approve.length && !ro.eta_week.length && !ro.b2b_week.length && <li className="text-muted-foreground">이번 주 입고·납품·승인 대기 없음</li>}
+          </ul>
+        </div>
+      </Section>
+
+      {/* 4단 · 상품 */}
+      <div className="grid gap-4 md:grid-cols-2">
         <Section title="최근 28일 TOP 10" sub="판매 수량 · 소진율" tab="상품 성과">
           <table className="w-full text-xs">
             <tbody>
@@ -230,20 +258,6 @@ export default function BrandDashboard({ brand }: { brand: string }) {
                 </tr>
               ))}
               {!data.top.length && <tr><td className="py-3 text-muted-foreground">판매 이력 없음</td></tr>}
-            </tbody>
-          </table>
-        </Section>
-        <Section title="발주 마감 임박" sub="마감일 = 소진일 − 리드타임 8주" tab="리오더">
-          <table className="w-full text-xs">
-            <tbody>
-              {[...ro.now, ...ro.soon].slice(0, 8).map(r => (
-                <tr key={r.sku} className="border-t border-border">
-                  <td className="py-1.5 pr-2"><div className="text-foreground truncate max-w-[200px]">{r.name}</div><div className="text-muted-foreground">재고 {r.stock} · 미입고 {r.on_order} · 일 {r.per_day}</div></td>
-                  <td className="py-1.5 text-right whitespace-nowrap"><div className="text-[var(--system-red)] font-medium">{r.order_by}</div><div className="text-muted-foreground">권장 {formatNumber(r.reco)}</div></td>
-                  <td className="py-1.5 pl-2 text-right">{(r as { approval?: string }).approval ? <Badge variant="outline" className="text-[10px]">{(r as { approval?: string }).approval}</Badge> : null}</td>
-                </tr>
-              ))}
-              {!ro.now.length && !ro.soon.length && <tr><td className="py-3 text-muted-foreground">2주 안에 발주할 상품이 없습니다.</td></tr>}
             </tbody>
           </table>
         </Section>
@@ -263,16 +277,8 @@ export default function BrandDashboard({ brand }: { brand: string }) {
         </Section>
       </div>
 
-      {/* 4단 · 운영 */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Section title="발주 진행" sub={`확정 ${ro.open_orders}건 · 예정일 지남 ${ro.late}건`} tab="리오더">
-          <ul className="text-xs space-y-1.5">
-            {ro.approve.map(o => <li key={'a' + o.id} className="flex justify-between gap-2"><span className="truncate"><Badge variant="outline" className="text-[10px] mr-1">승인</Badge>{o.name}</span><span className="whitespace-nowrap">{formatNumber(o.qty)}개</span></li>)}
-            {ro.eta_week.map(o => <li key={'e' + o.id} className="flex justify-between gap-2"><span className="truncate"><span className="text-muted-foreground mr-1">{o.eta.slice(5)}</span>{o.name}</span><span className="whitespace-nowrap">{formatNumber(o.qty - o.received)}개</span></li>)}
-            {ro.b2b_week.map(o => <li key={'b' + o.id} className="flex justify-between gap-2"><span className="truncate"><Badge className="text-[10px] mr-1">B2B</Badge>{o.partner} · {o.name}</span><span className="whitespace-nowrap">{formatNumber(o.qty - o.received)}개</span></li>)}
-            {!ro.approve.length && !ro.eta_week.length && !ro.b2b_week.length && <li className="text-muted-foreground">이번 주 입고·납품·승인 대기 없음</li>}
-          </ul>
-        </Section>
+      {/* 5단 · 보조 — 프로모션은 펼침, 퍼널·수집 상태는 접힘 */}
+      <div className="grid gap-4 md:grid-cols-2">
         <Section title="프로모션 (4주)" sub="채널 플랜" tab="채널 플랜">
           <ul className="text-xs space-y-1.5">
             {data.promos.slice(0, 8).map((p, i) => (
@@ -282,33 +288,37 @@ export default function BrandDashboard({ brand }: { brand: string }) {
             {!data.promos.length && <li className="text-muted-foreground">4주 안에 예정된 프로모션 없음</li>}
           </ul>
         </Section>
-        <Section title="체크아웃 퍼널 (7일)" sub="국문몰 픽셀" tab="체크아웃 퍼널">
-          {funnel?.steps ? (
+        <details className="rounded-lg border border-border bg-card p-4">
+          <summary className="cursor-pointer font-semibold text-foreground text-sm">체크아웃 퍼널 (7일) · 수집 상태 <span className="text-xs text-muted-foreground font-normal">— 펼치기</span></summary>
+          <div className="grid gap-4 md:grid-cols-2 mt-3">
+            <div>
+              {funnel?.steps ? (
+                <ul className="text-xs space-y-1">
+                  {funnel.steps.map(st => {
+                    const first = funnel.steps[0]?.count || 0;
+                    return (
+                      <li key={st.event} className="flex items-center gap-2">
+                        <span className="w-14 text-muted-foreground">{STEP_LABEL[st.event] || st.event}</span>
+                        <span className="flex-1 h-2 rounded bg-muted overflow-hidden"><span className="block h-full bg-primary" style={{ width: `${first ? (st.count / first) * 100 : 0}%` }} /></span>
+                        <span className="w-10 text-right">{st.count}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : <p className="text-xs text-muted-foreground">{brand === 'LUMEN' ? '퍼널 데이터 없음' : '픽셀 미설치'}</p>}
+              <a className="text-xs text-primary inline-flex items-center gap-1 mt-2" href={pmsUrl('체크아웃 퍼널')} target="_blank" rel="noreferrer">체크아웃 퍼널 <ArrowRight className="w-3 h-3" /></a>
+            </div>
             <ul className="text-xs space-y-1">
-              {funnel.steps.map(st => {
-                const first = funnel.steps[0]?.count || 0;
-                return (
-                  <li key={st.event} className="flex items-center gap-2">
-                    <span className="w-14 text-muted-foreground">{STEP_LABEL[st.event] || st.event}</span>
-                    <span className="flex-1 h-2 rounded bg-muted overflow-hidden"><span className="block h-full bg-primary" style={{ width: `${first ? (st.count / first) * 100 : 0}%` }} /></span>
-                    <span className="w-10 text-right">{st.count}</span>
-                  </li>
-                );
-              })}
+              {data.crons.slice(0, 9).map(c => (
+                <li key={c.name} className="flex justify-between gap-2">
+                  <span className="truncate">{c.label}</span>
+                  <span className={c.state === '정상' ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]'}>{c.state}{c.age_min != null ? ` · ${c.age_min >= 60 ? `${Math.round(c.age_min / 60)}h` : `${c.age_min}m`}` : ''}</span>
+                </li>
+              ))}
+              {!data.crons.length && <li className="text-muted-foreground">크론 기록 없음</li>}
             </ul>
-          ) : <p className="text-xs text-muted-foreground">{brand === 'LUMEN' ? '퍼널 데이터 없음' : '픽셀 미설치'}</p>}
-        </Section>
-        <Section title="수집 상태" sub="PMS 크론" tab="사이트 진단">
-          <ul className="text-xs space-y-1">
-            {data.crons.slice(0, 9).map(c => (
-              <li key={c.name} className="flex justify-between gap-2">
-                <span className="truncate">{c.label}</span>
-                <span className={c.state === '정상' ? 'text-[var(--system-green)]' : 'text-[var(--system-red)]'}>{c.state}{c.age_min != null ? ` · ${c.age_min >= 60 ? `${Math.round(c.age_min / 60)}h` : `${c.age_min}m`}` : ''}</span>
-              </li>
-            ))}
-            {!data.crons.length && <li className="text-muted-foreground">크론 기록 없음</li>}
-          </ul>
-        </Section>
+          </div>
+        </details>
       </div>
       <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Percent className="w-3 h-3" /> 판매속도 = 최근 28일 온라인 4채널 + 매장. 리오더 권장 = 일 수요 × 14주 − 재고 − 미입고 + B2B 납품.</p>
     </div>
