@@ -25,6 +25,7 @@ const EVENTS = new Set([
   'related_click', // 관련상품(GOOD MATCHS WITH 등) 클릭
   'filter_open',   // 목록 FILTER 버튼 클릭 (카페24 쇼핑큐레이션)
   'filter_apply',  // 필터 "결과 보기" 클릭 — path에 선택값 (DESIGN:PANIER|COLOR:BLACK)
+  'menu_click',    // 메뉴·홈 타일·라인 스트립 클릭 — path = "nav:BAG" | "home:여성 라지 백" | "mega:라인업:PANIER" | "line:MARRON"
 ]);
 
 function b64url(buf: Buffer): string {
