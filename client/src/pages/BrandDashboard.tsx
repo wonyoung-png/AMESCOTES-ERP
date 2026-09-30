@@ -196,7 +196,7 @@ export default function BrandDashboard({ brand }: { brand: string }) {
       )}
 
       {/* 2단 · 매출 추이 */}
-      <Section title="30일 채널별 매출" sub="카페24 · W컨셉·29CM · 오프라인 · 쇼피파이(원화 환산)" tab="채널별 매출">
+      <Section title="30일 채널별 매출" sub="카페24 · W컨셉·29CM(판매가 기준, 수수료·쿠폰 전) · 오프라인 · 쇼피파이(원화 환산)" tab="채널별 매출">
         {chart.length === 0 ? <p className="text-sm text-muted-foreground">데이터 없음</p> : (
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
