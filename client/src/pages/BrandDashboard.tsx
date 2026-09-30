@@ -41,8 +41,8 @@ interface Sku { sku: string; name: string; image: string; stock: number; sold: n
 interface Brand {
   asof: string; brand: string; todo: Todo[]; has_daily: boolean;
   sales: {
-    yesterday: { date: string; total: number | null; orders: number | null; shopify_usd: number | null; cafe24: number | null; offline: number | null; shopify: number | null; last_week: number | null };
-    mtd: { total: number; orders: number; days: number; prev_same: number; platform: number; goal: number | null; goal_pct: number | null; day_pct: number };
+    yesterday: { date: string; total: number | null; orders: number | null; qty: number; shopify_usd: number | null; cafe24: number | null; offline: number | null; shopify: number | null; last_week: number | null };
+    mtd: { total: number; orders: number; qty: number; days: number; prev_same: number; platform: number; goal: number | null; goal_pct: number | null; day_pct: number };
     p30: { total_krw?: number; orders?: number; avg_order_value?: number; cafe24_krw?: number; shopify_krw?: number; offline_krw?: number };
     daily30: { date: string; cafe24: number; shopify: number; offline: number; platform: number; total: number }[];
   };
@@ -177,8 +177,8 @@ export default function BrandDashboard({ brand }: { brand: string }) {
           sub={s.mtd.goal
             ? <>목표 {won(s.mtd.goal)} · 진도 <b className={s.mtd.goal_pct! + 5 < s.mtd.day_pct ? 'text-[var(--system-red)]' : 'text-[var(--system-green)]'}>{s.mtd.goal_pct}%</b> (일수 {s.mtd.day_pct}%) <button className="underline" onClick={() => setGoalOpen(true)}>수정</button></>
             : <>전월 동기 <Delta v={pct(s.mtd.total, s.mtd.prev_same)} /> · <button className="underline" onClick={() => setGoalOpen(true)}>목표 입력</button></>} />
-        <Kpi icon={<ShoppingCart className="w-4 h-4 text-primary" />} bg="bg-primary/10" label="주문 · 객단가" value={`${formatNumber(s.mtd.orders)}건`}
-          sub={`이달 · W컨셉·29CM ${won(s.mtd.platform)} 포함`} />
+        <Kpi icon={<ShoppingCart className="w-4 h-4 text-primary" />} bg="bg-primary/10" label="판매 수량 (이달)" value={`${formatNumber(s.mtd.qty)}개`}
+          sub={`어제 ${formatNumber(yd.qty)}개 · 전채널 · W컨셉·29CM 매출 ${won(s.mtd.platform)} 포함`} />
         <Kpi icon={<Boxes className="w-4 h-4 text-[var(--system-orange)]" />} bg="bg-[var(--system-orange)]/10" label="재고" value={`${formatNumber(inv.stock_qty)}개`}
           sub={`원가 ${won(inv.stock_cost)} · ${inv.months != null ? `${inv.months}개월치` : '속도 없음'}`} />
         <Kpi icon={<PackageSearch className="w-4 h-4 text-[var(--system-red)]" />} bg="bg-[var(--system-red)]/10" label="품절 · 임박" value={`${inv.out} · ${inv.low}`}
