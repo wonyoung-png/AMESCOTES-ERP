@@ -23,6 +23,8 @@ const EVENTS = new Set([
   'product_added_to_cart',
   'cart_viewed',
   'related_click', // 관련상품(GOOD MATCHS WITH 등) 클릭
+  'filter_open',   // 목록 FILTER 버튼 클릭 (카페24 쇼핑큐레이션)
+  'filter_apply',  // 필터 "결과 보기" 클릭 — path에 선택값 (DESIGN:PANIER|COLOR:BLACK)
 ]);
 
 function b64url(buf: Buffer): string {
@@ -190,6 +192,8 @@ router.get('/api/pixel/journey', async (req: Request, res: Response) => {
     const byClient = new Map<string, { id: string; events: Set<string>; lastTs: number; sessions: number }>();
     const prod = new Map<string, { views: number; adds: number }>();
     const searches = new Map<string, number>();
+    const filterVals = new Map<string, number>(); // filter_apply 선택값(그룹:값) 빈도
+    let filterApplies = 0;
     const daily = new Map<string, { visitors: Set<string>; adds: number; checkouts: number; completed: number }>();
     for (const row of rows) {
       const cid = row.client_id || 'anon';
@@ -213,6 +217,10 @@ router.get('/api/pixel/journey', async (req: Request, res: Response) => {
       }
       if (row.path && row.event === 'search_submitted') {
         searches.set(row.path, (searches.get(row.path) || 0) + 1);
+      }
+      if (row.event === 'filter_apply') {
+        filterApplies += 1;
+        for (const v of String(row.path || '').split('|')) if (v) filterVals.set(v, (filterVals.get(v) || 0) + 1);
       }
     }
     const clients = [...byClient.values()];
@@ -238,6 +246,15 @@ router.get('/api/pixel/journey', async (req: Request, res: Response) => {
       top_searches: [...searches.entries()]
         .map(([q, n]) => ({ q, n }))
         .sort((a, b) => b.n - a.n).slice(0, 30),
+      // 목록 필터 사용 — openers/appliers는 브라우저 수(방문자 대비 사용률), applies는 적용 횟수
+      filter: {
+        openers: has('filter_open'),
+        appliers: has('filter_apply'),
+        applies: filterApplies,
+        top_values: [...filterVals.entries()]
+          .map(([v, n]) => ({ v, n }))
+          .sort((a, b) => b.n - a.n).slice(0, 20),
+      },
       daily: Object.fromEntries([...daily.entries()].map(([d, v]) => [d, {
         visitors: v.visitors.size, adds: v.adds, checkouts: v.checkouts, completed: v.completed,
       }])),
