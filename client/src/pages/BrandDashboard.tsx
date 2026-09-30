@@ -42,9 +42,9 @@ interface Brand {
   asof: string; brand: string; todo: Todo[]; has_daily: boolean;
   sales: {
     yesterday: { date: string; total: number | null; orders: number | null; shopify_usd: number | null; cafe24: number | null; offline: number | null; shopify: number | null; last_week: number | null };
-    mtd: { total: number; orders: number; days: number; prev_same: number; goal: number | null; goal_pct: number | null; day_pct: number };
+    mtd: { total: number; orders: number; days: number; prev_same: number; platform: number; goal: number | null; goal_pct: number | null; day_pct: number };
     p30: { total_krw?: number; orders?: number; avg_order_value?: number; cafe24_krw?: number; shopify_krw?: number; offline_krw?: number };
-    daily30: { date: string; cafe24: number; shopify: number; offline: number; total: number }[];
+    daily30: { date: string; cafe24: number; shopify: number; offline: number; platform: number; total: number }[];
   };
   inventory: { skus: number; stock_qty: number; stock_cost: number; months: number | null; sold28: number; out: number; low: number; dead: number };
   top: Sku[]; dead: Sku[];
@@ -178,7 +178,7 @@ export default function BrandDashboard({ brand }: { brand: string }) {
             ? <>목표 {won(s.mtd.goal)} · 진도 <b className={s.mtd.goal_pct! + 5 < s.mtd.day_pct ? 'text-[var(--system-red)]' : 'text-[var(--system-green)]'}>{s.mtd.goal_pct}%</b> (일수 {s.mtd.day_pct}%) <button className="underline" onClick={() => setGoalOpen(true)}>수정</button></>
             : <>전월 동기 <Delta v={pct(s.mtd.total, s.mtd.prev_same)} /> · <button className="underline" onClick={() => setGoalOpen(true)}>목표 입력</button></>} />
         <Kpi icon={<ShoppingCart className="w-4 h-4 text-primary" />} bg="bg-primary/10" label="주문 · 객단가" value={`${formatNumber(s.mtd.orders)}건`}
-          sub={`이달 · 30일 객단가 ${won(s.p30.avg_order_value)}`} />
+          sub={`이달 · W컨셉·29CM ${won(s.mtd.platform)} 포함`} />
         <Kpi icon={<Boxes className="w-4 h-4 text-[var(--system-orange)]" />} bg="bg-[var(--system-orange)]/10" label="재고" value={`${formatNumber(inv.stock_qty)}개`}
           sub={`원가 ${won(inv.stock_cost)} · ${inv.months != null ? `${inv.months}개월치` : '속도 없음'}`} />
         <Kpi icon={<PackageSearch className="w-4 h-4 text-[var(--system-red)]" />} bg="bg-[var(--system-red)]/10" label="품절 · 임박" value={`${inv.out} · ${inv.low}`}
@@ -196,7 +196,7 @@ export default function BrandDashboard({ brand }: { brand: string }) {
       )}
 
       {/* 2단 · 매출 추이 */}
-      <Section title="30일 채널별 매출" sub="카페24 · 오프라인 · 쇼피파이(원화 환산). 통화가 다른 쇼피파이는 참고값" tab="채널별 매출">
+      <Section title="30일 채널별 매출" sub="카페24 · W컨셉·29CM · 오프라인 · 쇼피파이(원화 환산)" tab="채널별 매출">
         {chart.length === 0 ? <p className="text-sm text-muted-foreground">데이터 없음</p> : (
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
@@ -206,6 +206,7 @@ export default function BrandDashboard({ brand }: { brand: string }) {
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${Math.round(v / 1e6)}M`} width={36} />
                 <Tooltip formatter={(v: number) => formatKRW(v)} labelFormatter={(l: string) => `${month.slice(0, 4)}-${l}`} />
                 <Bar dataKey="cafe24" name="카페24" stackId="a" fill="var(--primary)" />
+                <Bar dataKey="platform" name="W컨셉·29CM" stackId="a" fill="var(--muted-foreground)" />
                 <Bar dataKey="offline" name="오프라인" stackId="a" fill="var(--system-orange)" />
                 <Bar dataKey="shopify" name="쇼피파이" stackId="a" fill="var(--system-green)" />
               </BarChart>
