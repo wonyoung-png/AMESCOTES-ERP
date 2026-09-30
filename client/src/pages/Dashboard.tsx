@@ -19,6 +19,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { confirmShippingPlan, fetchShippingPlans } from '@/lib/shippingPlans';
 import { getCurrentUser } from '@/lib/auth';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import BrandDashboard from './BrandDashboard';
 
 // 문서 아이콘
 function DocIconSmall({ fileType }: { fileType: string }) {
@@ -37,6 +39,13 @@ const STAGE_COLOR: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  // LUMEN/AETALOOF 워크스페이스는 제조 대시보드가 아니라 브랜드 운영 화면을 본다
+  const { workspace } = useWorkspace();
+  if (workspace !== 'OEM') return <BrandDashboard brand={workspace} />;
+  return <OemDashboard />;
+}
+
+function OemDashboard() {
   const queryClient = useQueryClient();
   const nowDate = new Date();
   const localToday = [nowDate.getFullYear(), String(nowDate.getMonth() + 1).padStart(2, '0'), String(nowDate.getDate()).padStart(2, '0')].join('-');
