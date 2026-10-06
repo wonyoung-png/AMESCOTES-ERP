@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Network,
   GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight,
-  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp, Inbox, Warehouse, Star,
+  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp, Inbox, Warehouse, Star, Store,
 } from 'lucide-react';
 
 interface NavItem {
@@ -147,6 +147,7 @@ const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
   { group: '데이터 & 점검', label: '채널 플랜', icon: <FileSpreadsheet size={17} /> },
   { group: '상품 운영', label: '상품 콘텐츠', icon: <Package size={17} /> },
   { group: '상품 운영', label: '상세페이지 교정', icon: <ClipboardCheck size={17} /> },
+  { group: '상품 운영', label: '자사몰관리', icon: <Store size={17} /> },
   { group: '콘텐츠 제작', label: '이미지 생성', icon: <ImageIcon size={17} /> },
   { group: '브랜드 인텔리전스', label: '브랜드 분석', icon: <Building2 size={17} /> },
   { group: '분석 & 진단', label: '매출분석', icon: <BarChart3 size={17} /> },
