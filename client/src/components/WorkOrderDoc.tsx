@@ -11,8 +11,6 @@ type ColorRow = {
   deco?: BomLine;      // 장식
   logo?: BomLine;      // 불박 로고
   edge?: BomLine;      // 기리매
-  thread?: BomLine;    // 실
-  zipper?: BomLine;    // 지퍼
 };
 
 /** 라인에서 "발주처"를 사람이 읽는 말로 — 본사제공이면 우리가, 아니면 공장이 산다 */
@@ -26,7 +24,7 @@ function pick(lines: BomLine[], test: (l: BomLine) => boolean) {
   return lines.find(test);
 }
 
-export function WorkOrderDoc({ order, bom, item, vendors, note, onSign }: {
+export function WorkOrderDoc({ order, bom, item, vendors, note, onSign, inherited, onPatch }: {
   order: ProductionOrder;
   bom?: Bom | null;
   item?: Item;
@@ -34,13 +32,34 @@ export function WorkOrderDoc({ order, bom, item, vendors, note, onSign }: {
   note?: string;
   /** 서명 칸을 눌렀을 때 — 인쇄 미리보기에서는 넘기지 않는다 */
   onSign?: (slot: 'writer' | 'checker' | 'receiver') => void;
+  /**
+   * 같은 스타일의 지난 발주에 적혀 있던 실넘버·지퍼넘버.
+   * 이 발주에 값이 없을 때만 쓴다 — 리오더에서 다시 적지 않게 하려는 것이다.
+   * 복사해 두지 않는 이유: 지난 발주를 고쳐도 이미 나간 서류가 뒤늦게 바뀌면 안 된다.
+   */
+  inherited?: Record<string, { thread?: string; zipper?: string }>;
+  /**
+   * 손으로 적은 값을 저장한다. 안 넘기면 읽기 전용(인쇄 미리보기·이미지 캡처).
+   *
+   * 바꿀 값을 바로 주지 않고 "직전 발주를 받아서 만드는 함수"를 준다.
+   * 실넘버를 적고 바로 옆 지퍼넘버로 넘어가면 두 저장이 같은 순간에 일어나는데,
+   * 그때 둘 다 렌더 당시의 옛 값 위에 덮어써서 먼저 적은 것이 날아갔다.
+   */
+  onPatch?: (make: (prev: ProductionOrder) => Partial<ProductionOrder>) => void;
 }) {
   const factory = order.vendorName || '';
   const colorBoms: any[] = ((bom as any)?.postColorBoms?.length ? (bom as any).postColorBoms : (bom as any)?.colorBoms) || [];
   const allLines: BomLine[] = colorBoms.flatMap((cb: any) => cb.lines || []);
+  /**
+   * 그 컬러의 BOM 줄. 컬러를 못 찾으면 첫 번째 컬러 하나로 떨어진다.
+   *
+   * 전에는 모든 컬러를 이어붙인 allLines 로 떨어졌다. 거기에 발주 수량을 곱하면 같은 자재가
+   * 컬러 수만큼 부푼다 — 컬러가 '기본' 한 줄일 때 바로 이렇게 됐다
+   * (CLAUDE.md: flatMap 전체 사용 금지). 표와 수량이 같은 줄을 봐야 하므로 한 함수로 쓴다.
+   */
   const linesOf = (color: string): BomLine[] => {
     const hit = colorBoms.find((cb: any) => (cb.color || '').trim() === color.trim());
-    return (hit?.lines || allLines) as BomLine[];
+    return (hit?.lines || colorBoms[0]?.lines || allLines) as BomLine[];
   };
 
   const colorQtys = (order.colorQtys || []).length > 0
@@ -57,8 +76,6 @@ export function WorkOrderDoc({ order, bom, item, vendors, note, onSign }: {
       deco: pick(ls, l => l.category === '장식'),
       logo: pick(ls, l => /불박|로고|logo/i.test(`${l.itemName} ${l.spec || ''}`)),
       edge: pick(ls, l => /기리매|엣지|edge/i.test(`${l.itemName} ${l.spec || ''}`)),
-      thread: pick(ls, l => /실|세라필|thread/i.test(l.itemName)),
-      zipper: pick(ls, l => l.category === '지퍼'),
     };
   });
 
@@ -74,20 +91,41 @@ export function WorkOrderDoc({ order, bom, item, vendors, note, onSign }: {
   const leatherQty = sum(l => l.subPart === '바디');
   const liningQty = sum(l => l.subPart === '안감');
 
-  // 원부자재 소요량 — PCS별 + 전체
-  const totalQty = colorQtys.reduce((s, c) => s + (c.qty || 0), 0);
-  const subMaterials = allLines
-    .filter(l => ['장식', '지퍼', '보강재', '봉사·접착제', '포장재', '철형'].includes(l.category as string))
-    .reduce((acc: Array<{ name: string; vendor: string; per: number }>, l) => {
-      const per = (l.netQty || 0) * (1 + (l.lossRate || 0));
-      const key = `${l.itemName}|${l.spec || ''}`;
-      const hit = acc.find(a => `${a.name}` === key);
-      if (hit) hit.per += per;
-      else acc.push({ name: key, vendor: l.vendorName || (l.isHqProvided ? '본사' : factory), per });
+  // 본사제공 자재 — 대표: "원부자재 소요량은 없어도된다. 다만 우리가 본사제공만 넣어서
+  // 체크할수있으면 좋을듯". 공장이 받은 것에 손으로 체크하는 칸이다.
+  //
+  // 컬러별로 쌓아야 한다. 컬러를 다 합친 뒤 전체 수량을 곱하면 컬러 수만큼 부풀고,
+  // 한 컬러에만 들어가는 자재(컬러마다 다른 로고 같은 것)는 아예 틀린 수가 나온다.
+  const hqItems = colorQtys.reduce(
+    (acc: Array<{ name: string; spec: string; unit: string; qty: number }>, cq) => {
+      linesOf(cq.color).filter(l => l.isHqProvided).forEach(l => {
+        const need = (l.netQty || 0) * (1 + (l.lossRate || 0)) * (cq.qty || 0);
+        const hit = acc.find(a =>
+          a.name === l.itemName && a.spec === (l.spec || '') && a.unit === (l.unit || ''));
+        if (hit) hit.qty += need;
+        else acc.push({ name: l.itemName, spec: l.spec || '', unit: l.unit || '', qty: need });
+      });
       return acc;
     }, []);
-  const half = Math.ceil(subMaterials.length / 2);
-  const subCols = [subMaterials.slice(0, half), subMaterials.slice(half)];
+  const half = Math.ceil(hqItems.length / 2);
+  const hqCols = [hqItems.slice(0, half), hqItems.slice(half)];
+
+  // 실·지퍼 넘버 — 이 발주에 적힌 것, 없으면 지난 발주에서 불러온 것
+  const specOf = (color: string) => ({
+    ...(inherited?.[color] || {}),
+    ...(order.specNumbers?.[color] || {}),
+  });
+  const patchSpec = (color: string, k: 'thread' | 'zipper', v: string) => {
+    if (!onPatch) return;
+    onPatch(prev => ({
+      specNumbers: {
+        ...(prev.specNumbers || {}),
+        // 지난 발주에서 불러온 값은 손을 댄 순간 이 발주에 박힌다
+        [color]: { ...(inherited?.[color] || {}), ...(prev.specNumbers?.[color] || {}), [k]: v },
+      },
+    }));
+  };
+  const numCell = 'w-full text-center text-[10px] bg-transparent outline-none border-b border-dashed border-neutral-300 focus:border-primary';
 
   const images = [item?.imageUrl, ...(item as any)?.imageUrls || []].filter(Boolean).slice(0, 2) as string[];
   const cell = 'border border-neutral-400 px-2 py-1.5 align-middle';
@@ -167,8 +205,20 @@ export function WorkOrderDoc({ order, bom, item, vendors, note, onSign }: {
                 {r.logo ? `${r.logo.itemName}${r.logo.spec ? ` / ${r.logo.spec}` : ''}` : '-'}
               </td>
               <td className={`${cell} text-center text-[10px]`}>{r.edge ? `${r.edge.itemName}${r.edge.spec ? ` / ${r.edge.spec}` : ''}` : '-'}</td>
-              <td className={`${cell} text-center text-[10px]`}>{r.thread ? `${r.thread.itemName}${r.thread.spec ? ` ${r.thread.spec}` : ''}` : '-'}</td>
-              <td className={`${cell} text-center text-[10px]`}>{r.zipper ? `${r.zipper.itemName}${r.zipper.spec ? ` ${r.zipper.spec}` : ''}` : '-'}</td>
+              {/* 실·지퍼 넘버는 BOM 품명에서 끌어오지 않는다. 손으로 적고, 리오더는 그걸 불러온다 */}
+              {(['thread', 'zipper'] as const).map(k => (
+                <td key={k} className={`${cell} text-center text-[10px]`}>
+                  {onPatch ? (
+                    <input type="text" key={`${order.id}|${r.color}|${k}`}
+                      className={numCell} defaultValue={specOf(r.color)[k] || ''}
+                      placeholder="—"
+                      onBlur={e => {
+                        const v = e.target.value.trim();
+                        if (v !== (specOf(r.color)[k] || '')) patchSpec(r.color, k, v);
+                      }} />
+                  ) : (specOf(r.color)[k] || '-')}
+                </td>
+              ))}
               <td className={`${cell} text-center font-semibold tabular-nums`}>{r.qty.toLocaleString()}</td>
               <td className={`${cell} text-center text-[10px]`}>{order.shipTo || '-'}</td>
             </tr>
@@ -186,7 +236,34 @@ export function WorkOrderDoc({ order, bom, item, vendors, note, onSign }: {
         </div>
       )}
 
-      {/* 하단 — 제품 이미지(크게) + 원부자재 소요량 */}
+      {/* 주의사항 / 기존 오더에서 바뀐 점 — 대표: "별도로 주의사항이나 기존 오더에서
+          변경사항 쓰면 좋을듯". 읽기 전용일 때 빈 칸은 숨긴다 (인쇄 공백 아끼기) */}
+      {(onPatch || order.cautionNote || order.changeNote) && (
+        <div className="grid grid-cols-2" style={{ border: '1px solid #9ca3af' }}>
+          {([
+            ['cautionNote', '주 의 사 항', 'text-red-600'],
+            ['changeNote', '기존 오더에서 변경된 점', 'text-blue-700'],
+          ] as const).map(([k, label, color], i) => (
+            <div key={k} className={i === 0 ? 'border-r border-neutral-400' : ''}>
+              <div className={`${head} border-0 border-b border-neutral-400`}>{label}</div>
+              {onPatch ? (
+                <textarea rows={2} key={`${order.id}|${k}`} defaultValue={order[k] || ''}
+                  className={`w-full px-2 py-1 text-[11px] font-semibold ${color} bg-transparent outline-none resize-none`}
+                  placeholder="적을 것이 있으면 여기에"
+                  onBlur={e => {
+                    const v = e.target.value.trim();
+                    if (v !== (order[k] || '')) onPatch(() => ({ [k]: v || undefined }));
+                  }} />
+              ) : (
+                <div className={`px-2 py-1 text-[11px] font-semibold ${color} whitespace-pre-wrap min-h-[2.6em]`}
+                  style={{ wordBreak: 'keep-all' }}>{order[k] || ''}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 하단 — 제품 이미지(크게) + 본사제공 체크리스트 */}
       <div className="grid" style={{ gridTemplateColumns: '260px 1fr', border: '1px solid #9ca3af' }}>
         <div className="border-r border-neutral-400 p-2 flex flex-col gap-2 items-center justify-center">
           {images.length > 0 ? images.map((src, i) => (
@@ -195,32 +272,43 @@ export function WorkOrderDoc({ order, bom, item, vendors, note, onSign }: {
           )) : <span className="text-neutral-400 text-[11px] py-16">제품 이미지 없음</span>}
         </div>
         <div className="p-2">
-          <div className="text-center font-semibold text-[11px] border-b border-neutral-300 pb-1 mb-1">원부자재 소요량</div>
-          <div className="grid grid-cols-2 gap-2">
-            {subCols.map((col, ci) => (
-              <table key={ci} className="w-full border-collapse text-[10.5px]">
-                <thead>
-                  <tr>
-                    <th className={`${head} text-left`}>품명</th>
-                    <th className={`${head} w-20`}>공장</th>
-                    <th className={`${head} w-16`}>PCS별</th>
-                    <th className={`${head} w-16`}>전체</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {col.map((m, i) => (
-                    <tr key={i}>
-                      <td className={cell} style={{ wordBreak: 'keep-all' }}>{m.name.split('|')[0]}{m.name.split('|')[1] ? ` ${m.name.split('|')[1]}` : ''}</td>
-                      <td className={`${cell} text-center text-[10px]`}>{m.vendor || '-'}</td>
-                      <td className={`${cell} text-right tabular-nums`}>{m.per ? m.per.toFixed(m.per % 1 ? 2 : 0) : '-'}</td>
-                      <td className={`${cell} text-right tabular-nums`}>{m.per ? Math.ceil(m.per * totalQty).toLocaleString() : '-'}</td>
-                    </tr>
-                  ))}
-                  {col.length === 0 && <tr><td className={cell} colSpan={4}>&nbsp;</td></tr>}
-                </tbody>
-              </table>
-            ))}
+          <div className="text-center font-semibold text-[11px] border-b border-neutral-300 pb-1 mb-1">
+            본사제공 자재 — 받은 것에 체크
           </div>
+          {hqItems.length === 0 ? (
+            <p className="text-center text-neutral-400 text-[11px] py-8">본사제공 자재 없음</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {hqCols.map((col, ci) => (
+                <table key={ci} className="w-full border-collapse text-[10.5px]">
+                  <thead>
+                    <tr>
+                      <th className={`${head} w-7`}>✓</th>
+                      <th className={`${head} text-left`}>품명</th>
+                      <th className={`${head} w-16`}>수량</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {col.map((m, i) => (
+                      <tr key={i}>
+                        {/* 공장이 받은 것에 손으로 체크한다. 인쇄하면 빈 네모가 된다 */}
+                        <td className={`${cell} text-center`}>
+                          <span className="inline-block w-3 h-3 border border-neutral-500" />
+                        </td>
+                        <td className={cell} style={{ wordBreak: 'keep-all' }}>
+                          {m.name}{m.spec ? ` ${m.spec}` : ''}
+                        </td>
+                        <td className={`${cell} text-right tabular-nums`}>
+                          {m.qty ? `${Math.ceil(m.qty).toLocaleString()}${m.unit ? ` ${m.unit}` : ''}` : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                    {col.length === 0 && <tr><td className={cell} colSpan={3}>&nbsp;</td></tr>}
+                  </tbody>
+                </table>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

@@ -428,6 +428,15 @@ export interface ProductionOrder {
   workOrderHtml?: string;
   /** 작업지시서 전자서명 — { writer, checker, receiver } */
   signatures?: Record<string, { name?: string; dataUrl?: string; at?: string }>;
+  /**
+   * 작업지시서의 실넘버·지퍼넘버. 컬러를 키로 쓴다.
+   * BOM 품명에서 끌어오지 않는다 — 첫 오더에 수기로 넣고 리오더는 지난 발주에서 불러온다.
+   */
+  specNumbers?: Record<string, { thread?: string; zipper?: string }>;
+  /** 작업지시서 주의사항 — 공장이 꼭 읽어야 하는 말 */
+  cautionNote?: string;
+  /** 기존 오더에서 바뀐 점 */
+  changeNote?: string;
   /** 출고지 — 한국출고 / 일본출고 / 태국출고. 공장이 반드시 알아야 하는 값 */
   shipTo?: string;
   /** 발주 묶음 번호 — 일괄 발주 1회 = 묶음 1개. 공장 발주서는 이 단위로 1장 나간다 */

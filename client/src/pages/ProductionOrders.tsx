@@ -156,6 +156,9 @@ export default function ProductionOrders() {
   const batchSheetRef = useRef<HTMLDivElement>(null);
   const [workOrderModal, setWorkOrderModal] = useState(false);
   const [workOrderTarget, setWorkOrderTarget] = useState<ProductionOrder | null>(null);
+  // 작업지시서에 손으로 적는 칸들 — 같은 순간에 두 칸이 저장될 때 서로 덮지 않게 한다
+  const woLive = useRef<ProductionOrder | null>(null);
+  const woSave = useRef<Promise<unknown>>(Promise.resolve());
   // 사후 불량 — 납품 후 뒤늦게 발견된 불량. 원본을 고치지 않고 차감 이력으로 쌓는다
   const [postDefectTarget, setPostDefectTarget] = useState<ProductionOrder | null>(null);
   const [postDefectForm, setPostDefectForm] = useState({ qty: '', reason: '', foundDate: new Date().toISOString().split('T')[0] });
@@ -170,12 +173,11 @@ export default function ProductionOrders() {
     localStorage.removeItem('ames_open_work_order');
     if (target) setWorkOrderTarget(target);
   }, [orders]);
+  woLive.current = workOrderTarget;
   const [workOrderNote, setWorkOrderNote] = useState('');
   const [woEditing, setWoEditing] = useState(false);
   const [signSlot, setSignSlot] = useState<null | 'writer' | 'checker' | 'receiver'>(null);
   const [workOrderWithBom, setWorkOrderWithBom] = useState(false);
-  // 작업지시서 본사제공 자재 수령 체크란
-  const [hqReceive, setHqReceive] = useState<{ received: string; checked: boolean }[]>([]);
 
   // 발주 완료 후 액션 팝업 상태
   const [postOrderModal, setPostOrderModal] = useState(false);
@@ -1334,6 +1336,54 @@ export default function ProductionOrders() {
   };
 
   /** 손으로 고친 작업지시서를 그대로 보관 (비우면 자동 생성으로 복귀) */
+  /**
+   * 작업지시서에 손으로 적은 값(실·지퍼 넘버, 주의사항, 변경사항)을 그 발주에 저장한다.
+   * 화면을 막지 않는다 — 칸에서 포커스가 빠질 때마다 불린다.
+   */
+  const patchWorkOrder = (make: (prev: ProductionOrder) => Partial<ProductionOrder>) => {
+    const base = woLive.current;
+    if (!base) return;
+    const next = { ...base, ...make(base), updatedAt: new Date().toISOString() };
+    woLive.current = next;             // 같은 순간에 또 불려도 방금 값 위에 쌓인다
+    setWorkOrderTarget(next);          // 다시 그리기 전에 화면부터 맞춘다
+    // 보낸 순서대로 저장한다. 그냥 띄우면 먼저 보낸 것이 나중에 닿아 새 값을 덮을 수 있다
+    woSave.current = woSave.current
+      .then(() => upsertOrder(next))
+      .then(() => refresh())
+      .catch(e => toast.error(`저장 실패: ${(e as Error).message}`));
+  };
+
+  /**
+   * 같은 스타일의 지난 발주에 적힌 실·지퍼 넘버. 리오더에서 다시 적지 않게 하려는 것이다.
+   * 컬러별로 가장 최근에 적힌 값을 모은다 — 컬러가 늘어난 리오더도 있던 컬러는 그대로 받는다.
+   */
+  const inheritedSpecNumbers = useMemo(() => {
+    if (!workOrderTarget) return {};
+    const out: Record<string, { thread?: string; zipper?: string }> = {};
+    // 같은 날 발주가 여러 건이면 날짜만으로는 앞뒤를 못 가린다. 만든 시각까지 붙여 비교한다
+    const when = (o: ProductionOrder) => `${o.orderDate || ''}|${o.createdAt || ''}`;
+    const mine = when(workOrderTarget);
+    const sameStyle = (o: ProductionOrder) =>
+      // 품번이 양쪽에 다 있으면 그것만 본다. 한쪽에만 styleId 가 있는 발주가 섞여 있어서,
+      // styleId 까지 OR 로 묶으면 품번이 다른데도 같은 스타일로 보게 된다
+      (o.styleNo && workOrderTarget.styleNo)
+        ? o.styleNo === workOrderTarget.styleNo
+        : !!workOrderTarget.styleId && o.styleId === workOrderTarget.styleId;
+    (orders as ProductionOrder[])
+      // 이 발주보다 나중에 넣은 발주의 값을 끌어오면 안 된다 — 옛 서류가 미래 값을 달고 나온다
+      .filter(o => o.id !== workOrderTarget.id && sameStyle(o) && when(o) <= mine)
+      // 오래된 것부터 덮어쓴다 → 마지막에 남는 것이 가장 최근 값
+      .sort((a, b) => when(a).localeCompare(when(b)))
+      .forEach(o => {
+        Object.entries(o.specNumbers || {}).forEach(([color, v]) => {
+          const thread = v?.thread?.trim();
+          const zipper = v?.zipper?.trim();
+          if (thread || zipper) out[color] = { ...out[color], ...(thread ? { thread } : {}), ...(zipper ? { zipper } : {}) };
+        });
+      });
+    return out;
+  }, [orders, workOrderTarget]);
+
   const saveWorkOrderEdit = async () => {
     const el = document.getElementById('work-order-print-area');
     if (!el || !workOrderTarget) return;
@@ -3312,7 +3362,10 @@ export default function ProductionOrders() {
                 #work-order-print-area { position: absolute; top: 0; left: 0; width: 100%; }
                 .no-print { display: none !important; }
                 textarea { border: none !important; resize: none; background: transparent; }
-                input[type="text"], input[type="number" min="0"] { border: none !important; background: transparent; }
+                /* 선택자 하나가 잘못되면 규칙 전체가 버려진다 — 전에는 이게 아무 일도 안 했다 */
+                input[type="text"], input[type="number"] { border: none !important; background: transparent; }
+                /* 안 적은 칸은 인쇄에서 빈 칸으로 — 점선도 placeholder 도 남기지 않는다 */
+                input::placeholder, textarea::placeholder { color: transparent !important; }
                 input[type="checkbox"] { display: inline-block !important; }
               }
             `}</style>
@@ -3366,6 +3419,8 @@ export default function ProductionOrders() {
                   item={items.find(i => i.id === workOrderTarget.styleId || i.styleNo === workOrderTarget.styleNo) as any}
                   vendors={allVendors as any}
                   note={workOrderNote}
+                  inherited={inheritedSpecNumbers}
+                  onPatch={woEditing ? undefined : patchWorkOrder}
                   onSign={woEditing ? undefined : (slot => setSignSlot(slot))}
                 />
               )}
