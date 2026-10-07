@@ -189,11 +189,13 @@ interface LayoutProps {
  * 사이드바 한 줄 — 즐겨찾기 구역과 본 목록이 같은 모양을 쓴다.
  * Layout 안에서 만들면 렌더마다 새 타입이 되어 별을 누를 때마다 메뉴가 통째로 다시 붙는다 (코덱스 지적).
  */
-const SideLink = React.memo(function SideLink({ item, active, fav, collapsed, onToggleFav, onNavigate }: {
+const SideLink = React.memo(function SideLink({ item, active, fav, collapsed, onToggleFav, onNavigate, badge }: {
   item: NavItem;
   active: boolean;
   fav: boolean;
   collapsed: boolean;
+  /** 안 본 개수 등 — 0 이면 안 보인다 */
+  badge?: number;
   onToggleFav: (path: string) => void;
   onNavigate: () => void;
 }) {
@@ -214,8 +216,15 @@ const SideLink = React.memo(function SideLink({ item, active, fav, collapsed, on
         {active && (
           <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-[var(--accent-mint)]" />
         )}
-        <span className={`shrink-0 ${active ? 'text-sidebar-primary' : ''}`}>{item.icon}</span>
+        <span className={`relative shrink-0 ${active ? 'text-sidebar-primary' : ''}`}>
+          {item.icon}
+          {collapsed && !!badge && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--system-red)]" />}
+        </span>
         {!collapsed && <span className="flex-1 min-w-0 truncate">{item.label}</span>}
+        {!collapsed && !!badge && (
+          <span className="shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-[var(--system-red)] text-white text-[11px] leading-5 text-center"
+            aria-label={`안 본 것 ${badge}건`}>{badge > 99 ? '99+' : badge}</span>
+        )}
       </Link>
       {/* 별은 평소에 숨어 있다가 줄에 마우스를 올리면 나온다. 이미 찍은 것은 계속 보인다 */}
       {!collapsed && (
@@ -239,6 +248,13 @@ const SideLink = React.memo(function SideLink({ item, active, fav, collapsed, on
 
 export default function Layout({ children, onLogout }: LayoutProps) {
   const [location, navigate] = useLocation();
+  // 업무 피드 안 본 개수 — 업무 비서 위젯이 1분마다 읽어 알려준다
+  const [workUnread, setWorkUnread] = useState(0);
+  React.useEffect(() => {
+    const on = (e: Event) => setWorkUnread(Number((e as CustomEvent).detail) || 0);
+    window.addEventListener('work:unread', on);
+    return () => window.removeEventListener('work:unread', on);
+  }, []);
   const [collapsed, setCollapsed] = useState(false);
   // 사이드바 그룹 접기 — 접힌 그룹 라벨을 저장한다
   const [closedGroups, setClosedGroups] = useState<string[]>(() => {
@@ -299,6 +315,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
       collapsed={collapsed}
       onToggleFav={toggleFavorite}
       onNavigate={() => setSidebarOpen(false)}
+      badge={item.path === '/work' ? workUnread : undefined}
     />
   );
 

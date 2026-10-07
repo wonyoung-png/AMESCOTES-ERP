@@ -16,7 +16,23 @@ export type Card = {
   status: 'open' | 'done' | 'cancelled'; assignee_id?: string | null; assignee_name?: string | null;
   reply_text?: string | null; replied_by_name?: string | null; related_id?: string | null;
   shared_teams: string[]; result_ref?: { table: string; id: string } | null; done_by_name?: string | null;
+  read_by?: string[];
 };
+
+/** 안 본 카드 = 남이 올렸고 내가 아직 확인 안 함. 내가 쓴 것·질문은 셀 필요 없다 */
+export const isUnread = (c: Card, me: Me | null) =>
+  !!me && c.created_by !== me.id && c.kind !== 'question' && !(c.read_by || []).includes(me.id);
+
+export async function markRead(ids: string[]): Promise<boolean> {
+  if (!ids.length) return true;
+  try {
+    const r = await fetch('/api/work/read', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
+    });
+    return r.ok;
+  } catch { return false; }
+}
 export type Me = { id: string; name: string; team: string; isLeader: boolean; isBoss: boolean; profile?: string };
 
 /** 업무 프로필 작성 안내 — 위젯과 사용자관리가 같이 쓴다 */

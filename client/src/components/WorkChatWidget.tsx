@@ -13,7 +13,7 @@ import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 import { Link } from 'wouter';
 import { toast } from 'sonner';
 import {
-  type Card, type Me, CardActions, isTodo, fetchWork, postWork, announceWorkChanged, fmtTime,
+  type Card, type Me, CardActions, isTodo, isUnread, fetchWork, postWork, announceWorkChanged, fmtTime,
   PROFILE_PLACEHOLDER, PROFILE_MAX,
 } from '@/components/WorkCardActions';
 
@@ -148,6 +148,9 @@ export default function WorkChatWidget() {
     .sort((a, b) => a.created_at.localeCompare(b.created_at)), [items, me]);
   // 버튼 숫자 = 업무 피드 '내 할 일'과 같은 기준 (내 할 일·받은 확인 요청·등록 안 한 일정)
   const todo = useMemo(() => items.filter(c => isTodo(c, me)).length, [items, me]);
+  // 왼쪽 메뉴 '업무 피드' 옆 숫자 = 안 본 카드 수. 위젯이 이미 1분마다 읽고 있으니 그 값을 알린다
+  const unread = useMemo(() => items.filter(c => isUnread(c, me)).length, [items, me]);
+  useEffect(() => { window.dispatchEvent(new CustomEvent('work:unread', { detail: unread })); }, [unread]);
 
   useEffect(() => { if (open) endRef.current?.scrollIntoView({ block: 'end' }); }, [open, thread.length, pending]);
 

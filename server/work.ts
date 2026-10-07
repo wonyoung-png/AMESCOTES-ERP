@@ -367,6 +367,34 @@ router.post('/api/work/:id/reply', requireUser(), async (req: Request, res: Resp
   }
 });
 
+// ───────────────────────── 읽음 체크
+
+/** 보이는 카드만 확인 처리한다 — 남의 팀 카드 id 를 넣어도 표시가 묻지 않게 볼 권한으로 한 번 거른다 */
+router.post('/api/work/read', requireUser(), async (req: Request, res: Response) => {
+  try {
+    const all = await members();
+    const me = all.find(m => m.id === userOf(req).id);
+    if (!me) { res.status(401).json({ error: 'no_session' }); return; }
+    const raw = (req.body ?? {}).ids;
+    if (!Array.isArray(raw) || !raw.length || raw.length > 500) { res.status(400).json({ error: 'bad_ids' }); return; }
+    const ids = Array.from(new Set(raw.map(String)));
+    // in.() 필터에 그대로 들어가므로 형식이 하나라도 틀리면 통째로 거절한다 (코덱스 지적)
+    if (ids.some(s => !/^wc_[a-z0-9]{1,40}$/.test(s))) { res.status(400).json({ error: 'bad_ids' }); return; }
+    const vr = await restAsServer(`work_cards?select=id&id=in.(${ids.join(',')})${visibleFilter(me)}`);
+    if (!vr.ok) { res.status(502).json({ error: 'db' }); return; }
+    const visible = (await vr.json()).map((c: any) => c.id);
+    if (!visible.length) { res.json({ ok: true, marked: 0 }); return; }
+    const r = await restAsServer('rpc/mark_work_read', {
+      method: 'POST', body: JSON.stringify({ p_user: me.id, p_ids: visible }),
+    });
+    if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
+    res.json({ ok: true, marked: await r.json() });
+  } catch (e) {
+    console.error('POST /api/work/read 실패:', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 // ───────────────────────── 종류 바꾸기 · 취소 (AI 가 잘못 가른 것을 사람이 바로잡는다)
 
 /** 쓴 사람, 그 팀 팀장, 대표만 */
