@@ -41,6 +41,7 @@ export default function CaptureUpload() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [mine, setMine] = useState<Capture[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -52,15 +53,69 @@ export default function CaptureUpload() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const pick = async (f?: File | null) => {
-    if (!f) return;
-    if (!f.type.startsWith('image/')) { toast.error('사진만 올릴 수 있습니다'); return; }
-    try { setPhoto(await resizeImage(f)); }
-    catch { toast.error('사진을 읽지 못했습니다'); }
-  };
+  /**
+   * 사진 한 장을 받는다.
+   *
+   * 줄이는 데 시간이 걸려서, 연달아 두 장을 넣으면 먼저 시작한 쪽이 늦게 끝나 나중 것을 덮을 수 있다.
+   * 번호를 매겨 마지막 것만 남긴다 (코덱스 지적).
+   * 화면을 떠난 뒤 끝나는 경우도 같은 번호 검사로 걸러진다 — 엉뚱한 화면에서 토스트가 뜨지 않는다.
+   */
+  const pickSeq = useRef(0);
+  const alive = useRef(true);
+  const busy = useRef(false);          // 전송 중에는 새 사진을 받지 않는다
+  useEffect(() => () => { alive.current = false; }, []);
+
+  const pick = useCallback(async (f?: File | null): Promise<boolean> => {
+    if (!f) return false;
+    // 보내는 중에 새 사진을 받으면 이번 접수에 들어갈지 다음 접수에 들어갈지가 모호해진다.
+    // 끝나고 넣게 한다 (코덱스 지적)
+    if (busy.current) { toast.info('접수 중입니다. 끝나면 넣어주세요'); return false; }
+    if (!f.type.startsWith('image/')) { toast.error('사진만 올릴 수 있습니다'); return false; }
+    const mine = ++pickSeq.current;
+    try {
+      const data = await resizeImage(f);
+      if (mine !== pickSeq.current || !alive.current) return false;   // 더 나중 것이 들어왔다
+      setPhoto(data);
+      return true;
+    } catch {
+      if (mine === pickSeq.current && alive.current) toast.error('사진을 읽지 못했습니다');
+      return false;
+    }
+  }, []);
+
+  /** 여러 개를 끌어다 놔도 그림 하나를 골라낸다 */
+  const firstImage = (files?: FileList | null) =>
+    Array.from(files || []).find(f => f.type.startsWith('image/')) || null;
+
+  /**
+   * PC 에서는 캡처해서 Ctrl+V 로 붙여넣는 게 가장 빠르다.
+   *
+   * 기준은 포커스가 아니라 클립보드다. 글칸에 커서가 있어도 클립보드에 그림이 있으면 사진으로 받는다 —
+   * 글칸에 그림을 붙여 넣을 일은 없다. 글을 복사해 붙이는 경우는 그대로 통과시킨다.
+   */
+  useEffect(() => {
+    const onPaste = async (e: ClipboardEvent) => {
+      const cd = e.clipboardData;
+      const f = Array.from(cd?.items || []).find(i => i.type.startsWith('image/'))?.getAsFile()
+        || Array.from(cd?.files || []).find(x => x.type.startsWith('image/'));
+      if (!f) return;                       // 글 붙여넣기는 건드리지 않는다
+      e.preventDefault();
+      if (await pick(f)) toast.success('사진을 붙여넣었습니다');
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [pick]);
+
+  /**
+   * 처리 중인 사진 변환을 버린다.
+   * 안 버리면, 변환이 끝난 뒤 이미 보냈거나 지운 자리에 사진이 되살아난다 (코덱스 지적).
+   */
+  const dropPending = () => { pickSeq.current += 1; };
 
   const send = async () => {
     if (!photo && !text.trim()) { toast.error('사진이나 글 중 하나는 있어야 합니다'); return; }
+    dropPending();            // 보내는 순간 들어오던 사진은 이 접수에 들어가지 않는다
+    busy.current = true;
     setSending(true);
     try {
       const r = await fetch('/api/captures', {
@@ -81,6 +136,7 @@ export default function CaptureUpload() {
     } catch {
       toast.error('접수 실패 — 통신 상태를 확인해주세요');
     } finally {
+      busy.current = false;
       setSending(false);
     }
   };
@@ -101,14 +157,15 @@ export default function CaptureUpload() {
         accept="image/*"
         capture="environment"
         className="hidden"
-        onChange={e => { pick(e.target.files?.[0]); }}
+        // 고른 값을 비워둬야 같은 파일을 다시 골랐을 때도 change 가 뜬다 (코덱스 지적)
+        onChange={e => { const f = firstImage(e.target.files); e.target.value = ''; pick(f); }}
       />
       {photo ? (
         <div className="relative">
           <img src={photo} alt="올릴 사진" className="w-full rounded-lg border border-border object-contain max-h-72 bg-[var(--fill-quaternary)]" />
           <button
             type="button"
-            onClick={() => { setPhoto(null); if (fileRef.current) fileRef.current.value = ''; }}
+            onClick={() => { dropPending(); setPhoto(null); if (fileRef.current) fileRef.current.value = ''; }}
             aria-label="사진 지우기"
             className="absolute top-2 right-2 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center"
           >
@@ -119,10 +176,22 @@ export default function CaptureUpload() {
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="w-full h-40 rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground active:bg-[var(--fill-quaternary)]"
+          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={async e => {
+            e.preventDefault(); setDragOver(false);
+            const f = firstImage(e.dataTransfer.files);
+            if (!f) { toast.error('사진만 올릴 수 있습니다'); return; }
+            if (await pick(f)) toast.success('사진을 넣었습니다');
+          }}
+          className={`w-full h-40 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 text-muted-foreground active:bg-[var(--fill-quaternary)] transition-colors ${
+            dragOver ? 'border-primary bg-primary/5 text-primary' : 'border-border'
+          }`}
         >
           <Camera className="w-8 h-8" />
           <span className="text-sm">사진 찍기</span>
+          {/* PC 에서만 알려준다. 폰에는 Ctrl 키도 끌어다 놓기도 없다 */}
+          <span className="text-[11px] hidden md:block">끌어다 놓거나 Ctrl+V 로 붙여넣기</span>
         </button>
       )}
 
