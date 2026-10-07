@@ -35,6 +35,10 @@ const esc = (s: string) => s.replace(/</g, '‹').replace(/>/g, '›');
 
 const PROFILE_MAX = 1000;
 
+/** 비용 추적용 — 서버 로그에 호출마다 한 줄. 출력 토큰에는 생각(thinking) 토큰이 포함된다 */
+const logUsage = (step: string, r: Anthropic.Message) =>
+  console.log(`[work] usage ${step} ${r.model} in=${r.usage.input_tokens} out=${r.usage.output_tokens} stop=${r.stop_reason}`);
+
 /** 세션 사용자에 팀·직책을 붙여 읽는다 (auth.ts 의 SessionUser 에는 없다) */
 async function members(): Promise<Member[]> {
   const r = await restAsServer('app_users?is_active=eq.true&select=id,name,team,position,role,email,work_profile');
@@ -119,6 +123,7 @@ JSON 하나만 출력한다. 설명 금지.
       system: sys,
       messages: [{ role: 'user', content: opts.text }],
     });
+    logUsage('classify', r);
     const raw = r.content.find(c => c.type === 'text')?.text || '';
     const j = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
     const kind: Kind = KINDS.includes(j.kind) ? j.kind : 'share';
@@ -197,6 +202,7 @@ ${esc(cards.map(fmtCard).join('\n')) || '(없음)'}
       model: ANSWER_MODEL, max_tokens: 4000, system: sys,
       messages: [{ role: 'user', content: user }],
     });
+    logUsage('answer', r);
     return r.content.find(c => c.type === 'text')?.text?.trim() || '답을 만들지 못했습니다.';
   } catch (e) {
     console.warn('[work] 답변 실패:', String(e).split('\n')[0]);
