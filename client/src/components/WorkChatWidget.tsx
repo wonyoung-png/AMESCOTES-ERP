@@ -11,7 +11,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 import { Link } from 'wouter';
-import { type Card, type Me, CardActions, isTodo, fetchWork, postWork, announceWorkChanged, fmtTime } from '@/components/WorkCardActions';
+import { toast } from 'sonner';
+import {
+  type Card, type Me, CardActions, isTodo, fetchWork, postWork, announceWorkChanged, fmtTime,
+  PROFILE_PLACEHOLDER, PROFILE_MAX,
+} from '@/components/WorkCardActions';
 
 const EXAMPLES = [
   'W컨셉 기획전 10/20 파니에 토트 20% 예정',
@@ -64,8 +68,47 @@ function WaitBubble() {
   );
 }
 
+/** 내 업무 프로필 — 비서가 담당·결정권·약어를 알고 답하게 한다 */
+function ProfilePanel({ initial, onClose }: { initial: string; onClose: () => void }) {
+  const [v, setV] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    setSaving(true);
+    try {
+      const r = await fetch('/api/work/profile', {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile: v }),
+      });
+      if (!r.ok) { toast.error('저장 실패'); return; }
+      toast.success('저장했습니다. 다음 대화부터 반영됩니다');
+      announceWorkChanged();
+      onClose();
+    } catch { toast.error('저장 실패 — 통신 상태를 확인해주세요'); }
+    finally { setSaving(false); }
+  };
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div>
+        <p className="text-sm font-medium">내 업무 프로필</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          맡은 채널·업무·결정권을 적어 두면 비서가 그에 맞게 분류하고 답합니다. 다른 직원이 "누구한테 물어봐?"라고 할 때도 쓰입니다.
+        </p>
+      </div>
+      <textarea value={v} onChange={e => setV(e.target.value.slice(0, PROFILE_MAX))} rows={9} placeholder={PROFILE_PLACEHOLDER}
+        className="w-full rounded-lg border border-border bg-background p-3 text-sm resize-none outline-none focus:border-primary/50" />
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-muted-foreground tabular-nums">{v.length}/{PROFILE_MAX}</span>
+        <button type="button" onClick={onClose} className="ml-auto h-9 px-3 rounded-md border border-border text-sm">취소</button>
+        <button type="button" onClick={save} disabled={saving}
+          className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm disabled:opacity-40">{saving ? '저장 중…' : '저장'}</button>
+      </div>
+    </div>
+  );
+}
+
 export default function WorkChatWidget() {
   const [open, setOpen] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [items, setItems] = useState<Card[]>([]);
   const [me, setMe] = useState<Me | null>(null);
   const [text, setText] = useState('');
@@ -125,13 +168,22 @@ export default function WorkChatWidget() {
             <Sparkles className="w-4 h-4 text-primary" />
             <span className="font-semibold text-sm">업무 비서</span>
             {me && <span className="text-xs text-muted-foreground truncate">· {me.name}{me.team ? ` (${me.team})` : ''}</span>}
-            <Link href="/work" onClick={() => setOpen(false)} className="ml-auto text-xs text-muted-foreground hover:text-foreground">팀 피드</Link>
+            <button type="button" onClick={() => setShowProfile(s => !s)}
+              className={`ml-auto text-xs hover:text-foreground ${showProfile ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>내 프로필</button>
+            <Link href="/work" onClick={() => setOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">팀 피드</Link>
             <button type="button" onClick={() => setOpen(false)} aria-label="닫기" className="p-1 rounded-md text-muted-foreground hover:text-foreground">
               <X className="w-5 h-5" />
             </button>
           </div>
 
+          {showProfile ? <ProfilePanel key={me?.id} initial={me?.profile || ''} onClose={() => setShowProfile(false)} /> : <>
           <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
+            {me && !me.profile && (
+              <button type="button" onClick={() => setShowProfile(true)}
+                className="w-full text-left text-xs px-3 py-2 rounded-lg border border-dashed border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]">
+                업무 프로필을 적어 두면 비서가 더 정확해져요 — 작성하기
+              </button>
+            )}
             {thread.length === 0 && !pending && (
               <div className="text-sm text-muted-foreground space-y-3 px-1">
                 <p>업무를 한 줄로 쓰세요. 확인이 필요하면 팀장에게, 일정이면 캘린더로 보내고, 물어보면 기록에서 찾아 답합니다.</p>
@@ -198,6 +250,7 @@ export default function WorkChatWidget() {
               <Send className="w-4 h-4" />
             </button>
           </div>
+          </>}
         </div>
       )}
     </>

@@ -16,6 +16,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { UserPlus, KeyRound, Lock } from 'lucide-react';
+import { PROFILE_PLACEHOLDER, PROFILE_MAX } from '@/components/WorkCardActions';
 
 interface DbUser {
   id: string;
@@ -26,6 +27,8 @@ interface DbUser {
   team: string | null;
   rank: string | null;
   position: string | null;
+  /** 업무 비서가 담당·결정권을 알게 하는 글 (본인은 위젯에서, 관리자는 여기서) */
+  work_profile: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -61,6 +64,23 @@ export default function UserManagement() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [invite, setInvite] = useState({ name: '', email: '', role: '사원' as UserRole, password: '' });
   const [resetTarget, setResetTarget] = useState<DbUser | null>(null);
+  const [profileTarget, setProfileTarget] = useState<DbUser | null>(null);
+  const [profileText, setProfileText] = useState('');
+  const openProfile = (u: DbUser) => { setProfileTarget(u); setProfileText(u.work_profile || ''); };
+  const saveProfile = async () => {
+    if (!profileTarget) return;
+    try {
+      // 남의 프로필은 서버에서 대표 권한을 다시 확인하고 저장한다
+      const r = await fetch(`/api/work/profile/${encodeURIComponent(profileTarget.id)}`, {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile: profileText }),
+      });
+      if (!r.ok) { toast.error(r.status === 403 ? '대표만 남의 프로필을 고칠 수 있습니다' : '저장 실패'); return; }
+      toast.success(`${profileTarget.name} 업무 프로필을 저장했습니다`);
+      setProfileTarget(null);
+      refetch();
+    } catch { toast.error('저장 실패'); }
+  };
   const [resetPassword, setResetPassword] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -163,6 +183,7 @@ export default function UserManagement() {
               <th>팀</th>
               <th>직급</th>
               <th>직책</th>
+              <th>업무 프로필</th>
               <th className="nw">등록일</th>
               <th>활성</th>
               <th className="num">비밀번호</th>
@@ -170,7 +191,7 @@ export default function UserManagement() {
           </thead>
           <tbody className="divide-y divide-border">
             {isLoading && (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Data Loading by AMESCOTES</td></tr>
+              <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">Data Loading by AMESCOTES</td></tr>
             )}
             {users.map(u => {
               const isAdminRow = isAdminEmail(u.email);
@@ -211,6 +232,12 @@ export default function UserManagement() {
                       placeholder="팀장"
                       className="h-7 w-16 text-[13px] border border-border rounded-md bg-card px-1.5"
                     />
+                  </td>
+                  <td>
+                    <button type="button" onClick={() => openProfile(u)}
+                      className="max-w-40 truncate text-left text-[13px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline">
+                      {u.work_profile ? u.work_profile.split('\n')[0] : '작성하기'}
+                    </button>
                   </td>
                   <td className="text-muted-foreground">{u.created_at?.slice(0, 10)}</td>
                   <td>
@@ -261,6 +288,7 @@ export default function UserManagement() {
                 <span className="text-[12px] px-2 py-0.5 rounded-[6px] bg-[var(--fill-tertiary)] text-foreground">{u.role}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] text-muted-foreground">{u.created_at?.slice(0, 10)}</span>
+                  <Button variant="outline" size="sm" onClick={() => openProfile(u)}>프로필</Button>
                   <Button variant="outline" size="sm" className="gap-1" onClick={() => setResetTarget(u)}>
                     <KeyRound className="w-3.5 h-3.5" />재설정
                   </Button>
@@ -305,6 +333,21 @@ export default function UserManagement() {
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setInviteOpen(false)}>취소</Button>
             <Button size="sm" onClick={handleInvite} disabled={saving}>{saving ? '생성 중...' : '계정 생성'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 업무 프로필 — 업무 비서가 이 사람의 담당·결정권을 알고 분류·답변한다 */}
+      <Dialog open={!!profileTarget} onOpenChange={open => { if (!open) setProfileTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>업무 프로필 — {profileTarget?.name}</DialogTitle></DialogHeader>
+          <textarea value={profileText} onChange={e => setProfileText(e.target.value.slice(0, PROFILE_MAX))} rows={8}
+            placeholder={PROFILE_PLACEHOLDER}
+            className="w-full rounded-md border border-border bg-background p-3 text-sm resize-none outline-none focus:border-primary/50" />
+          <p className="text-[12px] text-muted-foreground">{profileText.length}/{PROFILE_MAX} · 본인도 업무 비서의 "내 프로필"에서 고칠 수 있습니다</p>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setProfileTarget(null)}>취소</Button>
+            <Button size="sm" onClick={saveProfile}>저장</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

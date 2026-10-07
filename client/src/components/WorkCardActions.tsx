@@ -16,7 +16,14 @@ export type Card = {
   reply_text?: string | null; replied_by_name?: string | null; related_id?: string | null;
   shared_teams: string[]; result_ref?: { table: string; id: string } | null; done_by_name?: string | null;
 };
-export type Me = { id: string; name: string; team: string; isLeader: boolean; isBoss: boolean };
+export type Me = { id: string; name: string; team: string; isLeader: boolean; isBoss: boolean; profile?: string };
+
+/** 업무 프로필 작성 안내 — 위젯과 사용자관리가 같이 쓴다 */
+export const PROFILE_PLACEHOLDER = `담당 채널·브랜드: W컨셉, 29CM / LUMEN
+업무 범위: 기획전 협의, 샘플 발송
+결정권: 할인 15%까지는 본인 결정, 그 이상은 팀장 확인
+자주 쓰는 말: 파토 = 파니에 토트`;
+export const PROFILE_MAX = 1000;
 
 export const KIND: Record<Card['kind'], { label: string; icon: typeof Clock; cls: string }> = {
   request_check: { label: '확인 요청', icon: MessageSquare, cls: 'text-[var(--system-orange)]' },
