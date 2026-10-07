@@ -226,8 +226,15 @@ router.post('/api/captures/:id/approve', requireRole(...APPROVER_ROLES), async (
       const detail = await r.text();
       // 아는 사유는 사람 말로, 모르는 사유는 그대로 내보낸다.
       // "승인 실패" 한 마디로 뭉개면 왜 안 되는지 아무도 알 수 없다
+      // 청구 쪽 사유를 먼저 본다 — bill_amount_required 는 amount_required 를,
+      // bill_buyer_not_found 는 not_found 를 품고 있어서 순서가 바뀌면 엉뚱한 말이 나간다
       const msg =
         detail.includes('already:')            ? '이미 처리된 접수입니다'
+        : detail.includes('bill_buyer_not_found') ? '청구할 거래처를 찾지 못했습니다'
+        : detail.includes('bill_buyer_required')  ? '청구금액을 적었으면 청구할 곳도 골라주세요'
+        : detail.includes('bill_amount_required') ? '청구금액을 넣어주세요'
+        : detail.includes('statement_not_found')  ? '고른 거래명세표를 찾지 못했습니다'
+        : detail.includes('statement_locked')     ? '이미 청구·수금이 끝난 명세표입니다. 새 명세표로 만들어주세요'
         : detail.includes('not_found')          ? '접수를 찾지 못했습니다'
         : detail.includes('style_name_required')? '품명을 넣어주세요'
         : detail.includes('kind_not_ready')     ? '이 종류는 아직 전표를 만들지 않습니다'

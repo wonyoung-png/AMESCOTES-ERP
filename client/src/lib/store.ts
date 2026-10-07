@@ -811,6 +811,12 @@ function saveExpenses(list: Expense[]) {
   import('./expenseQueries').then(m => m.pushExpenses(list)).catch(() => {});
 }
 
+/** 거래명세표 저장 — 로컬에 쓰고 서버에도 올린다 (saveExpenses 와 같은 이유) */
+function saveTradeStatements(list: TradeStatement[]) {
+  setAll(KEYS.tradeStatements, list);
+  import('./tradeStatementQueries').then(m => m.pushTradeStatements(list)).catch(() => {});
+}
+
 // ─── 매출 (간단 버전) ───
 export interface SalesRecord {
   id: string;
@@ -1536,9 +1542,14 @@ export const store = {
 
   // Trade Statements
   getTradeStatements: () => getAll<TradeStatement>(KEYS.tradeStatements),
-  addTradeStatement: (v: TradeStatement) => { const a = getAll<TradeStatement>(KEYS.tradeStatements); a.push(v); setAll(KEYS.tradeStatements, a); },
-  updateTradeStatement: (id: string, u: Partial<TradeStatement>) => { const a = getAll<TradeStatement>(KEYS.tradeStatements); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.tradeStatements, a); } },
-  deleteTradeStatement: (id: string) => setAll(KEYS.tradeStatements, getAll<TradeStatement>(KEYS.tradeStatements).filter(x => x.id !== id)),
+  /** 서버에서 막 읽어온 것을 화면용으로만 채워 넣는다 (hydrateExpenses 와 같은 이유) */
+  hydrateTradeStatements: (v: TradeStatement[]) => setAll(KEYS.tradeStatements, v),
+  addTradeStatement: (v: TradeStatement) => { const a = getAll<TradeStatement>(KEYS.tradeStatements); a.push(v); saveTradeStatements(a); },
+  updateTradeStatement: (id: string, u: Partial<TradeStatement>) => { const a = getAll<TradeStatement>(KEYS.tradeStatements); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; saveTradeStatements(a); } },
+  deleteTradeStatement: (id: string) => {
+    setAll(KEYS.tradeStatements, getAll<TradeStatement>(KEYS.tradeStatements).filter(x => x.id !== id));
+    import('./tradeStatementQueries').then(m => m.deleteTradeStatementSB(id)).catch(() => {});
+  },
   getNextStatementNo: (vendorCode: string) => {
     const ym = new Date().toISOString().slice(0, 7).replace('-', '');
     const prefix = `${ym}-${vendorCode}-`;

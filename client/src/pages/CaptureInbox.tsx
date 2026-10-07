@@ -36,6 +36,80 @@ const STAGES = ['1차', '2차', '3차', '4차', '최종승인', '반려'];
 const SEASONS = ['25FW', '26SS', '26FW', '27SS'];
 const PAY_TYPES = ['법인카드', '계좌이체', '현금'];
 
+/**
+ * 자재 구매 승인에 딸리는 "바이어 청구" 칸.
+ *
+ * 산 금액과 청구할 금액은 다르다 — 마진을 붙여 청구한다 (대표). 그래서 금액을 따로 받는다.
+ * 청구할 곳을 비워 두면 지출결의만 만든다. 사내용 자재는 청구할 곳이 없다.
+ */
+function BillingFields({
+  buyerOptions, buyerId, billAmount, statementId, cost, field, label, onSet,
+}: {
+  buyerOptions: { id: string; label: string }[];
+  buyerId: string; billAmount: string; statementId: string; cost: number;
+  field: string; label: string;
+  onSet: (k: string, v: any) => void;
+}) {
+  const { data: open = [] } = useQuery({
+    queryKey: ['openStatements', buyerId],
+    enabled: !!buyerId,
+    queryFn: async () => {
+      const { fetchOpenStatements } = await import('@/lib/tradeStatementQueries');
+      return fetchOpenStatements(buyerId);
+    },
+  });
+  const bill = Number(billAmount || 0);
+  // 산 값보다 적게 청구하면 손해다. 일부러 그럴 수도 있으니 막지 않고 알려만 준다
+  const underBilled = !!buyerId && bill > 0 && cost > 0 && bill < cost;
+
+  return (
+    <div className="border border-border rounded-md p-2.5 space-y-2">
+      <p className="text-[11px] font-medium text-foreground">바이어 청구 (안 하면 비워 두세요)</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div>
+          <label className={label}>청구할 곳</label>
+          <select className={field} value={buyerId}
+            onChange={e => { onSet('billBuyerId', e.target.value); onSet('billStatementId', ''); }}>
+            <option value="">— 청구 안 함 —</option>
+            {buyerOptions.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
+          </select>
+        </div>
+        {!!buyerId && (
+          <>
+            <div>
+              <label className={label}>청구금액 (원)</label>
+              <input className={field} type="number" inputMode="numeric"
+                value={billAmount}
+                placeholder={cost > 0 ? String(cost) : ''}
+                onChange={e => onSet('billAmountKrw', e.target.value)} />
+            </div>
+            <div>
+              <label className={label}>명세표</label>
+              <select className={field} value={statementId}
+                onChange={e => onSet('billStatementId', e.target.value)}>
+                <option value="">새로 만들기</option>
+                {open.map((o: any) => (
+                  <option key={o.id} value={o.id}>
+                    {o.statementNo} 에 추가 ({(o.lines || []).length}줄)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+      </div>
+      {!!buyerId && !billAmount && (
+        <p className="text-[11px] text-muted-foreground">비워 두면 산 값 그대로 청구합니다.</p>
+      )}
+      {underBilled && (
+        <p className="text-[11px] text-[var(--system-orange)]">
+          산 값({cost.toLocaleString()}원)보다 적게 청구합니다. 맞나요?
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function CaptureInbox() {
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
   const [edit, setEdit] = useState<Record<string, Record<string, any>>>({});
@@ -47,6 +121,15 @@ export default function CaptureInbox() {
     .flatMap(v => normalizeBrands((v as any).brands).map(b => ({
       key: `${v.id}|${b.code}`, label: b.name, buyerId: v.id, brandCode: b.code,
     }))), [vendors]);
+  /** 청구할 곳 — 거래명세표는 사업자 단위로 나가므로 거래처 하나당 한 줄이다.
+   *  보이는 이름은 브랜드명으로 쓴다 (대표 지시). 브랜드가 없으면 거래처명. */
+  const buyerOptions = useMemo(() => (vendors as Vendor[])
+    .filter(v => (v as any).type === '바이어')
+    .map(v => {
+      const brands = normalizeBrands((v as any).brands).map(b => b.name);
+      return { id: v.id, label: brands.length ? brands.join('·') : (v.name || '(이름 없음)') };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, 'ko')), [vendors]);
 
   const { data, refetch, isLoading } = useQuery({
     queryKey: ['captures', tab],
@@ -80,6 +163,11 @@ export default function CaptureInbox() {
       toast.error('금액을 넣어주세요');
       return;
     }
+    // 청구금액만 적고 청구할 곳을 안 고르면 청구가 조용히 사라진다
+    if (kind === 'material' && !payload.billBuyerId && String(payload.billAmountKrw || '').trim()) {
+      toast.error('청구할 곳을 골라주세요');
+      return;
+    }
     setBusy(c.id);
     try {
       const r = await fetch(`/api/captures/${c.id}/approve`, {
@@ -93,14 +181,21 @@ export default function CaptureInbox() {
         toast.error(j.message || j.detail || j.error || '승인 실패', { duration: 10000 });
         return;
       }
-      toast.success(kind === 'material' ? '승인 — 지출결의가 만들어졌습니다' : '승인 — 샘플 기록이 만들어졌습니다');
+      // 자재구매는 청구까지 했으면 전표가 2장이다. 몇 장이 만들어졌는지 말해준다
+      toast.success(
+        kind !== 'material' ? '승인 — 샘플 기록이 만들어졌습니다'
+        : j.ref?.statementNo
+          ? `승인 — 지출결의 + 거래명세표 ${j.ref.statementNo}${j.ref.statementNew === false ? ' (줄 추가)' : ''}`
+          : '승인 — 지출결의가 만들어졌습니다');
       // 지출결의는 서버가 정본인데 앱이 시작할 때만 내려받는다 (syncFromSupabase).
       // 지금 내려받아 넣어주지 않으면 방금 만든 전표가 지출결의 화면에 안 보인다
       if (kind === 'material') {
         try {
           const { fetchExpensesSB } = await import('@/lib/expenseQueries');
+          const { fetchTradeStatementsSB } = await import('@/lib/tradeStatementQueries');
           const { store } = await import('@/lib/store');
           store.hydrateExpenses(await fetchExpensesSB());
+          store.hydrateTradeStatements(await fetchTradeStatementsSB() as any);
         } catch { /* 못 내려받아도 다음에 앱을 열면 보인다 */ }
       }
       setEdit(p => { const { [c.id]: _drop, ...rest } = p; return rest; });
@@ -288,6 +383,18 @@ export default function CaptureInbox() {
                           </>
                         )}
                       </div>
+
+                      {kind === 'material' && (
+                        <BillingFields
+                          buyerOptions={buyerOptions}
+                          buyerId={String(valOf(c, 'billBuyerId') || '')}
+                          billAmount={String(valOf(c, 'billAmountKrw') || '')}
+                          statementId={String(valOf(c, 'billStatementId') || '')}
+                          cost={Number(valOf(c, 'amountKrw') || 0)}
+                          field={field} label={label}
+                          onSet={(k, v) => setVal(c.id, k, v)}
+                        />
+                      )}
 
                       {canApprove && (
                         <div className="flex gap-2 pt-1">

@@ -328,24 +328,37 @@ export async function syncFromSupabase(): Promise<void> {
 
   try {
     await syncPhase1FromSupabase();
-    await mergePurchaseItems();
+    await mergeTable('purchase_items', 'ames_purchases', '자재구매');
+    // 거래명세표 — tax_invoice / lines 가 jsonb 라 자동 변환으로는 모양이 안 맞는다
+    const ts = await import('./tradeStatementQueries');
+    await mergeTable('trade_statements', 'ames_trade_statements', '거래명세표',
+      ts.tradeStatementRow, ts.fromRow);
     console.log('[syncFromSupabase] Phase1 테이블 동기화 완료');
   } catch (e) {
     console.warn('[syncFromSupabase] Phase1 동기화 스킵 (테이블 미생성 시 migration 실행):', e);
   }
 }
 
-/** 자재구매 — 서버본과 로컬본을 id 기준으로 합치고, 서버에 없던 로컬 건은 올려준다.
- *  (통째로 교체하면 서버 저장이 없던 시절에 만든 구매건이 사라진다) */
-async function mergePurchaseItems(): Promise<void> {
-  const KEY = 'ames_purchases';
+/** 서버본과 로컬본을 id 기준으로 합치고, 서버에 없던 로컬 건은 올려준다.
+ *
+ *  통째로 교체하면 서버 저장이 없던 시절에 만든 것이 사라진다. 자재구매와 거래명세표가
+ *  둘 다 그 처지다 — 테이블은 있는데 앱이 올리지 않던 시절의 데이터가 로컬에만 남아 있다.
+ *  label 은 콘솔에 사람이 알아볼 이름으로 적기 위한 것뿐이다. */
+async function mergeTable(
+  table: string,
+  KEY: string,
+  label: string,
+  toRow: (row: Record<string, any>) => Record<string, any>
+    = row => filterForTable(table, toSnakeCase(row)),
+  fromRow: (row: Record<string, any>) => Record<string, any> = toCamelCase,
+): Promise<void> {
   try {
-    const { data, error } = await supabase.from('purchase_items').select('*');
-    if (error) { console.warn('[syncFromSupabase] purchase_items 조회 실패:', error.message); return; }
+    const { data, error } = await supabase.from(table).select('*');
+    if (error) { console.warn(`[syncFromSupabase] ${table} 조회 실패:`, error.message); return; }
 
     const localRaw = localStorage.getItem(KEY);
     const local: Array<Record<string, any>> = localRaw ? JSON.parse(localRaw) : [];
-    const remote = (data || []).map(r => toCamelCase(r as Record<string, any>));
+    const remote = (data || []).map(r => fromRow(r as Record<string, any>));
 
     const byId = new Map<string, Record<string, any>>();
     local.forEach(r => { if (r?.id) byId.set(r.id, r); });
@@ -357,15 +370,15 @@ async function mergePurchaseItems(): Promise<void> {
     // 서버에 없던 로컬 건을 올린다 — 다음 접속부터는 다른 PC 에서도 보인다
     for (const row of localOnly) {
       try {
-        await supabase.from('purchase_items').upsert(filterForTable('purchase_items', toSnakeCase(row)));
+        await supabase.from(table).upsert(toRow(row));
       } catch (e) {
-        console.warn('[syncFromSupabase] purchase_items 업로드 실패:', String(e));
+        console.warn(`[syncFromSupabase] ${table} 업로드 실패:`, String(e));
       }
     }
     if (localOnly.length > 0) {
-      console.info(`[syncFromSupabase] 자재구매 로컬 전용 ${localOnly.length}건 서버로 올림`);
+      console.info(`[syncFromSupabase] ${label} 로컬 전용 ${localOnly.length}건 서버로 올림`);
     }
   } catch (e) {
-    console.warn('[syncFromSupabase] purchase_items 병합 실패:', String(e));
+    console.warn(`[syncFromSupabase] ${table} 병합 실패:`, String(e));
   }
 }
