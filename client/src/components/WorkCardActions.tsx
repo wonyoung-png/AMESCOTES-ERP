@@ -13,7 +13,7 @@ export type Card = {
   id: string; created_at: string; created_by: string; created_by_name: string; team: string;
   raw_text: string; kind: 'request_check' | 'todo' | 'schedule' | 'share' | 'question'; parsed: Record<string, any>;
   confirmed_payload?: Record<string, any> | null;
-  status: 'open' | 'done'; assignee_id?: string | null; assignee_name?: string | null;
+  status: 'open' | 'done' | 'cancelled'; assignee_id?: string | null; assignee_name?: string | null;
   reply_text?: string | null; replied_by_name?: string | null; related_id?: string | null;
   shared_teams: string[]; result_ref?: { table: string; id: string } | null; done_by_name?: string | null;
 };
@@ -95,6 +95,8 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
     (c.created_by === me.id || c.assignee_id === me.id || canAct);
   const [note, setNote] = useState('');
   const canConfirm = c.kind === 'schedule' && c.status === 'open' && !!me && (c.created_by === me.id || canAct);
+  // AI 가 잘못 가른 걸 바로잡는다 — 쓴 사람·팀장·대표. 질문은 '끝남'으로 저장되지만 바꿀 수 있다
+  const canFix = !!me && (c.created_by === me.id || canAct) && (c.status === 'open' || c.kind === 'question');
 
   const post = async (path: string, body: unknown, ok: string) => {
     setBusy(true);
@@ -208,6 +210,28 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
           {c.shared_teams?.length > 0 && <> · 공유: {c.shared_teams.join(', ')}</>}
         </p>
       ))}
+
+      {c.status === 'cancelled' && (
+        <p className="text-xs text-muted-foreground mt-1">취소됨{c.done_by_name ? ` · ${c.done_by_name}` : ''}</p>
+      )}
+      {canFix && (
+        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+          <label className="flex items-center gap-1">
+            종류
+            <select value={c.kind} disabled={busy}
+              onChange={e => post('kind', { kind: e.target.value }, `'${KIND[e.target.value as Card['kind']].label}'(으)로 바꿨습니다`)}
+              className="h-7 rounded-md border border-border bg-background px-1 text-xs">
+              {(Object.keys(KIND) as Card['kind'][]).map(k => <option key={k} value={k}>{KIND[k].label}</option>)}
+            </select>
+          </label>
+          {c.status === 'open' && (
+            <button type="button" disabled={busy} className="ml-auto underline-offset-2 hover:underline hover:text-[var(--system-red)]"
+              onClick={() => { if (window.confirm('이 카드를 취소할까요? 기록은 남고 할 일에서 빠집니다')) post('cancel', {}, '취소했습니다'); }}>
+              취소
+            </button>
+          )}
+        </div>
+      )}
     </>
   );
 }

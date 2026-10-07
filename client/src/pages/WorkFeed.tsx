@@ -70,13 +70,14 @@ export default function WorkFeed() {
           const k = KIND[c.kind] || KIND.share;
           const Icon = k.icon;
           return (
-            <div key={c.id} className={`rounded-lg border border-border bg-card p-3 ${c.status === 'done' ? 'opacity-80' : ''}`}>
+            <div key={c.id} className={`rounded-lg border border-border bg-card p-3 ${c.status === 'done' ? 'opacity-80' : c.status === 'cancelled' ? 'opacity-50' : ''}`}>
               <div className="flex items-center gap-2 text-xs">
                 <Icon className={`w-3.5 h-3.5 shrink-0 ${k.cls}`} />
                 <span className={`font-medium ${k.cls}`}>{k.label}</span>
                 <span className="text-muted-foreground truncate">· {c.created_by_name}{c.team ? ` (${c.team})` : ''}</span>
                 <span className="ml-auto text-muted-foreground shrink-0 flex items-center gap-1">
-                  {c.status === 'done' ? <><Check className="w-3 h-3 text-[var(--system-green)]" />완료</> : <><Clock className="w-3 h-3" />진행</>}
+                  {c.status === 'done' ? <><Check className="w-3 h-3 text-[var(--system-green)]" />완료</>
+                    : c.status === 'cancelled' ? <>취소</> : <><Clock className="w-3 h-3" />진행</>}
                   · {fmtTime(c.created_at)}
                 </span>
               </div>

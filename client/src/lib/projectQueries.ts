@@ -132,9 +132,10 @@ export interface Member { id: string; name: string; team?: string; rank?: string
 
 /** 담당자로 고를 수 있는 사람 = 가입된 계정 */
 export async function fetchMembers(): Promise<Member[]> {
-  const { data, error } = await supabase
-    .from('app_users').select('id,name,team,rank,position,is_active').eq('is_active', true);
-  if (error) throw error;
+  // app_users 는 서버만 읽는다 (password_hash 노출 차단). 이름·팀·직급만 받는다
+  const r = await fetch('/api/users/directory', { credentials: 'include' });
+  if (!r.ok) throw new Error(`members ${r.status}`);
+  const data = (await r.json()).items as any[];
   return (data || []).map((u: any) => ({
     id: u.id, name: u.name, team: u.team || undefined,
     rank: u.rank || undefined, position: u.position || undefined,

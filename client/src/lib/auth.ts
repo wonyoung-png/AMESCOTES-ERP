@@ -1,120 +1,51 @@
 // AMESCOTES ERP — 인증 유틸리티
-// localStorage 기반 (Phase 1 프로토타입용)
-// AMESCOTES ERP — 인증 유틸리티
-// localStorage 기반 (Phase 1 프로토타입용)
 //
-// ⚠️ 보안 주의:
-//   - 사내망(192.168.0.6:3000) 전용 + 팀원 5명 임시 운영 전제
-//   - 2~3주 후 Supabase Auth(bcrypt + JWT)로 반드시 마이그레이션
-//   - 원본 평문 비밀번호는 10_팀원비밀번호_대표님보관용.md 파일에만 보관
-//   - 아래 passwordHash 는 simpleHash() 결과값을 사전 계산하여 리터럴로 박은 것
-//     (코드에 평문이 남지 않도록)
-//
-// 버전: 2026-04-16-team (데모 계정 → 팀원 실계정 마이그레이션)
+// 로그인은 서버(/api/login)만 판정한다. 계정·비밀번호 해시는 브라우저에 두지 않는다.
+// (2026-10-07) 전에는 기본 계정과 해시를 번들에 박아 두고, 서버가 안 되면 로컬 해시로 로그인시켰다.
+// 해시가 32비트라 같은 값을 내는 문자열을 쉽게 만들 수 있어 사실상 비밀번호가 공개된 상태였다 — 제거.
 
-import { store, genId, type AppUser, type UserRole } from './store';
+import { store, type AppUser, type UserRole } from './store';
 
-/** 전체 페이지·사용자 관리 접근 가능한 관리자 목록 */
+/** 전체 페이지·사용자 관리 접근 가능한 관리자 목록 (server/users.ts 와 같아야 한다) */
 export const ADMIN_EMAILS = ['wonyoung@atlm.kr', 'wonyoung@atlm.co.kr', 'saintluxpgw@bgrow.co.kr'];
 export const ADMIN_EMAIL = ADMIN_EMAILS[0]; // 하위 호환
 export function isAdminEmail(email?: string | null): boolean {
   return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
-// 간단한 해시 (Phase 1 임시용)
-function simpleHash(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + ch;
-    hash |= 0;
-  }
-  return Math.abs(hash).toString(36);
-}
-
-/** 사용자 관리 화면에서 비밀번호 해시 생성용 */
-export function hashPassword(plain: string): string {
-  return simpleHash(plain);
-}
-
-
-
 // ─────────────────────────────────────────────────────────────
-//  자동 마이그레이션 — 기기별 최초 1회 기존 데모 계정 삭제
+//  예전 로컬 계정 정리 — 기기에 남은 해시 사본을 지운다
 // ─────────────────────────────────────────────────────────────
 const AUTH_VERSION_KEY = 'auth_version';
-const CURRENT_VERSION = '2026-06-01-pwreset';
+const CURRENT_VERSION = '2026-10-07-server-only';
 
-function runMigrationIfNeeded(): void {
-  const currentVersion = localStorage.getItem(AUTH_VERSION_KEY);
-  if (currentVersion !== CURRENT_VERSION) {
-    // 기존 데모 계정 / 세션 정리
-    localStorage.removeItem('users');
-    localStorage.removeItem('currentUser');
-    localStorage.setItem(AUTH_VERSION_KEY, CURRENT_VERSION);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-//  기본 계정 초기화 (최초 1회)
-// ─────────────────────────────────────────────────────────────
 export function initDefaultUsers(): void {
-  runMigrationIfNeeded();
-
-  const existing = store.getUsers();
-  if (existing.length > 0) {
-    // 캐시/마이그레이션 타이밍과 무관하게 대표 계정 비번을 항상 최신값으로 보정
-    // (비번: atlm2026 → simpleHash = '5a33sm')
-    const rep = existing.find(u => u.email === 'wonyoung@atlm.kr');
-    if (rep && rep.passwordHash !== '5a33sm') {
-      store.updateUser(rep.id, { passwordHash: '5a33sm' });
-    }
-    return;
-  }
-
-  // passwordHash = simpleHash(평문비밀번호) 결과를 사전 계산한 값
-  // 평문은 10_팀원비밀번호_대표님보관용.md 참조
-  const defaults: Omit<AppUser, 'id' | 'createdAt'>[] = [
-    { email: 'wonyoung@atlm.kr',      passwordHash: '5a33sm', name: '이원영',       role: '대표',         isActive: true }, // 비번: atlm2026 (2026-06-01 재설정)
-    { email: 'pm@atlm.kr',            passwordHash: '27io5c', name: '생산관리팀장',  role: '생산관리팀장',  isActive: true },
-    { email: 'mgr@atlm.kr',           passwordHash: 'xkvehy', name: '부관리 주임',   role: '부관리 주임',   isActive: true },
-    { email: 'staff@atlm.kr',         passwordHash: '8nuuz1', name: '사원',         role: '사원',         isActive: true },
-    { email: 'sales@atlm.kr',         passwordHash: 'fse155', name: '영업과장',     role: '영업과장',     isActive: true },
-  ];
-
-  for (const d of defaults) {
-    store.addUser({ ...d, id: genId(), createdAt: new Date().toISOString() });
+  if (localStorage.getItem(AUTH_VERSION_KEY) !== CURRENT_VERSION) {
+    // 예전 버전이 깔아 둔 기본 계정(해시 포함)을 지운다. 세션은 서버 쿠키로 다시 이어진다
+    // 실제 키는 store.ts KEYS — ames_users 에 예전 해시 사본이 들어 있다 (코덱스 지적)
+    // 로그인 화면에서만 불리므로 ames_current_user 를 지워도 쓰던 세션이 끊기지 않는다
+    for (const k of ['ames_users', 'ames_current_user', 'users', 'currentUser']) localStorage.removeItem(k);
+    localStorage.setItem(AUTH_VERSION_KEY, CURRENT_VERSION);
   }
 }
 
 export async function login(email: string, password: string): Promise<AppUser | null> {
   const normEmail = email.trim().toLowerCase();
-
-  // 1) 서버 검증 로그인 — 성공 시 12시간 세션 토큰 발급 (REST 접근에 필수)
+  // 서버 검증 로그인 — 성공 시 12시간 세션 토큰 발급. 서버가 안 되면 로그인도 안 된다 (로컬 폴백 없음)
+  let res: Response;
   try {
-    const res = await fetch('/api/login', {
+    res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: normEmail, password }),
     });
-    if (res.status === 401) return null;
-    if (res.ok) {
-      const { token, user } = (await res.json()) as { token: string; user: AppUser };
-      localStorage.setItem('erp_token', token);
-      // 로컬 캐시 동기화 (기존 화면들의 store.getUsers() 호환)
-      const local = store.getUsers().find(u => u.email.toLowerCase() === normEmail);
-      if (!local) store.addUser(user);
-      store.setCurrentUser(user);
-      return user;
-    }
-  } catch { /* 서버 불가 → 레거시 폴백 */ }
-
-  // 2) 서버 접속 불가 시에만 레거시 localStorage 폴백 (캐시된 데이터로 조회만 가능)
-  const hash = simpleHash(password);
-  const user = store.getUsers().find(
-    u => u.email.toLowerCase() === normEmail && u.passwordHash === hash && u.isActive,
-  );
-  if (!user) return null;
+  } catch { return null; } // 통신 실패 — 화면이 멈추지 않게 실패로 돌려준다
+  if (!res.ok) return null;
+  const { token, user } = (await res.json()) as { token: string; user: AppUser };
+  localStorage.setItem('erp_token', token);
+  // 로컬 캐시 동기화 (기존 화면들의 store.getUsers() 호환). 서버는 passwordHash 를 빈 값으로 준다
+  const local = store.getUsers().find(u => u.email.toLowerCase() === normEmail);
+  if (!local) store.addUser(user);
   store.setCurrentUser(user);
   return user;
 }

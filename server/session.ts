@@ -77,7 +77,8 @@ router.post('/api/login', async (req: Request, res: Response) => {
     if (!email || !password) { res.status(400).json({ error: 'missing_credentials' }); return; }
 
     const now = Math.floor(Date.now() / 1000);
-    const svcToken = signJwt({ role: 'anon', iss: 'erp-server', exp: now + 60 });
+    // app_users 는 anon 권한을 거뒀다 (password_hash 노출) — 서버 역할로 읽는다
+    const svcToken = signJwt({ role: 'erp_server', iss: 'erp-server', exp: now + 60 });
     const r = await fetch(
       `${POSTGREST_URL}/app_users?email=eq.${encodeURIComponent(email.trim().toLowerCase())}&select=*`,
       { headers: { Authorization: `Bearer ${svcToken}` } },
@@ -120,7 +121,8 @@ router.get('/api/session', async (req: Request, res: Response) => {
     const payload = verifyJwt(token);
     if (!payload || !payload.email) { res.status(401).json({ error: 'no_session' }); return; }
     const now = Math.floor(Date.now() / 1000);
-    const svcToken = signJwt({ role: 'anon', iss: 'erp-server', exp: now + 60 });
+    // app_users 는 anon 권한을 거뒀다 (password_hash 노출) — 서버 역할로 읽는다
+    const svcToken = signJwt({ role: 'erp_server', iss: 'erp-server', exp: now + 60 });
     const r = await fetch(
       `${POSTGREST_URL}/app_users?email=eq.${encodeURIComponent(String(payload.email).toLowerCase())}&select=*`,
       { headers: { Authorization: `Bearer ${svcToken}` } },

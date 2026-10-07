@@ -83,7 +83,8 @@ export async function currentUser(req: Request): Promise<SessionUser | null> {
   const payload = verifyJwt(token);
   if (!payload?.email) return null;
   try {
-    const r = await rest(`app_users?email=eq.${encodeURIComponent(String(payload.email).toLowerCase())}&select=*`);
+    // app_users 는 anon 권한을 거뒀다 (password_hash 노출). 서버 역할로 읽는다
+    const r = await rest(`app_users?email=eq.${encodeURIComponent(String(payload.email).toLowerCase())}&select=*`, { role: 'erp_server' });
     if (!r.ok) return null;
     const u = (await r.json())[0];
     if (!u || !u.is_active) return null;

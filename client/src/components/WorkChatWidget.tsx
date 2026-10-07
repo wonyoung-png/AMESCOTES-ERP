@@ -25,6 +25,7 @@ const EXAMPLES = [
 
 /** AI 쪽 말풍선 첫 줄 — 카드 상태를 사람 말로 */
 function aiLine(c: Card, me: Me | null): string {
+  if (c.status === 'cancelled') return '취소했어요.';
   if (c.created_by !== me?.id) {
     return c.kind === 'request_check' ? `${c.created_by_name}님이 확인을 요청했어요` : `${c.created_by_name}님이 올린 일정이에요. 등록할까요?`;
   }

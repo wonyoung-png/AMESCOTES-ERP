@@ -1,8 +1,7 @@
 // 사용자 관리 — 관리자(ADMIN_EMAIL)만 접근. DB(app_users) 기반 초대/비활성/비밀번호 재설정
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-import { getCurrentUser, hashPassword, isAdminEmail, ADMIN_EMAILS } from '@/lib/auth';
+import { getCurrentUser, isAdminEmail, ADMIN_EMAILS } from '@/lib/auth';
 import type { UserRole } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,18 +35,25 @@ interface DbUser {
 const ROLES: UserRole[] = ['대표', '생산관리팀장', '부관리 주임', '영업과장', '사원'];
 const TEAMS = ['국내영업', '해외영업', '비주얼컨텐츠', '디자인', '생산', '마케팅', '물류CS'];
 
-async function saveOrg(id: string, patch: Partial<Pick<DbUser, 'team' | 'rank' | 'position'>>) {
-  const { error } = await supabase.from('app_users').update(patch).eq('id', id);
-  if (error) throw error;
+// app_users 는 서버 API 로만 읽고 쓴다. 브라우저가 DB 에 직접 붙으면 로그인 없이도
+// 전 직원의 비밀번호 해시가 보였다. 관리자 여부도 서버가 다시 확인한다 (server/users.ts)
+async function api(path: string, method = 'GET', body?: unknown) {
+  const r = await fetch(path, {
+    method, credentials: 'include',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error || `HTTP ${r.status}`), { code: j.error, status: r.status });
+  return j;
+}
+
+async function saveOrg(id: string, patch: Partial<Pick<DbUser, 'team' | 'rank' | 'position' | 'is_active'>>) {
+  await api(`/api/users/${encodeURIComponent(id)}`, 'PATCH', patch);
 }
 
 async function fetchUsers(): Promise<DbUser[]> {
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('*')
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as DbUser[];
+  return (await api('/api/users')).items as DbUser[];
 }
 
 export default function UserManagement() {
@@ -107,22 +113,15 @@ export default function UserManagement() {
     if (users.some(u => u.email.toLowerCase() === email)) { toast.error('이미 등록된 이메일입니다'); return; }
     setSaving(true);
     try {
-      const { error } = await supabase.from('app_users').insert({
-        id: email,
-        email,
-        name,
-        role: invite.role,
-        password_hash: hashPassword(invite.password),
-        is_active: true,
-      });
-      if (error) throw error;
+      // 해시는 서버에서 만든다
+      await api('/api/users', 'POST', { email, name, role: invite.role, password: invite.password });
       toast.success(`${name} 계정을 만들었습니다 — 이메일과 임시 비밀번호를 직접 전달하세요`);
       setInviteOpen(false);
       setInvite({ name: '', email: '', role: '사원', password: '' });
       refresh();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error('계정 생성에 실패했습니다');
+      toast.error(e?.code === 'exists' ? '이미 등록된 이메일입니다' : '계정 생성에 실패했습니다');
     } finally {
       setSaving(false);
     }
@@ -130,8 +129,8 @@ export default function UserManagement() {
 
   const handleToggleActive = async (u: DbUser) => {
     if (isAdminEmail(u.email)) { toast.error('관리자 계정은 비활성화할 수 없습니다'); return; }
-    const { error } = await supabase.from('app_users').update({ is_active: !u.is_active }).eq('id', u.id);
-    if (error) { toast.error('변경 실패'); return; }
+    try { await saveOrg(u.id, { is_active: !u.is_active }); }
+    catch { toast.error('변경 실패'); return; }
     toast.success(`${u.name} — ${u.is_active ? '비활성화됨 (로그인 차단)' : '활성화됨'}`);
     refresh();
   };
@@ -141,11 +140,7 @@ export default function UserManagement() {
     if (resetPassword.length < 6) { toast.error('비밀번호는 6자 이상으로 하세요'); return; }
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('app_users')
-        .update({ password_hash: hashPassword(resetPassword) })
-        .eq('id', resetTarget.id);
-      if (error) throw error;
+      await api(`/api/users/${encodeURIComponent(resetTarget.id)}/password`, 'POST', { password: resetPassword });
       toast.success(`${resetTarget.name} 비밀번호를 재설정했습니다`);
       setResetTarget(null);
       setResetPassword('');

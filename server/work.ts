@@ -225,6 +225,21 @@ ${esc(cards.map(fmtCard).join('\n')) || '(없음)'}
   }
 }
 
+/**
+ * 카드를 누가 맡나. 올릴 때와 사람이 종류를 바꿀 때 같은 규칙을 쓴다.
+ *  확인 요청 → 쓴 사람의 팀장 (팀장이 쓰면 대표). 받을 사람이 없거나 대표가 쓴 것이면 본인 할 일로
+ *  할 일     → 쓴 사람
+ */
+function routeFor(kind: Kind, author: Member, all: Member[]): { kind: Kind; owner?: Member } {
+  if (kind === 'request_check') {
+    const leads = leadersOf(author.team, all).filter(m => m.id !== author.id);
+    const a = leads[0] || leadersOf('', all).find(m => m.id !== author.id);
+    if (!a || isBoss(author)) return { kind: 'todo', owner: author };
+    return { kind, owner: a };
+  }
+  return { kind, owner: kind === 'todo' ? author : undefined };
+}
+
 // ───────────────────────── 올리기
 
 router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
@@ -255,15 +270,10 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
     if (kind === 'question' && !parsed.answer) parsed.answer = await answer(me, text, all);
 
     // 확인 요청이면 팀장이 답할 사람이다. 팀장 본인이 쓴 것이면 대표에게 올린다
-    let assignee: Member | undefined;
-    if (kind === 'request_check') {
-      const leads = leadersOf(me.team, all).filter(m => m.id !== me.id);
-      assignee = leads[0] || leadersOf('', all).find(m => m.id !== me.id);
-      // 물어볼 윗사람이 없으면(대표 본인 등) 본인 할 일이다. 아무도 못 받는 요청을 만들지 않는다
-      if (!assignee || isBoss(me)) { kind = 'todo'; assignee = undefined; }
-    }
-    // 할 일은 쓴 사람 앞으로 — "내 할 일"에 뜨고 완료를 누를 때까지 남는다
-    const owner = kind === 'todo' ? me : assignee;
+    const routed = routeFor(kind, me, all);
+    kind = routed.kind;
+    const owner = routed.owner;
+    const assignee = kind === 'request_check' ? owner : undefined;
 
     const card = {
       id: genId('wc'),
@@ -353,6 +363,76 @@ router.post('/api/work/:id/reply', requireUser(), async (req: Request, res: Resp
     res.json({ ok: true });
   } catch (e) {
     console.error('POST /api/work/:id/reply 실패:', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ───────────────────────── 종류 바꾸기 · 취소 (AI 가 잘못 가른 것을 사람이 바로잡는다)
+
+/** 쓴 사람, 그 팀 팀장, 대표만 */
+const canManage = (card: any, me: Member, leader: boolean) => card.created_by === me.id || leader || isBoss(me);
+
+router.post('/api/work/:id/kind', requireUser(), async (req: Request, res: Response) => {
+  try {
+    const ctx = await loadForActor(req, res);
+    if (!ctx) return;
+    const { all, me, card, leader } = ctx;
+    if (!canManage(card, me, leader)) { res.status(403).json({ error: 'forbidden' }); return; }
+    const want = String((req.body ?? {}).kind || '') as Kind;
+    if (!KINDS.includes(want) || want === card.kind) { res.status(400).json({ error: 'bad_kind' }); return; }
+    // 끝난 카드는 못 바꾼다 — 단 질문은 처음부터 '끝남'으로 저장되니 예외 (잘못 질문으로 간 공유·할 일 구제)
+    if (card.status !== 'open' && card.kind !== 'question') { res.status(409).json({ error: 'already' }); return; }
+
+    // 담당은 쓴 사람 기준으로 다시 정한다 (팀장이 팀원 카드를 바꿔도 팀원의 할 일이 된다)
+    const author = all.find(m => m.id === card.created_by) || me;
+    const routed = routeFor(want, author, all);
+    const parsed = { ...(card.parsed || {}) };
+    if (routed.kind === 'schedule' && !cleanTeams(parsed.shareTeams, card.team)?.length) {
+      parsed.shareTeams = SCHEDULE_SHARE.filter(x => x !== card.team);
+    }
+    if (routed.kind === 'question' && !parsed.answer) parsed.answer = await answer(author, card.raw_text, all);
+
+    const now = new Date().toISOString();
+    const r = await restAsServer(`work_cards?id=eq.${encodeURIComponent(card.id)}&status=eq.${encodeURIComponent(card.status)}`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        kind: routed.kind, parsed,
+        status: routed.kind === 'question' ? 'done' : 'open',
+        assignee_id: routed.owner?.id || null, assignee_name: routed.owner?.name || null,
+        updated_at: now,
+      }),
+    });
+    if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
+    if (!(await r.json()).length) { res.status(409).json({ error: 'already' }); return; }
+
+    if (routed.kind === 'request_check' && routed.owner) {
+      await notify([{ user_id: routed.owner.id, card_id: card.id, title: `${author.name} — 확인 요청`, body: card.raw_text }]);
+    }
+    res.json({ ok: true, kind: routed.kind });
+  } catch (e) {
+    console.error('POST /api/work/:id/kind 실패:', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+/** 취소 — 지우지 않고 표시만 한다. 기록은 남아야 나중에 "왜 안 했지?"를 답할 수 있다 */
+router.post('/api/work/:id/cancel', requireUser(), async (req: Request, res: Response) => {
+  try {
+    const ctx = await loadForActor(req, res);
+    if (!ctx) return;
+    const { me, card, leader } = ctx;
+    if (!canManage(card, me, leader)) { res.status(403).json({ error: 'forbidden' }); return; }
+    // 끝난 카드(캘린더에 이미 올라간 일정 등)는 여기서 못 되돌린다
+    const now = new Date().toISOString();
+    const r = await restAsServer(`work_cards?id=eq.${encodeURIComponent(card.id)}&status=eq.open`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ status: 'cancelled', done_by_name: me.name, done_at: now, updated_at: now }),
+    });
+    if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
+    if (!(await r.json()).length) { res.status(409).json({ error: 'already' }); return; }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/work/:id/cancel 실패:', e);
     res.status(500).json({ error: 'internal' });
   }
 });
