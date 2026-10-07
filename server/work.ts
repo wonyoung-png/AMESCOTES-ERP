@@ -10,7 +10,7 @@ import { requireUser, requireRole, userOf, restAsServer, type SessionUser } from
 
 const router = Router();
 
-const KINDS = ['request_check', 'schedule', 'share', 'question'] as const;
+const KINDS = ['request_check', 'todo', 'schedule', 'share', 'question'] as const;
 type Kind = typeof KINDS[number];
 
 /**
@@ -90,13 +90,15 @@ async function classify(opts: {
 - 프로필의 약어는 풀어서 title·products 에 적는다.
 
 종류(kind):
-- request_check : 결정·확인을 윗사람에게 받아야 한다 ("팀장님 확인 필요", "결정 못함", "어떻게 할까요")
+- request_check : 결정·확인을 다른 사람(윗사람)에게 받아야 한다 ("팀장님 확인 필요", "어떻게 할까요")
+- todo          : 쓴 사람 본인이 해야 할 일·마감 ("나 내일까지 W컨셉 참여 결정해야 함", "금요일까지 견적 보내야 함")
+                  — 본인이 결정·처리하는 일이면 남에게 묻는 게 아니라 todo 다. 쓴 사람이 대표면 결정은 늘 본인 것이다.
 - schedule      : 날짜가 있는 기획전·할인·행사 일정이다 ("10/20 W컨셉 기획전 20%")
 - share         : 한 일을 단정적으로 알리는 문장 ("29CM 샘플 3개 발송 완료", "센텀 매장 VMD 교체함", "거래처에 견적 보냄")
                   — 의문·확인·부탁 표현("~했는지 알려줘", "~확인해줘")은 share 가 아니다
 - question      : 회사 일을 묻거나 알려 달라는 말 ("W컨셉 기획전 언제야?", "배송됐는지 알려줘"),
                   그리고 인사·잡담·한두 단어처럼 뜻을 알 수 없는 말 ("뭐해", "안녕", "뭐를") — 이건 팀에 공유하면 안 된다
-우선순위: 윗사람 확인·결정이 필요하면 request_check > 날짜 있는 일정이면 schedule > 단정적 완료 보고면 share > 나머지·애매하면 question.
+우선순위: 다른 사람의 확인·결정이 필요하면 request_check > 본인 할 일·마감이면 todo > 날짜 있는 기획전·행사 일정이면 schedule > 단정적 완료 보고면 share > 나머지·애매하면 question.
 
 채널은 이 중 하나로 맞춘다: ${CHANNELS.join(' | ')} (없으면 비운다)
 브랜드가 에탈루프(AETALOOF)면 workspace=AETALOOF, 아니면 LUMEN.
@@ -111,7 +113,7 @@ ${openList}
 - title 은 캘린더에 보일 짧은 이름이다. 예) "W컨셉 기획전 · 파니에 토트 20%"
 
 JSON 하나만 출력한다. 설명 금지.
-{"kind":"...","relatedId":null,"parsed":{"summary":"","title":"","channel":"","startDate":"","endDate":"","discountRate":null,"products":"","workspace":"LUMEN"}}`;
+{"kind":"...","relatedId":null,"parsed":{"summary":"","title":"","dueDate":"","channel":"","startDate":"","endDate":"","discountRate":null,"products":"","workspace":"LUMEN"}}`;
 
   try {
     const r = await new Anthropic({ apiKey: key }).messages.create({
@@ -227,7 +229,9 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
       `&select=id,raw_text,kind&order=created_at.desc&limit=20`);
     const open = or.ok ? await or.json() : [];
 
-    const { kind, parsed, relatedId: rid } = await classify({ text, me, open });
+    const c = await classify({ text, me, open });
+    const { parsed, relatedId: rid } = c;
+    let kind = c.kind;
     // 질문은 할 일이 아니라 대화다. 답을 붙여 끝난 카드로 남긴다 (나중에 "누가 뭘 물었나"도 기록이 된다)
     const relatedId = kind === 'question' ? null : rid;
     if (kind === 'question' && !parsed.answer) parsed.answer = await answer(me, text, all);
@@ -237,14 +241,18 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
     if (kind === 'request_check') {
       const leads = leadersOf(me.team, all).filter(m => m.id !== me.id);
       assignee = leads[0] || leadersOf('', all).find(m => m.id !== me.id);
+      // 물어볼 윗사람이 없으면(대표 본인 등) 본인 할 일이다. 아무도 못 받는 요청을 만들지 않는다
+      if (!assignee || isBoss(me)) { kind = 'todo'; assignee = undefined; }
     }
+    // 할 일은 쓴 사람 앞으로 — "내 할 일"에 뜨고 완료를 누를 때까지 남는다
+    const owner = kind === 'todo' ? me : assignee;
 
     const card = {
       id: genId('wc'),
       created_by: me.id, created_by_name: me.name, team: me.team,
       raw_text: text, kind, parsed,
       status: kind === 'question' ? 'done' : 'open',
-      assignee_id: assignee?.id || null, assignee_name: assignee?.name || null,
+      assignee_id: owner?.id || null, assignee_name: owner?.name || null,
       related_id: relatedId,
     };
     const r = await restAsServer('work_cards', {
@@ -302,7 +310,10 @@ router.post('/api/work/:id/reply', requireUser(), async (req: Request, res: Resp
     const ctx = await loadForActor(req, res);
     if (!ctx) return;
     const { me, card, leader } = ctx;
-    if (!(card.assignee_id === me.id || leader || isBoss(me))) { res.status(403).json({ error: 'forbidden' }); return; }
+    // 받은 사람이 답한다. 팀장·대표는 받은 사람이 자리에 없을 때 대신 답할 수 있다(의도된 설계).
+    // 다만 쓴 사람이 자기 요청에 스스로 답해 닫는 건 막는다
+    const proxy = (leader || isBoss(me)) && card.created_by !== me.id;
+    if (card.created_by === me.id || !(card.assignee_id === me.id || proxy)) { res.status(403).json({ error: 'forbidden' }); return; }
     // 일정 카드를 답변으로 닫으면 캘린더 등록 없이 끝나버린다 (코덱스 지적)
     if (card.kind !== 'request_check') { res.status(400).json({ error: 'not_request' }); return; }
     const text = String((req.body ?? {}).text || '').trim();
@@ -324,6 +335,36 @@ router.post('/api/work/:id/reply', requireUser(), async (req: Request, res: Resp
     res.json({ ok: true });
   } catch (e) {
     console.error('POST /api/work/:id/reply 실패:', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ───────────────────────── 할 일 완료
+
+router.post('/api/work/:id/done', requireUser(), async (req: Request, res: Response) => {
+  try {
+    const ctx = await loadForActor(req, res);
+    if (!ctx) return;
+    const { me, card, leader } = ctx;
+    if (card.kind !== 'todo') { res.status(400).json({ error: 'not_todo' }); return; }
+    if (!(card.created_by === me.id || card.assignee_id === me.id || leader || isBoss(me))) {
+      res.status(403).json({ error: 'forbidden' }); return;
+    }
+    const note = String((req.body ?? {}).note || '').trim().slice(0, 500);
+    const now = new Date().toISOString();
+    const r = await restAsServer(`work_cards?id=eq.${encodeURIComponent(card.id)}&status=eq.open`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        status: 'done', done_by_name: me.name, done_at: now, updated_at: now,
+        // 어떻게 정했는지 한 줄 남기면 나중에 "W컨셉 참여했어?"에 답할 근거가 된다
+        ...(note ? { reply_text: note, replied_by_name: me.name, replied_at: now } : {}),
+      }),
+    });
+    if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
+    if (!(await r.json()).length) { res.status(409).json({ error: 'already' }); return; }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/work/:id/done 실패:', e);
     res.status(500).json({ error: 'internal' });
   }
 });

@@ -31,6 +31,10 @@ function aiLine(c: Card, me: Me | null): string {
   switch (c.kind) {
     case 'request_check':
       return c.status === 'open' ? `${c.assignee_name || '팀장'}님께 확인 요청을 보냈어요. 답이 오면 알려드릴게요.` : '답이 왔어요.';
+    case 'todo':
+      return c.status === 'open'
+        ? `할 일로 적어 뒀어요${c.parsed?.dueDate ? ` (마감 ${c.parsed.dueDate})` : ''}. 업무 피드 '내 할 일'에도 올렸어요. 끝나면 완료를 눌러 주세요.`
+        : '완료했어요.';
     case 'schedule':
       return c.status === 'open' ? '일정으로 읽었어요. 값 확인하고 등록해 주세요.' : '운영캘린더에 등록했어요.';
     case 'share':
@@ -134,7 +138,8 @@ export default function WorkChatWidget() {
     .filter(c => c.created_by === me?.id || isTodo(c, me))
     .slice(0, 60)
     .sort((a, b) => a.created_at.localeCompare(b.created_at)), [items, me]);
-  const todo = useMemo(() => items.filter(c => isTodo(c, me) && c.created_by !== me?.id).length, [items, me]);
+  // 버튼 숫자 = 업무 피드 '내 할 일'과 같은 기준 (내 할 일·받은 확인 요청·등록 안 한 일정)
+  const todo = useMemo(() => items.filter(c => isTodo(c, me)).length, [items, me]);
 
   useEffect(() => { if (open) endRef.current?.scrollIntoView({ block: 'end' }); }, [open, thread.length, pending]);
 

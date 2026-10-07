@@ -3,14 +3,14 @@
  * 답변·캘린더 등록 버튼이 두 군데서 다르게 동작하면 안 되므로 한 곳에 둔다.
  */
 import { useState } from 'react';
-import { Clock, MessageSquare, CalendarPlus, Share2, HelpCircle } from 'lucide-react';
+import { Clock, MessageSquare, CalendarPlus, Share2, HelpCircle, ListTodo, Check } from 'lucide-react';
 import { Link } from 'wouter';
 import { toast } from 'sonner';
 import { fetchCampaignsSB } from '@/lib/campaignQueries';
 
 export type Card = {
   id: string; created_at: string; created_by: string; created_by_name: string; team: string;
-  raw_text: string; kind: 'request_check' | 'schedule' | 'share' | 'question'; parsed: Record<string, any>;
+  raw_text: string; kind: 'request_check' | 'todo' | 'schedule' | 'share' | 'question'; parsed: Record<string, any>;
   confirmed_payload?: Record<string, any> | null;
   status: 'open' | 'done'; assignee_id?: string | null; assignee_name?: string | null;
   reply_text?: string | null; replied_by_name?: string | null; related_id?: string | null;
@@ -27,6 +27,7 @@ export const PROFILE_MAX = 1000;
 
 export const KIND: Record<Card['kind'], { label: string; icon: typeof Clock; cls: string }> = {
   request_check: { label: '확인 요청', icon: MessageSquare, cls: 'text-[var(--system-orange)]' },
+  todo: { label: '할 일', icon: ListTodo, cls: 'text-primary' },
   schedule: { label: '일정', icon: CalendarPlus, cls: 'text-[var(--system-blue)]' },
   share: { label: '공유', icon: Share2, cls: 'text-muted-foreground' },
   question: { label: '질문', icon: HelpCircle, cls: 'text-muted-foreground' },
@@ -82,7 +83,12 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
     startDate: p.startDate || '', endDate: p.endDate || '', discountRate: p.discountRate ?? '',
   });
 
-  const canReply = c.kind === 'request_check' && c.status === 'open' && !!me && (c.assignee_id === me.id || canAct);
+  // 답변칸은 요청을 받은 사람 몫이다. 쓴 사람 본인에게 띄우면 자기 질문에 자기가 답하게 된다
+  const canReply = c.kind === 'request_check' && c.status === 'open' && !!me && c.created_by !== me.id &&
+    (c.assignee_id === me.id || canAct);
+  const canFinish = c.kind === 'todo' && c.status === 'open' && !!me &&
+    (c.created_by === me.id || c.assignee_id === me.id || canAct);
+  const [note, setNote] = useState('');
   const canConfirm = c.kind === 'schedule' && c.status === 'open' && !!me && (c.created_by === me.id || canAct);
 
   const post = async (path: string, body: unknown, ok: string) => {
@@ -121,6 +127,22 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
     <>
       {c.kind === 'question' && p.answer && (
         <p className="text-sm mt-1 whitespace-pre-wrap break-words">{p.answer}</p>
+      )}
+      {c.kind === 'todo' && p.dueDate && (
+        <p className={`text-xs mt-1 ${c.status === 'open' && p.dueDate <= new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) ? 'text-[var(--system-red)]' : 'text-muted-foreground'}`}>
+          마감 {p.dueDate}{c.status === 'done' && c.done_by_name ? ` · ${c.done_by_name} 완료` : ''}
+        </p>
+      )}
+      {canFinish && (
+        <div className="flex gap-2 mt-2">
+          <input value={note} onChange={e => setNote(e.target.value)} placeholder="결과 한 줄 (선택, 예: 참여하기로 함)"
+            className={`flex-1 ${input}`} />
+          <button type="button" disabled={busy}
+            onClick={() => post('done', { note }, '완료했습니다')}
+            className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm flex items-center gap-1 disabled:opacity-40">
+            <Check className="w-4 h-4" />완료
+          </button>
+        </div>
       )}
       {c.kind === 'request_check' && c.assignee_name && c.status === 'open' && (
         <p className="text-xs text-muted-foreground mt-1">→ {c.assignee_name}님 확인 대기</p>
