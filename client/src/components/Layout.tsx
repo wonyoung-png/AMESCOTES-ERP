@@ -9,6 +9,9 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import NotificationBell from '@/components/NotificationBell';
 import WorkChatWidget from '@/components/WorkChatWidget';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import type { Workspace } from '@/lib/phase1';
 import {
   BarChart3, Zap, Package, ClipboardList, FlaskConical, Factory,
@@ -235,7 +238,7 @@ const SideLink = React.memo(function SideLink({ item, active, fav, collapsed, on
 });
 
 export default function Layout({ children, onLogout }: LayoutProps) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   // 사이드바 그룹 접기 — 접힌 그룹 라벨을 저장한다
   const [closedGroups, setClosedGroups] = useState<string[]>(() => {
@@ -519,12 +522,28 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             <span className="hidden sm:inline text-muted-foreground">|</span>
             <span className="hidden sm:inline">CNY {settings.cnyKrw.toLocaleString()}</span>
             {currentUser && (
-              <div className="flex items-center gap-1.5 ml-2">
-                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
-                  {currentUser.name.slice(0, 1)}
-                </div>
-                <span className="text-foreground font-medium hidden sm:inline">{currentUser.name}</span>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" aria-label="내 계정 메뉴"
+                    className="flex items-center gap-1.5 ml-2 rounded-md px-1 py-0.5 hover:bg-[var(--fill-quaternary)]">
+                    <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
+                      {currentUser.name.slice(0, 1)}
+                    </div>
+                    <span className="text-foreground font-medium hidden sm:inline">{currentUser.name}</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  {/* 업무 비서 위젯이 이 이벤트를 받아 프로필 화면을 연다 */}
+                  <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event('work:open-profile'))}>
+                    내 업무 프로필
+                  </DropdownMenuItem>
+                  {isAdminEmail(currentUser.email) && (
+                    <DropdownMenuItem onSelect={() => navigate('/users')}>사용자 관리</DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={handleLogout} className="text-[var(--system-red)]">로그아웃</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </header>

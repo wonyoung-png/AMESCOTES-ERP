@@ -130,7 +130,14 @@ export default function WorkChatWidget() {
     load();
     const t = setInterval(load, 60_000);
     window.addEventListener('work:changed', load);
-    return () => { clearInterval(t); window.removeEventListener('work:changed', load); };
+    // 상단 이름 메뉴의 "내 업무 프로필"
+    const openProfile = () => { setOpen(true); setShowProfile(true); };
+    window.addEventListener('work:open-profile', openProfile);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('work:changed', load);
+      window.removeEventListener('work:open-profile', openProfile);
+    };
   }, [load]);
   useEffect(() => { if (open) load(); }, [open, load]);
 
