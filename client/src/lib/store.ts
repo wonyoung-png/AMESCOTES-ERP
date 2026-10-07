@@ -1524,6 +1524,12 @@ export const store = {
   // Expenses
   getExpenses: () => getAll<Expense>(KEYS.expenses),
   setExpenses: (v: Expense[]) => saveExpenses( v),
+  /**
+   * 서버에서 막 읽어온 것을 화면용으로만 채워 넣는다.
+   * setExpenses 를 쓰면 읽어온 전부를 서버로 되돌려 써서, 그 사이 남이 고친 것을
+   * 오래된 값으로 덮고 모든 행의 updated_at 이 바뀐다 (코덱스 지적).
+   */
+  hydrateExpenses: (v: Expense[]) => setAll(KEYS.expenses, v),
   addExpense: (v: Expense) => { const a = getAll<Expense>(KEYS.expenses); a.push(v); saveExpenses( a); },
   updateExpense: (id: string, u: Partial<Expense>) => { const a = getAll<Expense>(KEYS.expenses); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; saveExpenses( a); } },
   deleteExpense: (id: string) => saveExpenses( getAll<Expense>(KEYS.expenses).filter(x => x.id !== id)),

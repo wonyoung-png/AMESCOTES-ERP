@@ -230,7 +230,9 @@ router.post('/api/captures/:id/approve', requireRole(...APPROVER_ROLES), async (
         detail.includes('already:')            ? '이미 처리된 접수입니다'
         : detail.includes('not_found')          ? '접수를 찾지 못했습니다'
         : detail.includes('style_name_required')? '품명을 넣어주세요'
-        : detail.includes('kind_not_ready')     ? '지금은 샘플만 전표를 만듭니다'
+        : detail.includes('kind_not_ready')     ? '이 종류는 아직 전표를 만들지 않습니다'
+        : detail.includes('amount_required')    ? '금액을 넣어주세요'
+        : detail.includes('description_required')? '무엇을 샀는지 적어주세요'
         : '';
       // 서버 로그에도 남긴다 — 화면만 보고는 원인을 못 쫓는다
       console.error(`[capture] 승인 실패 ${capId} (${r.status}):`, detail.slice(0, 500));

@@ -27,13 +27,14 @@ type Capture = {
 
 const KINDS = [
   { v: 'sample', label: '샘플 제작', ready: true },
-  { v: 'material', label: '자재 구매', ready: false },
+  { v: 'material', label: '자재 구매', ready: true },
   { v: 'delivery', label: '메인 납품', ready: false },
   { v: 'billing', label: '바이어 청구', ready: false },
 ] as const;
 
 const STAGES = ['1차', '2차', '3차', '4차', '최종승인', '반려'];
 const SEASONS = ['25FW', '26SS', '26FW', '27SS'];
+const PAY_TYPES = ['법인카드', '계좌이체', '현금'];
 
 export default function CaptureInbox() {
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
@@ -65,9 +66,20 @@ export default function CaptureInbox() {
 
   const approve = async (c: Capture) => {
     const kind = edit[c.id]?.kind ?? c.kind;
-    if (kind !== 'sample') { toast.error('지금은 샘플만 전표를 만듭니다'); return; }
+    if (kind !== 'sample' && kind !== 'material') {
+      toast.error('지금은 샘플 제작과 자재 구매만 전표를 만듭니다');
+      return;
+    }
     const payload: Record<string, any> = { ...(c.parsed || {}), ...(edit[c.id] || {}), kind };
-    if (!payload.styleName) { toast.error('품명을 넣어주세요'); return; }
+    if (!String(payload.styleName || '').trim()) {
+      toast.error(kind === 'material' ? '무엇을 샀는지 적어주세요' : '품명을 넣어주세요');
+      return;
+    }
+    // 금액 없는 지출결의는 의미가 없다. 서버에서도 막지만 여기서 먼저 잡아준다
+    if (kind === 'material' && !(Number(payload.amountKrw) > 0)) {
+      toast.error('금액을 넣어주세요');
+      return;
+    }
     setBusy(c.id);
     try {
       const r = await fetch(`/api/captures/${c.id}/approve`, {
@@ -81,7 +93,16 @@ export default function CaptureInbox() {
         toast.error(j.message || j.detail || j.error || '승인 실패', { duration: 10000 });
         return;
       }
-      toast.success('승인 — 샘플 기록이 만들어졌습니다');
+      toast.success(kind === 'material' ? '승인 — 지출결의가 만들어졌습니다' : '승인 — 샘플 기록이 만들어졌습니다');
+      // 지출결의는 서버가 정본인데 앱이 시작할 때만 내려받는다 (syncFromSupabase).
+      // 지금 내려받아 넣어주지 않으면 방금 만든 전표가 지출결의 화면에 안 보인다
+      if (kind === 'material') {
+        try {
+          const { fetchExpensesSB } = await import('@/lib/expenseQueries');
+          const { store } = await import('@/lib/store');
+          store.hydrateExpenses(await fetchExpensesSB());
+        } catch { /* 못 내려받아도 다음에 앱을 열면 보인다 */ }
+      }
       setEdit(p => { const { [c.id]: _drop, ...rest } = p; return rest; });
       refetch();
     } catch { toast.error('승인 실패'); }
@@ -192,52 +213,80 @@ export default function CaptureInbox() {
                         ))}
                       </div>
 
+                      {/* 종류에 따라 묻는 것이 다르다. 자재 구매에 샘플 단계·시즌을 묻지 않는다 */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         <div>
-                          <label className={label}>브랜드</label>
-                          <select className={field}
-                            value={`${valOf(c, 'buyerId')}|${valOf(c, 'brandCode')}`}
-                            onChange={e => {
-                              const hit = brandOptions.find(b => b.key === e.target.value);
-                              setVal(c.id, 'buyerId', hit?.buyerId || '');
-                              setVal(c.id, 'brandCode', hit?.brandCode || '');
-                              setVal(c.id, 'brand', hit?.label || '');
-                            }}>
-                            <option value="|">— 고르세요 —</option>
-                            {brandOptions.map(b => <option key={b.key} value={b.key}>{b.label}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className={label}>품명 *</label>
+                          <label className={label}>{kind === 'material' ? '품목 *' : '품명 *'}</label>
                           <input className={field} value={valOf(c, 'styleName')}
+                            placeholder={kind === 'material' ? '예) 양가죽 10마' : '예) 토트백'}
                             onChange={e => setVal(c.id, 'styleName', e.target.value)} />
                         </div>
                         <div>
-                          <label className={label}>컬러</label>
-                          <input className={field} value={valOf(c, 'color')}
-                            onChange={e => setVal(c.id, 'color', e.target.value)} />
-                        </div>
-                        <div>
-                          <label className={label}>단계</label>
-                          <select className={field} value={valOf(c, 'stage') || '1차'}
-                            onChange={e => setVal(c.id, 'stage', e.target.value)}>
-                            {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className={label}>시즌</label>
-                          <select className={field} value={valOf(c, 'season') || ''}
-                            onChange={e => setVal(c.id, 'season', e.target.value)}>
-                            <option value="">—</option>
-                            {SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className={label}>금액 (원)</label>
+                          <label className={label}>금액 (원){kind === 'material' ? ' *' : ''}</label>
                           <input className={field} type="number" inputMode="numeric"
                             value={valOf(c, 'amountKrw') || ''}
                             onChange={e => setVal(c.id, 'amountKrw', e.target.value)} />
                         </div>
+
+                        {kind === 'material' ? (
+                          <>
+                            <div>
+                              <label className={label}>거래처</label>
+                              <input className={field} value={valOf(c, 'vendorName')}
+                                placeholder="예) 가자피혁"
+                                onChange={e => setVal(c.id, 'vendorName', e.target.value)} />
+                            </div>
+                            <div>
+                              <label className={label}>결제수단</label>
+                              <select className={field} value={valOf(c, 'expenseType') || '법인카드'}
+                                onChange={e => setVal(c.id, 'expenseType', e.target.value)}>
+                                {PAY_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className={label}>지출일</label>
+                              <input className={field} type="date" value={valOf(c, 'requestDate') || ''}
+                                onChange={e => setVal(c.id, 'requestDate', e.target.value)} />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <label className={label}>브랜드</label>
+                              <select className={field}
+                                value={`${valOf(c, 'buyerId')}|${valOf(c, 'brandCode')}`}
+                                onChange={e => {
+                                  const hit = brandOptions.find(b => b.key === e.target.value);
+                                  setVal(c.id, 'buyerId', hit?.buyerId || '');
+                                  setVal(c.id, 'brandCode', hit?.brandCode || '');
+                                  setVal(c.id, 'brand', hit?.label || '');
+                                }}>
+                                <option value="|">— 고르세요 —</option>
+                                {brandOptions.map(b => <option key={b.key} value={b.key}>{b.label}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className={label}>컬러</label>
+                              <input className={field} value={valOf(c, 'color')}
+                                onChange={e => setVal(c.id, 'color', e.target.value)} />
+                            </div>
+                            <div>
+                              <label className={label}>단계</label>
+                              <select className={field} value={valOf(c, 'stage') || '1차'}
+                                onChange={e => setVal(c.id, 'stage', e.target.value)}>
+                                {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className={label}>시즌</label>
+                              <select className={field} value={valOf(c, 'season') || ''}
+                                onChange={e => setVal(c.id, 'season', e.target.value)}>
+                                <option value="">—</option>
+                                {SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {canApprove && (
