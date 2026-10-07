@@ -1,0 +1,177 @@
+/**
+ * 업무 비서 — ERP 어느 화면에서든 오른쪽 아래 버튼으로 여는 챗봇.
+ *
+ * 한 줄 쓰면 AI 가 알아서 가른다:
+ *  "팀장님 확인 필요"        → 팀장에게 확인 요청을 보내고 답이 오면 이 대화에 붙는다
+ *  "10/20 W컨셉 20% 예정"   → 일정으로 읽고 대화 안에서 [캘린더 등록]
+ *  "W컨셉 기획전 언제야?"     → 쌓인 기록(업무 카드·운영캘린더)에서 찾아 답한다
+ *
+ * 대화 기록 = 업무 카드다. 따로 채팅 저장소를 두지 않는다.
+ */
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
+import { Link } from 'wouter';
+import { type Card, type Me, CardActions, isTodo, fetchWork, postWork, announceWorkChanged } from '@/components/WorkCardActions';
+
+const EXAMPLES = [
+  'W컨셉 기획전 10/20 파니에 토트 20% 예정',
+  '29CM 기획전 제안 왔는데 진행할지 팀장님 확인 필요',
+  '이번 달 기획전 일정 뭐 있어?',
+];
+
+/** AI 쪽 말풍선 첫 줄 — 카드 상태를 사람 말로 */
+function aiLine(c: Card, me: Me | null): string {
+  if (c.created_by !== me?.id) {
+    return c.kind === 'request_check' ? `${c.created_by_name}님이 확인을 요청했어요` : `${c.created_by_name}님이 올린 일정이에요. 등록할까요?`;
+  }
+  switch (c.kind) {
+    case 'request_check':
+      return c.status === 'open' ? `${c.assignee_name || '팀장'}님께 확인 요청을 보냈어요. 답이 오면 알려드릴게요.` : '답이 왔어요.';
+    case 'schedule':
+      return c.status === 'open' ? '일정으로 읽었어요. 값 확인하고 등록해 주세요.' : '운영캘린더에 등록했어요.';
+    case 'share':
+      return '팀 피드에 공유했어요.';
+    default:
+      return '';
+  }
+}
+
+export default function WorkChatWidget() {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<Card[]>([]);
+  const [me, setMe] = useState<Me | null>(null);
+  const [text, setText] = useState('');
+  const [pending, setPending] = useState<string | null>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  const load = useCallback(async () => {
+    const j = await fetchWork();
+    if (j) { setItems(j.items); setMe(j.me); }
+  }, []);
+
+  // 닫혀 있어도 "내 할 일" 수는 보여야 한다 — 1분마다, 그리고 피드에서 처리했을 때
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 60_000);
+    window.addEventListener('work:changed', load);
+    return () => { clearInterval(t); window.removeEventListener('work:changed', load); };
+  }, [load]);
+  useEffect(() => { if (open) load(); }, [open, load]);
+
+  // 대화 = 내가 쓴 것 + 나한테 온 것(확인 요청·팀원 일정). 오래된 것부터
+  const thread = useMemo(() => items
+    .filter(c => c.created_by === me?.id || isTodo(c, me))
+    .slice(0, 60)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at)), [items, me]);
+  const todo = useMemo(() => items.filter(c => isTodo(c, me) && c.created_by !== me?.id).length, [items, me]);
+
+  useEffect(() => { if (open) endRef.current?.scrollIntoView({ block: 'end' }); }, [open, thread.length, pending]);
+
+  const send = async (t = text) => {
+    const msg = t.trim();
+    if (!msg || pending) return;
+    setText(''); setPending(msg);
+    const card = await postWork(msg);
+    setPending(null);
+    if (!card) { setText(msg); return; }
+    announceWorkChanged();
+  };
+
+  return (
+    <>
+      {!open && (
+        <button
+          type="button" onClick={() => setOpen(true)} aria-label="업무 비서 열기"
+          className="fixed right-4 bottom-20 md:bottom-6 z-30 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:opacity-90"
+        >
+          <MessageCircle className="w-6 h-6" />
+          {todo > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[var(--system-red)] text-white text-[11px] leading-5 text-center">{todo}</span>
+          )}
+        </button>
+      )}
+
+      {open && (
+        <div className="fixed z-40 inset-0 md:inset-auto md:right-6 md:bottom-6 md:w-[400px] md:h-[600px] md:max-h-[calc(100vh-3rem)] bg-card md:rounded-xl md:border border-border shadow-2xl flex flex-col">
+          <div className="h-12 shrink-0 px-4 border-b border-border flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="font-semibold text-sm">업무 비서</span>
+            {me && <span className="text-xs text-muted-foreground truncate">· {me.name}{me.team ? ` (${me.team})` : ''}</span>}
+            <Link href="/work" onClick={() => setOpen(false)} className="ml-auto text-xs text-muted-foreground hover:text-foreground">팀 피드</Link>
+            <button type="button" onClick={() => setOpen(false)} aria-label="닫기" className="p-1 rounded-md text-muted-foreground hover:text-foreground">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
+            {thread.length === 0 && !pending && (
+              <div className="text-sm text-muted-foreground space-y-3 px-1">
+                <p>업무를 한 줄로 쓰세요. 확인이 필요하면 팀장에게, 일정이면 캘린더로 보내고, 물어보면 기록에서 찾아 답합니다.</p>
+                <div className="space-y-1.5">
+                  {EXAMPLES.map(e => (
+                    <button key={e} type="button" onClick={() => setText(e)}
+                      className="block w-full text-left text-xs px-3 py-2 rounded-lg border border-border hover:bg-[var(--fill-quaternary)] text-foreground">
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {thread.map(c => {
+              const mine = c.created_by === me?.id;
+              const line = aiLine(c, me);
+              return (
+                <div key={c.id} className="space-y-1.5">
+                  {mine && (
+                    <div className="flex justify-end">
+                      <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-3 py-2 text-sm whitespace-pre-wrap break-words">{c.raw_text}</div>
+                    </div>
+                  )}
+                  <div className="flex justify-start">
+                    <div className="max-w-[92%] rounded-2xl rounded-bl-sm bg-[var(--fill-quaternary)] px-3 py-2 text-sm">
+                      {line && <p className={mine ? '' : 'font-medium'}>{line}</p>}
+                      {!mine && <p className="text-sm mt-1 break-words">“{c.raw_text}”</p>}
+                      <CardActions c={c} me={me} onDone={announceWorkChanged} />
+                      <p className="text-[11px] text-muted-foreground mt-1">{c.created_at.slice(5, 16).replace('T', ' ')}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {pending && (
+              <div className="space-y-1.5">
+                <div className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-3 py-2 text-sm whitespace-pre-wrap break-words">{pending}</div>
+                </div>
+                <div className="flex justify-start">
+                  <div className="rounded-2xl rounded-bl-sm bg-[var(--fill-quaternary)] px-3 py-2 text-sm text-muted-foreground">읽는 중…</div>
+                </div>
+              </div>
+            )}
+            <div ref={endRef} />
+          </div>
+
+          <div className="shrink-0 border-t border-border p-2 flex items-end gap-2">
+            <textarea
+              value={text}
+              onChange={e => setText(e.target.value)}
+              onKeyDown={e => {
+                // 한글 조합 중 Enter 는 글자 확정이다. 그때 보내면 마지막 글자가 두 번 들어간다
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
+              }}
+              rows={1}
+              placeholder="업무를 한 줄로 쓰거나 물어보세요"
+              className="flex-1 max-h-32 min-h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none outline-none focus:border-primary/50"
+            />
+            <button type="button" onClick={() => send()} disabled={!text.trim() || !!pending} aria-label="보내기"
+              className="h-10 w-10 shrink-0 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40">
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

@@ -8,6 +8,7 @@ import { getCurrentUser, logout, isAdminEmail } from '@/lib/auth';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import NotificationBell from '@/components/NotificationBell';
+import WorkChatWidget from '@/components/WorkChatWidget';
 import type { Workspace } from '@/lib/phase1';
 import {
   BarChart3, Zap, Package, ClipboardList, FlaskConical, Factory,
@@ -47,7 +48,7 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/', label: '대시보드', icon: <BarChart3 size={17} />, table: '생산 현황' },
       { path: '/quick', label: '간편등록', icon: <Zap size={17} />, table: '밖에서 빠르게 · 초안 저장' },
-      { path: '/work', label: '업무 입력', icon: <MessageSquare size={17} />, table: '한 줄 → 팀장 확인·캘린더' },
+      { path: '/work', label: '업무 피드', icon: <MessageSquare size={17} />, table: '업무 비서에서 올린 것이 팀별로' },
   { path: '/capture', label: '현장 접수', icon: <Camera size={17} />, table: '사진 한 장 + 한 줄' },
       { path: '/inbox', label: '접수함', icon: <Inbox size={17} />, table: '승인하면 전표가 생긴다' },
       { path: '/workflow', label: '워크플로우', icon: <GitBranch size={17} />, table: '클릭 → 탭 이동' },
@@ -555,6 +556,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           })}
         </div>
       </nav>
+      <WorkChatWidget />
     </div>
   );
 }
