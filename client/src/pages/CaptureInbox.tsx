@@ -5,10 +5,10 @@
  * 승인·반려 권한은 서버에서 다시 검사한다 (server/capture.ts) — 이 화면은 보여주기만 한다.
  */
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Check, X, Clock, AlertTriangle, Image as ImageIcon } from 'lucide-react';
-import { fetchVendors } from '@/lib/supabaseQueries';
+import { fetchVendors, fetchOrders } from '@/lib/supabaseQueries';
 import { normalizeBrands, type Vendor } from '@/lib/store';
 
 type Capture = {
@@ -28,7 +28,7 @@ type Capture = {
 const KINDS = [
   { v: 'sample', label: '샘플 제작', ready: true },
   { v: 'material', label: '자재 구매', ready: true },
-  { v: 'delivery', label: '메인 납품', ready: false },
+  { v: 'delivery', label: '메인 납품', ready: true },
   { v: 'billing', label: '바이어 청구', ready: false },
 ] as const;
 
@@ -110,10 +110,147 @@ function BillingFields({
   );
 }
 
+/**
+ * 메인 납품 승인에 딸리는 칸.
+ *
+ * 출고 기록은 발주에 걸린다 (receipt_logs.order_id). 그래서 어느 발주의 납품인지를 먼저 고른다.
+ * 현장 글에 품번이나 품명이 있으면 그걸로 후보를 좁혀 둔다 — 발주가 쌓이면 목록이 길다.
+ *
+ * 청구 단가는 품목의 납품가를 서버가 꺼내 쓴다. 발주 단가는 공장에 주는 값이라
+ * 그걸로 청구하면 원가로 파는 셈이 된다. 납품가가 품목에 없으면 여기서 넣어야 한다.
+ */
+function DeliveryFields({
+  orderId, qty, defectQty, styleNo, styleName, buyerOptions,
+  billBuyerId, noBill, unitPrice, statementId, field, label, onSet,
+}: {
+  orderId: string; qty: string; defectQty: string; styleNo: string; styleName: string;
+  buyerOptions: { id: string; label: string }[];
+  billBuyerId: string; noBill: boolean; unitPrice: string; statementId: string;
+  field: string; label: string;
+  onSet: (k: string, v: any) => void;
+}) {
+  const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
+  const [showAll, setShowAll] = useState(false);
+
+  const open = useMemo(() => (orders as any[])
+    .filter(o => (o.shippedQty || 0) < (o.qty || 0) || o.id === orderId)
+    .sort((a, b) => String(b.orderDate || '').localeCompare(String(a.orderDate || ''))), [orders, orderId]);
+
+  // 현장 글에서 읽은 품번·품명으로 후보를 좁힌다. 맞는 게 없으면 전체를 보여준다.
+  // 이미 고른 발주는 항상 남긴다 — 품명을 고치다 목록에서 빠지면 빈 칸처럼 보이는데
+  // 승인은 그 발주로 되어 버린다 (코덱스 지적)
+  const hint = (styleNo || styleName || '').trim().toLowerCase();
+  const narrowed = hint
+    ? open.filter(o => o.id === orderId
+        || `${o.styleNo} ${o.styleName}`.toLowerCase().includes(hint))
+    : [];
+  const list = showAll || narrowed.length === 0 ? open : narrowed;
+
+  const picked = open.find(o => o.id === orderId);
+  const { data: openStmts = [] } = useQuery({
+    queryKey: ['openStatements', billBuyerId],
+    enabled: !!billBuyerId && !noBill,
+    queryFn: async () => {
+      const { fetchOpenStatements } = await import('@/lib/tradeStatementQueries');
+      return fetchOpenStatements(billBuyerId);
+    },
+  });
+
+  const n = Number(qty || 0);
+  const u = Number(unitPrice || 0);
+  // 발주 수량보다 많이 나가는 건 일어나는 일이다. 막지 않고 알려만 준다
+  const over = !!picked && n > 0 && (picked.shippedQty || 0) + n > (picked.qty || 0);
+
+  return (
+    <div className="border border-border rounded-md p-2.5 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-medium text-foreground">어느 발주의 납품인가 *</p>
+        {narrowed.length > 0 && !showAll && (
+          <button type="button" onClick={() => setShowAll(true)}
+            className="text-[11px] text-primary underline">전체 발주 보기</button>
+        )}
+      </div>
+      <select className={field} value={orderId}
+        onChange={e => {
+          onSet('orderId', e.target.value);
+          const o = open.find(x => x.id === e.target.value);
+          // 납품은 곧 청구다. 발주의 바이어를 미리 넣어 둔다
+          onSet('billBuyerId', o?.buyerId || '');
+          onSet('billStatementId', '');
+        }}>
+        <option value="">— 고르세요 —</option>
+        {list.map(o => (
+          <option key={o.id} value={o.id}>
+            {o.orderNo} · {o.styleNo} {o.styleName}
+            {` · 발주 ${o.qty || 0}개`}{(o.shippedQty || 0) > 0 ? ` · 출고 ${o.shippedQty}개` : ''}
+          </option>
+        ))}
+      </select>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div>
+          <label className={label}>납품 수량 *</label>
+          <input className={field} type="number" inputMode="numeric" value={qty}
+            onChange={e => onSet('qty', e.target.value)} />
+        </div>
+        <div>
+          <label className={label}>불량 수량</label>
+          <input className={field} type="number" inputMode="numeric" value={defectQty}
+            onChange={e => onSet('defectQty', e.target.value)} />
+        </div>
+        <div>
+          <label className={label}>청구할 곳</label>
+          <select className={field} value={noBill ? '' : billBuyerId}
+            onChange={e => {
+              onSet('billBuyerId', e.target.value);
+              onSet('noBill', e.target.value ? 'false' : 'true');
+              onSet('billStatementId', '');
+            }}>
+            <option value="">— 청구 안 함 —</option>
+            {buyerOptions.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={label}>명세표</label>
+          <select className={field} disabled={!billBuyerId || noBill} value={statementId}
+            onChange={e => onSet('billStatementId', e.target.value)}>
+            <option value="">새로 만들기</option>
+            {openStmts.map((o: any) => (
+              <option key={o.id} value={o.id}>{o.statementNo} 에 추가 ({(o.lines || []).length}줄)</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {!!billBuyerId && !noBill && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div>
+            <label className={label}>납품 단가 (비우면 품목 납품가)</label>
+            <input className={field} type="number" inputMode="numeric" value={unitPrice}
+              onChange={e => onSet('billUnitPrice', e.target.value)} />
+          </div>
+          {u > 0 && n > 0 && (
+            <p className="text-[11px] text-muted-foreground self-end pb-2">
+              청구 {(u * n).toLocaleString()}원
+            </p>
+          )}
+        </div>
+      )}
+
+      {over && (
+        <p className="text-[11px] text-[var(--system-orange)]">
+          발주 {picked!.qty}개인데 이번까지 {(picked!.shippedQty || 0) + n}개가 나갑니다. 맞나요?
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function CaptureInbox() {
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
   const [edit, setEdit] = useState<Record<string, Record<string, any>>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const qc = useQueryClient();
 
   const { data: vendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const brandOptions = useMemo(() => (vendors as Vendor[])
@@ -149,14 +286,19 @@ export default function CaptureInbox() {
 
   const approve = async (c: Capture) => {
     const kind = edit[c.id]?.kind ?? c.kind;
-    if (kind !== 'sample' && kind !== 'material') {
-      toast.error('지금은 샘플 제작과 자재 구매만 전표를 만듭니다');
+    if (kind !== 'sample' && kind !== 'material' && kind !== 'delivery') {
+      toast.error('바이어 청구는 아직 전표를 만들지 않습니다');
       return;
     }
     const payload: Record<string, any> = { ...(c.parsed || {}), ...(edit[c.id] || {}), kind };
-    if (!String(payload.styleName || '').trim()) {
+    // 메인 납품은 품명이 아니라 발주로 찾는다. 품명은 발주를 고를 때 쓰는 힌트일 뿐이다
+    if (kind !== 'delivery' && !String(payload.styleName || '').trim()) {
       toast.error(kind === 'material' ? '무엇을 샀는지 적어주세요' : '품명을 넣어주세요');
       return;
+    }
+    if (kind === 'delivery') {
+      if (!payload.orderId) { toast.error('어느 발주의 납품인지 골라주세요'); return; }
+      if (!(Number(payload.qty) > 0)) { toast.error('납품 수량을 넣어주세요'); return; }
     }
     // 금액 없는 지출결의는 의미가 없다. 서버에서도 막지만 여기서 먼저 잡아준다
     if (kind === 'material' && !(Number(payload.amountKrw) > 0)) {
@@ -182,19 +324,27 @@ export default function CaptureInbox() {
         return;
       }
       // 자재구매는 청구까지 했으면 전표가 2장이다. 몇 장이 만들어졌는지 말해준다
+      const stmt = j.ref?.statementNo
+        ? ` + 거래명세표 ${j.ref.statementNo}${j.ref.statementNew === false ? ' (줄 추가)' : ''}` : '';
       toast.success(
-        kind !== 'material' ? '승인 — 샘플 기록이 만들어졌습니다'
-        : j.ref?.statementNo
-          ? `승인 — 지출결의 + 거래명세표 ${j.ref.statementNo}${j.ref.statementNew === false ? ' (줄 추가)' : ''}`
-          : '승인 — 지출결의가 만들어졌습니다');
+        kind === 'sample'     ? '승인 — 샘플 기록이 만들어졌습니다'
+        : kind === 'delivery' ? `승인 — ${j.ref?.orderNo || ''} 출고 ${j.ref?.qty}개${stmt}`
+        : `승인 — 지출결의${stmt}`);
       // 지출결의는 서버가 정본인데 앱이 시작할 때만 내려받는다 (syncFromSupabase).
       // 지금 내려받아 넣어주지 않으면 방금 만든 전표가 지출결의 화면에 안 보인다
-      if (kind === 'material') {
+      if (kind === 'material' || kind === 'delivery') {
         try {
-          const { fetchExpensesSB } = await import('@/lib/expenseQueries');
           const { fetchTradeStatementsSB } = await import('@/lib/tradeStatementQueries');
           const { store } = await import('@/lib/store');
-          store.hydrateExpenses(await fetchExpensesSB());
+          if (kind === 'material') {
+            const { fetchExpensesSB } = await import('@/lib/expenseQueries');
+            store.hydrateExpenses(await fetchExpensesSB());
+          } else {
+            // 출고 기록과 발주 출고수량 — 둘 다 서버가 정본이라 다시 읽어 와야 화면에 보인다
+            const { syncPhase1FromSupabase } = await import('@/lib/phase1');
+            await syncPhase1FromSupabase();
+            qc.invalidateQueries({ queryKey: ['orders'] });
+          }
           store.hydrateTradeStatements(await fetchTradeStatementsSB() as any);
         } catch { /* 못 내려받아도 다음에 앱을 열면 보인다 */ }
       }
@@ -311,19 +461,30 @@ export default function CaptureInbox() {
                       {/* 종류에 따라 묻는 것이 다르다. 자재 구매에 샘플 단계·시즌을 묻지 않는다 */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         <div>
-                          <label className={label}>{kind === 'material' ? '품목 *' : '품명 *'}</label>
+                          <label className={label}>
+                            {kind === 'material' ? '품목 *' : kind === 'delivery' ? '품명' : '품명 *'}
+                          </label>
                           <input className={field} value={valOf(c, 'styleName')}
                             placeholder={kind === 'material' ? '예) 양가죽 10마' : '예) 토트백'}
                             onChange={e => setVal(c.id, 'styleName', e.target.value)} />
                         </div>
-                        <div>
-                          <label className={label}>금액 (원){kind === 'material' ? ' *' : ''}</label>
-                          <input className={field} type="number" inputMode="numeric"
-                            value={valOf(c, 'amountKrw') || ''}
-                            onChange={e => setVal(c.id, 'amountKrw', e.target.value)} />
-                        </div>
+                        {/* 메인 납품은 금액을 묻지 않는다. 청구액은 수량 x 납품가로 나온다 */}
+                        {kind !== 'delivery' && (
+                          <div>
+                            <label className={label}>금액 (원){kind === 'material' ? ' *' : ''}</label>
+                            <input className={field} type="number" inputMode="numeric"
+                              value={valOf(c, 'amountKrw') || ''}
+                              onChange={e => setVal(c.id, 'amountKrw', e.target.value)} />
+                          </div>
+                        )}
 
-                        {kind === 'material' ? (
+                        {kind === 'delivery' ? (
+                          <div>
+                            <label className={label}>납품일</label>
+                            <input className={field} type="date" value={valOf(c, 'requestDate') || ''}
+                              onChange={e => setVal(c.id, 'requestDate', e.target.value)} />
+                          </div>
+                        ) : kind === 'material' ? (
                           <>
                             <div>
                               <label className={label}>거래처</label>
@@ -383,6 +544,23 @@ export default function CaptureInbox() {
                           </>
                         )}
                       </div>
+
+                      {kind === 'delivery' && (
+                        <DeliveryFields
+                          orderId={String(valOf(c, 'orderId') || '')}
+                          qty={String(valOf(c, 'qty') || '')}
+                          defectQty={String(valOf(c, 'defectQty') || '')}
+                          styleNo={String(valOf(c, 'styleNo') || '')}
+                          styleName={String(valOf(c, 'styleName') || '')}
+                          buyerOptions={buyerOptions}
+                          billBuyerId={String(valOf(c, 'billBuyerId') || '')}
+                          noBill={String(valOf(c, 'noBill') || '') === 'true'}
+                          unitPrice={String(valOf(c, 'billUnitPrice') || '')}
+                          statementId={String(valOf(c, 'billStatementId') || '')}
+                          field={field} label={label}
+                          onSet={(k, v) => setVal(c.id, k, v)}
+                        />
+                      )}
 
                       {kind === 'material' && (
                         <BillingFields

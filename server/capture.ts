@@ -57,13 +57,15 @@ ${brandList}
 
 규칙:
 - 적혀 있지 않은 것은 지어내지 마라. 모르면 그 칸을 비워라.
+- styleNo 는 품번(예: AT2603HB01)이 적혀 있을 때만 넣는다. 품명에서 만들어내지 마라.
+- delivery 면 qty(납품 수량)를 꼭 찾아라. 몇 개 나갔는지가 핵심이다.
 - 브랜드는 위 목록에서만 고른다. 목록에 없으면 brand 에 들은 그대로 적고 buyerId 는 비운다.
 - confidence 는 네가 얼마나 확신하는지다. 브랜드를 못 찾았거나 금액이 없으면 낮춰라.
 
 JSON 하나만 출력한다. 설명 금지.
 {"kind":"...","confidence":0.0~1.0,"parsed":{
   "brand":"","buyerId":"","brandCode":"",
-  "styleName":"","color":"","stage":"","qty":null,
+  "styleNo":"","styleName":"","color":"","stage":"","qty":null,
   "amountKrw":null,"vendorName":"","note":""
 }}`;
 
@@ -235,6 +237,8 @@ router.post('/api/captures/:id/approve', requireRole(...APPROVER_ROLES), async (
         : detail.includes('bill_amount_required') ? '청구금액을 넣어주세요'
         : detail.includes('statement_not_found')  ? '고른 거래명세표를 찾지 못했습니다'
         : detail.includes('statement_locked')     ? '이미 청구·수금이 끝난 명세표입니다. 새 명세표로 만들어주세요'
+        : detail.includes('order_required')       ? '어느 발주의 납품인지 골라주세요'
+        : detail.includes('qty_required')          ? '납품 수량을 넣어주세요'
         : detail.includes('not_found')          ? '접수를 찾지 못했습니다'
         : detail.includes('style_name_required')? '품명을 넣어주세요'
         : detail.includes('kind_not_ready')     ? '이 종류는 아직 전표를 만들지 않습니다'
