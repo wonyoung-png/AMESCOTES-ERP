@@ -223,7 +223,7 @@ const SideLink = React.memo(function SideLink({ item, active, fav, collapsed, on
         {!collapsed && <span className="flex-1 min-w-0 truncate">{item.label}</span>}
         {!collapsed && !!badge && (
           <span className="shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-[var(--system-red)] text-white text-[11px] leading-5 text-center"
-            aria-label={`안 본 것 ${badge}건`}>{badge > 99 ? '99+' : badge}</span>
+            aria-label={`확인할 것 ${badge}건`}>{badge > 99 ? '99+' : badge}</span>
         )}
       </Link>
       {/* 별은 평소에 숨어 있다가 줄에 마우스를 올리면 나온다. 이미 찍은 것은 계속 보인다 */}
@@ -248,7 +248,7 @@ const SideLink = React.memo(function SideLink({ item, active, fav, collapsed, on
 
 export default function Layout({ children, onLogout }: LayoutProps) {
   const [location, navigate] = useLocation();
-  // 업무 피드 안 본 개수 — 업무 비서 위젯이 1분마다 읽어 알려준다
+  // 업무 피드 숫자(안 본 카드 + 내 할 일) — 업무 비서 위젯이 1분마다 읽어 알려준다
   const [workUnread, setWorkUnread] = useState(0);
   React.useEffect(() => {
     const on = (e: Event) => setWorkUnread(Number((e as CustomEvent).detail) || 0);
