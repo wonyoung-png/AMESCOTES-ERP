@@ -7,6 +7,7 @@ import { Clock, MessageSquare, CalendarPlus, Share2, HelpCircle, ListTodo, Check
 import { Link } from 'wouter';
 import { toast } from 'sonner';
 import { fetchCampaignsSB } from '@/lib/campaignQueries';
+import { CAMPAIGN_TEAMS } from '@/lib/phase1';
 
 export type Card = {
   id: string; created_at: string; created_by: string; created_by_name: string; team: string;
@@ -82,6 +83,10 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
     title: p.title || '', channel: CHANNELS.includes(p.channel) ? p.channel : '',
     startDate: p.startDate || '', endDate: p.endDate || '', discountRate: p.discountRate ?? '',
   });
+  // 같이 알릴 팀 — AI 추천이 먼저 체크돼 있고, 확정하는 사람이 고친다
+  const teamChoices = CAMPAIGN_TEAMS.filter(t => t !== c.team);
+  const [teams, setTeams] = useState<string[]>(Array.isArray(p.shareTeams) ? p.shareTeams : []);
+  const toggleTeam = (t: string) => setTeams(v => v.includes(t) ? v.filter(x => x !== t) : [...v, t]);
 
   // 답변칸은 요청을 받은 사람 몫이다. 쓴 사람 본인에게 띄우면 자기 질문에 자기가 답하게 된다
   const canReply = c.kind === 'request_check' && c.status === 'open' && !!me && c.created_by !== me.id &&
@@ -110,7 +115,8 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
   const confirm = async () => {
     if (!f.title.trim() || !f.startDate) { toast.error('이름과 시작일은 있어야 합니다'); return; }
     const payload = { ...f, discountRate: f.discountRate === '' ? null : Number(f.discountRate), workspace: p.workspace };
-    if (await post('confirm', { payload }, '운영캘린더에 등록하고 마케팅·물류CS에 공유했습니다')) {
+    const ok = teams.length ? `운영캘린더에 등록하고 ${teams.join('·')}에 알렸습니다` : '운영캘린더에 등록했습니다 (알린 팀 없음)';
+    if (await post('confirm', { payload, shareTeams: teams }, ok)) {
       // 캘린더는 로컬 사본을 읽는다. 앱을 다시 열 때까지 기다리지 않게 새 기획전을 바로 내려받는다
       try {
         const remote = await fetchCampaignsSB();
@@ -175,9 +181,23 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
             placeholder="할인율 %" className={input} />
           <input type="date" value={f.startDate} onChange={e => setF({ ...f, startDate: e.target.value })} className={input} />
           <input type="date" value={f.endDate} onChange={e => setF({ ...f, endDate: e.target.value })} className={input} />
+          <fieldset className="col-span-2">
+            <legend className="text-xs text-muted-foreground mb-1">같이 알릴 팀 (AI 추천)</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {teamChoices.map(t => {
+                const on = teams.includes(t);
+                return (
+                  <button key={t} type="button" aria-pressed={on} onClick={() => toggleTeam(t)}
+                    className={`h-7 px-2.5 rounded-full border text-xs ${on ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground'}`}>
+                    {on && <Check className="w-3 h-3 inline mr-0.5" />}{t}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
           <button type="button" disabled={busy} onClick={confirm}
             className="col-span-2 h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center gap-1.5 disabled:opacity-40">
-            <CalendarPlus className="w-4 h-4" />캘린더 등록 · 마케팅 공유
+            <CalendarPlus className="w-4 h-4" />캘린더 등록{teams.length ? ` · ${teams.length}개 팀에 알림` : ''}
           </button>
         </div>
       ) : (

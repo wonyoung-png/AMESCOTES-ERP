@@ -22,8 +22,15 @@ const ANSWER_MODEL = 'claude-opus-5-5';
 
 const CHANNELS = ['자사몰', '센텀', '29CM', 'W컨셉', '쇼룸', '해외'];
 
-/** 일정·기획전이 확정되면 같이 알아야 하는 팀 — 올린 팀은 빼고 보낸다 */
+/** 회사 팀 — client/src/lib/phase1.ts CAMPAIGN_TEAMS 와 같다 */
+const TEAMS = ['국내영업', '해외영업', '비주얼컨텐츠', '디자인', '생산', '마케팅', '물류CS', '쇼룸'];
+
+/** AI 추천이 없을 때 일정 확정 시 기본으로 알리는 팀 — 올린 팀은 빼고 보낸다 */
 const SCHEDULE_SHARE = ['마케팅', '물류CS'];
+
+/** 공유 대상 팀 정리: 회사 팀 목록에 있는 것만, 올린 팀 빼고, 중복 없이 */
+const cleanTeams = (v: unknown, own: string) =>
+  Array.isArray(v) ? Array.from(new Set(v.map(String).filter(t => TEAMS.includes(t) && t !== own))) : null;
 
 const genId = (p: string) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 const kstToday = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
@@ -103,6 +110,12 @@ async function classify(opts: {
 채널은 이 중 하나로 맞춘다: ${CHANNELS.join(' | ')} (없으면 비운다)
 브랜드가 에탈루프(AETALOOF)면 workspace=AETALOOF, 아니면 LUMEN.
 
+schedule 이면 shareTeams 에 같이 알아야 할 팀을 이 중에서 고른다: ${TEAMS.join(' | ')} (쓴 사람 팀은 빼고)
+- 기획전·할인: 마케팅(광고·콘텐츠), 물류CS(출고·고객 문의)는 거의 늘 필요하다
+- 매장·쇼룸 판매가 걸리면 쇼룸, 배너·상세 이미지가 새로 필요하면 비주얼컨텐츠·디자인
+- 해외 채널이면 해외영업, 생산·입고 일정이 걸리면 생산
+- 필요 없는 팀까지 넣지 마라. 다른 kind 면 [] 로 둔다
+
 이 팀에 열려 있는 카드:
 ${openList}
 같은 건(같은 채널·같은 기획전 등)이 위에 있으면 relatedId 에 그 id 를 넣는다. 아니면 null.
@@ -113,7 +126,7 @@ ${openList}
 - title 은 캘린더에 보일 짧은 이름이다. 예) "W컨셉 기획전 · 파니에 토트 20%"
 
 JSON 하나만 출력한다. 설명 금지.
-{"kind":"...","relatedId":null,"parsed":{"summary":"","title":"","dueDate":"","channel":"","startDate":"","endDate":"","discountRate":null,"products":"","workspace":"LUMEN"}}`;
+{"kind":"...","relatedId":null,"parsed":{"summary":"","title":"","dueDate":"","channel":"","startDate":"","endDate":"","discountRate":null,"products":"","workspace":"LUMEN","shareTeams":[]}}`;
 
   try {
     const r = await new Anthropic({ apiKey: key }).messages.create({
@@ -232,6 +245,11 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
     const c = await classify({ text, me, open });
     const { parsed, relatedId: rid } = c;
     let kind = c.kind;
+    // 일정의 추천 팀을 미리 정리해 둔다. AI 가 비웠거나 엉뚱한 이름이면 기본 팀으로
+    if (kind === 'schedule') {
+      const t = cleanTeams(parsed.shareTeams, me.team);
+      parsed.shareTeams = t?.length ? t : SCHEDULE_SHARE.filter(x => x !== me.team);
+    }
     // 질문은 할 일이 아니라 대화다. 답을 붙여 끝난 카드로 남긴다 (나중에 "누가 뭘 물었나"도 기록이 된다)
     const relatedId = kind === 'question' ? null : rid;
     if (kind === 'question' && !parsed.answer) parsed.answer = await answer(me, text, all);
@@ -380,7 +398,11 @@ router.post('/api/work/:id/confirm', requireUser(), async (req: Request, res: Re
 
     const payload = { ...(card.parsed || {}), ...((req.body ?? {}).payload || {}) };
     if (payload.channel && !CHANNELS.includes(payload.channel)) payload.channel = '';
-    const shared = SCHEDULE_SHARE.filter(t => t !== card.team);
+    // 확정하는 사람이 고른 팀 > AI 추천 > 기본값 순. 빈 배열도 "아무 팀에도 안 알림"이라는 선택이다
+    const shared = cleanTeams((req.body ?? {}).shareTeams, card.team)
+      ?? cleanTeams(card.parsed?.shareTeams, card.team)
+      ?? SCHEDULE_SHARE.filter(t => t !== card.team);
+    delete payload.shareTeams;
 
     const r = await restAsServer('rpc/confirm_schedule_card', {
       method: 'POST',
