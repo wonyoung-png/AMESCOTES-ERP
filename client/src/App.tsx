@@ -30,6 +30,8 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 const ItemMaster = lazyWithReload(() => import("./pages/ItemMaster"));
 const QuickEntry = lazyWithReload(() => import("./pages/QuickEntry"));
+const CaptureUpload = lazyWithReload(() => import("./pages/CaptureUpload"));
+const CaptureInbox = lazyWithReload(() => import("./pages/CaptureInbox"));
 const SalesSummary = lazyWithReload(() => import("./pages/SalesSummary"));
 const BomManagement = lazyWithReload(() => import("./pages/BomManagement"));
 const SampleManagement = lazyWithReload(() => import("./pages/SampleManagement"));
@@ -152,6 +154,8 @@ function Router() {
         <Route path="/workflow" component={WorkflowGuide} />
         <Route path="/users" component={UserManagement} />
         <Route path="/quick" component={QuickEntry} />
+        <Route path="/capture" component={CaptureUpload} />
+        <Route path="/inbox" component={CaptureInbox} />
         <Route path="/items" component={ItemMaster} />
         <Route path="/sales-summary" component={SalesSummary} />
         <Route path="/bom" component={BomManagement} />

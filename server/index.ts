@@ -12,6 +12,7 @@ import yardageOcrRouter from "./yardage-ocr.js";
 import sessionRouter from "./session.js";
 import dailyBridgeRouter from "./daily-bridge.js";
 import vendorOcrRouter from "./vendor-ocr.js";
+import captureRouter from "./capture.js";
 import pixelRouter from "./pixel.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -64,6 +65,9 @@ async function startServer() {
   // OCR 라우터
   app.use(yardageOcrRouter);
   app.use(vendorOcrRouter);
+
+  // 접수함 — 현장 사진·한 줄 접수와 팀장 승인
+  app.use(captureRouter);
 
   // AI 에이전트 API 라우터 — Supabase service key 없으면 스킵
   try {
