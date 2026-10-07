@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Bell } from 'lucide-react';
 import { Link } from 'wouter';
+import { fmtTime } from '@/components/WorkCardActions';
 
 type Ntf = { id: string; title: string; body?: string; link?: string; read_at?: string | null; created_at: string };
 
@@ -67,7 +68,7 @@ export default function NotificationBell() {
                 <div className="flex items-center gap-2">
                   {!n.read_at && <span className="w-1.5 h-1.5 rounded-full bg-[var(--system-red)] shrink-0" />}
                   <span className="text-xs font-medium text-foreground truncate">{n.title}</span>
-                  <span className="ml-auto text-[11px] text-muted-foreground shrink-0">{n.created_at.slice(5, 16).replace('T', ' ')}</span>
+                  <span className="ml-auto text-[11px] text-muted-foreground shrink-0">{fmtTime(n.created_at)}</span>
                 </div>
                 {n.body && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>}
               </Link>

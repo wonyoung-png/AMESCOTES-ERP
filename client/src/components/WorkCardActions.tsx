@@ -56,6 +56,11 @@ export async function fetchWork(): Promise<{ items: Card[]; me: Me | null } | nu
   } catch { return null; }
 }
 
+/** DB 시각은 UTC 다. 그대로 자르면 9시간 이르게 보인다 */
+export const fmtTime = (iso: string) => new Date(iso).toLocaleString('ko-KR', {
+  timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+
 /** 처리 후 위젯·피드 양쪽을 다시 읽게 한다 */
 export const announceWorkChanged = () => window.dispatchEvent(new Event('work:changed'));
 

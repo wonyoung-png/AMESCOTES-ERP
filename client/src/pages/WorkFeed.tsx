@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Check, Clock, MessageCircle } from 'lucide-react';
-import { type Card, type Me, KIND, CardActions, isTodo, fetchWork, announceWorkChanged } from '@/components/WorkCardActions';
+import { type Card, type Me, KIND, CardActions, isTodo, fetchWork, announceWorkChanged, fmtTime } from '@/components/WorkCardActions';
 
 type Tab = 'todo' | 'team' | 'shared' | 'all';
 
@@ -77,7 +77,7 @@ export default function WorkFeed() {
                 <span className="text-muted-foreground truncate">· {c.created_by_name}{c.team ? ` (${c.team})` : ''}</span>
                 <span className="ml-auto text-muted-foreground shrink-0 flex items-center gap-1">
                   {c.status === 'done' ? <><Check className="w-3 h-3 text-[var(--system-green)]" />완료</> : <><Clock className="w-3 h-3" />진행</>}
-                  · {c.created_at.slice(5, 16).replace('T', ' ')}
+                  · {fmtTime(c.created_at)}
                 </span>
               </div>
               <p className="text-sm mt-1.5 break-words">{c.raw_text}</p>

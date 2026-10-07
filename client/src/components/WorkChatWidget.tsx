@@ -11,7 +11,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 import { Link } from 'wouter';
-import { type Card, type Me, CardActions, isTodo, fetchWork, postWork, announceWorkChanged } from '@/components/WorkCardActions';
+import { type Card, type Me, CardActions, isTodo, fetchWork, postWork, announceWorkChanged, fmtTime } from '@/components/WorkCardActions';
 
 const EXAMPLES = [
   'W컨셉 기획전 10/20 파니에 토트 20% 예정',
@@ -133,7 +133,7 @@ export default function WorkChatWidget() {
                       {line && <p className={mine ? '' : 'font-medium'}>{line}</p>}
                       {!mine && <p className="text-sm mt-1 break-words">“{c.raw_text}”</p>}
                       <CardActions c={c} me={me} onDone={announceWorkChanged} />
-                      <p className="text-[11px] text-muted-foreground mt-1">{c.created_at.slice(5, 16).replace('T', ' ')}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">{fmtTime(c.created_at)}</p>
                     </div>
                   </div>
                 </div>
