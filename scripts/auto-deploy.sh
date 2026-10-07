@@ -51,6 +51,12 @@ fi
 cd /opt/app && docker compose up -d app
 sleep 8
 
+# PostgREST 는 시작할 때 읽은 스키마만 안다. 새 테이블·함수를 만들어도
+# 다시 읽히지 않으면 "그런 함수 없다"며 404 를 돌려준다 — 접수함 승인이 이걸로 한 번 막혔다.
+docker kill -s SIGUSR1 app-postgrest-1 >/dev/null 2>&1 \
+  && log "PostgREST 스키마 다시 읽음" \
+  || log "PostgREST 재적재 건너뜀(컨테이너 없음)"
+
 # 4000 포트는 호스트에 열려 있지 않다(Caddy가 도커 네트워크로 붙는다).
 # 컨테이너 IP를 찾아 직접 두드린다 — 바깥 DNS에 기대지 않는다
 CIP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' app-app-1 2>/dev/null | head -1)

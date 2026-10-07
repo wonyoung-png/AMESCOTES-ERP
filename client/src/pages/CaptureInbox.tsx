@@ -76,7 +76,11 @@ export default function CaptureInbox() {
         body: JSON.stringify({ payload }),
       });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) { toast.error(j.message || j.error || '승인 실패'); return; }
+      if (!r.ok) {
+        // 모르는 사유는 서버가 보낸 원문을 그대로 보여준다. 뭉개면 왜 안 되는지 알 수가 없다
+        toast.error(j.message || j.detail || j.error || '승인 실패', { duration: 10000 });
+        return;
+      }
       toast.success('승인 — 샘플 기록이 만들어졌습니다');
       setEdit(p => { const { [c.id]: _drop, ...rest } = p; return rest; });
       refetch();

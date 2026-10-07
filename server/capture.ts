@@ -224,14 +224,17 @@ router.post('/api/captures/:id/approve', requireRole(...APPROVER_ROLES), async (
 
     if (!r.ok) {
       const detail = await r.text();
-      // DB 함수가 던진 사유를 사람 말로 바꿔 돌려준다
+      // 아는 사유는 사람 말로, 모르는 사유는 그대로 내보낸다.
+      // "승인 실패" 한 마디로 뭉개면 왜 안 되는지 아무도 알 수 없다
       const msg =
         detail.includes('already:')            ? '이미 처리된 접수입니다'
         : detail.includes('not_found')          ? '접수를 찾지 못했습니다'
         : detail.includes('style_name_required')? '품명을 넣어주세요'
         : detail.includes('kind_not_ready')     ? '지금은 샘플만 전표를 만듭니다'
-        : '승인 실패';
-      res.status(400).json({ error: 'approve_failed', message: msg, detail });
+        : '';
+      // 서버 로그에도 남긴다 — 화면만 보고는 원인을 못 쫓는다
+      console.error(`[capture] 승인 실패 ${capId} (${r.status}):`, detail.slice(0, 500));
+      res.status(400).json({ error: 'approve_failed', message: msg, detail: detail.slice(0, 500) });
       return;
     }
     res.json({ ok: true, ref: await r.json() });
