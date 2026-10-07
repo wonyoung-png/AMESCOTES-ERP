@@ -94,6 +94,13 @@ async function startServer() {
   // 대표 콘솔(ceo.<도메인>) — 정적 파일보다 먼저. 대표 계정이 아니면 화면을 주지 않는다
   app.use(ceoHostGate());
 
+  // 서비스워커·manifest·아이콘은 파일명에 해시가 없다. 아래 1년 캐시에 걸리면 고쳐도 안 바뀐다.
+  // 아이콘은 몇 KB 고 홈 화면에 넣을 때나 읽으므로 캐시를 포기해도 손해가 없다 (코덱스 지적)
+  app.use(["/sw.js", "/manifest.webmanifest", "/icons"], (_req, res, next) => {
+    res.set("Cache-Control", "no-cache");
+    next();
+  });
+
   // 해시 파일명(assets/*)은 1년 불변 캐시 — 재방문 시 재다운로드 없음
   app.use(express.static(staticPath, { maxAge: "365d", immutable: true, index: false }));
 

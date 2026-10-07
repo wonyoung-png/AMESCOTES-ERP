@@ -5,10 +5,24 @@
     <meta charset="UTF-8" />
     <!-- Chrome 자동 번역 차단 — 번역기가 DOM을 직접 조작해 React removeChild 크래시를 유발 -->
     <meta name="google" content="notranslate" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <!-- maximum-scale 을 두면 손가락으로 키워 볼 수가 없다 (코덱스 지적).
+         iOS 는 16px 보다 작은 입력칸에 들어갈 때 알아서 확대하는데, 이제는 다시 줄일 수 있다.
+         그것까지 막으려면 폰 화면의 input/select/textarea 를 16px 로 올리면 된다 — 다만
+         사내 화면 전부의 글자 크기가 바뀌므로 대표 확인 뒤에 한다. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AMESCOTES OS</title>
+
+    <!-- 홈 화면에 추가 — 현장에서 사진 올리는 일은 폰으로 한다.
+         서비스워커는 두지 않는다. 배포가 잦아서 캐시가 묵으면 옛 화면이 그대로 뜬다. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#171717" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- iOS 는 manifest 를 안 본다. 아래 둘이 있어야 주소창 없이 뜬다 -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="AMESCOTES" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet" />
