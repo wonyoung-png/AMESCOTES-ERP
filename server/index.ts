@@ -15,6 +15,7 @@ import vendorOcrRouter from "./vendor-ocr.js";
 import captureRouter from "./capture.js";
 import workRouter from "./work.js";
 import usersRouter from "./users.js";
+import ceoRouter, { ceoHostGate } from "./ceo.js";
 import pixelRouter from "./pixel.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -72,6 +73,7 @@ async function startServer() {
   app.use(captureRouter);
   app.use(workRouter);
   app.use(usersRouter);
+  app.use(ceoRouter);
 
   // AI 에이전트 API 라우터 — Supabase service key 없으면 스킵
   try {
@@ -88,6 +90,9 @@ async function startServer() {
   if (!fs.existsSync(indexHtml)) {
     console.error(`[server] UI 빌드 없음: ${indexHtml} — npm run build 후 재시작 필요`);
   }
+
+  // 대표 콘솔(ceo.<도메인>) — 정적 파일보다 먼저. 대표 계정이 아니면 화면을 주지 않는다
+  app.use(ceoHostGate());
 
   // 해시 파일명(assets/*)은 1년 불변 캐시 — 재방문 시 재다운로드 없음
   app.use(express.static(staticPath, { maxAge: "365d", immutable: true, index: false }));

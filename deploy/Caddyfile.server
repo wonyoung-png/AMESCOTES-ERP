@@ -35,6 +35,18 @@ os.54-116-241-64.sslip.io {
 	file_server
 }
 
+# 대표 콘솔 — 대표 계정만 (앱 서버 ceo.ts 가 계정을 확인한다). 화면·API 모두 같은 앱 컨테이너
+ceo.54-116-241-64.sslip.io {
+	encode zstd gzip
+	log {
+		output stdout
+		format json
+	}
+	reverse_proxy app:4000 {
+		flush_interval -1
+	}
+}
+
 # Daily Check (PMS 모듈)
 daily.54-116-241-64.sslip.io {
 	encode zstd gzip

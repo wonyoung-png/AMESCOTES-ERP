@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>대표실 · AMESCOTES</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600&display=swap">
+<style>
+/*
+ * 대표실 — 대표 한 사람이 회사 전체를 보고, 결정하고, 묻는 화면.
+ * 레이아웃: 왼쪽 메뉴 · 가운데 내용 · 오른쪽 고정 비서실장 패널 (Cofounder 구조)
+ * 톤: 옅은 회색 캔버스, 얇은 선, 명조 인사말 하나, 하늘 커버 하나로만 온기를 준다
+ */
+:root{
+  --canvas:#f3f3f1; --panel:#ffffff; --ink:#1b1c1e; --sub:#5c5e63; --faint:#6f7176; --line:#e5e5e2;
+  --hover:#f0f0ed; --accent:#2c5446; --accent-ink:#ffffff; --sun:#e2a93b; --danger:#b4413a; --ok:#2f7a55;
+  --sky1:#bcd6ee; --sky2:#e7f0f8; --cloud:rgba(255,255,255,.85);
+  --sans:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;
+  --serif:"Noto Serif KR","Apple Myungjo",serif;
+  --ease:cubic-bezier(.2,0,0,1); --fast:140ms; --slow:280ms;
+}
+@media (prefers-color-scheme:dark){:root{
+  --canvas:#141516; --panel:#1b1c1e; --ink:#ececea; --sub:#b0b2b7; --faint:#93959a; --line:#2b2c2f;
+  --hover:#222326; --accent:#8fc4ad; --accent-ink:#10201a; --sun:#e9b44f; --danger:#ff8a80; --ok:#6fd3a0;
+  --sky1:#24364a; --sky2:#1b2733; --cloud:rgba(255,255,255,.10); color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--canvas);color:var(--ink);font:14px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{display:grid;grid-template-columns:208px minmax(0,1fr) 400px;height:100%}
+@media (max-width:1180px){.app{grid-template-columns:208px minmax(0,1fr)}.ai{position:fixed;inset:0 0 0 auto;width:min(420px,100%);transform:translateX(102%);transition:transform var(--slow) var(--ease);z-index:20;box-shadow:-20px 0 40px -20px rgba(0,0,0,.25)}.ai.open{transform:none}.ai-toggle{display:flex!important}}
+@media (max-width:760px){.app{grid-template-columns:minmax(0,1fr)}.nav{display:none}}
+
+/* 왼쪽 메뉴 */
+.nav{border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:2px;background:var(--canvas)}
+.brand{display:flex;align-items:center;gap:8px;padding:4px 8px 18px;font-weight:600;letter-spacing:-.01em}
+.brand i{width:22px;height:22px;border-radius:6px;background:var(--sun);display:grid;place-items:center;font-style:normal;font-size:12px;color:#3a2a06}
+.brand small{display:block;font-weight:400;color:var(--faint);font-size:11px;letter-spacing:0}
+.nav a{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;color:var(--sub);text-decoration:none;transition:background var(--fast) var(--ease),color var(--fast) var(--ease)}
+.nav a:hover{background:var(--hover);color:var(--ink)}
+.nav a.on{background:var(--panel);color:var(--ink);font-weight:500;box-shadow:0 0 0 1px var(--line)}
+.nav a .n{margin-left:auto;font-size:11px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--ink);color:var(--canvas);display:grid;place-items:center}
+.nav a.soon{opacity:.55;pointer-events:none}
+.nav a.soon::after{content:"곧";margin-left:auto;font-size:10px;color:var(--faint);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.nav .sep{height:1px;background:var(--line);margin:10px 8px}
+.nav .foot{margin-top:auto;font-size:12px;color:var(--faint);padding:8px 10px}
+
+/* 가운데 */
+.main{overflow-y:auto;padding:24px clamp(16px,3vw,40px) 64px}
+.inner{max-width:880px;margin:0 auto;display:grid;gap:28px}
+.top{display:flex;align-items:center;gap:10px}
+.top .crumb{color:var(--faint);font-size:13px}
+.ai-toggle{display:none;margin-left:auto;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 12px;cursor:pointer}
+
+.cover{position:relative;height:168px;border-radius:16px;overflow:hidden;
+  background:radial-gradient(60px 22px at 18% 38%,var(--cloud),transparent 70%),radial-gradient(90px 26px at 26% 42%,var(--cloud),transparent 70%),
+  radial-gradient(70px 20px at 72% 30%,var(--cloud),transparent 70%),radial-gradient(110px 28px at 82% 36%,var(--cloud),transparent 70%),
+  linear-gradient(180deg,var(--sky1),var(--sky2))}
+.cover::after{content:"";position:absolute;left:0;right:0;bottom:0;height:34px;background:linear-gradient(180deg,transparent,rgba(120,160,110,.28))}
+.hello{display:grid;gap:4px}
+.hello h1{margin:0;font:600 30px/1.25 var(--serif);letter-spacing:-.01em;text-wrap:balance}
+.hello p{margin:0;color:var(--sub)}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:2px}
+.stat b{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.stat span{font-size:12px;color:var(--sub)}
+.stat.warn b{color:var(--danger)}
+
+.sec{display:grid;gap:10px}
+.sec-h{display:flex;align-items:baseline;gap:8px}
+.sec-h h2{margin:0;font-size:15px;font-weight:600}
+.sec-h span{color:var(--faint);font-size:12px}
+.sec-h a{margin-left:auto;font-size:12px;color:var(--sub);text-decoration:none}
+.sec-h a:hover{color:var(--ink)}
+
+.list{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px 14px;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.item .k{font-size:11px;font-weight:500;padding:2px 7px;border-radius:5px;background:var(--hover);color:var(--sub);white-space:nowrap;margin-top:2px}
+.item .k.req{background:#fbefdc;color:#8a5a12}.item .k.todo{background:#e6eef9;color:#2d4f86}.item .k.sch{background:#e5f2ec;color:#2c5446}.item .k.cap{background:#f1e9f7;color:#6a3f8a}
+@media (prefers-color-scheme:dark){.item .k.req{background:#3a2c14;color:#f0c27a}.item .k.todo{background:#1c2a3d;color:#9dbbe8}.item .k.sch{background:#173026;color:#8fc4ad}.item .k.cap{background:#2c2036;color:#cfa8ea}}
+.item .t{min-width:0;display:grid;gap:3px}
+.item .t p{margin:0;word-break:break-word}
+.item .t small{color:var(--faint);font-size:12px}
+.item .t .rep{font-size:12px;color:var(--sub);background:var(--hover);border-radius:6px;padding:4px 8px}
+.item .when{font-size:12px;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
+.act{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.act input{flex:1;min-width:140px;height:32px;border:1px solid var(--line);border-radius:7px;background:var(--canvas);padding:0 10px}
+.btn{height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:var(--panel);cursor:pointer;white-space:nowrap;transition:background var(--fast) var(--ease),transform var(--fast) var(--ease)}
+.btn:hover{background:var(--hover)}
+.btn:active{transform:scale(.97)}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:default}
+.empty{padding:22px 14px;text-align:center;color:var(--faint)}
+
+.teams{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.team{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
+.team h3{margin:0;font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px}
+.team h3 i{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.team h3 i.idle{background:var(--faint)}.team h3 i.warn{background:var(--danger)}
+.team dl{margin:0;display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.team dt{font-size:11px;color:var(--faint)}.team dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+.team p{margin:0;font-size:12px;color:var(--sub);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+.cal .item{grid-template-columns:52px minmax(0,1fr) auto}
+.date{display:grid;justify-items:center;border:1px solid var(--line);border-radius:8px;padding:4px 0;line-height:1.1}
+.date b{font-size:17px;font-weight:600}.date small{font-size:10px;color:var(--faint)}
+
+.money{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.up{color:var(--danger)}.down{color:#2d5fb8}
+
+/* 오른쪽 비서실장 */
+.ai{background:var(--panel);border-left:1px solid var(--line);display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100%}
+.ai-h{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.ai-h b{font-weight:600}.ai-h small{color:var(--faint);font-size:12px}
+.ai-h button{margin-left:auto;border:0;background:none;color:var(--sub);cursor:pointer;font-size:12px}
+.msgs{overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.m{max-width:92%;padding:9px 12px;border-radius:12px;white-space:pre-wrap;word-break:break-word;animation:in var(--slow) var(--ease)}
+.m.u{align-self:flex-end;background:var(--ink);color:var(--canvas);border-bottom-right-radius:4px}
+.m.a{align-self:flex-start;background:var(--canvas);border:1px solid var(--line);border-bottom-left-radius:4px}
+.m.wait{color:var(--sub);display:flex;gap:10px}
+@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.sugs{display:grid;gap:6px}
+.sugs button{text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 12px;cursor:pointer;color:var(--sub)}
+.sugs button:hover{color:var(--ink);background:var(--hover)}
+.ask{padding:12px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:flex-end}
+.ask textarea{flex:1;resize:none;min-height:42px;max-height:160px;border:1px solid var(--line);border-radius:10px;background:var(--canvas);padding:10px 12px}
+.ask button{height:42px;width:42px;border-radius:10px;border:0;background:var(--ink);color:var(--canvas);cursor:pointer}
+.ask button:disabled{opacity:.4}
+.err{color:var(--danger);font-size:12px;padding:0 16px 8px}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="nav" aria-label="대표실 메뉴">
+    <div class="brand"><i aria-hidden="true">✦</i><span>대표실<small>AMESCOTES</small></span></div>
+    <a href="#home" data-v="home">홈</a>
+    <a href="#inbox" data-v="inbox">결정할 것<span class="n" id="navN" hidden>0</span></a>
+    <a class="soon">회사 지도</a>
+    <a class="soon">회사 기억</a>
+    <div class="sep"></div>
+    <a id="erpLink" href="#" target="_blank" rel="noopener">ERP 열기 ↗</a>
+    <div class="foot" id="who"></div>
+  </nav>
+
+  <main class="main" id="main">
+    <div class="inner">
+      <div class="top"><span class="crumb" id="crumb">홈</span>
+        <button class="ai-toggle" id="aiToggle" type="button">비서실장</button></div>
+      <div id="view"><p class="empty">불러오는 중…</p></div>
+    </div>
+  </main>
+
+  <aside class="ai" id="ai" aria-label="비서실장">
+    <div class="ai-h"><b>비서실장</b><small>전 팀 기록·매출을 보고 답합니다</small>
+      <button type="button" id="aiClose" hidden>닫기</button></div>
+    <div class="msgs" id="msgs">
+      <div class="sugs" id="sugs">
+        <button type="button">오늘 내가 결정할 게 뭐야?</button>
+        <button type="button">팀별로 이번 주 진행 상황 요약해줘</button>
+        <button type="button">다가오는 기획전이랑 준비 상태 정리해줘</button>
+        <button type="button">최근 매출 흐름 어때?</button>
+      </div>
+    </div>
+    <div class="err" id="aiErr" hidden></div>
+    <form class="ask" id="askForm">
+      <label for="q" hidden>질문</label>
+      <textarea id="q" rows="1" placeholder="회사에 대해 무엇이든 물어보세요"></textarea>
+      <button type="submit" id="askBtn" aria-label="보내기">↑</button>
+    </form>
+  </aside>
+</div>
+
+<script>
+// 직원이 쓴 글이 화면에 그대로 들어간다 — 모든 문자열은 esc() 를 거쳐야 한다
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => (typeof v === 'number' && Number.isFinite(v)) ? v : null; // PMS 값도 화면에 넣기 전에 숫자로 거른다
+const won = n => n == null ? '–' : (Math.abs(n) >= 1e8 ? (n/1e8).toFixed(2).replace(/\.?0+$/,'') + '억' : Math.round(n/1e4).toLocaleString() + '만') + '원';
+const kst = iso => new Date(iso).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
+const KIND = { request_check:['확인 요청','req'], todo:['할 일','todo'], schedule:['일정','sch'], share:['공유',''], capture:['현장 접수','cap'] };
+let D = null;
+
+async function api(path, body) {
+  const r = await fetch(path, { method: body ? 'POST' : 'GET', credentials: 'include',
+    headers: body ? {'Content-Type':'application/json'} : undefined, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.message || j.error || 'HTTP ' + r.status), { status: r.status });
+  return j;
+}
+
+async function load() {
+  try { D = await api('/api/ceo/overview'); }
+  catch (e) { document.getElementById('view').innerHTML = `<p class="empty">불러오지 못했습니다 (${esc(e.message)}). 새로고침해 보세요.</p>`; return; }
+  document.getElementById('who').textContent = D.me.name + ' · ' + D.me.email;
+  document.getElementById('erpLink').href = D.erpUrl;
+  const n = D.decide.length + D.captures.length;
+  const nav = document.getElementById('navN'); nav.hidden = !n; nav.textContent = n;
+  render();
+}
+
+function greet() {
+  const h = Number(new Date().toLocaleString('en-US',{timeZone:'Asia/Seoul',hour:'numeric',hour12:false}));
+  const w = h < 6 ? '늦은 밤이에요' : h < 12 ? '좋은 아침이에요' : h < 18 ? '좋은 오후예요' : '좋은 저녁이에요';
+  const name = (D.me.name || '').replace(/^이/, '') || D.me.name;
+  return `${w}, ${name}님`;
+}
+
+function itemHtml(c, withActions) {
+  const [label, cls] = KIND[c.kind] || ['업무',''];
+  const due = c.parsed?.dueDate ? ` · 마감 ${esc(c.parsed.dueDate)}` : '';
+  const meta = `${esc(c.created_by_name || '')}${c.team ? ' · ' + esc(c.team) : ''}${due}`;
+  let act = '';
+  if (withActions) {
+    if (c.kind === 'request_check') act = `<div class="act"><input id="r-${esc(c.id)}" placeholder="답변 (예: 20%로 진행)"><button class="btn pri" data-a="reply" data-id="${esc(c.id)}">답변</button></div>`;
+    else if (c.kind === 'todo') act = `<div class="act"><input id="r-${esc(c.id)}" placeholder="결과 한 줄 (선택)"><button class="btn pri" data-a="done" data-id="${esc(c.id)}">완료</button></div>`;
+    else if (c.kind === 'schedule') {
+      const p = c.parsed || {};
+      act = `<div class="act"><small style="flex-basis:100%;color:var(--sub)">${esc(p.startDate || '날짜 없음')}${p.endDate && p.endDate !== p.startDate ? '~' + esc(p.endDate) : ''} · ${esc(p.channel || '채널 미정')}${p.discountRate != null ? ' · ' + esc(p.discountRate) + '%' : ''} · 알림: ${esc((p.shareTeams || []).join(', ') || '없음')}</small>
+        <button class="btn pri" data-a="confirm" data-id="${esc(c.id)}">캘린더 등록</button></div>`;
+    }
+  }
+  return `<div class="item"><span class="k ${cls}">${label}</span>
+    <div class="t"><p>${esc(c.raw_text)}</p><small>${meta}</small>${c.reply_text ? `<span class="rep">${esc(c.replied_by_name)}: ${esc(c.reply_text)}</span>` : ''}${act}</div>
+    <span class="when">${kst(c.created_at)}</span></div>`;
+}
+function captureHtml(c, withActions) {
+  return `<div class="item"><span class="k cap">현장 접수</span>
+    <div class="t"><p>${esc(c.raw_text || '(사진만)')}</p><small>${esc(c.created_by_name || '')} · AI 판정: ${esc(c.kind)}</small>
+    ${withActions ? `<div class="act"><a class="btn" href="${esc(D.erpUrl)}/inbox" target="_blank" rel="noopener" style="display:inline-grid;place-items:center;text-decoration:none">ERP 접수함에서 승인 ↗</a></div>` : ''}</div>
+    <span class="when">${kst(c.created_at)}</span></div>`;
+}
+
+function home() {
+  const today = D.today;
+  const overdue = D.teams.reduce((s, t) => s + t.overdue, 0);
+  const openN = D.teams.reduce((s, t) => s + t.open, 0);
+  const k = D.kpi && D.kpi.ok ? D.kpi : null;
+  const dateLabel = new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'long',day:'numeric',weekday:'long'});
+  const decideTop = [...D.decide.map(c => itemHtml(c, false)), ...D.captures.map(c => captureHtml(c, false))].slice(0, 5);
+  const teamCards = D.teams.sort((a,b) => (b.open + b.newToday) - (a.open + a.newToday)).map(t => {
+    const dot = t.overdue ? 'warn' : (t.open || t.newToday) ? '' : 'idle';
+    return `<div class="team"><h3><i class="${dot}"></i>${esc(t.team)}</h3>
+      <dl><div><dt>진행 중</dt><dd>${t.open}</dd></div><div><dt>오늘 완료</dt><dd>${t.doneToday}</dd></div><div><dt>마감 지남</dt><dd${t.overdue ? ' class="up"' : ''}>${t.overdue}</dd></div></dl>
+      <p>${t.latest ? esc(t.latest) : '아직 올라온 업무가 없어요'}</p></div>`;
+  }).join('');
+  const cal = D.campaigns.map(c => {
+    const d = new Date(c.start_date + 'T00:00:00+09:00');
+    return `<div class="item"><div class="date"><small>${d.getMonth()+1}월</small><b>${d.getDate()}</b></div>
+      <div class="t"><p>${esc(c.title)}</p><small>${esc(c.channel || '')}${c.end_date && c.end_date !== c.start_date ? ' · ~' + esc(c.end_date.slice(5)) : ''}${c.discount_rate != null ? ' · ' + esc(c.discount_rate) + '%' : ''}</small></div>
+      <span class="when">${c.status === 'draft' ? '예정' : esc(c.status)}</span></div>`;
+  }).join('');
+  const money = k ? `<section class="sec"><div class="sec-h"><h2>LUMEN 매출</h2><span>기준 ${esc(k.as_of)} · PMS</span></div>
+      <div class="money">
+        <div class="stat"><b>${won(num(k.period?.p7?.total_krw))}</b><span>최근 7일</span></div>
+        <div class="stat"><b>${won(num(k.period?.p30?.total_krw))}</b><span>최근 30일</span></div>
+        <div class="stat"><b class="${num(k.mom_pct) > 0 ? 'up' : num(k.mom_pct) < 0 ? 'down' : ''}">${num(k.mom_pct) == null ? '–' : (num(k.mom_pct) > 0 ? '+' : '') + num(k.mom_pct) + '%'}</b><span>직전 30일 대비</span></div>
+        <div class="stat${num(k.inventory?.flag_exceed) ? ' warn' : ''}"><b>${num(k.inventory?.out_of_stock) ?? '–'}</b><span>품절 SKU (초과판매 위험 ${num(k.inventory?.flag_exceed) ?? 0})</span></div>
+      </div></section>` : `<section class="sec"><div class="sec-h"><h2>LUMEN 매출</h2><span>PMS 연결이 지금은 안 돼요</span></div></section>`;
+
+  return `<div class="cover" aria-hidden="true"></div>
+    <div class="hello"><h1>${esc(greet())}</h1><p>${esc(dateLabel)} · 결정할 것 ${D.decide.length + D.captures.length}건이 기다리고 있어요</p></div>
+    <div class="stats">
+      <div class="stat"><b>${D.decide.length + D.captures.length}</b><span>결정할 것</span></div>
+      <div class="stat"><b>${openN}</b><span>팀 진행 중 업무</span></div>
+      <div class="stat${overdue ? ' warn' : ''}"><b>${overdue}</b><span>마감 지난 할 일</span></div>
+      <div class="stat"><b>${D.campaigns.length}</b><span>30일 안 기획전</span></div>
+    </div>
+    <section class="sec"><div class="sec-h"><h2>결정할 것</h2><span>먼저 올라온 순</span><a href="#inbox">모두 처리하기 →</a></div>
+      <div class="list">${decideTop.join('') || '<p class="empty">지금 결정할 것이 없어요</p>'}</div></section>
+    <section class="sec"><div class="sec-h"><h2>팀</h2><span>최근 30일 업무 카드 기준</span></div>
+      <div class="teams">${teamCards || '<p class="empty">팀이 지정된 직원이 아직 없어요 — ERP 사용자관리에서 팀을 정해주세요</p>'}</div></section>
+    <section class="sec cal"><div class="sec-h"><h2>다가오는 일정</h2><span>운영캘린더 · 30일</span></div>
+      <div class="list">${cal || '<p class="empty">30일 안에 잡힌 기획전이 없어요</p>'}</div></section>
+    ${money}`;
+}
+
+function inbox() {
+  const groups = [
+    ['확인 요청', D.decide.filter(c => c.kind === 'request_check')],
+    ['내 할 일', D.decide.filter(c => c.kind === 'todo')],
+    ['캘린더 등록 대기', D.decide.filter(c => c.kind === 'schedule')],
+  ];
+  const sec = groups.map(([t, list]) => `<section class="sec"><div class="sec-h"><h2>${t}</h2><span>${list.length}건</span></div>
+    <div class="list">${list.map(c => itemHtml(c, true)).join('') || '<p class="empty">없어요</p>'}</div></section>`).join('');
+  return sec + `<section class="sec"><div class="sec-h"><h2>현장 접수 승인 대기</h2><span>${D.captures.length}건 · 금액·품명 확인이 필요해 ERP에서 승인</span></div>
+    <div class="list">${D.captures.map(c => captureHtml(c, true)).join('') || '<p class="empty">없어요</p>'}</div></section>`;
+}
+
+function render() {
+  const v = (location.hash || '#home').slice(1);
+  document.querySelectorAll('.nav a[data-v]').forEach(a => a.classList.toggle('on', a.dataset.v === v));
+  document.getElementById('crumb').textContent = v === 'inbox' ? '결정할 것' : '홈';
+  document.getElementById('view').innerHTML = `<div class="inner" style="padding:0">${v === 'inbox' ? inbox() : home()}</div>`;
+}
+window.addEventListener('hashchange', () => D && render());
+
+// 승인함 버튼 — ERP 의 업무 카드 API 를 그대로 부른다 (권한은 서버가 다시 본다)
+document.getElementById('view').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-a]'); if (!b) return;
+  const id = b.dataset.id, a = b.dataset.a;
+  const inp = document.getElementById('r-' + id);
+  const card = D.decide.find(c => c.id === id);
+  try {
+    b.disabled = true;
+    if (a === 'reply') {
+      if (!inp.value.trim()) { inp.focus(); b.disabled = false; return; }
+      await api(`/api/work/${encodeURIComponent(id)}/reply`, { text: inp.value.trim() });
+    } else if (a === 'done') {
+      await api(`/api/work/${encodeURIComponent(id)}/done`, { note: inp?.value.trim() || '' });
+    } else if (a === 'confirm') {
+      const p = card?.parsed || {};
+      if (!p.title || !p.startDate) { alertInline(b, '이름·날짜가 없어 ERP 업무 피드에서 채워 등록해야 해요'); b.disabled = false; return; }
+      await api(`/api/work/${encodeURIComponent(id)}/confirm`, { payload: p, shareTeams: p.shareTeams || [] });
+    }
+    await load();
+  } catch (err) { alertInline(b, err.message); b.disabled = false; }
+});
+function alertInline(btn, msg) {
+  let s = btn.parentElement.querySelector('.err'); if (!s) { s = document.createElement('small'); s.className = 'err'; s.style.flexBasis = '100%'; btn.parentElement.appendChild(s); }
+  s.textContent = msg;
+}
+
+// ───────── 비서실장
+const msgs = document.getElementById('msgs'), q = document.getElementById('q'), askBtn = document.getElementById('askBtn');
+let history = [];
+try { history = JSON.parse(sessionStorage.getItem('ceo-chat') || '[]'); } catch { history = []; }
+history.forEach(h => bubble(h.role === 'user' ? 'u' : 'a', h.content));
+if (history.length) document.getElementById('sugs').remove();
+
+function bubble(cls, text) {
+  const d = document.createElement('div'); d.className = 'm ' + cls; d.textContent = text;
+  msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d;
+}
+async function ask(text) {
+  text = text.trim(); if (!text || askBtn.disabled) return;
+  document.getElementById('sugs')?.remove();
+  document.getElementById('aiErr').hidden = true;
+  bubble('u', text); q.value = ''; autosize();
+  const w = bubble('a wait', '살펴보는 중… 0초');
+  const t0 = Date.now(); const tick = setInterval(() => { w.textContent = `살펴보는 중… ${Math.floor((Date.now() - t0) / 1000)}초 (보통 10~30초)`; }, 500);
+  askBtn.disabled = true;
+  try {
+    const r = await api('/api/ceo/ask', { question: text, history: history.slice(-8) });
+    w.className = 'm a'; w.textContent = r.answer;
+    history.push({ role: 'user', content: text }, { role: 'assistant', content: r.answer });
+    try { sessionStorage.setItem('ceo-chat', JSON.stringify(history.slice(-20))); } catch {}
+  } catch (e) {
+    w.remove(); const er = document.getElementById('aiErr'); er.hidden = false; er.textContent = '답을 받지 못했어요: ' + e.message;
+  } finally { clearInterval(tick); askBtn.disabled = false; msgs.scrollTop = msgs.scrollHeight; }
+}
+document.getElementById('askForm').addEventListener('submit', e => { e.preventDefault(); ask(q.value); });
+q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); ask(q.value); } });
+function autosize() { q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, 160) + 'px'; }
+q.addEventListener('input', autosize);
+document.getElementById('sugs')?.addEventListener('click', e => { const b = e.target.closest('button'); if (b) ask(b.textContent); });
+
+// 좁은 화면: 비서실장은 오른쪽에서 열리는 서랍
+const ai = document.getElementById('ai'), close = document.getElementById('aiClose');
+document.getElementById('aiToggle').addEventListener('click', () => { ai.classList.add('open'); close.hidden = false; q.focus(); });
+close.addEventListener('click', () => { ai.classList.remove('open'); close.hidden = true; });
+
+load();
+setInterval(load, 120000); // 2분마다 새로 읽는다
+</script>
+</body>
+</html>

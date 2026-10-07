@@ -18,7 +18,7 @@ type Kind = typeof KINDS[number];
  * 분류는 짧은 JSON 이라 빠른 Sonnet, 사람이 읽는 답변은 대표 지시대로 Opus.
  */
 const CLASSIFY_MODEL = 'claude-sonnet-5-5';
-const ANSWER_MODEL = 'claude-opus-5-5';
+export const ANSWER_MODEL = 'claude-opus-5-5';
 
 const CHANNELS = ['자사몰', '센텀', '29CM', 'W컨셉', '쇼룸', '해외'];
 
@@ -33,12 +33,12 @@ const cleanTeams = (v: unknown, own: string) =>
   Array.isArray(v) ? Array.from(new Set(v.map(String).filter(t => TEAMS.includes(t) && t !== own))) : null;
 
 const genId = (p: string) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-const kstToday = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+export const kstToday = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 
-type Member = { id: string; name: string; team: string; position: string; role: string; email: string; profile: string };
+export type Member = { id: string; name: string; team: string; position: string; role: string; email: string; profile: string };
 
 /** 직원이 쓴 글을 프롬프트에 넣을 때 — 꺾쇠를 막아 <records>·<profile> 구역을 끊지 못하게 (코덱스 지적) */
-const esc = (s: string) => s.replace(/</g, '‹').replace(/>/g, '›');
+export const esc = (s: string) => s.replace(/</g, '‹').replace(/>/g, '›');
 
 const PROFILE_MAX = 1000;
 
@@ -47,7 +47,7 @@ const logUsage = (step: string, r: Anthropic.Message) =>
   console.log(`[work] usage ${step} ${r.model} in=${r.usage.input_tokens} out=${r.usage.output_tokens} stop=${r.stop_reason}`);
 
 /** 세션 사용자에 팀·직책을 붙여 읽는다 (auth.ts 의 SessionUser 에는 없다) */
-async function members(): Promise<Member[]> {
+export async function members(): Promise<Member[]> {
   const r = await restAsServer('app_users?is_active=eq.true&select=id,name,team,position,role,email,work_profile');
   if (!r.ok) return [];
   return (await r.json()).map((u: any) => ({
