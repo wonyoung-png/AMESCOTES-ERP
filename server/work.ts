@@ -13,8 +13,12 @@ const router = Router();
 const KINDS = ['request_check', 'schedule', 'share', 'question'] as const;
 type Kind = typeof KINDS[number];
 
-/** 판정·답변 모델. 바꿀 땐 여기 한 곳. 2026-10-07 서버에서 호출 확인 (opus-5-5 200, 약 2초) — 대표 지시로 Opus */
-const MODEL = 'claude-opus-5-5';
+/**
+ * 모델. 2026-10-07 서버에서 둘 다 호출 확인 (opus-5-5 약 2.2초, sonnet-5-5 약 1.5초).
+ * 분류는 짧은 JSON 이라 빠른 Sonnet, 사람이 읽는 답변은 대표 지시대로 Opus.
+ */
+const CLASSIFY_MODEL = 'claude-sonnet-5-5';
+const ANSWER_MODEL = 'claude-opus-5-5';
 
 const CHANNELS = ['자사몰', '센텀', '29CM', 'W컨셉', '쇼룸', '해외'];
 
@@ -96,7 +100,7 @@ JSON 하나만 출력한다. 설명 금지.
 
   try {
     const r = await new Anthropic({ apiKey: key }).messages.create({
-      model: MODEL,
+      model: CLASSIFY_MODEL,
       max_tokens: 600,
       system: sys,
       messages: [{ role: 'user', content: opts.text }],
@@ -168,7 +172,7 @@ ${esc(cards.map(fmtCard).join('\n')) || '(없음)'}
 <question>${esc(question)}</question>`;
   try {
     const r = await new Anthropic({ apiKey: key }).messages.create({
-      model: MODEL, max_tokens: 500, system: sys,
+      model: ANSWER_MODEL, max_tokens: 500, system: sys,
       messages: [{ role: 'user', content: user }],
     });
     return r.content.find(c => c.type === 'text')?.text?.trim() || '답을 만들지 못했습니다.';
