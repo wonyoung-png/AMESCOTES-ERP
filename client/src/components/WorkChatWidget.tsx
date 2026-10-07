@@ -36,6 +36,34 @@ function aiLine(c: Card, me: Me | null): string {
   }
 }
 
+/**
+ * 기다리는 동안 몇 초 지났는지·보통 얼마 걸리는지 보여준다.
+ * 실측(10/7, Opus): 판정만 3~5초, 질문은 답까지 두 번 불러 5~8초.
+ * ponytail: 막대는 진짜 진행률이 아니라 8초 기준 추정치. 정확히 하려면 응답 스트리밍으로 바꿔야 한다.
+ */
+function WaitBubble() {
+  const [sec, setSec] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const t = setInterval(() => setSec(Math.floor((Date.now() - start) / 1000)), 250);
+    return () => clearInterval(t);
+  }, []);
+  const step = sec < 3 ? '글을 읽는 중' : sec < 6 ? '기록을 찾는 중' : '답을 정리하는 중';
+  return (
+    <div className="w-56 rounded-2xl rounded-bl-sm bg-[var(--fill-quaternary)] px-3 py-2 text-sm text-muted-foreground">
+      <div className="flex justify-between gap-2">
+        {/* 단계 문구만 읽어 준다. 초 단위 숫자까지 읽으면 화면낭독기가 매초 끼어든다 (코덱스 지적) */}
+        <span role="status" aria-live="polite">{sec < 15 ? `${step}…` : '평소보다 오래 걸리고 있어요…'}</span>
+        <span className="tabular-nums shrink-0" aria-hidden="true">{sec}초</span>
+      </div>
+      <div className="mt-1.5 h-1 rounded-full bg-border overflow-hidden">
+        <div className="h-full bg-primary transition-[width] duration-300" style={{ width: `${Math.min(95, (sec / 8) * 100)}%` }} />
+      </div>
+      <p className="text-[11px] mt-1">보통 3~8초 걸려요</p>
+    </div>
+  );
+}
+
 export default function WorkChatWidget() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Card[]>([]);
@@ -146,7 +174,7 @@ export default function WorkChatWidget() {
                   <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-3 py-2 text-sm whitespace-pre-wrap break-words">{pending}</div>
                 </div>
                 <div className="flex justify-start">
-                  <div className="rounded-2xl rounded-bl-sm bg-[var(--fill-quaternary)] px-3 py-2 text-sm text-muted-foreground">읽는 중…</div>
+                  <WaitBubble />
                 </div>
               </div>
             )}
