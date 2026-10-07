@@ -17,7 +17,7 @@ type Kind = typeof KINDS[number];
  * 모델. 2026-10-07 서버에서 둘 다 호출 확인 (opus-5-5 약 2.2초, sonnet-5-5 약 1.5초).
  * 분류는 짧은 JSON 이라 빠른 Sonnet, 사람이 읽는 답변은 대표 지시대로 Opus.
  */
-const CLASSIFY_MODEL = 'claude-sonnet-5-5';
+export const CLASSIFY_MODEL = 'claude-sonnet-5-5';
 export const ANSWER_MODEL = 'claude-opus-5-5';
 
 const CHANNELS = ['자사몰', '센텀', '29CM', 'W컨셉', '쇼룸', '해외'];

@@ -16,6 +16,7 @@ import captureRouter from "./capture.js";
 import workRouter from "./work.js";
 import usersRouter from "./users.js";
 import ceoRouter, { ceoHostGate } from "./ceo.js";
+import { startAgentScheduler } from "./agents.js";
 import pixelRouter from "./pixel.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -123,6 +124,7 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`[server] AMESCOTES ERP 서버 시작 — port ${port}`);
+    startAgentScheduler(); // 팀 에이전트 아침 점검 (KST 08:30 이후 하루 한 번)
   });
 }
 

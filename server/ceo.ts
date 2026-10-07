@@ -14,6 +14,7 @@ import CONSOLE_HTML from './ceo-console.html';
 import { currentUser, restAsServer, type SessionUser } from './auth.js';
 import { members, esc, kstToday, ANSWER_MODEL } from './work.js';
 import { dailyFetch } from './daily-bridge.js';
+import { latestRuns, runAgentsOnce } from './agents.js';
 
 const router = Router();
 
@@ -86,7 +87,7 @@ async function gather(me: SessionUser) {
   const today = kstToday();
   const in30 = new Date(Date.now() + 9 * 3600e3 + 30 * 864e5).toISOString().slice(0, 10);
   const ago3 = new Date(Date.now() + 9 * 3600e3 - 3 * 864e5).toISOString().slice(0, 10);
-  const [cr, pr, kr, all, kpi] = await Promise.all([
+  const [cr, pr, kr, all, kpi, agents] = await Promise.all([
     // 대표는 전부 본다 — 질문(개인 대화)만 뺀다
     restAsServer(`work_cards?kind=neq.question&created_at=gte.${since}&select=*&order=created_at.desc&limit=300`),
     restAsServer(`capture_inbox?status=eq.pending&select=id,created_at,created_by_name,raw_text,kind,parsed,confidence&order=created_at.desc&limit=50`),
@@ -94,6 +95,7 @@ async function gather(me: SessionUser) {
       `&end_date=gte.${ago3}&start_date=lte.${in30}&order=start_date.asc&limit=50`),
     members(),
     salesKpi(),
+    latestRuns(),
   ]);
   const cards: any[] = cr.ok ? await cr.json() : [];
   const captures: any[] = pr.ok ? await pr.json() : [];
@@ -121,7 +123,7 @@ async function gather(me: SessionUser) {
   // 팀원이 있는 팀은 카드가 없어도 보인다
   for (const m of all) if (m.team && !teams.has(m.team)) teams.set(m.team, { team: m.team, open: 0, doneToday: 0, newToday: 0, overdue: 0 });
 
-  return { me, today, cards, open, decide, captures, campaigns, teams: Array.from(teams.values()), members: all, kpi };
+  return { me, today, cards, open, decide, captures, campaigns, teams: Array.from(teams.values()), members: all, kpi, agents };
 }
 
 // ───────────────────────── 화면용 요약
@@ -138,6 +140,7 @@ router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response
       teams: g.teams,
       recent: g.cards.slice(0, 20),
       kpi: g.kpi,
+      agents: g.agents,
       erpUrl: ERP_URL,
     });
   } catch (e) {
@@ -174,6 +177,7 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
       '', '[운영캘린더 — 지난 3일~앞으로 30일]', ...g.campaigns.map(c => `- ${c.start_date}~${c.end_date} ${c.channel || ''} ${c.title} (${c.status === 'draft' ? '예정' : c.status}${c.discount_rate != null ? ', ' + c.discount_rate + '%' : ''})`),
       '', '[승인 대기 현장 접수]', ...g.captures.map(c => `- ${c.created_at.slice(0, 10)} ${c.created_by_name} [${c.kind}] ${c.raw_text}`),
       '', '[업무 기록 — 최근 30일, 전 팀]', ...g.cards.slice(0, 200).map(fmtCard),
+      '', '[팀 에이전트 최근 점검]', ...g.agents.map(a => `- ${a.team} (${a.created_at.slice(0, 16)}) [${a.status}] ${a.headline}${a.summary ? ' / ' + a.summary.replace(/\s+/g, ' ') : ''}`),
       '', '[브랜드 매출 요약 (PMS)]', g.kpi ? JSON.stringify(g.kpi).slice(0, 6000) : '(지금은 불러오지 못함)',
     ].join('\n');
 
@@ -202,6 +206,20 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
     res.json({ answer: text });
   } catch (e) {
     console.error('POST /api/ceo/ask 실패:', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ───────────────────────── 팀 에이전트 점검 (대표가 [지금 점검])
+
+router.post('/api/ceo/agents/run', requireCeo(), async (req: Request, res: Response) => {
+  try {
+    const team = typeof req.body?.team === 'string' ? req.body.team.slice(0, 40) : undefined;
+    const runs = await runAgentsOnce('manual', team);
+    if (!runs) { res.status(409).json({ error: 'busy', message: '이미 점검 중이에요. 잠시 후 다시 눌러주세요' }); return; }
+    res.json({ runs });
+  } catch (e) {
+    console.error('POST /api/ceo/agents/run 실패:', e);
     res.status(500).json({ error: 'internal' });
   }
 });
