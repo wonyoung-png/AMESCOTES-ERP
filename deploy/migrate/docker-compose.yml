@@ -1,0 +1,115 @@
+# AMESCOTES ERP — 새 서버 운영 스택
+#
+# 지금 서버(비그로우 AWS 계정)에서 쓰던 것과 다른 점 셋:
+#
+#  1. ECR 이미지를 쓰지 않는다. 세 앱 모두 소스에서 직접 빌드한다.
+#     ECR 레지스트리가 비그로우 계정에 있어서, 그 계정을 떠나면 이미지를 못 받는다.
+#  2. awslogs 로깅을 쓰지 않는다. AWS 가 아닌 곳에서도 돌아야 하고,
+#     지금 로그도 그쪽 계정 CloudWatch 에 쌓이고 있었다.
+#  3. 주소를 변수로 뺐다. 지금은 IP 가 주소라서(54-116-241-64.sslip.io)
+#     서버를 옮길 때마다 주소가 바뀌었다. 앞으로는 ameserp.kr 을 쓴다.
+#
+# 쓰는 법: bootstrap.sh 가 소스를 /opt/app/src/{erp,daily,hr} 로 받아 둔 뒤 이 파일을 쓴다.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: erp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      PGRST_AUTHENTICATOR_PASSWORD: ${PGRST_AUTHENTICATOR_PASSWORD:?}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # 빈 DB 로 처음 뜰 때만 도는 초기화. 옮겨온 덤프를 넣을 때는
+      # cutover.sh 가 이 뒤에 restore 하므로 순서가 엉키지 않는다.
+      - ./src/erp/db/00_roles.sh:/docker-entrypoint-initdb.d/00_roles.sh:ro
+      - ./src/erp/supabase/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./src/erp/db/99_grants.sh:/docker-entrypoint-initdb.d/99_grants.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d erp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: &logs
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.12
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${PGRST_AUTHENTICATOR_PASSWORD:?}@db:5432/erp
+      PGRST_DB_SCHEMAS: public
+      # PGRST_DB_ANON_ROLE 미설정 = 무토큰 요청 401 (로그인 토큰 필수)
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?}
+    logging: *logs
+
+  app:
+    build:
+      context: ./src/erp
+      args:
+        VITE_SUPABASE_URL: https://${ERP_HOST:?}
+        VITE_SUPABASE_ANON_KEY: ${PGRST_JWT_SECRET:?}
+    image: amescotes-erp:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SHARE_PASS: ""                        # 서버 검증 로그인으로 대체 (2026-08-04)
+      PMS_COOKIE_DOMAIN: ".${ROOT_DOMAIN:?}"  # daily 서브도메인과 로그인 공유
+      DAILY_URL: http://daily:8000
+    depends_on: [postgrest]
+    logging: *logs
+
+  daily:
+    build: { context: ./src/daily }
+    image: atlm-daily-check:latest
+    restart: unless-stopped
+    env_file: daily.env
+    environment:
+      PORT: "8000"
+      DB_PATH: /app/data/daily.db
+      DATA_DIR: /app/data
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?}
+      POSTGREST_URL: http://postgrest:3000
+      CAFE24_REDIRECT: https://daily.${ROOT_DOMAIN:?}/api/cafe24/callback
+    volumes:
+      - ./daily-data:/app/data
+    logging: *logs
+
+  hr:
+    build: { context: ./src/hr }
+    image: atlm-hr:latest
+    restart: unless-stopped
+    env_file: hr.env
+    environment:
+      PORT: "8100"
+      DB_PATH: /app/data/hr.db
+      TZ: Asia/Seoul
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?}
+    volumes:
+      - ./hr-data:/app/data
+    logging: *logs
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [app]
+    ports: ["80:80", "443:443"]
+    environment:
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?}
+      ERP_HOST: ${ERP_HOST:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./src/erp/deploy/shell:/srv/shell:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logs
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:

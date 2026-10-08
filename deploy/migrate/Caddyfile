@@ -1,0 +1,90 @@
+# AMESCOTES ERP — 새 서버 라우팅
+#
+# 주소를 환경변수로 뺐다. 지금 서버는 IP 가 곧 주소라(54-116-241-64.sslip.io)
+# 서버를 옮길 때마다 주소가 바뀌고, 쿠키·OAuth 콜백·북마크가 전부 깨졌다.
+# 앞으로는 ameserp.kr 이 주소다 — 서버를 또 옮겨도 주소는 그대로다.
+#
+# HTTPS 인증서는 Caddy 가 Let's Encrypt 에서 알아서 받는다. DNS 가 이 서버를
+# 가리키고 80·443 이 열려 있으면 그걸로 끝이다.
+
+{
+	email wonyoung@atlm.kr
+}
+
+(erp) {
+	encode zstd gzip
+	log {
+		output stdout
+		format json
+	}
+
+	handle_path /rest/v1/* {
+		reverse_proxy postgrest:3000
+	}
+
+	# 자체 호스팅이라 Supabase Auth 는 없다. 옛 클라이언트가 찔러도 조용히 끝낸다
+	handle /auth/v1/* {
+		header Content-Type application/json
+		respond `{"error":"invalid_grant","error_description":"Supabase Auth disabled (self-hosted)"}` 400
+	}
+
+	handle {
+		reverse_proxy app:4000 {
+			flush_interval -1
+		}
+	}
+}
+
+{$ERP_HOST} {
+	import erp
+}
+
+# 대표 콘솔 — 대표 계정만 (앱 서버 ceo.ts 가 계정을 확인한다)
+ceo.{$ROOT_DOMAIN} {
+	encode zstd gzip
+	log {
+		output stdout
+		format json
+	}
+	reverse_proxy app:4000 {
+		flush_interval -1
+	}
+}
+
+# PMS (데일리 점검·상품관리)
+daily.{$ROOT_DOMAIN} {
+	encode zstd gzip
+	log {
+		output stdout
+		format json
+	}
+	reverse_proxy daily:8000
+}
+
+# HR (근태·휴가·계좌·카드·세금계산서)
+hr.{$ROOT_DOMAIN} {
+	encode zstd gzip
+	log {
+		output stdout
+		format json
+	}
+	reverse_proxy hr:8100
+}
+
+# 런처 셸 — 정적 파일이라 컨테이너가 필요 없다
+os.{$ROOT_DOMAIN} {
+	encode zstd gzip
+	root * /srv/shell
+	file_server
+}
+
+# 맨 주소·http 로 들어오면 정식 주소로 보낸다.
+# 헬스체크만은 직접 답한다 — 리다이렉트를 받으면 감시 도구가 죽은 줄 안다
+http:// {
+	handle /healthz {
+		reverse_proxy app:4000
+	}
+	handle {
+		redir https://{$ERP_HOST}{uri} 308
+	}
+}
