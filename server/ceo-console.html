@@ -175,6 +175,11 @@ button,input,textarea{font:inherit;color:inherit}
 .order label{font-weight:600;font-size:13px}
 .order textarea{resize:vertical;border:1px solid var(--line);border-radius:10px;background:var(--canvas);padding:10px 12px;font:inherit}
 .order .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cap-view{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px 16px;margin:0}
+.cap-view dt{font-size:11px;color:var(--faint)}
+.cap-view dd{margin:2px 0 0;font-size:14px;color:var(--ink)}
+.cap-view dd.empty{color:var(--faint)}
+.cap-form .hint.warn{color:var(--danger)}
 .cap-item{border-bottom:1px solid var(--line)}
 .cap-item:last-child{border-bottom:0}
 .cap-item summary{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;list-style:none}
@@ -187,11 +192,6 @@ button,input,textarea{font:inherit;color:inherit}
 .cap-item .cap-form{padding:0 16px 16px 34px;margin-top:0}
 .cap-form{display:grid;gap:10px;margin-top:10px}
 .cap-photo{max-width:220px;max-height:220px;border-radius:10px;border:1px solid var(--line);object-fit:contain;background:var(--canvas)}
-.chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font:inherit;font-size:12px;color:var(--sub);cursor:pointer}
-.chip.on{border-color:var(--ink);color:var(--ink);font-weight:600}
-.cap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
-.cap-form .f{display:grid;gap:3px;font-size:11px;color:var(--faint)}
 .cap-form input,.cap-form select{border:1px solid var(--line);border-radius:8px;background:var(--canvas);padding:7px 9px;font:inherit;font-size:13px;color:var(--ink);min-width:0}
 .cap-form .act{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .cap-form .act input{flex:1;min-width:140px}
@@ -303,7 +303,7 @@ const capOpen = new Set(); // 펼친 접수 id (다시 그려도 유지)
 function captureHtml(c, withActions) {
   // 결정할 것 화면: 한 줄 목록 → 눌러 펼치면 사진·입력칸·승인
   if (withActions) return `<details class="cap-item" data-capopen="${esc(c.id)}"${capOpen.has(String(c.id)) ? ' open' : ''}>
-    <summary><span class="k cap">${esc(CAP_KIND[(capEdit[c.id]?.kind) || c.kind] || '현장 접수')}</span>
+    <summary><span class="k cap">${esc(CAP_KIND[c.kind] || '현장 접수')}</span>
       <span class="cap-t">${esc(c.raw_text || '(사진만)')}</span>
       <small>${esc(c.created_by_name || '')}${c.has_photo ? ' · 사진' : ''}</small>
       <span class="when">${kst(c.created_at)}</span></summary>
@@ -317,35 +317,39 @@ function captureHtml(c, withActions) {
  * 접수 바로 승인 — ERP 접수함(CaptureInbox.tsx)과 같은 값을 같은 API(/api/captures/:id/approve)로 보낸다.
  * 메인 납품은 발주를 골라야 해서 ERP 로 보낸다. 승인 권한·검증은 서버가 다시 한다.
  */
+/**
+ * 10/8 대표: 승인자는 고치지 않는다 — 올린 사람이 쓴 그대로 보고 승인하거나, 모자라면 반려(보완 요청)한다.
+ * 그래서 입력칸 없이 읽기 전용으로 보여준다. 필수값이 비면 승인 버튼을 막고 반려 사유를 미리 적어 둔다.
+ */
+const CAP_REQUIRED = { sample: [['styleName', '품명']], material: [['styleName', '품목'], ['amountKrw', '금액']] };
 function captureForm(c) {
-  const v = k => capEdit[c.id]?.[k] ?? c.parsed?.[k] ?? '';
-  const kind = v('kind') || c.kind;
+  const p = c.parsed || {}, kind = c.kind;
+  const won = n => Number(n) > 0 ? Number(n).toLocaleString() + '원' : '';
+  const buyer = id => { const b = (D.buyers || []).find(x => x.id === String(id)); return b ? (b.brands.map(x => x.name).join('·') || b.name) : `(목록에 없는 거래처 ${id})`; };
+  const rows = kind === 'sample'
+    ? [['품명', p.styleName], ['품번', p.styleNo], ['브랜드', p.brand], ['컬러', p.color], ['단계', p.stage], ['수량', p.qty], ['금액', won(p.amountKrw)]]
+    : kind === 'material'
+    ? [['품목', p.styleName], ['금액', won(p.amountKrw)], ['거래처', p.vendorName], ['결제수단', p.expenseType || '법인카드 (안 적혀 기본값)'], ['지출일', p.requestDate],
+       ['바이어 청구', p.billBuyerId ? `${buyer(p.billBuyerId)} ${won(p.billAmountKrw)}` : '']]
+    : [];
   const photo = c.has_photo ? `/api/ceo/capture-photo/${encodeURIComponent(c.id)}` : '';
-  const inp = (k, ph, type = 'text') => `<label class="f"><span>${ph}</span><input data-k="${k}" type="${type}" value="${esc(v(k))}"></label>`;
-  const sel = (k, label, opts, cur = v(k)) => `<label class="f"><span>${label}</span><select data-k="${k}">${opts.map(([val, t]) => `<option value="${esc(val)}"${String(cur) === String(val) ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
-  const brands = (D.buyers || []).flatMap(b => b.brands.map(x => [`${b.id}|${x.code}|${x.name}`, x.name]));
-  // AI 가 찾은 브랜드를 기본으로 골라 둔다
-  const brandCur = capEdit[c.id]?._brand ?? (brands.find(([val]) => c.parsed?.buyerId && val.startsWith(`${c.parsed.buyerId}|${c.parsed.brandCode || ''}|`))?.[0] || '');
-  const buyers = (D.buyers || []).map(b => [b.id, b.brands.map(x => x.name).join('·') || b.name]);
-  let fields = '';
-  if (kind === 'sample') fields = inp('styleName', '품명 *') + sel('_brand', '브랜드', [['', '— 고르세요 —'], ...brands], brandCur) + inp('color', '컬러')
-    + sel('stage', '단계', ['1차', '2차', '3차', '4차', '최종승인', '반려'].map(s => [s, s])) + inp('amountKrw', '금액 (원)', 'number');
-  else if (kind === 'material') fields = inp('styleName', '품목 *') + inp('amountKrw', '금액 (원) *', 'number') + inp('vendorName', '거래처')
-    + sel('expenseType', '결제수단', ['법인카드', '계좌이체', '현금'].map(s => [s, s])) + inp('requestDate', '지출일', 'date')
-    + sel('billBuyerId', '바이어 청구 (선택)', [['', '청구 안 함'], ...buyers]) + inp('billAmountKrw', '청구금액 (원)', 'number');
-  const kinds = ['sample', 'material', 'delivery'].map(k => `<button type="button" class="chip${kind === k ? ' on' : ''}" data-capkind="${k}">${CAP_KIND[k]}</button>`).join('');
+  const missing = (CAP_REQUIRED[kind] || []).filter(([k]) => kind === 'material' && k === 'amountKrw' ? !(Number(p[k]) > 0) : !String(p[k] ?? '').trim()).map(([, l]) => l);
+  const ready = (kind === 'sample' || kind === 'material') && !missing.length;
+  const why = kind === 'delivery' ? '메인 납품은 어느 발주인지 골라야 해서 ERP 접수함에서 처리해요'
+    : !(kind === 'sample' || kind === 'material') ? `AI 가 종류를 못 가렸어요 (${CAP_KIND[kind] || kind}) — 종류를 적어 다시 올리게 반려하세요`
+    : missing.length ? `${missing.join('·')}이(가) 비어 있어 승인할 수 없어요 — 반려해서 보완을 요청하세요` : '';
+  const reason = capEdit[c.id]?._reason ?? (missing.length ? `${missing.join('·')}을(를) 적어서 다시 올려주세요` : '');
   return `<div class="cap-form" data-cap="${esc(c.id)}">
     ${photo ? `<img class="cap-photo" src="${esc(photo)}" alt="접수 사진" loading="lazy">` : ''}
-    <div class="chips">${kinds}</div>
-    ${kind === 'delivery' || !fields
-      ? `<p class="hint">메인 납품은 어느 발주인지 골라야 해서 ERP 접수함에서 승인해요.</p>
-         <a class="btn" href="${esc(D.erpUrl)}/inbox" target="_blank" rel="noopener">ERP 접수함 열기 ↗</a>`
-      : `<div class="cap-grid">${fields}</div>
-         <div class="act"><button class="btn pri" type="button" data-capact="approve">승인</button>
-           <input data-k="_reason" placeholder="반려 사유 (반려할 때만)"><button class="btn" type="button" data-capact="reject">반려</button></div>`}
+    <dl class="cap-view">${rows.map(([l, val]) => `<div><dt>${l}</dt><dd${val === '' || val == null ? ' class="empty"' : ''}>${esc(val === '' || val == null ? '—' : val)}</dd></div>`).join('')}</dl>
+    ${why ? `<p class="hint${missing.length ? ' warn' : ''}">${esc(why)}</p>` : ''}
+    <div class="act">
+      ${kind === 'delivery' ? `<a class="btn" href="${esc(D.erpUrl)}/inbox" target="_blank" rel="noopener">ERP 접수함 열기 ↗</a>`
+        : `<button class="btn pri" type="button" data-capact="approve"${ready ? '' : ' disabled'}>승인</button>`}
+      <input data-k="_reason" placeholder="반려 사유 (올린 사람에게 그대로 보여요)" value="${esc(reason)}"><button class="btn" type="button" data-capact="reject">반려</button>
+    </div>
   </div>`;
 }
-
 function home() {
   const today = D.today;
   const overdue = D.teams.reduce((s, t) => s + t.overdue, 0);
@@ -584,31 +588,21 @@ document.getElementById('view').addEventListener('input', e => {
 document.getElementById('view').addEventListener('click', async e => {
   const f = e.target.closest('.cap-form'); if (!f) return;
   const id = f.dataset.cap, c = D.captures.find(x => x.id === id); if (!c) return;
-  const kb = e.target.closest('[data-capkind]');
-  if (kb) { (capEdit[id] ||= {}).kind = kb.dataset.capkind; render(); return; }
-  const b = e.target.closest('[data-capact]'); if (!b) return;
+  const b = e.target.closest('[data-capact]'); if (!b || b.disabled) return;
   if (capBusy.has(id)) return; // 승인·반려가 겹쳐 나가지 않게 접수 단위로 잠근다 (코덱스 지적)
-  const ed = capEdit[id] || {};
+  const before = [...f.querySelectorAll('button')].map(x => x.disabled);
   capBusy.add(id); f.querySelectorAll('button').forEach(x => x.disabled = true);
-  const unlock = () => { capBusy.delete(id); f.querySelectorAll('button').forEach(x => x.disabled = false); };
+  const unlock = () => { capBusy.delete(id); f.querySelectorAll('button').forEach((x, i) => x.disabled = before[i]); };
   try {
     if (b.dataset.capact === 'reject') {
-      const reason = (ed._reason || '').trim();
+      const reason = (f.querySelector('input[data-k="_reason"]')?.value || '').trim();
       if (!reason) { alertInline(b, '반려 사유를 적어주세요 (올린 사람에게 그대로 보여요)'); unlock(); return; }
       await api(`/api/captures/${encodeURIComponent(id)}/reject`, { reason });
     } else {
-      const { _brand, _reason, ...rest } = ed;
-      const payload = { ...(c.parsed || {}), ...rest, kind: ed.kind || c.kind };
-      const brandVal = _brand ?? f.querySelector('select[data-k="_brand"]')?.value;
-      if (brandVal) { const [buyerId, brandCode, ...n] = brandVal.split('|'); Object.assign(payload, { buyerId, brandCode, brand: n.join('|') }); }
-      // ERP 접수함과 같은 검사 (서버도 다시 막는다)
-      const need = !String(payload.styleName || '').trim() ? (payload.kind === 'material' ? '무엇을 샀는지 적어주세요' : '품명을 넣어주세요')
-        : payload.kind === 'material' && !(Number(payload.amountKrw) > 0) ? '금액을 넣어주세요'
-        : payload.kind === 'material' && !payload.billBuyerId && String(payload.billAmountKrw || '').trim() ? '청구할 곳을 골라주세요' : '';
-      if (need) { alertInline(b, need); unlock(); return; }
-      await api(`/api/captures/${encodeURIComponent(id)}/approve`, { payload });
+      // 올린 사람이 쓴 그대로 승인한다 — 콘솔에서 값을 바꾸지 않는다 (서버가 필수값을 다시 검사)
+      await api(`/api/captures/${encodeURIComponent(id)}/approve`, { payload: { ...(c.parsed || {}), kind: c.kind } });
     }
-    delete capEdit[id]; capBusy.delete(id);
+    delete capEdit[id]; capBusy.delete(id); capOpen.delete(String(id));
     await load();
   } catch (err) { alertInline(b, err.message); unlock(); }
 });
