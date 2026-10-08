@@ -28,6 +28,13 @@ docker compose stop app daily hr
 # ── PostgreSQL
 # 통째로 지우고 다시 넣는다. 덤프에 CREATE 가 들어 있어서 빈 스키마 위에 부으면
 # "이미 있다"로 절반이 튕긴다. 그 절반이 어디인지는 아무도 모른다.
+# 덤프에 erp_server 역할이 섞여 있다 (접수함 승인이 쓰는 역할).
+# 새 DB 초기화 스크립트는 anon·authenticator 만 만들어서, 없으면 복원이 통째로 멈춘다
+log "빠진 역할 만들기"
+docker compose exec -T db psql -U postgres -d postgres -q -c   "do \$\$ begin if not exists (select 1 from pg_roles where rolname='erp_server') then
+     create role erp_server nologin; grant anon to erp_server; grant erp_server to authenticator;
+   end if; end \$\$;"
+
 log "DB 비우고 덤프 넣기"
 docker compose exec -T db psql -U postgres -d postgres -q \
   -c "drop database if exists erp with (force);" -c "create database erp;"
