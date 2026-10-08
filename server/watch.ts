@@ -145,7 +145,8 @@ export async function gatherWatch(): Promise<Map<string, Watch>> {
         `${name} 리오더: 지금 발주 ${ro.now?.length ?? 0}종, 2주 안 ${ro.soon?.length ?? 0}종, 입고 늦음 ${ro.late ?? 0}건, 승인 대기 ${ro.approve?.length ?? 0}건`,
         ...(ro.now || []).slice(0, 6).map((r: any) => `  · 지금 발주: ${r.name} 재고 ${r.stock} / 하루 ${r.per_day} / ${r.order_by || ''}까지`),
         `${name} 재고: 품절 ${inv.out ?? '-'}종, 품절 임박 ${inv.low ?? '-'}종, 장기재고 ${inv.dead ?? '-'}종`],
-      glob: [`${name} 해외몰(쇼피파이) ${trend('shopify')}`, `${name} 품절 ${inv.out ?? '-'}종, 품절 임박 ${inv.low ?? '-'}종`],
+      // 쇼피파이 원화가 2주 내내 0 이면 매출이 없는 게 아니라 PMS 일일점검에 안 들어온 것 — '0원'으로 보고하지 않게
+      glob: [wk('shopify', -14) ? `${name} 해외몰(쇼피파이) ${trend('shopify')}` : `(${name} 해외몰 매출: PMS 일일점검에 원화 값이 비어 있음 — 확인 필요, 0원으로 판단하지 말 것)`, `${name} 품절 ${inv.out ?? '-'}종, 품절 임박 ${inv.low ?? '-'}종`],
       off: [`${name} 매장 ${trend('offline')}, 어제 ${won(Number(y.offline) || 0)}`],
       late: Number(ro.late) || 0,
     };
