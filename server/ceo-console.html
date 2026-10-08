@@ -175,6 +175,9 @@ button,input,textarea{font:inherit;color:inherit}
 .order label{font-weight:600;font-size:13px}
 .order textarea{resize:vertical;border:1px solid var(--line);border-radius:10px;background:var(--canvas);padding:10px 12px;font:inherit}
 .order .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.order label small,.order .row small{font-weight:400;color:var(--faint);font-size:12px;margin-left:6px}
+.facts summary{cursor:pointer;font-size:13px;color:var(--sub)}
+.facts pre{margin:8px 0 0;white-space:pre-wrap;font:12px/1.6 var(--sans);color:var(--sub);background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:10px 12px;max-height:320px;overflow:auto}
 .order input[type=date]{border:1px solid var(--line);border-radius:8px;background:var(--canvas);padding:6px 8px;font:inherit}
 </style>
 </head>
@@ -393,8 +396,10 @@ function mapView() {
       ${a.summary ? `<p class="sum">${esc(a.summary)}</p>` : ''}
       <div class="nums"><span><b>${num(a.stats?.open) ?? 0}</b>진행 중</span><span><b>${num(a.stats?.overdue) ?? 0}</b>마감 지남</span><span><b>${num(a.stats?.toCeo) ?? 0}</b>대표 확인 요청</span><span><b>${(D.orders || []).filter(o => o.team === a.team && o.status === 'open').length}</b>내 지시 진행</span><span><b>${num(a.stats?.doneToday) ?? 0}</b>오늘 완료</span></div>
       ${a.needs?.length ? `<div><div class="sec-h"><h2>대표님이 볼 것</h2></div><ul>${a.needs.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul></div>` : ''}
+      ${facts(a)}
       ${people(a.team)}
       ${ordersOf(a.team)}
+      ${watchForm(a.team)}
       <form class="order" data-team="${esc(a.team)}">
         <label for="ord-t">이 팀에 지시</label>
         <textarea id="ord-t" rows="2" maxlength="1000" placeholder="예: 10/20 W컨셉 기획전 상품 리스트 금요일까지 정리"></textarea>
@@ -416,6 +421,22 @@ function people(team) {
   return `<div><div class="sec-h"><h2>팀원</h2><span>${t.members.filter(p => p.hasAccount).length}/${t.members.length}명 ERP 계정</span></div>
     <div class="ppl">${t.members.map((p, i) => `<span class="${p.hasAccount ? '' : 'off'}">${esc(p.name)} <small>${esc(p.rank)}${i === 0 ? '·팀장' : ''}${p.hasAccount ? '' : ' · 계정 없음'}</small></span>`).join('')}</div></div>`;
 }
+function facts(a) {
+  const f = Array.isArray(a.stats?.facts) ? a.stats.facts : [];
+  if (!f.length) return '';
+  return `<details class="facts"><summary>에이전트가 본 데이터 (ERP·PMS) ${num(a.stats?.alerts) ? '· 경고 ' + num(a.stats.alerts) + '건' : ''}</summary>
+    <pre>${esc(f.join('\n'))}</pre></details>`;
+}
+function watchForm(team) {
+  const t = D.org.teams.find(x => x.key === team);
+  if (!t) return '';
+  const custom = t.rules && t.rules !== t.rulesDefault;
+  return `<form class="order watch" data-team="${esc(team)}">
+    <label for="w-t">이 팀에서 꼭 볼 것 <small>${custom ? '대표님이 고친 기준' : '기본 기준 — 고쳐 쓰세요'}</small></label>
+    <textarea id="w-t" rows="3" maxlength="2000">${esc(t.rules)}</textarea>
+    <div class="row"><button class="btn" type="submit">기준 저장</button><small>비워서 저장하면 기본 기준으로 돌아가요. 다음 점검부터 반영</small></div>
+  </form>`;
+}
 function ordersOf(team) {
   const list = (D.orders || []).filter(o => o.team === team);
   if (!list.length) return '';
@@ -425,6 +446,17 @@ function ordersOf(team) {
     <span class="when">${kst(o.created_at)}</span></div>`).join('')}</div></div>`;
 }
 document.getElementById('view').addEventListener('submit', async e => {
+  const wf = e.target.closest('form.watch');
+  if (wf) {
+    e.preventDefault();
+    const b = wf.querySelector('button'); b.disabled = true;
+    try {
+      await api('/api/ceo/watch', { team: wf.dataset.team, rules: wf.querySelector('textarea').value });
+      await load();
+      alertInline(document.querySelector('form.watch button'), '저장했어요. [이 팀 지금 점검]을 누르면 바로 반영돼요');
+    } catch (err) { alertInline(b, err.message); b.disabled = false; }
+    return;
+  }
   const f = e.target.closest('form.order'); if (!f) return;
   e.preventDefault();
   const t = f.querySelector('textarea'), d = f.querySelector('input[type=date]'), b = f.querySelector('button');

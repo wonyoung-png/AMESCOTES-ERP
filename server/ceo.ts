@@ -14,8 +14,8 @@ import CONSOLE_HTML from './ceo-console.html';
 import { currentUser, restAsServer, type SessionUser } from './auth.js';
 import { members, esc, kstToday, ANSWER_MODEL, notify, genId } from './work.js';
 import { dailyFetch } from './daily-bridge.js';
-import { latestRuns, runAgentsOnce, orgOf, isDirective, CEO_DESK } from './agents.js';
-import { ORG, DIVISIONS, DIVISION_HEADS, orgTeam } from './org.js';
+import { latestRuns, runAgentsOnce, orgOf, isDirective, CEO_DESK, loadRules } from './agents.js';
+import { ORG, DIVISIONS, DIVISION_HEADS, DEFAULT_RULES, orgTeam } from './org.js';
 import { syncSoon } from './gcal.js';
 
 const router = Router();
@@ -134,7 +134,7 @@ async function gather(me: SessionUser) {
 
 router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response) => {
   try {
-    const g = await gather((req as any).user);
+    const [g, rules] = await Promise.all([gather((req as any).user), loadRules()]);
     res.set('Cache-Control', 'no-store'); // 없으면 브라우저가 옛 요약을 다시 보여준다 (지시 직후 안 보임)
     res.json({
       me: { name: g.me.name, email: g.me.email },
@@ -149,7 +149,7 @@ router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response
       // 조직도 + 팀원 ERP 계정 여부, 팀별 대표 지시 (지도·지시 화면용)
       org: {
         divisions: DIVISIONS, heads: DIVISION_HEADS,
-        teams: ORG.map(t => ({ ...t, members: t.members.map(p => ({ ...p, hasAccount: g.members.some(x => x.name === p.name) })) })),
+        teams: ORG.map(t => ({ ...t, rules: rules.get(t.key) || '', rulesDefault: DEFAULT_RULES[t.key] || '', members: t.members.map(p => ({ ...p, hasAccount: g.members.some(x => x.name === p.name) })) })),
       },
       orders: g.cards.filter(c => c._dir).map(c => ({
         id: c.id, team: c._org, text: c.parsed.directive.text, status: c.status, created_at: c.created_at,
@@ -258,6 +258,25 @@ router.post('/api/ceo/directive', requireCeo(), async (req: Request, res: Respon
     res.json({ ok: true, delivered: to ? to.name : null });
   } catch (e) {
     console.error('POST /api/ceo/directive 실패:', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ───────────────────────── 팀 감시 기준 (대표가 한글로 적는다)
+
+router.post('/api/ceo/watch', requireCeo(), async (req: Request, res: Response) => {
+  try {
+    const me = (req as any).user as SessionUser;
+    const team = orgTeam(String(req.body?.team || ''));
+    const rules = String(req.body?.rules ?? '').trim().slice(0, 2000);
+    if (!team) { res.status(400).json({ error: 'bad_team' }); return; }
+    // 비워 저장하면 기본값으로 돌아간다 (행은 지우지 않고 빈 값으로 둔다)
+    const r = await restAsServer('team_watch?on_conflict=team', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify({ team: team.key, rules, updated_at: new Date().toISOString(), updated_by: me.email }) });
+    if (!r.ok) { res.status(502).json({ error: 'save_failed' }); return; }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/ceo/watch 실패:', e);
     res.status(500).json({ error: 'internal' });
   }
 });
