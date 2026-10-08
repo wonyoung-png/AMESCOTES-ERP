@@ -2,6 +2,7 @@
 // 기존 AMESCOTES 생산 기능 유지 · 브랜드운영·AI 메뉴는 Phase 2
 
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { useLocation, Link } from 'wouter';
 import { store } from '@/lib/store';
 import { getCurrentUser, logout, isAdminEmail } from '@/lib/auth';
@@ -248,6 +249,32 @@ const SideLink = React.memo(function SideLink({ item, active, fav, collapsed, on
 
 export default function Layout({ children, onLogout }: LayoutProps) {
   const [location, navigate] = useLocation();
+  // 구글 캘린더 연결 상태 (구글 앱 키가 서버에 없으면 메뉴 자체를 숨긴다)
+  const [gcal, setGcal] = useState<{ configured: boolean; connected: boolean; email: string | null } | null>(null);
+  const loadGcal = React.useCallback(() => {
+    fetch('/api/gcal/status', { credentials: 'include' }).then(r => r.ok ? r.json() : null).then(setGcal).catch(() => {});
+  }, []);
+  React.useEffect(() => {
+    loadGcal();
+    // 구글 연결 화면에서 돌아왔을 때 결과를 알려주고 주소에서 표시를 지운다
+    const p = new URLSearchParams(window.location.search).get('gcal');
+    if (!p) return;
+    const MSG: Record<string, [boolean, string]> = {
+      connected: [true, '구글 캘린더를 연결했어요. "ATLM 업무" 캘린더에 할 일·기획전이 들어갑니다'],
+      not_company: [false, '회사 계정(@atlm.kr)으로만 연결할 수 있어요'],
+      wrong_account: [false, 'ERP에 로그인한 것과 같은 회사 구글 계정으로 연결해 주세요'],
+      denied: [false, '구글에서 허용하지 않아 연결하지 않았어요'],
+    };
+    const [ok, msg] = MSG[p] || [false, '구글 캘린더 연결에 실패했어요. 잠시 후 다시 해주세요'];
+    (ok ? toast.success : toast.error)(msg);
+    window.history.replaceState(null, '', window.location.pathname);
+  }, [loadGcal]);
+  const disconnectGcal = async () => {
+    if (!window.confirm('구글 캘린더 연결을 해제할까요? "ATLM 업무" 캘린더는 구글에 남고 더 이상 갱신되지 않습니다')) return;
+    const r = await fetch('/api/gcal/disconnect', { method: 'POST', credentials: 'include' }).catch(() => null);
+    if (r?.ok) { toast.success('구글 캘린더 연결을 해제했어요'); loadGcal(); } else toast.error('해제하지 못했어요');
+  };
+
   // 업무 피드 숫자(안 본 카드 + 내 할 일) — 업무 비서 위젯이 1분마다 읽어 알려준다
   const [workUnread, setWorkUnread] = useState(0);
   React.useEffect(() => {
@@ -554,6 +581,14 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                   <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event('work:open-profile'))}>
                     내 업무 프로필
                   </DropdownMenuItem>
+                  {gcal?.configured && (gcal.connected ? (
+                    <DropdownMenuItem onSelect={disconnectGcal}>
+                      <span className="flex flex-col"><span>구글 캘린더 연결됨</span><span className="text-[11px] text-muted-foreground">{gcal.email} · 해제하기</span></span>
+                    </DropdownMenuItem>
+                  ) : (
+                    // 구글 로그인 화면으로 넘어갔다가 돌아온다 (회사 @atlm.kr 계정만)
+                    <DropdownMenuItem onSelect={() => { window.location.href = '/api/gcal/connect'; }}>구글 캘린더 연결</DropdownMenuItem>
+                  ))}
                   {isAdminEmail(currentUser.email) && (
                     <DropdownMenuItem onSelect={() => navigate('/users')}>사용자 관리</DropdownMenuItem>
                   )}

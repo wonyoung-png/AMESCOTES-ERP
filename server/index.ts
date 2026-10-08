@@ -17,6 +17,7 @@ import workRouter from "./work.js";
 import usersRouter from "./users.js";
 import ceoRouter, { ceoHostGate } from "./ceo.js";
 import { startAgentScheduler } from "./agents.js";
+import gcalRouter, { startGcalSync } from "./gcal.js";
 import pixelRouter from "./pixel.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -75,6 +76,7 @@ async function startServer() {
   app.use(workRouter);
   app.use(usersRouter);
   app.use(ceoRouter);
+  app.use(gcalRouter);
 
   // AI 에이전트 API 라우터 — Supabase service key 없으면 스킵
   try {
@@ -125,6 +127,7 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`[server] AMESCOTES ERP 서버 시작 — port ${port}`);
     startAgentScheduler(); // 팀 에이전트 아침 점검 (KST 08:30 이후 하루 한 번)
+    startGcalSync(); // 직원 구글 캘린더 정기 동기화 (키 없으면 꺼짐)
   });
 }
 

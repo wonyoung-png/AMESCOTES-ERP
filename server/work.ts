@@ -7,6 +7,7 @@
 import { Router, type Request, type Response } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireUser, requireRole, userOf, restAsServer, type SessionUser } from './auth.js';
+import { syncSoon, myUpcoming } from './gcal.js';
 
 const router = Router();
 
@@ -168,12 +169,14 @@ async function answer(me: Member, question: string, all: Member[]): Promise<stri
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return 'AI 키가 없어 답할 수 없습니다.';
   const since = new Date(Date.now() - 90 * 864e5).toISOString();
-  const [cr, pr] = await Promise.all([
+  const [cr, pr, mine] = await Promise.all([
     restAsServer(`work_cards?kind=neq.question&created_at=gte.${since}` +
       `&select=created_at,created_by_name,team,kind,raw_text,status,reply_text,replied_by_name,confirmed_payload,done_by_name` +
       `&order=created_at.desc&limit=150${visibleFilter(me)}`),
     restAsServer(`campaigns?select=title,channel,start_date,end_date,status,discount_rate,workspace` +
       `&end_date=gte.${new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)}&order=start_date.asc&limit=100`),
+    // 본인 구글 캘린더 (연결한 사람만, 본인 질문에만)
+    myUpcoming(me.id),
   ]);
   const cards = cr.ok ? await cr.json() : [];
   const camps = pr.ok ? await pr.json() : [];
@@ -200,6 +203,9 @@ async function answer(me: Member, question: string, all: Member[]): Promise<stri
       (m.id === me.id ? m.profile : m.profile.slice(0, 300)).replace(/\s+/g, ' '))
     .join('\n');
   const user = `<records>
+[내 구글 캘린더 — 다음 7일]
+${esc(mine.join('\n')) || '(연결 안 됨 또는 일정 없음)'}
+
 [직원 담당·업무 범위]
 ${esc(dir) || '(없음)'}
 
@@ -291,6 +297,7 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
     if (assignee) {
       await notify([{ user_id: assignee.id, card_id: card.id, title: `${me.name} — 확인 요청`, body: text }]);
     }
+    syncSoon(); // 마감 있는 할 일이면 구글 캘린더에도
     res.json({ ok: true, card: (await r.json())[0] });
   } catch (e) {
     console.error('POST /api/work 실패:', e);
@@ -436,6 +443,7 @@ router.post('/api/work/:id/kind', requireUser(), async (req: Request, res: Respo
     if (routed.kind === 'request_check' && routed.owner) {
       await notify([{ user_id: routed.owner.id, card_id: card.id, title: `${author.name} — 확인 요청`, body: card.raw_text }]);
     }
+    syncSoon();
     res.json({ ok: true, kind: routed.kind });
   } catch (e) {
     console.error('POST /api/work/:id/kind 실패:', e);
@@ -458,6 +466,7 @@ router.post('/api/work/:id/cancel', requireUser(), async (req: Request, res: Res
     });
     if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
     if (!(await r.json()).length) { res.status(409).json({ error: 'already' }); return; }
+    syncSoon();
     res.json({ ok: true });
   } catch (e) {
     console.error('POST /api/work/:id/cancel 실패:', e);
@@ -488,6 +497,7 @@ router.post('/api/work/:id/done', requireUser(), async (req: Request, res: Respo
     });
     if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
     if (!(await r.json()).length) { res.status(409).json({ error: 'already' }); return; }
+    syncSoon();
     res.json({ ok: true });
   } catch (e) {
     console.error('POST /api/work/:id/done 실패:', e);
@@ -540,6 +550,7 @@ router.post('/api/work/:id/confirm', requireUser(), async (req: Request, res: Re
       ...(card.created_by && card.created_by !== me.id
         ? [{ user_id: card.created_by, card_id: card.id, title: `${me.name} — 캘린더 등록`, body: `${when} ${title}` }] : []),
     ]);
+    syncSoon(); // 공유받은 팀원들 구글 캘린더에 기획전
     res.json({ ok: true, ref, shared });
   } catch (e) {
     console.error('POST /api/work/:id/confirm 실패:', e);
