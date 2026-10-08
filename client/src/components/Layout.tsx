@@ -550,6 +550,15 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             >
               OS 홈 <ArrowUpRight size={12} />
             </a>
+            {/* 대표 콘솔 — 링크만 숨김, 실제 접근 제한은 서버(server/ceo.ts)가 한다 */}
+            {currentUser?.email?.toLowerCase() === 'wonyoung@atlm.kr' && (
+              <a
+                href="https://ceo.54-116-241-64.sslip.io/"
+                className="inline-flex items-center gap-0.5 font-medium text-foreground hover:opacity-70"
+              >
+                비서실 <ArrowUpRight size={12} />
+              </a>
+            )}
             <NotificationBell />
             <button
               type="button"
