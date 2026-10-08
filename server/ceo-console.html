@@ -175,6 +175,16 @@ button,input,textarea{font:inherit;color:inherit}
 .order label{font-weight:600;font-size:13px}
 .order textarea{resize:vertical;border:1px solid var(--line);border-radius:10px;background:var(--canvas);padding:10px 12px;font:inherit}
 .order .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cap-item{border-bottom:1px solid var(--line)}
+.cap-item:last-child{border-bottom:0}
+.cap-item summary{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;list-style:none}
+.cap-item summary::-webkit-details-marker{display:none}
+.cap-item summary::before{content:'›';color:var(--faint);transition:transform var(--fast) var(--ease)}
+.cap-item[open] summary::before{transform:rotate(90deg)}
+.cap-item summary:hover{background:var(--hover)}
+.cap-item .cap-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cap-item summary small{color:var(--faint);font-size:12px;white-space:nowrap}
+.cap-item .cap-form{padding:0 16px 16px 34px;margin-top:0}
 .cap-form{display:grid;gap:10px;margin-top:10px}
 .cap-photo{max-width:220px;max-height:220px;border-radius:10px;border:1px solid var(--line);object-fit:contain;background:var(--canvas)}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
@@ -289,7 +299,15 @@ function itemHtml(c, withActions) {
 const CAP_KIND = { sample: '샘플 제작', material: '자재 구매', delivery: '메인 납품', billing: '바이어 청구', unknown: '모름' };
 const capEdit = {}; // 접수 id → 대표가 고친 값 (다시 그려도 남게)
 const capBusy = new Set(); // 처리 중인 접수 id
+const capOpen = new Set(); // 펼친 접수 id (다시 그려도 유지)
 function captureHtml(c, withActions) {
+  // 결정할 것 화면: 한 줄 목록 → 눌러 펼치면 사진·입력칸·승인
+  if (withActions) return `<details class="cap-item" data-capopen="${esc(c.id)}"${capOpen.has(c.id) ? ' open' : ''}>
+    <summary><span class="k cap">${esc(CAP_KIND[(capEdit[c.id]?.kind) || c.kind] || '현장 접수')}</span>
+      <span class="cap-t">${esc(c.raw_text || '(사진만)')}</span>
+      <small>${esc(c.created_by_name || '')}${c.has_photo ? ' · 사진' : ''}</small>
+      <span class="when">${kst(c.created_at)}</span></summary>
+    ${captureForm(c)}</details>`;
   return `<div class="item"><span class="k cap">현장 접수</span>
     <div class="t"><p>${esc(c.raw_text || '(사진만)')}</p><small>${esc(c.created_by_name || '')} · AI 판정: ${esc(CAP_KIND[c.kind] || c.kind)}</small>
     ${withActions ? captureForm(c) : ''}</div>
@@ -555,6 +573,10 @@ document.getElementById('view').addEventListener('click', async e => {
   } catch (err) { alertInline(b, err.message); b.disabled = false; }
 });
 // ───────── 접수 바로 승인
+document.getElementById('view').addEventListener('toggle', e => {
+  const d = e.target.closest?.('details.cap-item'); if (!d) return;
+  d.open ? capOpen.add(d.dataset.capopen) : capOpen.delete(d.dataset.capopen);
+}, true); // toggle 은 버블링이 안 돼서 캡처로 받는다
 document.getElementById('view').addEventListener('input', e => {
   const f = e.target.closest('.cap-form'); const k = e.target.dataset?.k;
   if (f && k) (capEdit[f.dataset.cap] ||= {})[k] = e.target.value;
