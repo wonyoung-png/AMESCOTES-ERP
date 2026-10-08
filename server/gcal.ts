@@ -24,6 +24,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events.readonly', // 본인 일정 읽기
 ];
 export const gcalConfigured = () => !!(CLIENT_ID && CLIENT_SECRET);
+export const GOOGLE_CLIENT_ID = CLIENT_ID;
 
 // ───────── 토큰 암호화 (AES-256-GCM, 키 = 서버 비밀키에서 파생)
 const KEY = crypto.createHash('sha256').update('gcal:' + (process.env.PGRST_JWT_SECRET || '')).digest();
@@ -41,7 +42,7 @@ function open(sealed: string): string {
 }
 
 // ───────── 구글 호출
-async function tokenFrom(params: Record<string, string>) {
+export async function tokenFrom(params: Record<string, string>) {
   const r = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ client_id: CLIENT_ID, client_secret: CLIENT_SECRET, ...params }),
@@ -84,7 +85,7 @@ async function patchLink(userId: string, patch: Record<string, unknown>, ifToken
  * 구글 신원 확인. id_token 을 내용만 읽지 않고 구글 tokeninfo 로 서명·발급처·대상 앱·만료를 검증받는다 (코덱스 지적).
  * 회사 계정(hd=atlm.kr)이고 이메일 확인이 끝난 계정만 통과.
  */
-async function verifiedEmail(idToken?: string): Promise<string | null> {
+export async function verifiedEmail(idToken?: string): Promise<string | null> {
   if (!idToken) return null;
   const r = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken));
   if (!r.ok) return null;

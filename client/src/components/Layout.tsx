@@ -252,6 +252,12 @@ export default function Layout({ children, onLogout }: LayoutProps) {
   const [location, navigate] = useLocation();
   // 구글 캘린더 연결 상태 (구글 앱 키가 서버에 없으면 메뉴 자체를 숨긴다)
   const [gcal, setGcal] = useState<{ configured: boolean; connected: boolean; email: string | null } | null>(null);
+  // 비서실 버튼 — 서버가 세션으로 대표인지 확인해 준 경우에만 보인다 (화면 로그인 정보는 고칠 수 있다)
+  const [isCeo, setIsCeo] = useState(false);
+  React.useEffect(() => {
+    fetch('/api/me/ceo', { credentials: 'include', cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null).then(j => setIsCeo(j?.ceo === true)).catch(() => {});
+  }, []);
   const loadGcal = React.useCallback(() => {
     fetch('/api/gcal/status', { credentials: 'include' }).then(r => r.ok ? r.json() : null).then(setGcal).catch(() => {});
   }, []);
@@ -552,7 +558,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
               OS 홈 <ArrowUpRight size={12} />
             </a>
             {/* 대표 콘솔 — 링크만 숨김, 실제 접근 제한은 서버(server/ceo.ts)가 한다 */}
-            {currentUser?.email?.toLowerCase() === 'wonyoung@atlm.kr' && (
+            {isCeo && (
               <a
                 href="https://ceo.54-116-241-64.sslip.io/"
                 className="inline-flex items-center gap-0.5 font-medium text-foreground hover:opacity-70"

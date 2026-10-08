@@ -11,7 +11,9 @@ import Anthropic from '@anthropic-ai/sdk';
 // 콘솔 화면은 정적 파일로 두지 않고 서버 번들에 문자열로 넣는다 (esbuild --loader:.html=text).
 // 정적 폴더에 있으면 인코딩된 경로(/%63eo-…) 같은 우회로 ERP 주소에서 열릴 수 있다 (코덱스 지적)
 import CONSOLE_HTML from './ceo-console.html';
-import { currentUser, restAsServer, type SessionUser } from './auth.js';
+import crypto from 'crypto';
+import { currentUser, restAsServer, CEO_EMAILS, type SessionUser } from './auth.js';
+import { gcalConfigured, tokenFrom, verifiedEmail, GOOGLE_CLIENT_ID } from './gcal.js';
 import { members, esc, kstToday, ANSWER_MODEL, notify, genId } from './work.js';
 import { dailyFetch } from './daily-bridge.js';
 import { latestRuns, runAgentsOnce, orgOf, isDirective, CEO_DESK, loadRules } from './agents.js';
@@ -20,19 +22,69 @@ import { syncSoon } from './gcal.js';
 
 const router = Router();
 
-/** 대표 콘솔에 들어올 수 있는 계정 (10/7 대표 지시: 하나만) */
-const CEO_EMAILS = ['wonyoung@atlm.kr'];
 const ERP_URL = 'https://54-116-241-64.sslip.io';
+const CEO_URL = 'https://ceo.54-116-241-64.sslip.io';
+const CEO_REDIRECT = `${CEO_URL}/api/ceo/google/callback`;
 
 const isCeoHost = (req: Request) => (req.hostname || '').startsWith('ceo.');
 
-function requireCeo() {
+/**
+ * 2단계 잠금 (10/8 대표 지시: 비서실은 나만, 아무도 접근 금지).
+ *  1) ERP 로그인 계정이 대표 이메일
+ *  2) 이 기기에서 구글(회사 워크스페이스)로 대표 본인임을 다시 확인한 표(ceo_g 쿠키)
+ * ERP 비밀번호는 저장 방식이 약하고 다른 관리자가 재설정할 수도 있었다 — 그것만으로는 열리지 않게 한다.
+ * ceo_g 는 콘솔 주소 전용 쿠키(Domain 없음)라 ERP·PMS 로 새지 않는다.
+ */
+const CEO_COOKIE = 'ceo_g';
+const CEO_TTL = 7 * 24 * 3600; // 7일 — 기기마다 일주일에 한 번 구글로 다시 확인
+
+// 콘솔 표(ceo_g)·구글 state 는 ERP 로그인 토큰과 다른 키로 서명한다.
+// 같은 키면 ceo_g 를 ERP 로그인 토큰으로 써먹을 수 있다 (currentUser 는 email 만 본다, 코덱스 지적)
+const CKEY = crypto.createHash('sha256').update('ceo-console:' + (process.env.PGRST_JWT_SECRET || '')).digest();
+function signC(payload: Record<string, unknown>): string {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  return `${body}.${crypto.createHmac('sha256', CKEY).update(body).digest('base64url')}`;
+}
+function verifyC(tok: string, p: string): Record<string, any> | null {
+  if (!process.env.PGRST_JWT_SECRET) return null;
+  const [body, sig] = String(tok || '').split('.');
+  if (!body || !sig) return null;
+  const want = crypto.createHmac('sha256', CKEY).update(body).digest('base64url');
+  if (sig.length !== want.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want))) return null;
+  try {
+    const j = JSON.parse(Buffer.from(body, 'base64url').toString());
+    return j.p === p && Number(j.exp) * 1000 > Date.now() ? j : null;
+  } catch { return null; }
+}
+
+function googleOk(req: Request, u: SessionUser): boolean {
+  const raw = (req.headers.cookie || '').split(/;\s*/).find(c => c.startsWith(CEO_COOKIE + '='));
+  const t = raw ? verifyC(decodeURIComponent(raw.slice(CEO_COOKIE.length + 1)), 'ceo_g') : null;
+  return !!t && String(t.email || '').toLowerCase() === u.email.toLowerCase();
+}
+
+/**
+ * 콘솔 주소로 오는 API 전부를 라우터보다 먼저 막는다 (index.ts 에서 맨 앞에 건다).
+ * 안 그러면 /api/work·/api/captures·/api/users 같은 ERP API 가 콘솔 주소에서도 ERP 로그인만으로 열린다 (코덱스 지적).
+ * 쓰기 요청은 콘솔 화면에서 온 것만 (Origin 확인).
+ */
+export function ceoHostLock() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!isCeoHost(req) || !req.path.startsWith('/api/')) { next(); return; }
+    if (req.method !== 'GET' && req.headers.origin !== CEO_URL) { res.status(403).json({ error: 'bad_origin' }); return; }
+    requireCeo(req.path.startsWith('/api/ceo/google/') ? 'session' : 'full')(req, res, next);
+  };
+}
+
+/** stage 'session': ERP 로그인만 확인 (구글 확인 시작·콜백용). 'full': 구글 확인까지 */
+function requireCeo(stage: 'session' | 'full' = 'full') {
   return async (req: Request, res: Response, next: NextFunction) => {
     // 콘솔 API 는 콘솔 주소에서만. ERP 주소로 직접 불러도 막는다 (코덱스 지적)
     if (!isCeoHost(req)) { res.status(404).json({ error: 'not_found' }); return; }
     const u = await currentUser(req);
     if (!u) { res.status(401).json({ error: 'no_session' }); return; }
     if (!CEO_EMAILS.includes(u.email.toLowerCase())) { res.status(403).json({ error: 'forbidden' }); return; }
+    if (stage === 'full' && !googleOk(req, u)) { res.status(401).json({ error: 'google_required', message: '구글 확인이 필요해요. 새로고침하세요' }); return; }
     (req as Request & { user: SessionUser }).user = u;
     next();
   };
@@ -62,12 +114,69 @@ export function ceoHostGate() {
       return;
     }
     if (!CEO_EMAILS.includes(u.email.toLowerCase())) {
+      console.warn(`[ceo] 접근 차단 ${u.email} ${req.ip}`);
       res.status(403).type('html').send(page('접근 권한 없음', '<p>이 화면은 열 수 없는 계정입니다.</p>'));
+      return;
+    }
+    if (!googleOk(req, u)) {
+      res.status(401).type('html').send(page('본인 확인',
+        `<p>대표실은 대표 본인만 엽니다.<br>회사 구글 계정(${u.email})으로 한 번 더 확인해주세요.</p>
+        <p><a href="/api/ceo/google/start" style="display:inline-block;padding:10px 18px;border-radius:10px;background:#1c1c1e;color:#fff;text-decoration:none">Google 로 확인</a></p>
+        <p style="font-size:12px;color:#888">이 기기에서 7일 동안 유지됩니다</p>`));
       return;
     }
     res.type('html').send(CONSOLE_HTML);
   };
 }
+
+/**
+ * ERP 상단 '비서실' 버튼을 띄울지 — 서버가 세션으로 판단한다.
+ * 화면의 로그인 정보(localStorage)는 고칠 수 있어서 그것만으로 버튼을 보이면 안 된다 (10/8 대표: 다른 사람에겐 버튼도 안 보이게)
+ */
+router.get('/api/me/ceo', async (req: Request, res: Response) => {
+  const u = await currentUser(req);
+  res.set({ 'Cache-Control': 'private, no-store', Vary: 'Cookie' });
+  res.json({ ceo: !!u && CEO_EMAILS.includes(u.email.toLowerCase()) });
+});
+
+// ───────────────────────── 구글 본인 확인
+
+router.get('/api/ceo/google/start', requireCeo('session'), (req: Request, res: Response) => {
+  if (!gcalConfigured()) { res.status(503).type('html').send(page('설정 필요', '<p>구글 로그인이 아직 설정되지 않았습니다.</p>')); return; }
+  const u = (req as any).user as SessionUser;
+  // state = 이 요청을 시작한 ERP 계정을 서명한 10분짜리 표 — 콜백이 다른 세션에 붙지 않게
+  const state = signC({ p: 'ceo_state', uid: u.id, exp: Math.floor(Date.now() / 1000) + 600 });
+  const q = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID, redirect_uri: CEO_REDIRECT, response_type: 'code', scope: 'openid email',
+    hd: 'atlm.kr', login_hint: u.email, prompt: 'select_account', state,
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${q}`);
+});
+
+router.get('/api/ceo/google/callback', requireCeo('session'), async (req: Request, res: Response) => {
+  const fail = (why: string) => res.status(403).type('html').send(page('확인 실패', `<p>${why}</p><p><a href="/">다시 시도</a></p>`));
+  try {
+    const u = (req as any).user as SessionUser;
+    const st = verifyC(String(req.query.state || ''), 'ceo_state');
+    if (!st || st.uid !== u.id) { fail('요청이 만료됐거나 맞지 않습니다.'); return; }
+    if (req.query.error || !req.query.code) { fail('구글 확인을 취소했습니다.'); return; }
+    const t = await tokenFrom({ grant_type: 'authorization_code', code: String(req.query.code), redirect_uri: CEO_REDIRECT });
+    const email = await verifiedEmail(t.id_token); // 구글 tokeninfo 로 서명·대상·만료·회사 도메인 검증
+    if (!email || email !== u.email.toLowerCase() || !CEO_EMAILS.includes(email)) {
+      console.warn(`[ceo] 구글 확인 불일치 erp=${u.email} google=${email}`);
+      fail('대표 구글 계정이 아닙니다.');
+      return;
+    }
+    const tok = signC({ p: 'ceo_g', email, exp: Math.floor(Date.now() / 1000) + CEO_TTL });
+    // Domain 을 안 붙인다 = 콘솔 주소에서만 보이는 쿠키
+    res.setHeader('Set-Cookie', `${CEO_COOKIE}=${encodeURIComponent(tok)}; Path=/; Max-Age=${CEO_TTL}; HttpOnly; Secure; SameSite=Lax`);
+    console.log(`[ceo] 구글 확인 ${email} ${req.ip}`);
+    res.redirect('/');
+  } catch (e) {
+    console.error('GET /api/ceo/google/callback 실패:', e);
+    fail('구글 확인 중 오류가 났습니다.');
+  }
+});
 
 // ───────────────────────── 데이터 모으기
 

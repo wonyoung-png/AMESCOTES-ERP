@@ -116,3 +116,6 @@ export function requireRole(...roles: string[]) {
 }
 
 export const userOf = (req: Request): SessionUser => (req as Request & { user: SessionUser }).user;
+
+/** 대표 — 대표 콘솔(비서실)에 들어올 수 있는 유일한 계정. 이 계정은 본인만 바꿀 수 있다 (users.ts) */
+export const CEO_EMAILS = ['wonyoung@atlm.kr'];

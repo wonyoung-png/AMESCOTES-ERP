@@ -15,7 +15,7 @@ import vendorOcrRouter from "./vendor-ocr.js";
 import captureRouter from "./capture.js";
 import workRouter from "./work.js";
 import usersRouter from "./users.js";
-import ceoRouter, { ceoHostGate } from "./ceo.js";
+import ceoRouter, { ceoHostGate, ceoHostLock } from "./ceo.js";
 import { startAgentScheduler } from "./agents.js";
 import gcalRouter, { startGcalSync } from "./gcal.js";
 import pixelRouter from "./pixel.js";
@@ -60,6 +60,9 @@ async function startServer() {
   // JSON 파싱 미들웨어
   app.use(compression());
   app.use(express.json({ limit: "10mb" }));
+
+  // 대표 콘솔 주소(ceo.)의 API 는 어떤 라우터보다 먼저 대표+구글 확인으로 잠근다
+  app.use(ceoHostLock());
 
   // 서버 검증 로그인
   app.use(sessionRouter);
