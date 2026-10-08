@@ -153,6 +153,8 @@ const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
   { group: '데이터 & 점검', label: '상품 손익', icon: <FileSpreadsheet size={17} /> },
   { group: '데이터 & 점검', label: '재고관리', icon: <Layers size={17} /> },
   { group: '데이터 & 점검', label: '채널 플랜', icon: <FileSpreadsheet size={17} /> },
+  // PMS 에서 채널 대조는 시트 탭이라 '데이터 & 점검'에 있다. 마케팅 대시보드는 PMS 에서 없어져(8월) 뺐다 — 누르면 아무 데도 안 갔다 (10/8)
+  { group: '데이터 & 점검', label: '채널 대조', icon: <ClipboardCheck size={17} /> },
   { group: '상품 운영', label: '상품 콘텐츠', icon: <Package size={17} /> },
   { group: '상품 운영', label: '상세페이지 교정', icon: <ClipboardCheck size={17} /> },
   { group: '상품 운영', label: '자사몰관리', icon: <Store size={17} /> },
@@ -161,8 +163,6 @@ const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
   { group: '분석 & 진단', label: '매출분석', icon: <BarChart3 size={17} /> },
   { group: '분석 & 진단', label: '체크아웃 퍼널', icon: <LineChart size={17} /> },
   { group: '분석 & 진단', label: 'AI 유입 구매', icon: <Globe size={17} /> },
-  { group: '분석 & 진단', label: '마케팅 대시보드', icon: <Percent size={17} /> },
-  { group: '분석 & 진단', label: '채널 대조', icon: <ClipboardCheck size={17} /> },
   { group: '실행 & 일정', label: '할인 캠페인', icon: <Percent size={17} /> },
   { group: '실행 & 일정', label: '배송비 분석', icon: <Truck size={17} /> },
   { group: '실행 & 일정', label: '사이트 진단', icon: <Globe size={17} /> },
