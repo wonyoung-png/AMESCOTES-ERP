@@ -12,9 +12,11 @@ import Anthropic from '@anthropic-ai/sdk';
 // 정적 폴더에 있으면 인코딩된 경로(/%63eo-…) 같은 우회로 ERP 주소에서 열릴 수 있다 (코덱스 지적)
 import CONSOLE_HTML from './ceo-console.html';
 import { currentUser, restAsServer, type SessionUser } from './auth.js';
-import { members, esc, kstToday, ANSWER_MODEL } from './work.js';
+import { members, esc, kstToday, ANSWER_MODEL, notify, genId } from './work.js';
 import { dailyFetch } from './daily-bridge.js';
-import { latestRuns, runAgentsOnce } from './agents.js';
+import { latestRuns, runAgentsOnce, orgOf, isDirective } from './agents.js';
+import { ORG, DIVISIONS, DIVISION_HEADS, orgTeam } from './org.js';
+import { syncSoon } from './gcal.js';
 
 const router = Router();
 
@@ -98,6 +100,8 @@ async function gather(me: SessionUser) {
     latestRuns(),
   ]);
   const cards: any[] = cr.ok ? await cr.json() : [];
+  const bossIds = new Set(all.filter(m => m.role === '대표').map(m => m.id));
+  for (const c of cards) { c._dir = isDirective(c, bossIds); c._org = orgOf(c, bossIds); }
   const captures: any[] = pr.ok ? await pr.json() : [];
   const campaigns: any[] = kr.ok ? await kr.json() : [];
 
@@ -110,8 +114,9 @@ async function gather(me: SessionUser) {
   const dayAgo = Date.now() - 864e5;
   type TeamDay = { team: string; open: number; doneToday: number; newToday: number; overdue: number; latest?: string };
   const teams = new Map<string, TeamDay>();
+  for (const t of ORG) teams.set(t.key, { team: t.key, open: 0, doneToday: 0, newToday: 0, overdue: 0 });
   for (const c of cards) {
-    const t: string = c.team || '팀 미지정';
+    const t: string = c._org;
     const s: TeamDay = teams.get(t) || { team: t, open: 0, doneToday: 0, newToday: 0, overdue: 0 };
     if (c.status === 'open') s.open++;
     if (c.done_at && Date.parse(c.done_at) > dayAgo) s.doneToday++;
@@ -120,8 +125,6 @@ async function gather(me: SessionUser) {
     if (!s.latest) s.latest = c.raw_text;
     teams.set(t, s);
   }
-  // 팀원이 있는 팀은 카드가 없어도 보인다
-  for (const m of all) if (m.team && !teams.has(m.team)) teams.set(m.team, { team: m.team, open: 0, doneToday: 0, newToday: 0, overdue: 0 });
 
   return { me, today, cards, open, decide, captures, campaigns, teams: Array.from(teams.values()), members: all, kpi, agents };
 }
@@ -141,6 +144,15 @@ router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response
       recent: g.cards.slice(0, 20),
       kpi: g.kpi,
       agents: g.agents,
+      // 조직도 + 팀원 ERP 계정 여부, 팀별 대표 지시 (지도·지시 화면용)
+      org: {
+        divisions: DIVISIONS, heads: DIVISION_HEADS,
+        teams: ORG.map(t => ({ ...t, members: t.members.map(p => ({ ...p, hasAccount: g.members.some(x => x.name === p.name) })) })),
+      },
+      orders: g.cards.filter(c => c._dir).map(c => ({
+        id: c.id, team: c._org, text: c.parsed.directive.text, status: c.status, created_at: c.created_at,
+        assignee_name: c.assignee_name, done_at: c.done_at, reply_text: c.reply_text, dueDate: c.parsed.dueDate || null,
+      })),
       erpUrl: ERP_URL,
     });
   } catch (e) {
@@ -206,6 +218,44 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
     res.json({ answer: text });
   } catch (e) {
     console.error('POST /api/ceo/ask 실패:', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ───────────────────────── 대표 지시 → 팀
+//
+// 에이전트 보고를 본 대표가 팀에 일을 시킨다. 업무 카드(할 일)로 팀장에게 가고 알림이 뜬다.
+// 팀장 계정이 아직 없으면 팀원 중 계정 있는 첫 사람, 그것도 없으면 '전달 대기'로 남는다
+// (계정이 생기면 그 팀 피드에 보인다). 끝났는지는 팀 에이전트가 다음 점검에서 따라간다.
+
+router.post('/api/ceo/directive', requireCeo(), async (req: Request, res: Response) => {
+  try {
+    const me = (req as any).user as SessionUser;
+    const team = orgTeam(String(req.body?.team || ''));
+    const text = String(req.body?.text || '').trim().slice(0, 1000);
+    const due = String(req.body?.dueDate || '');
+    if (!team || !text) { res.status(400).json({ error: 'bad_request', message: '팀과 지시 내용을 적어주세요' }); return; }
+    // 2026-99-99 같은 값은 정규식만으론 통과한다 — 날짜로 바꿨다 되돌려 같은지 본다 (코덱스 지적)
+    const t = Date.parse(due + 'T00:00:00Z');
+    const okDate = /^\d{4}-\d{2}-\d{2}$/.test(due) && !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === due;
+    if (due && !okDate) { res.status(400).json({ error: 'bad_date', message: '마감일이 날짜가 아니에요' }); return; }
+
+    const all = await members();
+    const to = team.members.map(p => all.find(x => x.name === p.name)).find(Boolean);
+    const card = {
+      id: genId('wc'),
+      created_by: me.id, created_by_name: me.name,
+      team: to?.team || team.key,
+      raw_text: `[대표 지시] ${text}`, kind: 'todo', status: 'open',
+      parsed: { summary: text, title: text.slice(0, 60), ...(due ? { dueDate: due } : {}), directive: { team: team.key, text } },
+      assignee_id: to?.id || null, assignee_name: to?.name || null,
+    };
+    const r = await restAsServer('work_cards', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(card) });
+    if (!r.ok) { res.status(502).json({ error: 'save_failed' }); return; }
+    if (to) { await notify([{ user_id: to.id, card_id: card.id, title: `${me.name} 대표 — 지시`, body: text }]); syncSoon(); }
+    res.json({ ok: true, delivered: to ? to.name : null });
+  } catch (e) {
+    console.error('POST /api/ceo/directive 실패:', e);
     res.status(500).json({ error: 'internal' });
   }
 });

@@ -33,7 +33,7 @@ const SCHEDULE_SHARE = ['마케팅', '물류CS'];
 const cleanTeams = (v: unknown, own: string) =>
   Array.isArray(v) ? Array.from(new Set(v.map(String).filter(t => TEAMS.includes(t) && t !== own))) : null;
 
-const genId = (p: string) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+export const genId = (p: string) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 export const kstToday = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 
 export type Member = { id: string; name: string; team: string; position: string; role: string; email: string; profile: string };
@@ -67,7 +67,7 @@ function leadersOf(team: string, all: Member[]): Member[] {
   return all.filter(m => m.role === '대표' && m.email.endsWith('@atlm.kr'));
 }
 
-async function notify(rows: Array<{ user_id: string; card_id: string; title: string; body?: string }>) {
+export async function notify(rows: Array<{ user_id: string; card_id: string; title: string; body?: string }>) {
   const uniq = new Map(rows.map(r => [r.user_id, r]));
   if (!uniq.size) return;
   const r = await restAsServer('notifications', {
