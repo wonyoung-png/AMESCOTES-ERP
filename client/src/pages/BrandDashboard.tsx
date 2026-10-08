@@ -4,7 +4,7 @@
 // "어제 얼마 팔았고, 오늘 무엇을 손대야 하는가"를 본다. 숫자는 PMS가 모아 둔 것을
 // /api/dashboard/brand 한 번으로 받고, 체크아웃 퍼널만 ERP 자체(/api/pixel/funnel)에서 읽는다.
 import { useEffect, useMemo, useState } from 'react';
-import { PMS_API, PMS_URL } from '@/lib/hosts';
+import { PMS_API } from '@/lib/hosts';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle, ArrowRight, BarChart3, Boxes, CalendarDays, Clock, PackageSearch, Percent, ShoppingCart, TrendingUp, Truck, Activity,
@@ -17,11 +17,8 @@ import { formatKRW, formatNumber } from '@/lib/store';
 
 
 
-// PMS 탭 링크 — Layout의 pmsTabUrl과 같은 규칙 (ERP 토큰을 실어 비밀번호를 다시 묻지 않는다)
-const pmsUrl = (tab: string) => {
-  const t = localStorage.getItem('erp_token');
-  return `${PMS_URL()}${t ? `?erp=${encodeURIComponent(t)}` : ''}#${encodeURIComponent(tab)}`;
-};
+// PMS 화면도 ERP 안에서 연다. 실제 데이터 API만 PMS 서버를 그대로 사용한다.
+const pmsUrl = (tab: string) => `/pms?tab=${encodeURIComponent(tab)}`;
 
 async function pms<T>(path: string, brand: string, init: RequestInit = {}): Promise<T> {
   const r = await fetch(PMS_API() + path, {
@@ -96,7 +93,7 @@ function Section({ title, sub, tab, children }: { title: string; sub?: string; t
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-3">
         <div><h2 className="font-semibold text-foreground">{title}</h2>{sub && <p className="text-xs text-muted-foreground">{sub}</p>}</div>
-        {tab && <a className="text-xs text-primary inline-flex items-center gap-1" href={pmsUrl(tab)} target="_blank" rel="noreferrer">{tab} <ArrowRight className="w-3 h-3" /></a>}
+        {tab && <a className="text-xs text-primary inline-flex items-center gap-1" href={pmsUrl(tab)}>{tab} <ArrowRight className="w-3 h-3" /></a>}
       </div>
       {children}
     </section>
@@ -162,7 +159,7 @@ export default function BrandDashboard({ brand }: { brand: string }) {
         ) : (
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             {data.todo.map(t => (
-              <a key={t.key} href={pmsUrl(t.tab)} target="_blank" rel="noreferrer" className={`rounded-lg border p-3 flex items-start gap-3 hover:opacity-90 ${TONE[t.tone]}`}>
+              <a key={t.key} href={pmsUrl(t.tab)} className={`rounded-lg border p-3 flex items-start gap-3 hover:opacity-90 ${TONE[t.tone]}`}>
                 {t.tone === 'bad' ? <AlertTriangle className="w-4 h-4 mt-0.5 text-[var(--system-red)]" /> : t.tone === 'warn' ? <Clock className="w-4 h-4 mt-0.5 text-[var(--system-orange)]" /> : <Activity className="w-4 h-4 mt-0.5 text-muted-foreground" />}
                 <div className="min-w-0"><p className="text-sm font-medium text-foreground">{t.label}</p><p className="text-xs text-muted-foreground truncate">{t.detail}</p></div>
               </a>
@@ -307,7 +304,7 @@ export default function BrandDashboard({ brand }: { brand: string }) {
                   })}
                 </ul>
               ) : <p className="text-xs text-muted-foreground">{brand === 'LUMEN' ? '퍼널 데이터 없음' : '픽셀 미설치'}</p>}
-              <a className="text-xs text-primary inline-flex items-center gap-1 mt-2" href={pmsUrl('체크아웃 퍼널')} target="_blank" rel="noreferrer">체크아웃 퍼널 <ArrowRight className="w-3 h-3" /></a>
+              <a className="text-xs text-primary inline-flex items-center gap-1 mt-2" href={pmsUrl('체크아웃 퍼널')}>체크아웃 퍼널 <ArrowRight className="w-3 h-3" /></a>
             </div>
             <ul className="text-xs space-y-1">
               {data.crons.slice(0, 9).map(c => (

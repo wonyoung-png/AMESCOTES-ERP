@@ -2,7 +2,7 @@
 // 기존 AMESCOTES 생산 기능 유지 · 브랜드운영·AI 메뉴는 Phase 2
 
 import React, { useState } from 'react';
-import { PMS_URL, OS_URL, CEO_URL } from '@/lib/hosts';
+import { OS_URL, CEO_URL } from '@/lib/hosts';
 import { toast } from 'sonner';
 import { useLocation, Link } from 'wouter';
 import { store } from '@/lib/store';
@@ -171,15 +171,8 @@ const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
   { group: '실행 & 일정', label: '일정 목록', icon: <CalendarDays size={17} /> },
 ];
 
-/**
- * PMS 탭 링크. ERP 로그인 토큰을 함께 실어 보내 비밀번호를 다시 묻지 않게 한다.
- * PMS는 같은 PGRST_JWT_SECRET으로 이 토큰을 검증하고, 받자마자 주소창에서 지운다.
- */
-const pmsTabUrl = (label: string) => {
-  const t = localStorage.getItem('erp_token');
-  const q = t ? `?erp=${encodeURIComponent(t)}` : '';
-  return `${PMS_URL()}${q}#${encodeURIComponent(label)}`;
-};
+/** PMS 탭을 ERP 내부 라우트로 연다. 인증 전달은 PmsWorkspace가 맡는다. */
+const pmsTabUrl = (label: string) => `/pms?tab=${encodeURIComponent(label)}`;
 
 type WorkspaceId = Workspace;
 
@@ -472,7 +465,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           })}
           {isBrand && (
             <>
-            {/* LUMEN/AETALOOF: PMS 탭 미러 — 클릭 시 PMS 해당 탭으로 (named window 재사용) */}
+            {/* LUMEN/AETALOOF: PMS를 ERP 내부 화면으로 연다 */}
             {pmsTabs.map((tab, ti) => {
               const groupStart = ti === 0 || pmsTabs[ti - 1].group !== tab.group;
               return (
@@ -485,10 +478,8 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     </div>
                   )}
                   {groupStart && collapsed && ti !== 0 && <div className="my-2 mx-2 h-px bg-border" />}
-                  <a
+                  <Link
                     href={pmsTabUrl(tab.label)}
-                    target="pms"
-                    rel="noopener noreferrer"
                     onClick={() => setSidebarOpen(false)}
                     className={`
                       relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 outline-none focus-visible:outline-none
@@ -500,7 +491,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     {!collapsed && (
                       <span className="flex-1 min-w-0 truncate">{tab.label}</span>
                     )}
-                  </a>
+                  </Link>
                 </div>
               );
             })}
