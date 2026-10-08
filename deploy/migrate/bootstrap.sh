@@ -27,38 +27,70 @@ if ! command -v docker >/dev/null; then
     systemctl enable --now docker
   fi
 fi
-docker compose version >/dev/null || { echo "docker compose 플러그인이 없다"; exit 1; }
+# Amazon Linux 2023 의 docker 패키지에는 compose 플러그인이 안 들어 있다. 직접 받는다
+if ! docker compose version >/dev/null 2>&1; then
+  log "docker compose 플러그인 설치"
+  CV=v2.39.1
+  ARCH=$(uname -m)   # aarch64 또는 x86_64
+  mkdir -p /usr/libexec/docker/cli-plugins
+  curl -fsSL "https://github.com/docker/compose/releases/download/${CV}/docker-compose-linux-${ARCH}" \
+    -o /usr/libexec/docker/cli-plugins/docker-compose
+  chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+fi
+docker compose version >/dev/null || { echo "docker compose 설치 실패"; exit 1; }
 
 # ── 2. 스왑 — 2GB 서버에서 빌드하다 서버가 통째로 멈춘 적이 있다 (2026-08-06).
 # 스왑이 없으면 메모리를 다 쓴 순간 SSH 까지 끊긴다. 먼저 깔아 둔다.
 if ! swapon --show | grep -q .; then
   log "스왑 2GB"
-  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap -q /swapfile && swapon /swapfile
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
   grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
 mkdir -p "$APP"/{src,daily-data,hr-data,.ssh}
 chmod 700 "$APP/.ssh"
+# PMS·HR 컨테이너는 appuser(uid 1000) 로 돈다. root 소유로 두면 SQLite 가
+# "unable to open database file" 로 죽고 컨테이너가 재시작만 반복한다
+chown -R 1000:1000 "$APP/daily-data" "$APP/hr-data"
 cd "$APP"
 
 # ── 3. 배포키 — 레포가 비공개라 익명으로는 못 받는다.
-# 키는 여기서 만들고 여기서만 산다. 만들어서 보내면 보낸 경로에 사본이 남는다.
-if [ ! -f "$APP/.ssh/deploy_ed25519" ]; then
-  ssh-keygen -t ed25519 -N '' -C "$(hostname)-deploy" -f "$APP/.ssh/deploy_ed25519" >/dev/null
-  ssh-keyscan -t ed25519 github.com > "$APP/.ssh/known_hosts" 2>/dev/null
+# 깃허브 배포키는 레포 하나당 하나만 쓸 수 있다. 같은 키를 두 번째 레포에 넣으면
+# "key is already in use" 로 막힌다. 그래서 레포마다 따로 만든다.
+# 키는 여기서 만들고 여기서만 산다 — 만들어서 보내면 보낸 경로에 사본이 남는다.
+NEED_KEYS=0
+for n in erp daily hr; do
+  [ -f "$APP/.ssh/deploy_$n" ] || { ssh-keygen -t ed25519 -N "" -C "ameserp-$n" -f "$APP/.ssh/deploy_$n" >/dev/null; NEED_KEYS=1; }
+done
+[ -f "$APP/.ssh/known_hosts" ] || ssh-keyscan -t ed25519 github.com > "$APP/.ssh/known_hosts" 2>/dev/null
+chmod 600 "$APP"/.ssh/deploy_*
+
+gitssh() { echo "ssh -i $APP/.ssh/deploy_$1 -o UserKnownHostsFile=$APP/.ssh/known_hosts -o IdentitiesOnly=yes"; }
+
+# 레포마다 읽기 권한이 있는지 본다. 하나라도 막혀 있으면 공개키를 보여주고 멈춘다
+BLOCKED=""
+check() { GIT_SSH_COMMAND="$(gitssh "$1")" git ls-remote "git@github.com:wonyoung-png/$2.git" HEAD >/dev/null 2>&1 || BLOCKED="$BLOCKED $1:$2"; }
+check erp   AMESCOTES-ERP
+check daily atlm-daily-check
+check hr    atlm-hr
+if [ -n "$BLOCKED" ]; then
   echo
-  echo "================= 아래 공개키를 레포 3개에 '읽기 전용' 배포키로 넣어라 ================="
-  cat "$APP/.ssh/deploy_ed25519.pub"
-  echo "  wonyoung-png/AMESCOTES-ERP · atlm-daily-check · atlm-hr"
-  echo "============================================================================="
+  echo "===== 아래 공개키를 각 레포에 '읽기 전용' 배포키로 넣어라 ====="
+  for n in erp daily hr; do
+    case $n in erp) R=AMESCOTES-ERP;; daily) R=atlm-daily-check;; hr) R=atlm-hr;; esac
+    echo "--- wonyoung-png/$R"
+    cat "$APP/.ssh/deploy_$n.pub"
+  done
+  echo "============================================================"
+  echo "아직 안 붙은 것:$BLOCKED"
   echo "넣은 뒤 이 스크립트를 다시 실행해라."
   exit 0
 fi
-export GIT_SSH_COMMAND="ssh -i $APP/.ssh/deploy_ed25519 -o UserKnownHostsFile=$APP/.ssh/known_hosts -o IdentitiesOnly=yes"
 
 # ── 4. 소스 — 이미지를 받아오지 않고 직접 빌드한다 (ECR 은 비그로우 계정에 있다)
 clone() {
   local name=$1 repo=$2 branch=$3
+  export GIT_SSH_COMMAND="$(gitssh "$name")"
   if [ -d "$APP/src/$name/.git" ]; then
     git -C "$APP/src/$name" fetch -q origin "$branch" && git -C "$APP/src/$name" reset -q --hard "origin/$branch"
   else
@@ -67,8 +99,9 @@ clone() {
   log "$name $(git -C "$APP/src/$name" log --oneline -1)"
 }
 clone erp   AMESCOTES-ERP     aws-migration
-clone daily atlm-daily-check  main
+clone daily atlm-daily-check  master
 clone hr    atlm-hr           main
+unset GIT_SSH_COMMAND
 
 cp "$APP/src/erp/deploy/migrate/docker-compose.yml" "$APP/docker-compose.yml"
 cp "$APP/src/erp/deploy/migrate/Caddyfile"          "$APP/Caddyfile"

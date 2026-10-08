@@ -109,8 +109,11 @@ IID=$(aws_ ec2 describe-instances \
        --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || echo None)
 
 if [ "$IID" = "None" ] || [ -z "$IID" ]; then
-  AMI=$(aws_ ssm get-parameter --name /aws/service/ami-al2023/ami-al2023-latest-arm64 \
-         --query 'Parameter.Value' --output text)
+  # SSM 공개 파라미터는 계정에 따라 안 보인다 (ParameterNotFound). 이미지를 직접 찾는다
+  AMI=$(aws_ ec2 describe-images --owners amazon \
+         --filters "Name=name,Values=al2023-ami-2023.*-kernel-6.1-arm64" "Name=state,Values=available" \
+         --query 'reverse(sort_by(Images,&CreationDate))[0].ImageId' --output text)
+  [ -n "$AMI" ] && [ "$AMI" != "None" ] || { echo "AL2023 ARM64 이미지를 못 찾았다"; exit 1; }
   log "AMI $AMI 로 $TYPE 생성"
   IID=$(aws_ ec2 run-instances \
     --image-id "$AMI" --instance-type "$TYPE" --security-group-ids "$SGID" \

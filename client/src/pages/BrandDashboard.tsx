@@ -4,6 +4,7 @@
 // "어제 얼마 팔았고, 오늘 무엇을 손대야 하는가"를 본다. 숫자는 PMS가 모아 둔 것을
 // /api/dashboard/brand 한 번으로 받고, 체크아웃 퍼널만 ERP 자체(/api/pixel/funnel)에서 읽는다.
 import { useEffect, useMemo, useState } from 'react';
+import { PMS_API, PMS_URL } from '@/lib/hosts';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle, ArrowRight, BarChart3, Boxes, CalendarDays, Clock, PackageSearch, Percent, ShoppingCart, TrendingUp, Truck, Activity,
@@ -13,17 +14,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatKRW, formatNumber } from '@/lib/store';
 
-const PMS_API = 'https://daily.54-116-241-64.sslip.io';
-const PMS_APP = 'https://daily.54-116-241-64.sslip.io/app/';
+
+
 
 // PMS 탭 링크 — Layout의 pmsTabUrl과 같은 규칙 (ERP 토큰을 실어 비밀번호를 다시 묻지 않는다)
 const pmsUrl = (tab: string) => {
   const t = localStorage.getItem('erp_token');
-  return `${PMS_APP}${t ? `?erp=${encodeURIComponent(t)}` : ''}#${encodeURIComponent(tab)}`;
+  return `${PMS_URL()}${t ? `?erp=${encodeURIComponent(t)}` : ''}#${encodeURIComponent(tab)}`;
 };
 
 async function pms<T>(path: string, brand: string, init: RequestInit = {}): Promise<T> {
-  const r = await fetch(PMS_API + path, {
+  const r = await fetch(PMS_API() + path, {
     ...init,
     headers: {
       'Content-Type': 'application/json',

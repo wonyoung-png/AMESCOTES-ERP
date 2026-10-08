@@ -12,7 +12,9 @@ const SESSION_HOURS = 12;
 const COOKIE_DOMAIN = process.env.PMS_COOKIE_DOMAIN || '';
 // OS 셸 등 서브도메인 오리진에서의 로그인/세션 호출 허용 (쿠키 포함)
 const ALLOWED_ORIGINS = (process.env.PMS_SHELL_ORIGINS ||
-  'https://os.54-116-241-64.sslip.io,https://daily.54-116-241-64.sslip.io')
+  (process.env.ROOT_DOMAIN
+    ? `https://os.${process.env.ROOT_DOMAIN},https://daily.${process.env.ROOT_DOMAIN}`
+    : ''))
   .split(',').map(s => s.trim()).filter(Boolean);
 
 router.use((req: Request, res: Response, next) => {

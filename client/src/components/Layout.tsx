@@ -2,6 +2,7 @@
 // 기존 AMESCOTES 생산 기능 유지 · 브랜드운영·AI 메뉴는 Phase 2
 
 import React, { useState } from 'react';
+import { PMS_URL, OS_URL, CEO_URL } from '@/lib/hosts';
 import { toast } from 'sonner';
 import { useLocation, Link } from 'wouter';
 import { store } from '@/lib/store';
@@ -133,7 +134,7 @@ const bottomTabs = [
   { path: '/', label: '더보기', icon: <MoreHorizontal size={20} />, isMore: true },
 ];
 
-const PMS_URL = 'https://daily.54-116-241-64.sslip.io/app/';
+// 주소는 lib/hosts 가 지금 보고 있는 주소에서 계산한다
 
 /**
  * LUMEN/AETALOOF 탭 사이드바 = PMS 탭 미러.
@@ -177,7 +178,7 @@ const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
 const pmsTabUrl = (label: string) => {
   const t = localStorage.getItem('erp_token');
   const q = t ? `?erp=${encodeURIComponent(t)}` : '';
-  return `${PMS_URL}${q}#${encodeURIComponent(label)}`;
+  return `${PMS_URL()}${q}#${encodeURIComponent(label)}`;
 };
 
 type WorkspaceId = Workspace;
@@ -373,7 +374,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         `}
       >
         <div className={`flex items-center gap-3 px-4 py-5 border-b border-sidebar-border ${collapsed ? 'justify-center px-2' : ''}`}>
-          <a href="https://os.54-116-241-64.sslip.io/" aria-label="OS 홈"
+          <a href={OS_URL()} aria-label="OS 홈"
             className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center shrink-0">
             <span className="text-sidebar-primary-foreground font-bold text-xs leading-none">AT</span>
           </a>
@@ -552,7 +553,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <a
-              href="https://os.54-116-241-64.sslip.io/"
+              href={OS_URL()}
               className="hidden sm:inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground"
             >
               OS 홈 <ArrowUpRight size={12} />
@@ -560,7 +561,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             {/* 대표 콘솔 — 링크만 숨김, 실제 접근 제한은 서버(server/ceo.ts)가 한다 */}
             {isCeo && (
               <a
-                href="https://ceo.54-116-241-64.sslip.io/"
+                href={CEO_URL()}
                 className="inline-flex items-center gap-0.5 font-medium text-foreground hover:opacity-70"
               >
                 비서실 <ArrowUpRight size={12} />

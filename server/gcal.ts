@@ -14,7 +14,8 @@ const router = Router();
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const ERP_URL = 'https://54-116-241-64.sslip.io';
+// 구글 OAuth 리디렉션 주소가 여기서 나온다. 주소가 바뀌면 구글 콘솔에도 같이 넣어야 한다
+const ERP_URL = process.env.ERP_HOST ? `https://${process.env.ERP_HOST}` : '';
 const REDIRECT = process.env.GOOGLE_REDIRECT_URI || `${ERP_URL}/api/gcal/callback`;
 const DOMAIN = 'atlm.kr'; // 회사 워크스페이스 계정만
 const CAL_NAME = 'ATLM 업무';

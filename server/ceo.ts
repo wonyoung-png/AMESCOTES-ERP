@@ -22,8 +22,13 @@ import { syncSoon } from './gcal.js';
 
 const router = Router();
 
-const ERP_URL = 'https://54-116-241-64.sslip.io';
-const CEO_URL = 'https://ceo.54-116-241-64.sslip.io';
+// 주소를 코드에 박아 두면 서버를 옮길 때마다 여러 파일을 손으로 고쳐야 한다.
+// 한 군데만 빠뜨려도 그 링크가 조용히 옛 서버를 가리킨다 — 옛 서버가 살아 있으면 눈치채지도 못한다.
+// CEO_EMAILS 는 auth.ts 로 옮겨졌다 (여기서 다시 정의하지 않는다)
+const ERP_HOST = process.env.ERP_HOST || '';
+const ROOT_DOMAIN = process.env.ROOT_DOMAIN || '';
+const ERP_URL = ERP_HOST ? `https://${ERP_HOST}` : '';
+const CEO_URL = ROOT_DOMAIN ? `https://ceo.${ROOT_DOMAIN}` : '';
 const CEO_REDIRECT = `${CEO_URL}/api/ceo/google/callback`;
 
 const isCeoHost = (req: Request) => (req.hostname || '').startsWith('ceo.');
