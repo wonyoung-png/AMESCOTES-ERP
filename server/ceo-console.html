@@ -175,6 +175,18 @@ button,input,textarea{font:inherit;color:inherit}
 .order label{font-weight:600;font-size:13px}
 .order textarea{resize:vertical;border:1px solid var(--line);border-radius:10px;background:var(--canvas);padding:10px 12px;font:inherit}
 .order .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cap-form{display:grid;gap:10px;margin-top:10px}
+.cap-photo{max-width:220px;max-height:220px;border-radius:10px;border:1px solid var(--line);object-fit:contain;background:var(--canvas)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font:inherit;font-size:12px;color:var(--sub);cursor:pointer}
+.chip.on{border-color:var(--ink);color:var(--ink);font-weight:600}
+.cap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.cap-form .f{display:grid;gap:3px;font-size:11px;color:var(--faint)}
+.cap-form input,.cap-form select{border:1px solid var(--line);border-radius:8px;background:var(--canvas);padding:7px 9px;font:inherit;font-size:13px;color:var(--ink);min-width:0}
+.cap-form .act{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.cap-form .act input{flex:1;min-width:140px}
+.cap-form .hint{margin:0;font-size:12px;color:var(--sub)}
+.cap-form a.btn{justify-self:start;text-decoration:none;display:inline-grid;place-items:center}
 .order label small,.order .row small{font-weight:400;color:var(--faint);font-size:12px;margin-left:6px}
 .facts summary{cursor:pointer;font-size:13px;color:var(--sub)}
 .facts pre{margin:8px 0 0;white-space:pre-wrap;font:12px/1.6 var(--sans);color:var(--sub);background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:10px 12px;max-height:320px;overflow:auto}
@@ -274,11 +286,46 @@ function itemHtml(c, withActions) {
     <div class="t"><p>${esc(c.raw_text)}</p><small>${meta}</small>${c.reply_text ? `<span class="rep">${esc(c.replied_by_name)}: ${esc(c.reply_text)}</span>` : ''}${act}</div>
     <span class="when">${kst(c.created_at)}</span></div>`;
 }
+const CAP_KIND = { sample: '샘플 제작', material: '자재 구매', delivery: '메인 납품', billing: '바이어 청구', unknown: '모름' };
+const capEdit = {}; // 접수 id → 대표가 고친 값 (다시 그려도 남게)
+const capBusy = new Set(); // 처리 중인 접수 id
 function captureHtml(c, withActions) {
   return `<div class="item"><span class="k cap">현장 접수</span>
-    <div class="t"><p>${esc(c.raw_text || '(사진만)')}</p><small>${esc(c.created_by_name || '')} · AI 판정: ${esc(c.kind)}</small>
-    ${withActions ? `<div class="act"><a class="btn" href="${esc(D.erpUrl)}/inbox" target="_blank" rel="noopener" style="display:inline-grid;place-items:center;text-decoration:none">ERP 접수함에서 승인 ↗</a></div>` : ''}</div>
+    <div class="t"><p>${esc(c.raw_text || '(사진만)')}</p><small>${esc(c.created_by_name || '')} · AI 판정: ${esc(CAP_KIND[c.kind] || c.kind)}</small>
+    ${withActions ? captureForm(c) : ''}</div>
     <span class="when">${kst(c.created_at)}</span></div>`;
+}
+/**
+ * 접수 바로 승인 — ERP 접수함(CaptureInbox.tsx)과 같은 값을 같은 API(/api/captures/:id/approve)로 보낸다.
+ * 메인 납품은 발주를 골라야 해서 ERP 로 보낸다. 승인 권한·검증은 서버가 다시 한다.
+ */
+function captureForm(c) {
+  const v = k => capEdit[c.id]?.[k] ?? c.parsed?.[k] ?? '';
+  const kind = v('kind') || c.kind;
+  const photo = c.has_photo ? `/api/ceo/capture-photo/${encodeURIComponent(c.id)}` : '';
+  const inp = (k, ph, type = 'text') => `<label class="f"><span>${ph}</span><input data-k="${k}" type="${type}" value="${esc(v(k))}"></label>`;
+  const sel = (k, label, opts, cur = v(k)) => `<label class="f"><span>${label}</span><select data-k="${k}">${opts.map(([val, t]) => `<option value="${esc(val)}"${String(cur) === String(val) ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
+  const brands = (D.buyers || []).flatMap(b => b.brands.map(x => [`${b.id}|${x.code}|${x.name}`, x.name]));
+  // AI 가 찾은 브랜드를 기본으로 골라 둔다
+  const brandCur = capEdit[c.id]?._brand ?? (brands.find(([val]) => c.parsed?.buyerId && val.startsWith(`${c.parsed.buyerId}|${c.parsed.brandCode || ''}|`))?.[0] || '');
+  const buyers = (D.buyers || []).map(b => [b.id, b.brands.map(x => x.name).join('·') || b.name]);
+  let fields = '';
+  if (kind === 'sample') fields = inp('styleName', '품명 *') + sel('_brand', '브랜드', [['', '— 고르세요 —'], ...brands], brandCur) + inp('color', '컬러')
+    + sel('stage', '단계', ['1차', '2차', '3차', '4차', '최종승인', '반려'].map(s => [s, s])) + inp('amountKrw', '금액 (원)', 'number');
+  else if (kind === 'material') fields = inp('styleName', '품목 *') + inp('amountKrw', '금액 (원) *', 'number') + inp('vendorName', '거래처')
+    + sel('expenseType', '결제수단', ['법인카드', '계좌이체', '현금'].map(s => [s, s])) + inp('requestDate', '지출일', 'date')
+    + sel('billBuyerId', '바이어 청구 (선택)', [['', '청구 안 함'], ...buyers]) + inp('billAmountKrw', '청구금액 (원)', 'number');
+  const kinds = ['sample', 'material', 'delivery'].map(k => `<button type="button" class="chip${kind === k ? ' on' : ''}" data-capkind="${k}">${CAP_KIND[k]}</button>`).join('');
+  return `<div class="cap-form" data-cap="${esc(c.id)}">
+    ${photo ? `<img class="cap-photo" src="${esc(photo)}" alt="접수 사진" loading="lazy">` : ''}
+    <div class="chips">${kinds}</div>
+    ${kind === 'delivery' || !fields
+      ? `<p class="hint">메인 납품은 어느 발주인지 골라야 해서 ERP 접수함에서 승인해요.</p>
+         <a class="btn" href="${esc(D.erpUrl)}/inbox" target="_blank" rel="noopener">ERP 접수함 열기 ↗</a>`
+      : `<div class="cap-grid">${fields}</div>
+         <div class="act"><button class="btn pri" type="button" data-capact="approve">승인</button>
+           <input data-k="_reason" placeholder="반려 사유 (반려할 때만)"><button class="btn" type="button" data-capact="reject">반려</button></div>`}
+  </div>`;
 }
 
 function home() {
@@ -333,7 +380,7 @@ function inbox() {
   ];
   const sec = groups.map(([t, list]) => `<section class="sec"><div class="sec-h"><h2>${t}</h2><span>${list.length}건</span></div>
     <div class="list">${list.map(c => itemHtml(c, true)).join('') || '<p class="empty">없어요</p>'}</div></section>`).join('');
-  return sec + `<section class="sec"><div class="sec-h"><h2>현장 접수 승인 대기</h2><span>${D.captures.length}건 · 금액·품명 확인이 필요해 ERP에서 승인</span></div>
+  return sec + `<section class="sec"><div class="sec-h"><h2>현장 접수 승인 대기</h2><span>${D.captures.length}건 · 사진·내용 확인하고 고쳐서 승인</span></div>
     <div class="list">${D.captures.map(c => captureHtml(c, true)).join('') || '<p class="empty">없어요</p>'}</div></section>`;
 }
 
@@ -506,6 +553,42 @@ document.getElementById('view').addEventListener('click', async e => {
     }
     await load();
   } catch (err) { alertInline(b, err.message); b.disabled = false; }
+});
+// ───────── 접수 바로 승인
+document.getElementById('view').addEventListener('input', e => {
+  const f = e.target.closest('.cap-form'); const k = e.target.dataset?.k;
+  if (f && k) (capEdit[f.dataset.cap] ||= {})[k] = e.target.value;
+});
+document.getElementById('view').addEventListener('click', async e => {
+  const f = e.target.closest('.cap-form'); if (!f) return;
+  const id = f.dataset.cap, c = D.captures.find(x => x.id === id); if (!c) return;
+  const kb = e.target.closest('[data-capkind]');
+  if (kb) { (capEdit[id] ||= {}).kind = kb.dataset.capkind; render(); return; }
+  const b = e.target.closest('[data-capact]'); if (!b) return;
+  if (capBusy.has(id)) return; // 승인·반려가 겹쳐 나가지 않게 접수 단위로 잠근다 (코덱스 지적)
+  const ed = capEdit[id] || {};
+  capBusy.add(id); f.querySelectorAll('button').forEach(x => x.disabled = true);
+  const unlock = () => { capBusy.delete(id); f.querySelectorAll('button').forEach(x => x.disabled = false); };
+  try {
+    if (b.dataset.capact === 'reject') {
+      const reason = (ed._reason || '').trim();
+      if (!reason) { alertInline(b, '반려 사유를 적어주세요 (올린 사람에게 그대로 보여요)'); unlock(); return; }
+      await api(`/api/captures/${encodeURIComponent(id)}/reject`, { reason });
+    } else {
+      const { _brand, _reason, ...rest } = ed;
+      const payload = { ...(c.parsed || {}), ...rest, kind: ed.kind || c.kind };
+      const brandVal = _brand ?? f.querySelector('select[data-k="_brand"]')?.value;
+      if (brandVal) { const [buyerId, brandCode, ...n] = brandVal.split('|'); Object.assign(payload, { buyerId, brandCode, brand: n.join('|') }); }
+      // ERP 접수함과 같은 검사 (서버도 다시 막는다)
+      const need = !String(payload.styleName || '').trim() ? (payload.kind === 'material' ? '무엇을 샀는지 적어주세요' : '품명을 넣어주세요')
+        : payload.kind === 'material' && !(Number(payload.amountKrw) > 0) ? '금액을 넣어주세요'
+        : payload.kind === 'material' && !payload.billBuyerId && String(payload.billAmountKrw || '').trim() ? '청구할 곳을 골라주세요' : '';
+      if (need) { alertInline(b, need); unlock(); return; }
+      await api(`/api/captures/${encodeURIComponent(id)}/approve`, { payload });
+    }
+    delete capEdit[id]; capBusy.delete(id);
+    await load();
+  } catch (err) { alertInline(b, err.message); unlock(); }
 });
 function alertInline(btn, msg) {
   let s = btn.parentElement.querySelector('.err'); if (!s) { s = document.createElement('small'); s.className = 'err'; s.style.flexBasis = '100%'; btn.parentElement.appendChild(s); }

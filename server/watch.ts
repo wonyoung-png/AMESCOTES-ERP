@@ -137,6 +137,11 @@ export async function gatherWatch(): Promise<Map<string, Watch>> {
     if (!d) return { dom: [`(${name} 매출: PMS 지금 읽지 못함)`], glob: [`(${name} 매출: PMS 지금 읽지 못함)`], off: [`(${name} 매출: PMS 지금 읽지 못함)`], late: 0 };
     const s = d.sales || {}, y = s.yesterday || {}, m = s.mtd || {}, inv = d.inventory || {}, ro = d.reorder || {};
     const d30: any[] = Array.isArray(s.daily30) ? s.daily30 : [];
+    // 일일점검 행이 하나도 없으면 매출 0 이 아니라 아직 수집을 안 하는 브랜드다 (10/8 AETALOOF)
+    if (!d30.length && !inv.skus) {
+      const none = [`(${name}: PMS 에 매출·재고 데이터가 아직 없음 — 수집 전)`];
+      return { dom: none, glob: none, off: none, late: 0 };
+    }
     const wk = (k: string, from: number, to?: number) => d30.slice(from, to).reduce((v, r) => v + (Number(r[k]) || 0), 0);
     const trend = (k: string) => `최근 7일 ${won(wk(k, -7))} (그 전 7일 ${won(wk(k, -14, -7))})`;
     return {

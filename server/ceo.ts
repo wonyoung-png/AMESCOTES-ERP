@@ -92,6 +92,7 @@ async function gather(me: SessionUser) {
   const [cr, pr, kr, all, kpi, agents] = await Promise.all([
     // 대표는 전부 본다 — 질문(개인 대화)만 뺀다
     restAsServer(`work_cards?kind=neq.question&created_at=gte.${since}&select=*&order=created_at.desc&limit=300`),
+    // 사진은 빼고 — 콘솔이 /api/ceo/capture-photo/:id 로 따로 받는다 (요약에 넣으면 응답이 수십 MB 가 될 수 있다, 코덱스 지적)
     restAsServer(`capture_inbox?status=eq.pending&select=id,created_at,created_by_name,raw_text,kind,parsed,confidence&order=created_at.desc&limit=50`),
     restAsServer(`campaigns?select=id,title,channel,start_date,end_date,status,discount_rate,workspace` +
       `&end_date=gte.${ago3}&start_date=lte.${in30}&order=start_date.asc&limit=50`),
@@ -103,6 +104,11 @@ async function gather(me: SessionUser) {
   const bossIds = new Set(all.filter(m => m.role === '대표').map(m => m.id));
   for (const c of cards) { c._dir = isDirective(c, bossIds); c._org = orgOf(c, bossIds); }
   const captures: any[] = pr.ok ? await pr.json() : [];
+  if (captures.length) {
+    const ph = await restAsServer('capture_inbox?status=eq.pending&photo=not.is.null&select=id&limit=50');
+    const withPhoto = new Set<string>(ph.ok ? (await ph.json()).map((x: any) => x.id) : []);
+    for (const c of captures) c.has_photo = withPhoto.has(c.id);
+  }
   const campaigns: any[] = kr.ok ? await kr.json() : [];
 
   const open = cards.filter(c => c.status === 'open');
@@ -127,7 +133,19 @@ async function gather(me: SessionUser) {
     teams.set(t, s);
   }
 
-  return { me, today, cards, open, decide, captures, campaigns, teams: Array.from(teams.values()), members: all, kpi, agents };
+  return { me, today, cards, open, decide, captures, campaigns, teams: Array.from(teams.values()), members: all, kpi, agents,
+    buyers: captures.length ? await buyerOptions() : [] };
+}
+
+/** 접수 승인용 — 바이어 거래처와 그 브랜드 (ERP 접수함 화면과 같은 목록, client/src/pages/CaptureInbox.tsx) */
+async function buyerOptions() {
+  const r = await restAsServer(`vendors?type=eq.${encodeURIComponent('바이어')}&select=id,name,brands`);
+  if (!r.ok) return [];
+  // 브랜드가 하나면 배열이 아니라 객체로 저장된 거래처가 있다 (store.ts normalizeBrands)
+  const norm = (v: unknown) => (Array.isArray(v) ? v : v && typeof v === 'object' ? [v] : [])
+    .map((b: any) => typeof b === 'string' ? { name: b, code: '' } : b?.name ? { name: String(b.name), code: String(b.code || '') } : null)
+    .filter(Boolean) as Array<{ name: string; code: string }>;
+  return (await r.json()).map((v: any) => ({ id: String(v.id), name: String(v.name || ''), brands: norm(v.brands) }));
 }
 
 // ───────────────────────── 화면용 요약
@@ -141,6 +159,7 @@ router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response
       today: g.today,
       decide: g.decide,
       captures: g.captures,
+      buyers: g.buyers,
       campaigns: g.campaigns,
       teams: g.teams,
       recent: g.cards.slice(0, 20),
@@ -259,6 +278,23 @@ router.post('/api/ceo/directive', requireCeo(), async (req: Request, res: Respon
   } catch (e) {
     console.error('POST /api/ceo/directive 실패:', e);
     res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ───────────────────────── 접수 사진 (대표가 콘솔에서 보고 승인)
+
+router.get('/api/ceo/capture-photo/:id', requireCeo(), async (req: Request, res: Response) => {
+  try {
+    const r = await restAsServer(`capture_inbox?id=eq.${encodeURIComponent(String(req.params.id))}&select=photo`);
+    const photo: unknown = r.ok ? (await r.json())[0]?.photo : null;
+    // data URL 을 그대로 화면에 꽂지 않고 이미지 바이트로 내준다 — 속성 주입이 생길 틈이 없다
+    const m = typeof photo === 'string' ? /^data:(image\/(?:jpeg|png|gif|webp));base64,([A-Za-z0-9+/=]+)$/.exec(photo) : null;
+    if (!m) { res.status(404).end(); return; }
+    res.set({ 'Content-Type': m[1], 'Cache-Control': 'private, max-age=600', 'X-Content-Type-Options': 'nosniff' });
+    res.send(Buffer.from(m[2], 'base64'));
+  } catch (e) {
+    console.error('GET /api/ceo/capture-photo 실패:', e);
+    res.status(500).end();
   }
 });
 
