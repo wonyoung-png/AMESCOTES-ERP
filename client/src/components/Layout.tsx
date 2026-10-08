@@ -53,6 +53,7 @@ const navGroups: NavGroup[] = [
       { path: '/', label: '대시보드', icon: <BarChart3 size={17} />, table: '생산 현황' },
       { path: '/quick', label: '간편등록', icon: <Zap size={17} />, table: '밖에서 빠르게 · 초안 저장' },
       { path: '/work', label: '업무 피드', icon: <MessageSquare size={17} />, table: '업무 비서에서 올린 것이 팀별로' },
+      { path: '/my-calendar', label: '내 캘린더', icon: <CalendarDays size={17} />, table: '구글 캘린더 + ATLM 업무' },
   { path: '/capture', label: '현장 접수', icon: <Camera size={17} />, table: '사진 한 장 + 한 줄' },
       { path: '/inbox', label: '접수함', icon: <Inbox size={17} />, table: '승인하면 전표가 생긴다' },
       { path: '/workflow', label: '워크플로우', icon: <GitBranch size={17} />, table: '클릭 → 탭 이동' },

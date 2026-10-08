@@ -100,10 +100,12 @@ async function verifiedEmail(idToken?: string): Promise<string | null> {
 router.get('/api/gcal/status', requireUser(), async (req: Request, res: Response) => {
   let l: any;
   try { l = await linkOf(userOf(req).id); } catch { res.status(502).json({ error: 'db' }); return; }
+  res.set({ 'Cache-Control': 'private, no-store', Vary: 'Cookie' }); // 본인 이메일·캘린더 ID
   res.json({
     configured: gcalConfigured(),
     connected: l?.status === 'connected',
     email: l?.status === 'connected' ? l.google_email : null,
+    calendarId: l?.status === 'connected' ? l.calendar_id : null,
     lastSync: l?.last_sync_at || null, error: l?.status === 'error' ? l.last_error : null,
   });
 });
