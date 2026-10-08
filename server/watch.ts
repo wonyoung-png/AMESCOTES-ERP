@@ -150,7 +150,10 @@ export async function gatherWatch(): Promise<Map<string, Watch>> {
       late: Number(ro.late) || 0,
     };
   };
-  const L = brand(lumen, 'LUMEN'), A = brand(aeta, 'AETALOOF');
+  // 10/8 실측: PMS 가 AETALOOF 요청에도 LUMEN 과 똑같은 숫자를 준다 — 그대로 쓰면 경고가 두 번 센다. 같으면 빼고 그 사실만 남긴다
+  const same = !!lumen && !!aeta && JSON.stringify((lumen as any).sales) === JSON.stringify((aeta as any).sales);
+  const L = brand(lumen, 'LUMEN');
+  const A = same ? { dom: ['(AETALOOF: PMS 가 LUMEN 과 같은 값을 줘서 제외 — 브랜드 분리 확인 필요)'], glob: [], off: [], late: 0 } : brand(aeta, 'AETALOOF');
   add('국내 MD', [...L.dom, ...A.dom], L.late + A.late);
   add('글로벌 MD', [...L.glob, ...A.glob]);
   add('리테일', [...L.off, ...A.off]);
