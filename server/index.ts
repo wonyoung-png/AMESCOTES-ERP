@@ -18,6 +18,7 @@ import usersRouter from "./users.js";
 import ceoRouter, { ceoHostGate, ceoHostLock } from "./ceo.js";
 import { startAgentScheduler } from "./agents.js";
 import gcalRouter, { startGcalSync } from "./gcal.js";
+import brandOpsRouter from "./brand-ops.js";
 import pixelRouter from "./pixel.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -80,6 +81,7 @@ async function startServer() {
   app.use(usersRouter);
   app.use(ceoRouter);
   app.use(gcalRouter);
+  app.use(brandOpsRouter); // 옛 PMS 탭을 ERP 로 (docs/PMS_MERGE_PLAN.md)
 
   // AI 에이전트 API 라우터 — Supabase service key 없으면 스킵
   try {

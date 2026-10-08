@@ -34,6 +34,7 @@ const CaptureUpload = lazyWithReload(() => import("./pages/CaptureUpload"));
 const CaptureInbox = lazyWithReload(() => import("./pages/CaptureInbox"));
 const WorkFeed = lazyWithReload(() => import("./pages/WorkFeed"));
 const MyCalendar = lazyWithReload(() => import("./pages/MyCalendar"));
+const BrandSheet = lazyWithReload(() => import("./pages/BrandSheet"));
 const SalesSummary = lazyWithReload(() => import("./pages/SalesSummary"));
 const BomManagement = lazyWithReload(() => import("./pages/BomManagement"));
 const SampleManagement = lazyWithReload(() => import("./pages/SampleManagement"));
@@ -160,6 +161,7 @@ function Router() {
         <Route path="/inbox" component={CaptureInbox} />
         <Route path="/work" component={WorkFeed} />
       <Route path="/my-calendar" component={MyCalendar} />
+      <Route path="/brand/sheet/:name" component={BrandSheet} />
         <Route path="/items" component={ItemMaster} />
         <Route path="/sales-summary" component={SalesSummary} />
         <Route path="/bom" component={BomManagement} />
