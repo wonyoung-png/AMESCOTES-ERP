@@ -302,7 +302,7 @@ const capBusy = new Set(); // 처리 중인 접수 id
 const capOpen = new Set(); // 펼친 접수 id (다시 그려도 유지)
 function captureHtml(c, withActions) {
   // 결정할 것 화면: 한 줄 목록 → 눌러 펼치면 사진·입력칸·승인
-  if (withActions) return `<details class="cap-item" data-capopen="${esc(c.id)}"${capOpen.has(c.id) ? ' open' : ''}>
+  if (withActions) return `<details class="cap-item" data-capopen="${esc(c.id)}"${capOpen.has(String(c.id)) ? ' open' : ''}>
     <summary><span class="k cap">${esc(CAP_KIND[(capEdit[c.id]?.kind) || c.kind] || '현장 접수')}</span>
       <span class="cap-t">${esc(c.raw_text || '(사진만)')}</span>
       <small>${esc(c.created_by_name || '')}${c.has_photo ? ' · 사진' : ''}</small>
