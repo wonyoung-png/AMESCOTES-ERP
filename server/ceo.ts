@@ -135,6 +135,7 @@ async function gather(me: SessionUser) {
 router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response) => {
   try {
     const g = await gather((req as any).user);
+    res.set('Cache-Control', 'no-store'); // 없으면 브라우저가 옛 요약을 다시 보여준다 (지시 직후 안 보임)
     res.json({
       me: { name: g.me.name, email: g.me.email },
       today: g.today,

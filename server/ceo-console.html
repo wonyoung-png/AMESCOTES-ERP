@@ -229,7 +229,7 @@ const KIND = { request_check:['확인 요청','req'], todo:['할 일','todo'], s
 let D = null;
 
 async function api(path, body) {
-  const r = await fetch(path, { method: body ? 'POST' : 'GET', credentials: 'include',
+  const r = await fetch(path, { method: body ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',
     headers: body ? {'Content-Type':'application/json'} : undefined, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(j.message || j.error || 'HTTP ' + r.status), { status: r.status });
