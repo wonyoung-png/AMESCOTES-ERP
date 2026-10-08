@@ -21,7 +21,11 @@ import { formatKRW, formatNumber } from '@/lib/store';
 const pmsUrl = (tab: string) => `/pms?tab=${encodeURIComponent(tab)}`;
 
 async function pms<T>(path: string, brand: string, init: RequestInit = {}): Promise<T> {
-  const r = await fetch(PMS_API() + path, {
+  const base = PMS_API();
+  // 주소를 못 만들면(로컬·IP 접속) 빈 문자열이 온다. 그대로 fetch 하면 지금 서버를
+  // 부르게 되어 엉뚱한 404 를 PMS 장애처럼 보여 준다 (코덱스 지적)
+  if (!base) throw new Error('PMS 주소를 알 수 없습니다 (정식 주소로 접속해 주세요)');
+  const r = await fetch(base + path, {
     ...init,
     headers: {
       'Content-Type': 'application/json',

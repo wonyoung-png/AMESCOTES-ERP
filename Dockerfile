@@ -12,7 +12,9 @@ RUN npm ci --no-audit --no-fund
 FROM deps AS build
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
-ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL} \
+# 형제 서비스 주소(daily·hr·ceo·os)의 기준. 안 주면 화면이 지금 주소에서 짐작한다
+ARG VITE_ROOT_DOMAIN
+ENV VITE_ROOT_DOMAIN=${VITE_ROOT_DOMAIN}     VITE_SUPABASE_URL=${VITE_SUPABASE_URL} \
     VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
 COPY . .
 # URL은 빈값 허용(빈값 → 런타임에 same-origin 사용). anon 키는 필수.

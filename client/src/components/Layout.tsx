@@ -2,7 +2,7 @@
 // 기존 AMESCOTES 생산 기능 유지 · 브랜드운영·AI 메뉴는 Phase 2
 
 import React, { useState } from 'react';
-import { OS_URL, CEO_URL } from '@/lib/hosts';
+import { OS_URL, CEO_URL, linkOr } from '@/lib/hosts';
 import { toast } from 'sonner';
 import { useLocation, Link } from 'wouter';
 import { store } from '@/lib/store';
@@ -367,7 +367,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         `}
       >
         <div className={`flex items-center gap-3 px-4 py-5 border-b border-sidebar-border ${collapsed ? 'justify-center px-2' : ''}`}>
-          <a href={OS_URL()} aria-label="OS 홈"
+          <a {...linkOr(OS_URL())} aria-label="OS 홈"
             className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center shrink-0">
             <span className="text-sidebar-primary-foreground font-bold text-xs leading-none">AT</span>
           </a>
@@ -544,7 +544,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <a
-              href={OS_URL()}
+              {...linkOr(OS_URL())}
               className="hidden sm:inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground"
             >
               OS 홈 <ArrowUpRight size={12} />
@@ -552,7 +552,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             {/* 대표 콘솔 — 링크만 숨김, 실제 접근 제한은 서버(server/ceo.ts)가 한다 */}
             {isCeo && (
               <a
-                href={CEO_URL()}
+                {...linkOr(CEO_URL())}
                 className="inline-flex items-center gap-0.5 font-medium text-foreground hover:opacity-70"
               >
                 비서실 <ArrowUpRight size={12} />

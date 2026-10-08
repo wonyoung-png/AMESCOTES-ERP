@@ -130,8 +130,14 @@ else
 fi
 
 # ── 고정 IP ─────────────────────────────────────────────
-EIP=$(aws_ ec2 describe-addresses --filters "Name=tag:Name,Values=${NAME}-eip" \
-       --query 'Addresses[0].PublicIp' --output text 2>/dev/null || echo None)
+EIPJSON=$(aws_ ec2 describe-addresses --filters "Name=tag:Name,Values=${NAME}-eip" --query 'Addresses[0].[PublicIp,AllocationId,InstanceId]' --output text 2>/dev/null || echo 'None None None')
+read -r EIP EIP_ALLOC EIP_ON <<<"$EIPJSON"
+# 고정 IP 는 있는데 다른(또는 없어진) 인스턴스에 붙어 있으면 DNS 와 서버가 따로 논다.
+# 주소는 살아 있으니 아무도 에러를 못 본다 — 그냥 안 열릴 뿐이다 (코덱스 지적)
+if [ "$EIP" != "None" ] && [ -n "$EIP" ] && [ "$EIP_ON" != "$IID" ]; then
+  log "고정 IP $EIP 가 이 인스턴스에 안 붙어 있다 — 다시 붙인다"
+  aws_ ec2 associate-address --instance-id "$IID" --allocation-id "$EIP_ALLOC" >/dev/null
+fi
 if [ "$EIP" = "None" ] || [ -z "$EIP" ]; then
   ALLOC=$(aws_ ec2 allocate-address --domain vpc \
     --tag-specifications "ResourceType=elastic-ip,Tags=[{Key=Name,Value=${NAME}-eip}]" \

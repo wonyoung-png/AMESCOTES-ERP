@@ -54,6 +54,7 @@ services:
       args:
         VITE_SUPABASE_URL: https://${ERP_HOST:?}
         VITE_SUPABASE_ANON_KEY: ${PGRST_JWT_SECRET:?}
+        VITE_ROOT_DOMAIN: ${ROOT_DOMAIN:?}
     image: amescotes-erp:latest
     restart: unless-stopped
     env_file: .env
