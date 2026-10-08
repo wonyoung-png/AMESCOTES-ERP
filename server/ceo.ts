@@ -14,7 +14,7 @@ import CONSOLE_HTML from './ceo-console.html';
 import { currentUser, restAsServer, type SessionUser } from './auth.js';
 import { members, esc, kstToday, ANSWER_MODEL, notify, genId } from './work.js';
 import { dailyFetch } from './daily-bridge.js';
-import { latestRuns, runAgentsOnce, orgOf, isDirective } from './agents.js';
+import { latestRuns, runAgentsOnce, orgOf, isDirective, CEO_DESK } from './agents.js';
 import { ORG, DIVISIONS, DIVISION_HEADS, orgTeam } from './org.js';
 import { syncSoon } from './gcal.js';
 
@@ -117,6 +117,7 @@ async function gather(me: SessionUser) {
   for (const t of ORG) teams.set(t.key, { team: t.key, open: 0, doneToday: 0, newToday: 0, overdue: 0 });
   for (const c of cards) {
     const t: string = c._org;
+    if (t === CEO_DESK) continue; // 대표 본인 업무는 '결정할 것'에서 본다
     const s: TeamDay = teams.get(t) || { team: t, open: 0, doneToday: 0, newToday: 0, overdue: 0 };
     if (c.status === 'open') s.open++;
     if (c.done_at && Date.parse(c.done_at) > dayAgo) s.doneToday++;

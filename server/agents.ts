@@ -25,7 +25,10 @@ export const isDirective = (c: any, bossIds: Set<string>) =>
 
 /** 카드 → 조직 팀. 대표 지시는 지시한 팀, 나머지는 쓴 사람 이름(조직도), 그다음 카드의 팀 */
 export const orgOf = (c: any, bossIds: Set<string>): string =>
-  (isDirective(c, bossIds) ? c.parsed.directive.team : '') || orgTeamOfName(c.created_by_name) || (orgTeam(c.team) ? c.team : NO_TEAM);
+  (isDirective(c, bossIds) ? c.parsed.directive.team : '') || orgTeamOfName(c.created_by_name) || (orgTeam(c.team) ? c.team : '')
+  || (bossIds.has(c.created_by) ? CEO_DESK : NO_TEAM);
+/** 대표 본인 업무 — 팀 에이전트가 감독할 대상이 아니다 */
+export const CEO_DESK = '대표실';
 
 /** 숫자 근거와 상태 — 규칙만으로 */
 function judge(team: string, cards: any[], bossIds: Set<string>, today: string) {
@@ -111,7 +114,7 @@ export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: strin
   const bossIds = new Set(all.filter(m => m.role === '대표').map(m => m.id));
   const teams = new Set<string>(ORG.map(t => t.key));
   for (const c of cards) { c._dir = isDirective(c, bossIds); c._org = orgOf(c, bossIds); } // 카드마다 한 번만 판정
-  cards.forEach(c => c.kind !== 'question' && teams.add(c._org));
+  cards.forEach(c => c.kind !== 'question' && c._org !== CEO_DESK && teams.add(c._org));
   const today = kstToday();
 
   const out: AgentRun[] = [];
