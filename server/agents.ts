@@ -187,6 +187,11 @@ export async function runAgentsOnce(trigger: 'schedule' | 'manual', onlyTeam?: s
   try { return await runAgents(trigger, onlyTeam); } finally { running = false; }
 }
 
+export const missingScheduleTeams = (done: Iterable<string>) => {
+  const set = new Set(done);
+  return ORG.map(t => t.key).filter(team => !set.has(team));
+};
+
 /** KST 08:30 이후, 오늘 자동 점검이 아직 없으면 한 번 돈다. 10분마다 확인 */
 export function startAgentScheduler() {
   const tick = async () => {
@@ -194,10 +199,17 @@ export function startAgentScheduler() {
       const kst = new Date(Date.now() + 9 * 3600e3);
       if (kst.getUTCHours() * 60 + kst.getUTCMinutes() < 8 * 60 + 30) return;
       const dayStartUtc = new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()) - 9 * 3600e3).toISOString();
-      const r = await restAsServer(`team_agent_runs?trigger=eq.schedule&created_at=gte.${dayStartUtc}&select=id&limit=1`);
-      if (!r.ok || (await r.json()).length) return;
-      const runs = await runAgentsOnce('schedule');
-      if (runs) console.log(`[agents] 아침 점검 ${runs.length}팀`);
+      const r = await restAsServer(`team_agent_runs?trigger=eq.schedule&created_at=gte.${dayStartUtc}&select=team&limit=100`);
+      if (!r.ok) return;
+      const missing = missingScheduleTeams((await r.json()).map((x: any) => x.team));
+      if (!missing.length) return;
+      let saved = 0;
+      // 이미 성공한 팀은 다시 AI 호출하지 않고, 빠진 팀만 채운다.
+      for (const team of missing) {
+        const runs = await runAgentsOnce('schedule', team);
+        saved += runs?.length || 0;
+      }
+      console.log(`[agents] 아침 점검 보완 ${saved}/${missing.length}팀`);
     } catch (e) { console.warn('[agents] 스케줄 점검 실패:', String(e).split('\n')[0]); }
   };
   setTimeout(tick, 60_000);
