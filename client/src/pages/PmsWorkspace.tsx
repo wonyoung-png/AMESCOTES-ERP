@@ -5,7 +5,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 export default function PmsWorkspace() {
   const search = useSearch();
   const { workspace } = useWorkspace();
-  const tab = new URLSearchParams(search).get('tab') || '일일점검';
+  const tab = new URLSearchParams(search).get('tab') || '오늘 업무';
   const base = PMS_URL();
   const token = localStorage.getItem('erp_token');
 

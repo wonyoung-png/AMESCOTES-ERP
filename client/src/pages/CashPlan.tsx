@@ -67,7 +67,7 @@ export default function CashPlan() {
           <thead><tr className="border-b text-muted-foreground"><th>월</th><th className="num">예상입금</th><th className="num">예상지출</th><th className="num">순현금흐름</th><th>상태</th></tr></thead>
           <tbody className="divide-y">
             {months.map(m => <tr key={m.key} onClick={() => setSelected(m.key)} className={`cursor-pointer hover:bg-muted/50 ${selected === m.key ? 'bg-primary/5' : ''}`}>
-              <td className="font-medium">{m.label}</td><td className="num text-[var(--system-green)]">{formatKRW(m.incoming)}</td><td className="num text-[var(--system-red)]">{formatKRW(m.outgoing)}</td><td className={`num font-semibold ${m.net < 0 ? 'text-[var(--system-red)]' : ''}`}>{formatKRW(m.net)}</td><td>{m.net < 0 ? <span className="text-[var(--system-red)]">순유출</span> : '순유입'}</td>
+              <td className="font-medium">{m.label}</td><td className="num text-[var(--system-green)]">{formatKRW(m.incoming)}</td><td className="num text-[var(--system-red)]">{formatKRW(m.outgoing)}</td><td className={`num font-semibold ${m.net < 0 ? 'text-[var(--system-red)]' : ''}`}>{formatKRW(m.net)}</td><td>{m.net < 0 ? <span className="text-[var(--system-red)]">순유출</span> : m.net > 0 ? '순유입' : '순변동 없음'}</td>
             </tr>)}
           </tbody>
         </table>

@@ -66,6 +66,8 @@ export default function ProjectPL() {
           {sales.length === 0 && <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">매출 데이터가 없습니다.</td></tr>}
         </tbody></table></div>
       </section>
+      <h2 className="font-semibold">발주별 생산 손익 · 그룹 전체</h2>
+      <p className="text-sm text-muted-foreground">등록된 청구·생산·자재 금액 기준이며, 미등록 비용과 전사 운영비는 포함하지 않습니다.</p>
       <div className="flex flex-wrap gap-2">
         {allOrderNos.length === 0 ? (
           <p className="text-sm text-muted-foreground">등록된 발주가 없습니다</p>
@@ -92,7 +94,7 @@ export default function ProjectPL() {
             <Kpi
               label="손익"
               value={formatKRW(pl.profit)}
-              sub={pl.profit >= 0 ? '흑자' : '적자'}
+              sub={pl.profit > 0 ? '등록 금액 기준 흑자' : pl.profit < 0 ? '등록 금액 기준 적자' : '등록 금액 기준 수지 일치'}
             />
           </div>
 
