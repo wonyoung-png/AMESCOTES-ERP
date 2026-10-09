@@ -4,13 +4,13 @@ import type { TradeStatement } from './store';
 
 export type PlannedExpenseStage = '예상' | '확정';
 export type PlannedExpenseWorkspace = 'OEM' | 'LUMEN' | 'AETALOOP';
-export const encodePlannedExpense = (workspace: PlannedExpenseWorkspace, category: string, stage: PlannedExpenseStage, description: string) =>
-  `[자금계획|${workspace}|${category}|${stage}] ${description.trim()}`;
+export const encodePlannedExpense = (workspace: PlannedExpenseWorkspace, category: string, stage: PlannedExpenseStage, description: string, groupId?: string, installment?: string) =>
+  `[자금계획|${workspace}|${category}|${stage}${groupId ? `|${groupId}|${installment || '지급'}` : ''}] ${description.trim()}`;
 export const parsePlannedExpense = (memo?: string) => {
-  const match = memo?.match(/^\[자금계획\|(OEM|LUMEN|AETALOOP)\|([^|]+)\|(예상|확정)\]\s*(.*)$/);
-  return match ? { workspace: match[1] as PlannedExpenseWorkspace, category: match[2], stage: match[3] as PlannedExpenseStage, description: match[4] } : null;
+  const match = memo?.match(/^\[자금계획\|(OEM|LUMEN|AETALOOP)\|([^|]+)\|(예상|확정)(?:\|([^|]+)\|([^\]]+))?\]\s*(.*)$/);
+  return match ? { workspace: match[1] as PlannedExpenseWorkspace, category: match[2], stage: match[3] as PlannedExpenseStage, groupId: match[4], installment: match[5], description: match[6] } : null;
 };
-export const confirmPlannedExpenseMemo = (memo?: string) => memo?.replace(/^(\[자금계획\|[^|]+\|[^|]+\|)예상(\])/, '$1확정$2');
+export const confirmPlannedExpenseMemo = (memo?: string) => memo?.replace(/^(\[자금계획\|[^|]+\|[^|]+\|)예상(?=\||\])/, '$1확정');
 
 export const statementTotal = (s: TradeStatement) => s.lines.reduce((sum, line) => {
   const supply = line.qty * line.unitPrice;

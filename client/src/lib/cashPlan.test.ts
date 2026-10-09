@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMonthlyCashPlan, encodePlannedExpense, parsePlannedExpense } from './cashPlan';
+import { buildMonthlyCashPlan, confirmPlannedExpenseMemo, encodePlannedExpense, parsePlannedExpense } from './cashPlan';
 
 test('미수·미지급 잔액을 예정월별로 합산하고 완납·지급완료는 제외한다', () => {
   const result = buildMonthlyCashPlan([
@@ -39,7 +39,13 @@ test('LUMEN 비정기 지출은 예상 단계로 분류하고 메타정보를 �
   const memo = encodePlannedExpense('LUMEN', '인테리어', '예상', '성수점 계약금');
   const result = buildMonthlyCashPlan([], [{ id: 'p1', vendorName: '시공사', sourceType: 'manual', amountKrw: 5000, paidAmountKrw: 0, dueDate: '2026-11-05', status: 'pending', memo, createdAt: '' }], [], new Date(2026, 10, 1), 1);
 
-  assert.deepEqual(parsePlannedExpense(memo), { workspace: 'LUMEN', category: '인테리어', stage: '예상', description: '성수점 계약금' });
+  assert.deepEqual(parsePlannedExpense(memo), { workspace: 'LUMEN', category: '인테리어', stage: '예상', groupId: undefined, installment: undefined, description: '성수점 계약금' });
   assert.equal(result[0].expectedOutgoing, 5000);
   assert.equal(result[0].confirmedOutgoing, 0);
+});
+
+test('분할지급은 같은 묶음과 각 회차를 보존한다', () => {
+  const memo = encodePlannedExpense('LUMEN', '인테리어', '예상', '성수점 공사', 'project-1', '중도금');
+  assert.deepEqual(parsePlannedExpense(memo), { workspace: 'LUMEN', category: '인테리어', stage: '예상', groupId: 'project-1', installment: '중도금', description: '성수점 공사' });
+  assert.equal(parsePlannedExpense(confirmPlannedExpenseMemo(memo))?.stage, '확정');
 });
