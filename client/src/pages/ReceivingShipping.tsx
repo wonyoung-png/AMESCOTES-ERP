@@ -4,7 +4,7 @@ import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, formatNumber, genId } from '@/lib/store';
 import { phase1, DEFECT_DISPOSITION_LABEL, type DeliveryMarket, type ReceiptLogType, type DefectDisposition } from '@/lib/phase1';
-import { fetchOrders } from '@/lib/supabaseQueries';
+import { fetchOrders, upsertOrder } from '@/lib/supabaseQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,7 +71,7 @@ export default function ReceivingShipping() {
     setModal({ orderId, logType });
   };
 
-  const submitLog = () => {
+  const submitLog = async () => {
     if (!modal || form.qty <= 0) { toast.error('수량을 입력하세요'); return; }
     const o = orders.find(x => x.id === modal.orderId);
     if (!o) return;
@@ -82,6 +82,25 @@ export default function ReceivingShipping() {
       return;
     }
     if (form.defectQty > form.qty) { toast.error('불량수량이 입고수량보다 많습니다'); return; }
+    const isInbound = modal.logType === 'inbound';
+    const newReceived = cur.receivedQty + (isInbound ? form.qty : 0);
+    const newShipped = cur.shippedQty + (isInbound ? 0 : form.qty);
+    const newDefect = cur.defectQty + (isInbound ? form.defectQty : 0);
+    const updates: Record<string, unknown> = {
+      receivedQty: newReceived,
+      defectQty: newDefect,
+      receivedDate: form.date,
+      shippedQty: newShipped,
+    };
+    if (newReceived >= o.qty) updates.status = '입고완료';
+    const updatedOrder = { ...o, ...updates, updatedAt: new Date().toISOString() };
+    try {
+      await upsertOrder(updatedOrder);
+    } catch (error) {
+      toast.error(`입출고 기록 저장 실패: ${(error as Error).message}`);
+      return;
+    }
+    store.updateOrder(o.id, updates as Partial<typeof o>);
     phase1.addReceiptLog({
       orderId: o.id,
       orderNo: o.orderNo,
@@ -92,19 +111,8 @@ export default function ReceivingShipping() {
       defectNote: form.defectNote,
       receivedDate: form.date,
       memo: form.memo,
-      deliveryMarket: modal.logType === 'inbound' ? undefined : form.deliveryMarket,
+      deliveryMarket: isInbound ? undefined : form.deliveryMarket,
     });
-    const sum = phase1.getOrderReceiptSummary(o.id, o.qty);
-    const newReceived = sum.receivedQty;
-    const newShipped = sum.shippedQty + (modal.logType !== 'inbound' ? form.qty : 0);
-    const updates: Record<string, unknown> = {
-      receivedQty: newReceived,
-      defectQty: sum.defectQty,
-      receivedDate: form.date,
-      shippedQty: newShipped,
-    };
-    if (newReceived >= o.qty) updates.status = '입고완료';
-    store.updateOrder(o.id, updates as Partial<typeof o>);
     if (form.defectQty > 0 && modal.logType === 'inbound') {
       const unit = o.factoryUnitPriceKrw || 0;
       phase1.addDefectCarryover({
