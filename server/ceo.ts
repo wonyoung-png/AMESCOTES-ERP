@@ -204,14 +204,13 @@ async function gather(me: SessionUser) {
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
   const today = kstToday();
   const in30 = new Date(Date.now() + 9 * 3600e3 + 30 * 864e5).toISOString().slice(0, 10);
-  const ago3 = new Date(Date.now() + 9 * 3600e3 - 3 * 864e5).toISOString().slice(0, 10);
   const [cr, pr, kr, all, kpi, agents, watch] = await Promise.all([
     // 대표는 전부 본다 — 질문(개인 대화)만 뺀다
     reportingCards('*', since),
     // 사진은 빼고 — 콘솔이 /api/ceo/capture-photo/:id 로 따로 받는다 (요약에 넣으면 응답이 수십 MB 가 될 수 있다, 코덱스 지적)
     allRows(`capture_inbox?status=eq.pending&select=id,created_at,created_by_name,raw_text,kind,parsed,confidence&order=created_at.desc,id.desc`),
     allRows(`campaigns?select=id,title,channel,start_date,end_date,status,discount_rate,workspace` +
-      `&end_date=gte.${ago3}&start_date=lte.${in30}&order=start_date.asc,id.asc`),
+      `&status=neq.closed&end_date=gte.${today}&start_date=lte.${in30}&order=start_date.asc,id.asc`),
     members(),
     salesKpi(),
     latestRuns(),
@@ -331,7 +330,7 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
       (c.parsed?.dueDate ? ` (마감 ${c.parsed.dueDate})` : '');
     const records = [
       '[직원]', ...g.members.map(m => `- ${m.name}(${m.team || '-'}${m.position ? '·' + m.position : ''})${m.profile ? ': ' + m.profile.replace(/\s+/g, ' ').slice(0, 300) : ''}`),
-      '', '[운영캘린더 — 지난 3일~앞으로 30일]', ...g.campaigns.map(c => `- ${c.start_date}~${c.end_date} ${c.channel || ''} ${c.title} (${c.status === 'draft' ? '예정' : c.status}${c.discount_rate != null ? ', ' + c.discount_rate + '%' : ''})`),
+      '', '[운영캘린더 — 현재 진행 및 앞으로 30일, 종료 확인 누락은 현재 운영 점검에 별도 포함]', ...g.campaigns.map(c => `- ${c.start_date}~${c.end_date} ${c.channel || ''} ${c.title} (${c.status === 'draft' ? '예정' : c.status}${c.discount_rate != null ? ', ' + c.discount_rate + '%' : ''})`),
       '', '[승인 대기 현장 접수]', ...g.captures.map(c => `- ${c.created_at.slice(0, 10)} ${c.created_by_name} [${c.kind}] ${c.raw_text}`),
       '', `[업무 전수 집계 — 최근 30일 + 오래된 미결/최근 처리] ${g.cards.length}건, 미결 ${g.open.length}건`,
       '', `[질문 관련 근거 — 과거 검색 포함, 선택 ${evidence.length}건]`, ...evidence.map(fmtCard),

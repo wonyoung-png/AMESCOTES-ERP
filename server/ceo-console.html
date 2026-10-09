@@ -365,7 +365,7 @@ function home() {
     const dot = t.overdue || (D.watch || []).find(w => w.team === t.team)?.alerts ? 'warn' : (t.open || t.newToday) ? '' : 'idle';
     return `<div class="team"><h3><i class="${dot}"></i>${esc(t.team)}</h3>
       <dl><div><dt>진행 중</dt><dd>${t.open}</dd></div><div><dt>오늘 완료</dt><dd>${t.doneToday}</dd></div><div><dt>마감 지남</dt><dd${t.overdue ? ' class="up"' : ''}>${t.overdue}</dd></div></dl>
-      <p>${(() => { const ag = (D.agents || []).find(x => x.team === t.team); return ag ? (ag.stale ? '[오늘 이전 보고] ' : '') + esc(ag.headline) : t.latest ? esc(t.latest) : '아직 올라온 업무가 없어요'; })()}</p></div>`;
+      <p>${(() => { const ag = (D.agents || []).find(x => x.team === t.team); return ag ? '[보고 ' + esc(new Date(ag.created_at).toLocaleString('ko-KR', {timeZone:'Asia/Seoul'})) + (ag.stale ? ' · 오늘 이전' : '') + '] ' + esc(ag.headline) : t.latest ? esc(t.latest) : '아직 올라온 업무가 없어요'; })()}</p></div>`;
   }).join('');
   const cal = D.campaigns.map(c => {
     const d = new Date(c.start_date + 'T00:00:00+09:00');
