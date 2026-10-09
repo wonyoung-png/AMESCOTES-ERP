@@ -24,6 +24,7 @@ import subscriptionsRouter from "./subscriptions.js";
 import productionRiskRouter from "./production-risk-routes.js";
 import brandWorkflowRouter from "./brand-workflow.js";
 import payablePaymentRouter from "./payable-payment.js";
+import receiptWorkflowRouter from "./receipt-workflow.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,6 +78,7 @@ async function startServer() {
   app.use(reorderBridgeRouter);
   app.use(brandWorkflowRouter);
   app.use(payablePaymentRouter);
+  app.use(receiptWorkflowRouter);
 
   // OCR 라우터
   app.use(yardageOcrRouter);

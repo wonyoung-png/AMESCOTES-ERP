@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { store, formatNumber, type OrderStatus, type ProductionOrder } from '@/lib/store';
+import { store, formatNumber, genId, type OrderStatus, type ProductionOrder } from '@/lib/store';
 import {
   phase1, pullBrandOrders, CHINA_CORP_VENDOR_CODE, CHINA_CORP_VENDOR_NAME,
   type BrandOrderBatch, type OrderDisplayStatus, type ReceiptDestination, type ReorderOrderRow,
@@ -94,6 +94,8 @@ export default function BrandOrders() {
   const [recvFocusColor, setRecvFocusColor] = useState<string>('');
 
   const [recvOpen, setRecvOpen] = useState(false);
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const [receiptRequestId, setReceiptRequestId] = useState('');
   const [recvForm, setRecvForm] = useState({
     destination: 'korea' as ReceiptDestination,
     qty: 0,
@@ -299,6 +301,7 @@ export default function BrandOrders() {
       memo: '',
       createPayable: true,
     });
+    setReceiptRequestId(genId());
     setRecvOpen(true);
   };
 
@@ -311,23 +314,40 @@ export default function BrandOrders() {
     refresh();
   };
 
-  const submitRecv = () => {
+  const submitRecv = async () => {
+    if (receiptBusy) return;
     if (!detailRow) return;
     if (!Number.isInteger(recvForm.qty) || recvForm.qty <= 0) { toast.error('수량은 양의 정수로 입력하세요'); return; }
     if (!validDate(recvForm.date)) { toast.error('올바른 입고 날짜를 입력하세요'); return; }
     const colorKey = recvForm.color.trim() || '(미배정)';
     const colorLine = detailRow.colorLines.find(c => c.color === colorKey || c.color === recvForm.color.trim());
     const colorRemain = colorLine ? colorLine.remaining : detailRow.remaining;
-    if (recvForm.qty > colorRemain) {
+    if (recvForm.destination === 'china' && recvForm.qty > colorRemain) {
       toast.error(`해당 컬러 잔량(${colorRemain})을 초과할 수 없습니다`);
       return;
     }
-    if (recvForm.qty > detailRow.remaining) { toast.error('잔량을 초과할 수 없습니다'); return; }
+    if (recvForm.destination === 'china' && recvForm.qty > detailRow.remaining) { toast.error('잔량을 초과할 수 없습니다'); return; }
     if (!recvForm.color.trim()) {
       toast.error('컬러를 선택하세요 (품목·컬러별 관리)');
       return;
     }
     const order = orders.find(o => o.id === detailRow.orderId);
+    if (recvForm.destination === 'korea') {
+      setReceiptBusy(true);
+      try {
+        const result = await phase1.saveKoreaReceipt({ id: receiptRequestId, orderId: detailRow.orderId,
+          qty: recvForm.qty, defectQty: 0, receivedDate: recvForm.date, color: recvForm.color.trim(),
+          memo: recvForm.memo, isAdvance: recvForm.isAdvance || detailRow.productionStatus !== 'produced',
+          createPayable: recvForm.createPayable, disposition: 'deduct' });
+        store.cacheOrderReceipt(result.order);
+        if (recvForm.createPayable && !result.payable) toast.warning('입고 저장 완료 · 공장 원화 단가 미확정으로 미지급은 생성하지 않았습니다');
+        toast.success(`한국입고 ${recvForm.qty}개 저장${result.payable ? ' · 미지급 연결' : ''}`);
+        setRecvOpen(false); setDetailRow(null); refresh();
+        queryClient.invalidateQueries({ queryKey: ['payables'] });
+      } catch (error) { toast.error((error as Error).message); }
+      finally { setReceiptBusy(false); }
+      return;
+    }
     const log = phase1.addReceiptLog({
       orderId: detailRow.orderId,
       orderNo: detailRow.orderNo,
@@ -784,7 +804,7 @@ export default function BrandOrders() {
       </Dialog>
 
       {/* 입고 등록 */}
-      <Dialog open={recvOpen} onOpenChange={setRecvOpen}>
+      <Dialog open={recvOpen} onOpenChange={open => { if (!receiptBusy) setRecvOpen(open); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>입고 등록</DialogTitle>
@@ -855,8 +875,8 @@ export default function BrandOrders() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRecvOpen(false)}>취소</Button>
-            <Button onClick={submitRecv}>입고 확정</Button>
+            <Button variant="outline" onClick={() => setRecvOpen(false)} disabled={receiptBusy}>취소</Button>
+            <Button onClick={submitRecv} disabled={receiptBusy}>{receiptBusy ? '저장 중…' : '입고 확정'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1107,6 +1107,11 @@ export const store = {
   // Orders
   getOrders: () => getAll<ProductionOrder>(KEYS.orders),
   setOrders: (v: ProductionOrder[]) => setAll(KEYS.orders, v),
+  cacheOrderReceipt: (row: { id: string; received_qty: number; defect_qty: number; received_date: string; status: string; updated_at: string }) => {
+    setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).map(o => o.id === row.id ? { ...o,
+      receivedQty: row.received_qty, defectQty: row.defect_qty, receivedDate: row.received_date,
+      status: row.status as OrderStatus, updatedAt: row.updated_at } : o));
+  },
   addOrder: (v: ProductionOrder) => {
     const a = getAll<ProductionOrder>(KEYS.orders); a.push(v); setAll(KEYS.orders, a);
     // production_orders 테이블은 qty→quantity, factoryUnitPriceKrw→unit_price, factoryCurrency→currency 매핑 필요

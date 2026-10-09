@@ -51,3 +51,23 @@ globalThis.fetch = async () => ({ ok: true, json: async () => ({ items: [] }) })
 await pullPayables();
 assert.equal(phase1.getPayables().length, 0, 'empty server list must clear stale cache');
 console.log('phase1 persistence checks=8 PASS');
+
+const receiptInput = { id: 'test_atomic', orderId: 'test_atomic_order', qty: 5, defectQty: 1,
+  receivedDate: '2026-10-09', createPayable: true, disposition: 'deduct' };
+const receiptCacheBefore = JSON.stringify(phase1.getReceiptLogs());
+globalThis.fetch = async () => ({ ok: false, json: async () => ({ message: 'rollback' }) });
+await assert.rejects(phase1.saveKoreaReceipt(receiptInput), /rollback/);
+assert.equal(JSON.stringify(phase1.getReceiptLogs()), receiptCacheBefore, 'failed atomic receipt changed cache');
+const result = { receipt: { id: 'test_atomic' }, order: { id: 'test_atomic_order', received_qty: 5 },
+  logs: [{ id: 'test_atomic', order_id: 'test_atomic_order', log_type: 'inbound', qty: 5, defect_qty: 1, received_date: '2026-10-09' }],
+  payable: { id: 'pay_test_atomic', source_id: 'test_atomic', source_type: 'order_receipt', amount_krw: 5000, paid_amount_krw: 0, status: 'pending' },
+  defect: { id: 'def_test_atomic', qty: 1, amount_krw: 1000, disposition: 'deduct', status: 'pending' } };
+const writesBefore = t.writes.length;
+globalThis.fetch = async () => ({ ok: true, json: async () => ({ result }) });
+await phase1.saveKoreaReceipt(receiptInput);
+await phase1.saveKoreaReceipt(receiptInput);
+assert.equal(phase1.getReceiptLogs().filter(r => r.id === 'test_atomic').length, 1);
+assert.equal(phase1.getPayables().filter(r => r.id === 'pay_test_atomic').length, 1);
+assert.equal(phase1.getDefectCarryovers().filter(r => r.id === 'def_test_atomic').length, 1);
+assert.equal(t.writes.length, writesBefore, 'server receipt result triggered duplicate browser DB writes');
+console.log('atomic receipt cache checks=5 PASS');

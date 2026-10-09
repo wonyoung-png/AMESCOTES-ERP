@@ -32,7 +32,8 @@ export default function ReceivingShipping() {
   const [filter, setFilter] = usePersistedState<'all' | 'pending' | 'partial' | 'done'>('receiving.filter', 'all');
   const [search, setSearch] = usePersistedState('receiving.search', '');
   const [logFilter, setLogFilter] = useState<ReceiptLogType | 'all'>('all');
-  const [modal, setModal] = useState<{ orderId: string; logType: ReceiptLogType } | null>(null);
+  const [modal, setModal] = useState<{ orderId: string; logType: ReceiptLogType; requestId: string } | null>(null);
+  const [receiptBusy, setReceiptBusy] = useState(false);
   const [form, setForm] = useState({ qty: 0, defectQty: 0, defectNote: '', defectDisposition: 'deduct' as DefectDisposition, date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: 'domestic' as DeliveryMarket });
   const [shippingOpen, setShippingOpen] = useState(false);
   const [shippingForm, setShippingForm] = useState({ shipDate: today, method: 'air' as ShippingMethod, orderNo: '', description: '', qty: 0, memo: '' });
@@ -71,10 +72,11 @@ export default function ReceivingShipping() {
     const sum = phase1.getOrderReceiptSummary(orderId, o?.qty || 0);
     const remain = logType === 'inbound' ? o!.qty - sum.receivedQty : o!.qty - sum.shippedQty;
     setForm({ qty: Math.max(0, remain), defectQty: 0, defectNote: '', defectDisposition: 'deduct', date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: logType === 'outbound_oem' ? 'b2b' : 'domestic' });
-    setModal({ orderId, logType });
+    setModal({ orderId, logType, requestId: genId() });
   };
 
   const submitLog = async () => {
+    if (receiptBusy) return;
     if (!modal || !Number.isInteger(form.qty) || form.qty <= 0) { toast.error('수량은 양의 정수로 입력하세요'); return; }
     if (!Number.isInteger(form.defectQty) || form.defectQty < 0) { toast.error('불량수량은 0 이상의 정수여야 합니다'); return; }
     if (!validDate(form.date)) { toast.error('올바른 입출고 날짜를 입력하세요'); return; }
@@ -82,15 +84,29 @@ export default function ReceivingShipping() {
     if (!o) return;
     const cur = phase1.getOrderReceiptSummary(o.id, o.qty);
     const already = modal.logType === 'inbound' ? cur.receivedQty : cur.shippedQty;
-    if (already + form.qty > o.qty) {
+    if (modal.logType !== 'inbound' && already + form.qty > o.qty) {
       toast.error(`발주수량을 넘습니다 — 남은 수량 ${formatNumber(Math.max(0, o.qty - already))}개`);
       return;
     }
     if (form.defectQty > form.qty) { toast.error('불량수량이 입고수량보다 많습니다'); return; }
-    const isInbound = modal.logType === 'inbound';
-    const newReceived = cur.receivedQty + (isInbound ? form.qty : 0);
-    const newShipped = cur.shippedQty + (isInbound ? 0 : form.qty);
-    const newDefect = cur.defectQty + (isInbound ? form.defectQty : 0);
+    if (modal.logType === 'inbound') {
+      setReceiptBusy(true);
+      try {
+        const result = await phase1.saveKoreaReceipt({ id: modal.requestId, orderId: o.id, qty: form.qty,
+          defectQty: form.defectQty, defectNote: form.defectNote, disposition: form.defectDisposition,
+          receivedDate: form.date, memo: form.memo, createPayable: true });
+        store.cacheOrderReceipt(result.order);
+        if (!result.payable) toast.warning('입고 저장 완료 · 공장 원화 단가 미확정으로 미지급은 생성하지 않았습니다');
+        toast.success(`입고 ${form.qty}개 저장${result.payable ? ' · 미지급 연결' : ''}${result.defect ? ' · 불량 연결' : ''}`);
+        setModal(null); refresh();
+        queryClient.invalidateQueries({ queryKey: ['payables'] });
+      } catch (error) { toast.error((error as Error).message); }
+      finally { setReceiptBusy(false); }
+      return;
+    }
+    const newReceived = cur.receivedQty;
+    const newShipped = cur.shippedQty + form.qty;
+    const newDefect = cur.defectQty;
     const updates: Record<string, unknown> = {
       receivedQty: newReceived,
       defectQty: newDefect,
@@ -106,7 +122,7 @@ export default function ReceivingShipping() {
       return;
     }
     store.updateOrder(o.id, updates as Partial<typeof o>);
-    const receiptLog = phase1.addReceiptLog({
+    phase1.addReceiptLog({
       orderId: o.id,
       orderNo: o.orderNo,
       projectNo: (o as { projectNo?: string }).projectNo,
@@ -116,16 +132,8 @@ export default function ReceivingShipping() {
       defectNote: form.defectNote,
       receivedDate: form.date,
       memo: form.memo,
-      deliveryMarket: isInbound ? undefined : form.deliveryMarket,
+      deliveryMarket: form.deliveryMarket,
     });
-    if (isInbound) {
-      const payable = phase1.createPayableFromReceipt(receiptLog, {
-        unitPriceKrw: o.factoryUnitPriceKrw || 0,
-        factoryVendorId: o.vendorId,
-        factoryVendorName: o.vendorName,
-      });
-      if (!payable) toast.warning('입고 기록과 별개로 공장 단가가 미확정이라 미지급을 생성하지 못했습니다');
-    }
     if (modal.logType === 'outbound_oem' && newShipped >= o.qty) {
       const marker = `[AUTO-ORDER:${o.id}]`;
       const exists = store.getTradeStatements().some(s => s.memo?.includes(marker));
@@ -158,22 +166,6 @@ export default function ReceivingShipping() {
       } else if (!exists && !buyer) {
         toast.warning('바이어가 없어 거래명세표 초안은 생성하지 못했습니다');
       }
-    }
-    if (form.defectQty > 0 && modal.logType === 'inbound') {
-      const unit = o.factoryUnitPriceKrw || 0;
-      phase1.addDefectCarryover({
-        styleNo: o.styleNo,
-        orderNo: o.orderNo,
-        projectNo: (o as { projectNo?: string }).projectNo,
-        vendorId: o.vendorId,
-        vendorName: o.vendorName,
-        // 재작업·수정은 대금을 깎지 않는다. 수량만 남겨 추적한다
-        amountKrw: form.defectDisposition === 'deduct' ? unit * form.defectQty : 0,
-        qty: form.defectQty,
-        disposition: form.defectDisposition,
-        reason: form.defectNote || '입고 불량',
-        defectDate: form.date,
-      });
     }
     toast.success(`${LOG_LABELS[modal.logType]} ${form.qty}개 기록`);
     setModal(null);
@@ -316,7 +308,7 @@ export default function ReceivingShipping() {
         </div>
       </div>
 
-      <Dialog open={!!modal} onOpenChange={() => setModal(null)}>
+      <Dialog open={!!modal} onOpenChange={() => { if (!receiptBusy) setModal(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{modal ? LOG_LABELS[modal.logType] : ''} 등록</DialogTitle>
@@ -358,8 +350,8 @@ export default function ReceivingShipping() {
             <div><Label>메모</Label><Input value={form.memo} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModal(null)}>취소</Button>
-            <Button onClick={submitLog}>저장</Button>
+            <Button variant="outline" onClick={() => setModal(null)} disabled={receiptBusy}>취소</Button>
+            <Button onClick={submitLog} disabled={receiptBusy}>{receiptBusy ? '저장 중…' : '저장'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

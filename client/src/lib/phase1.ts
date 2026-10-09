@@ -615,6 +615,39 @@ function paymentAxisForOrder(orderId: string): OrderPaymentAxis {
 }
 
 export const phase1 = {
+  /** 한국입고: 서버 트랜잭션 성공 이후에만 캐시를 교체한다. */
+  saveKoreaReceipt: async (input: {
+    id: string; orderId: string; qty: number; defectQty: number; receivedDate: string;
+    createPayable: boolean; disposition: DefectDisposition; color?: string; memo?: string;
+    defectNote?: string; isAdvance?: boolean;
+  }) => {
+    const response = await fetch(`/api/orders/${encodeURIComponent(input.orderId)}/receive`, {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.message || '입고 서버 저장 실패');
+    const result = body.result;
+    if (!result?.receipt || !result?.order || !Array.isArray(result.logs)) throw new Error('입고 저장 결과 확인이 필요합니다 — 이력을 조회해주세요');
+    try {
+      const logs: ReceiptLog[] = result.logs.map((r: any) => ({ id: r.id, orderId: r.order_id, orderNo: r.order_no,
+        projectNo: r.project_no, logType: r.log_type, qty: r.qty, defectQty: r.defect_qty || 0,
+        defectNote: r.defect_note, receivedDate: r.received_date, memo: r.memo, destination: r.destination,
+        color: r.color, isAdvance: r.is_advance, deliveryMarket: r.delivery_market, createdAt: r.created_at }));
+      setAll(KEYS.receiptLogs, [...getAll<ReceiptLog>(KEYS.receiptLogs).filter(r => r.orderId !== input.orderId), ...logs]);
+      if (result.payable) {
+        const p = rowToPayable(result.payable);
+        setAll(KEYS.payables, [...getAll<Payable>(KEYS.payables).filter(row => row.id !== p.id), p]);
+      }
+      if (result.defect) {
+        const r = result.defect;
+        const d: DefectCarryover = { id: r.id, styleNo: r.style_no, orderNo: r.order_no, projectNo: r.project_no,
+          vendorId: r.vendor_id, vendorName: r.vendor_name, amountKrw: Number(r.amount_krw), qty: r.qty,
+          disposition: r.disposition, reason: r.reason, defectDate: r.defect_date, status: r.status, createdAt: r.created_at };
+        setAll(KEYS.defectCarryovers, [...getAll<DefectCarryover>(KEYS.defectCarryovers).filter(row => row.id !== d.id), d]);
+      }
+    } catch { throw new Error('입고는 서버에 저장됐으나 화면 갱신에 실패했습니다 — 같은 요청으로 재시도해주세요'); }
+    return result as { receipt: any; order: any; payable: any; defect: any; retry: boolean };
+  },
   getProjects: () => getAll<Project>(KEYS.projects),
   getProjectByNo: (no: string) => getAll<Project>(KEYS.projects).find(p => p.projectNo === no),
 
