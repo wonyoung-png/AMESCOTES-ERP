@@ -14,6 +14,7 @@ import { CalendarClock, List, Calendar, BarChart3, Check, ChevronLeft, ChevronRi
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import ProductionRiskPanel from '@/components/ProductionRiskPanel';
 
 const MILESTONE_LABELS: Partial<Record<MilestoneStage, string>> = {
   '샘플1차': '샘플1차',
@@ -144,6 +145,7 @@ export default function DeadlineManagement() {
         </div>
       </div>
 
+      <ProductionRiskPanel />
       <Tabs value={view} onValueChange={setView}>
         <TabsList>
           <TabsTrigger value="list" className="gap-1"><List size={14} />리스트</TabsTrigger>

@@ -21,6 +21,7 @@ import { startAgentScheduler } from "./agents.js";
 import gcalRouter, { startGcalSync } from "./gcal.js";
 import pixelRouter from "./pixel.js";
 import subscriptionsRouter from "./subscriptions.js";
+import productionRiskRouter from "./production-risk-routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -82,6 +83,7 @@ async function startServer() {
   app.use(workRouter);
   app.use(usersRouter);
   app.use(subscriptionsRouter);
+  app.use(productionRiskRouter);
   app.use(ceoRouter);
   app.use(gcalRouter);
 
