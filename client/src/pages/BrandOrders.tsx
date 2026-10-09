@@ -61,7 +61,7 @@ export default function BrandOrders() {
   const ws = workspace === 'AETALOOF' ? 'AETALOOF' : 'LUMEN';
   const queryClient = useQueryClient();
   const { data: remoteOrders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
-  const { data: pulled = 0 } = useQuery({ queryKey: ['brandOrders'], queryFn: pullBrandOrders });
+  const { data: pulled = 0, isError: brandReadError } = useQuery({ queryKey: ['brandOrders'], queryFn: pullBrandOrders });
   const [tickN, tick] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [workflowBusy, setWorkflowBusy] = useState(false);
@@ -181,7 +181,7 @@ export default function BrandOrders() {
   /** 발주 취소 — 수주함이 받기 전이면 초안으로 되돌린다 */
   const cancelIssue = async () => {
     if (!detail || workflowBusy) return;
-    if (!confirm(`${detail.projectNo} 발주를 취소합니다. 초안으로 되돌아갑니다.`)) return;
+    if (!confirm(`${detail.projectNo}를 작성 상태로 되돌립니다. 수정 후 대표 승인을 다시 받아야 합니다.`)) return;
     setWorkflowBusy(true);
     let saved = false;
     try {
@@ -189,7 +189,7 @@ export default function BrandOrders() {
       saved = true;
       await pullBrandOrders();
       refresh(); setSelected(phase1.getBrandBatch(detail.id) || null);
-      toast.success('발주 취소 — 다시 수정 후 대표 승인이 필요합니다');
+      toast.success('작성 상태로 되돌렸습니다 — 수정 후 대표 승인이 필요합니다');
     } catch (e: any) {
       refresh();
       if (saved) toast.warning('취소는 저장됐지만 목록 조회에 실패했습니다 — 새로고침해주세요');
@@ -275,6 +275,7 @@ export default function BrandOrders() {
 
   /** 발주가 지금 어디까지 왔는지 — 담는 중 → 발주 → 납기확정 → 분할 */
   const stepLabel = (batch: BrandOrderBatch) => {
+    if (batch.status === 'done') return '의뢰 완료';
     if (batch.status === 'split') return '생산발주 완료';
     if (batch.status === 'issued') return batch.expectedDely ? `납기 ${batch.expectedDely}` : '납기 대기';
     if (batch.status === 'approved') return '승인 완료 · 발행 대기';
@@ -453,7 +454,7 @@ export default function BrandOrders() {
 
           {board.length === 0 ? (
             <div className="bg-card rounded-lg border p-10 text-center text-sm text-muted-foreground">
-              표시할 오더가 없습니다. 승인 탭에서 묶음 발주 → 생산발주 분할 후, 또는 리오더 생산발주를 등록하세요.
+              표시할 오더가 없습니다. 발주 작성에서 대표 승인 → 발주서 발행 → OEM 수주 후 생산 오더가 표시됩니다.
             </div>
           ) : board.map(group => (
             <div key={group.styleNo} className="bg-card rounded-lg border overflow-hidden">
@@ -535,6 +536,7 @@ export default function BrandOrders() {
 
         {/* ── 승인 (기존) ── */}
         <TabsContent value="approval" className="mt-4 space-y-4">
+          {brandReadError && <p role="alert" className="text-sm text-[var(--system-orange)]">서버 목록을 조회하지 못했습니다. 이전 자료일 수 있으니 새로고침 후 확인해주세요.</p>}
           <div className="flex gap-2">
             <Input placeholder="발주 제목 (예: 6월 2주차 리오더)" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="max-w-sm" />
             <Button variant="secondary" onClick={createBatch}>+ 묶음 발주</Button>
@@ -568,7 +570,7 @@ export default function BrandOrders() {
                     <span className="text-xs bg-muted px-2 py-1 rounded">{stepLabel(detail)}</span>
                   </div>
 
-                  {detail.status === 'issued' ? (
+                  {['issued', 'split', 'done'].includes(detail.status) ? (
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                       <span className="text-muted-foreground">
                         발주 완료 · <b className="font-mono text-foreground">
@@ -589,7 +591,7 @@ export default function BrandOrders() {
                           </Link>
                         );
                       })()}
-                      {!detail.lines.some(l => l.acceptedAt) && (
+                      {detail.status === 'issued' && !detail.lines.some(l => l.acceptedAt) && (
                         <Button size="sm" variant="outline" className="h-7 text-xs ml-auto" onClick={cancelIssue} disabled={workflowBusy}>
                           <Undo2 className="w-3 h-3 mr-1" />발주 취소
                         </Button>
@@ -603,11 +605,14 @@ export default function BrandOrders() {
                       <Button size="sm" onClick={issue} disabled={workflowBusy || detail.status !== 'approved' || detail.lines.length === 0}>
                         <Send className="w-3 h-3 mr-1" />발주서 발행
                       </Button>
+                      {['in_approval', 'approved'].includes(detail.status) && (
+                        <Button size="sm" variant="outline" onClick={cancelIssue} disabled={workflowBusy}>작성으로 되돌리기</Button>
+                      )}
                       <span className="text-[11px] text-muted-foreground">
                         AMESCOTES 수주함으로 넘어갑니다. 납기는 수주함에서 회신됩니다
                       </span>
                       <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs text-muted-foreground hover:text-[var(--system-red)]"
-                        onClick={removeBatch}>
+                        onClick={removeBatch} disabled={workflowBusy || detail.status !== 'draft'}>
                         <Trash2 className="w-3 h-3 mr-1" />발주 삭제
                       </Button>
                     </div>

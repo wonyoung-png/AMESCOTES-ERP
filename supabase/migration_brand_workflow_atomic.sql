@@ -102,7 +102,7 @@ begin
   if b.status='draft' and not exists(select 1 from public.brand_order_lines where batch_id=p_id and (po_no is not null or accepted_at is not null)) then
     return jsonb_build_object('id',p_id,'status','draft');
   end if;
-  if b.status<>'issued' then raise exception 'invalid_status'; end if;
+  if b.status not in ('issued','approved','in_approval') then raise exception 'invalid_status'; end if;
   if exists(select 1 from public.brand_order_lines where batch_id=p_id and accepted_at is not null)
     or exists(select 1 from public.production_orders where brand_batch_id=p_id) then raise exception 'already_accepted'; end if;
   update public.brand_order_lines set po_no=null,issued_at=null where batch_id=p_id;

@@ -23,7 +23,7 @@ export default function InboundPO() {
   /** PO별 납기 회신 — 여기서 정한 날이 브랜드 오더관리의 확정 납기가 된다 */
   const [dely, setDely] = useState<Record<string, string>>({});
   // 서버가 정본 — 발주서를 만든 사람과 받는 사람은 다른 브라우저다
-  const { data: pulled = 0 } = useQuery({ queryKey: ['brandOrders'], queryFn: pullBrandOrders });
+  const { data: pulled = 0, isError } = useQuery({ queryKey: ['brandOrders'], queryFn: pullBrandOrders });
 
   const pos = useMemo(() => phase1.getInboundPOs(), [pulled, busy]);
 
@@ -60,7 +60,8 @@ export default function InboundPO() {
         </p>
       </div>
 
-      {pos.length === 0 ? (
+      {isError && <p role="alert" className="text-sm text-[var(--system-orange)]">발주서 조회에 실패했습니다. 이전 자료일 수 있으며 새로고침 전에는 수주할 수 없습니다.</p>}
+      {pos.length === 0 && !isError ? (
         <div className="bg-card rounded-lg border p-12 text-center">
           <Inbox className="w-8 h-8 mx-auto text-muted-foreground mb-3" />
           <p className="text-sm text-muted-foreground">
@@ -94,7 +95,7 @@ export default function InboundPO() {
                       value={dely[po.poNo] || ''}
                       onChange={e => setDely(d => ({ ...d, [po.poNo]: e.target.value }))} />
                   </div>
-                  <Button size="sm" onClick={() => accept(po)} disabled={!!busy} className="gap-1.5">
+                  <Button size="sm" onClick={() => accept(po)} disabled={!!busy || isError} className="gap-1.5">
                     {busy === po.poNo ? '등록 중…' : <>납기 확정 · 생산발주<ArrowRight className="w-3.5 h-3.5" /></>}
                   </Button>
                 </div>

@@ -21,6 +21,12 @@ begin
   perform public.approve_brand_batch(b,'test-actor','test-actor');
   perform public.approve_brand_batch(b,'test-actor','test-actor');
   assert (select count(*) from public.approval_logs where batch_id=b)=1,'duplicate approval'; checks:=checks+1;
+  perform public.cancel_brand_issue(b);
+  assert (select status from public.brand_order_batches where id=b)='draft','approved cannot return to draft';
+  update public.brand_order_batches set status='in_approval' where id=b;
+  perform public.cancel_brand_issue(b);
+  assert (select status from public.brand_order_batches where id=b)='draft','approval request cannot return to draft';
+  perform public.approve_brand_batch(b,'test-actor','test-actor'); checks:=checks+1;
   first_result:=public.issue_brand_batch(b);
   result:=public.issue_brand_batch(b);
   assert result=first_result and jsonb_array_length(result)=2,'factory route split/retry'; checks:=checks+1;
