@@ -21,12 +21,12 @@ const MOVE_LABEL: Record<ChinaStockMoveType, string> = {
 export default function ChinaWarehouse() {
   const { workspace } = useWorkspace();
   const ws = workspace === 'AETALOOF' ? 'AETALOOF' : 'LUMEN';
-  const [, tick] = useState(0);
+  const [revision, tick] = useState(0);
   const refresh = () => tick(n => n + 1);
 
   const items = store.getItems();
-  const balances = useMemo(() => phase1.getChinaStockBalances(ws), [ws, tick]);
-  const moves = useMemo(() => phase1.getChinaStockMoves(ws), [ws, tick]);
+  const balances = useMemo(() => phase1.getChinaStockBalances(ws), [ws, revision]);
+  const moves = useMemo(() => phase1.getChinaStockMoves(ws), [ws, revision]);
 
   const [search, setSearch] = useState('');
   const [outOpen, setOutOpen] = useState(false);
@@ -70,7 +70,7 @@ export default function ChinaWarehouse() {
       toast.error('품목·컬러를 입력하세요');
       return;
     }
-    if (form.qty <= 0) { toast.error('수량을 입력하세요'); return; }
+    if (!Number.isSafeInteger(form.qty) || form.qty <= 0) { toast.error('양의 정수 수량을 입력하세요'); return; }
     const item = items.find(i => i.styleNo === form.styleNo.trim());
     const move = phase1.addChinaStockMove({
       workspace: ws,
@@ -96,7 +96,7 @@ export default function ChinaWarehouse() {
       toast.error('품목·컬러를 입력하세요');
       return;
     }
-    if (!form.qty) { toast.error('조정 수량(+/-)을 입력하세요'); return; }
+    if (!Number.isSafeInteger(form.qty) || !form.qty) { toast.error('조정 수량(+/-)을 정수로 입력하세요'); return; }
     const item = items.find(i => i.styleNo === form.styleNo.trim());
     const move = phase1.addChinaStockMove({
       workspace: ws,
@@ -117,6 +117,8 @@ export default function ChinaWarehouse() {
     refresh();
   };
 
+  if (workspace === 'OEM') return <div className="p-6 text-sm text-muted-foreground">브랜드를 선택한 후 중국창고를 관리하세요.</div>;
+
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -126,10 +128,11 @@ export default function ChinaWarehouse() {
             중국창고
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {ws} — 품목·컬러 장부 (한국 3PL/이지어드민과 별도)
+            {ws} — 전체 재고의 중국 위치 관리 · 국내 가용에 합산하지 않음 · 현재 이 브라우저에 저장
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href="/inventory"><Button variant="outline" size="sm">전체 재고</Button></Link>
           <Link href="/brand-orders">
             <Button variant="outline" size="sm">리오더 · 오더관리</Button>
           </Link>
@@ -273,7 +276,7 @@ export default function ChinaWarehouse() {
             </div>
             <div>
               <Label>수량</Label>
-              <Input type="number" min="0" value={form.qty || ''} onChange={e => setForm(f => ({ ...f, qty: +e.target.value }))} />
+              <Input type="number" min="1" step="1" value={form.qty || ''} onChange={e => setForm(f => ({ ...f, qty: +e.target.value }))} />
             </div>
             <div>
               <Label>출고일</Label>
@@ -310,7 +313,7 @@ export default function ChinaWarehouse() {
             </div>
             <div>
               <Label>조정 수량 (+/−)</Label>
-              <Input type="number" min="0" value={form.qty || ''} onChange={e => setForm(f => ({ ...f, qty: +e.target.value }))} />
+              <Input type="number" step="1" value={form.qty || ''} onChange={e => setForm(f => ({ ...f, qty: +e.target.value }))} />
             </div>
             <div>
               <Label>일자</Label>

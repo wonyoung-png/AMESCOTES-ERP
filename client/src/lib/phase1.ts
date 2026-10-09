@@ -1224,7 +1224,7 @@ export const phase1 = {
   addChinaStockMove: (input: Omit<ChinaStockMove, 'id' | 'createdAt'>) => {
     const color = (input.color || '').trim();
     if (!input.styleNo.trim() || !color) return null;
-    if (!input.qty || input.qty === 0) return null;
+    if (!Number.isSafeInteger(input.qty) || input.qty === 0) return null;
     if (input.moveType === 'outbound' && input.qty < 0) return null;
     const move: ChinaStockMove = {
       ...input,

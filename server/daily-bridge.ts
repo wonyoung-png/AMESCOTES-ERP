@@ -21,9 +21,10 @@ function mintServiceToken(ttlSec = 60): string {
 }
 
 /** Daily API 호출 헬퍼 — 교차 기능 개발 시 재사용 */
-export async function dailyFetch(path: string): Promise<unknown> {
+export async function dailyFetch(path: string, timeoutMs = 30000): Promise<unknown> {
   const r = await fetch(`${DAILY_URL}${path}`, {
     headers: { Authorization: `Bearer ${mintServiceToken()}` },
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!r.ok) throw new Error(`daily ${path} → ${r.status}`);
   return r.json();

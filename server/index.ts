@@ -25,6 +25,7 @@ import productionRiskRouter from "./production-risk-routes.js";
 import brandWorkflowRouter from "./brand-workflow.js";
 import payablePaymentRouter from "./payable-payment.js";
 import receiptWorkflowRouter from "./receipt-workflow.js";
+import inventoryRouter from "./inventory.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -79,6 +80,7 @@ async function startServer() {
   app.use(brandWorkflowRouter);
   app.use(payablePaymentRouter);
   app.use(receiptWorkflowRouter);
+  app.use(inventoryRouter);
 
   // OCR 라우터
   app.use(yardageOcrRouter);

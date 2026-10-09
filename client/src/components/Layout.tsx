@@ -96,7 +96,7 @@ const navGroups: NavGroup[] = [
       { path: '/brand-orders', label: '브랜드 생산 의뢰', icon: <Factory size={17} />, table: 'production_orders', lumenOnly: true },
       { path: '/orders', label: '생산 오더', icon: <Factory size={17} />, table: 'production_orders', lumenOnly: true },
       { path: '/receiving', label: '3PL 입고', icon: <Truck size={17} />, table: 'receipt_logs', lumenOnly: true },
-      { path: '/china-warehouse', label: '중국창고', icon: <Warehouse size={17} />, table: 'china_stock' },
+      { path: '/inventory', label: '전체 재고', icon: <Warehouse size={17} />, table: 'china_stock' },
     ],
   },
   {

@@ -71,3 +71,21 @@ assert.equal(phase1.getPayables().filter(r => r.id === 'pay_test_atomic').length
 assert.equal(phase1.getDefectCarryovers().filter(r => r.id === 'def_test_atomic').length, 1);
 assert.equal(t.writes.length, writesBefore, 'server receipt result triggered duplicate browser DB writes');
 console.log('atomic receipt cache checks=5 PASS');
+
+const chinaMove = { workspace: 'LUMEN', styleNo: 'TEST_CN', color: 'BLACK', qty: 5, moveType: 'inbound', moveDate: '2026-10-09' };
+phase1.addChinaStockMove(chinaMove);
+assert.equal(phase1.getChinaStockBalances('LUMEN')[0].onHand, 5);
+assert.equal(phase1.getChinaStockBalances('AETALOOF').length, 0);
+for (const qty of [1.5, NaN, Infinity, 0]) assert.equal(phase1.addChinaStockMove({ ...chinaMove, qty }), null);
+assert.equal(phase1.addChinaStockMove({ ...chinaMove, moveType: 'outbound', qty: 6 }), null);
+phase1.addChinaStockMove({ ...chinaMove, moveType: 'outbound', qty: 2 });
+assert.equal(phase1.getChinaStockBalances('LUMEN')[0].onHand, 3);
+phase1.addChinaStockMove({ ...chinaMove, moveType: 'adjust', qty: -1 });
+assert.equal(phase1.getChinaStockBalances('LUMEN')[0].onHand, 2);
+const chinaReceipt = { id: 'test_cn_receipt', orderId: 'test_cn_order', orderNo: 'test_cn_order', logType: 'inbound', destination: 'china', qty: 2, receivedDate: '2026-10-09' };
+const options = { workspace: 'LUMEN', styleNo: 'TEST_CN', color: 'BLACK' };
+phase1.postChinaInboundFromReceipt(chinaReceipt, options);
+phase1.postChinaInboundFromReceipt(chinaReceipt, options);
+assert.equal(phase1.getChinaStockMoves('LUMEN').filter(row => row.receiptLogId === chinaReceipt.id).length, 1);
+assert.equal(phase1.getChinaStockBalances('LUMEN')[0].onHand, 4);
+console.log('China stock checks=10 PASS');
