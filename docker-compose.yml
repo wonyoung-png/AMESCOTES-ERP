@@ -31,6 +31,7 @@ services:
       - ./db/07_prod_schema_drift.sql:/docker-entrypoint-initdb.d/07_prod_schema_drift.sql:ro
       - ./db/08_app_users.sql:/docker-entrypoint-initdb.d/08_app_users.sql:ro
       - ./db/10_operations.sql:/docker-entrypoint-initdb.d/10_operations.sql:ro
+      - ./db/14_work_scale_indexes.sql:/docker-entrypoint-initdb.d/14_work_scale_indexes.sql:ro
       # 접수함 — 99_grants 보다 먼저 와야 테이블이 있고, 잠금(14)은 그 뒤에 와야 revoke 가 안 덮인다
       - ./supabase/migration_capture_inbox.sql:/docker-entrypoint-initdb.d/13_capture_inbox.sql:ro
       - ./db/99_grants.sh:/docker-entrypoint-initdb.d/99_grants.sh:ro

@@ -20,6 +20,8 @@ export type AgentRun = {
 
 const genId = () => `ag_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 const NO_TEAM = '팀 미지정';
+const CARD_PAGE_SIZE = 1000;
+const CARD_SELECT = 'id,created_at,created_by,created_by_name,kind,status,team,assignee_id,assignee_name,parsed,raw_text,reply_text,replied_by_name,done_at';
 
 /** 대표 지시 카드인가 — parsed 는 AI 가 채우는 칸이라 그것만 믿지 않는다. 대표가 쓴 것 + 조직도 팀일 때만 (코덱스 지적) */
 export const isDirective = (c: any, bossIds: Set<string>) =>
@@ -33,7 +35,7 @@ export const orgOf = (c: any, bossIds: Set<string>): string =>
 export const CEO_DESK = '대표실';
 
 /** 숫자 근거와 상태 — 규칙만으로 */
-function judge(team: string, cards: any[], bossIds: Set<string>, today: string, watch?: Watch) {
+export function judge(team: string, cards: any[], bossIds: Set<string>, today: string, watch?: Watch) {
   const mine = cards.filter(c => c._org === team && c.kind !== 'question' && c.status !== 'cancelled');
   const open = mine.filter(c => c.status === 'open');
   const dayAgo = Date.now() - 864e5;
@@ -115,17 +117,26 @@ export async function loadRules(): Promise<Map<string, string>> {
   return m;
 }
 
+/** PostgREST 기본/임의 limit 때문에 일일 1,000건 이상에서도 보고 숫자가 잘리지 않게 전부 페이지 조회한다. */
+async function recentCards(since: string): Promise<any[]> {
+  const out: any[] = [];
+  for (let offset = 0; ; offset += CARD_PAGE_SIZE) {
+    const r = await restAsServer(`work_cards?created_at=gte.${since}&select=${CARD_SELECT}&order=created_at.desc&limit=${CARD_PAGE_SIZE}&offset=${offset}`);
+    if (!r.ok) throw new Error(`work_cards 조회 실패 ${r.status}`);
+    const page: any[] = await r.json();
+    out.push(...page);
+    if (page.length < CARD_PAGE_SIZE) return out;
+  }
+}
+
 /** 팀 목록 = 조직도 14팀 (+ 어느 팀에도 못 붙인 카드가 있으면 '팀 미지정') */
 export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: string): Promise<AgentRun[]> {
   await runSubscriptionUsageChecks().catch(e => console.warn('[agents] 구독 사용 확인 실패:', String(e).split('\n')[0]));
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
-  const [cr, all] = await Promise.all([
-    restAsServer(`work_cards?created_at=gte.${since}&select=*&order=created_at.desc&limit=600`),
+  const [cards, all] = await Promise.all([
+    recentCards(since),
     members(),
   ]);
-  // 업무를 못 읽었는데 빈 목록으로 진행하면 전 팀이 '대기'로 잘못 보고된다 — 점검 자체를 실패시킨다 (코덱스 지적)
-  if (!cr.ok) throw new Error(`work_cards 조회 실패 ${cr.status}`);
-  const cards: any[] = await cr.json();
   const bossIds = new Set(all.filter(m => CEO_EMAILS.includes(m.email.toLowerCase())).map(m => m.id));
   const teams = new Set<string>(ORG.map(t => t.key));
   for (const c of cards) { c._dir = isDirective(c, bossIds); c._org = orgOf(c, bossIds); } // 카드마다 한 번만 판정
