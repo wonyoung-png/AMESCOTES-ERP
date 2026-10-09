@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { phase1 } from '@/lib/phase1';
+import { chinaStockRequest, type ChinaSnapshot } from '@/lib/chinaStock';
 import { formatNumber } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { inventorySubtotal, type InventoryLocation, type InventoryRow } from '../../../shared/inventory';
 
 const LOCATIONS: Record<InventoryLocation, string> = {
-  domestic: '국내 · EZ 가용', 'ez-overseas': 'EZ 해외', hannam: '한남쇼룸', centum: '신세계센텀', china: '중국창고',
+  domestic: '국내 · EZ 가용', 'ez-overseas': 'EZ 해외', hannam: '한남쇼룸', centum: '신세계센텀', china: '중국창고', 'in-transit':'중국 → 한국 운송중',
 };
 type Snapshot = { workspace: string; rows: InventoryRow[]; asof: string; warning: string };
 const number = (value: number | null) => value == null ? '미확인' : formatNumber(value);
@@ -21,6 +22,13 @@ export default function InventoryOverview() {
   const [revision, refresh] = useState(0);
   const [location, setLocation] = useState<InventoryLocation | 'all'>('all');
   const [query, setQuery] = useState('');
+  const [chinaSnapshot, setChinaSnapshot] = useState<ChinaSnapshot | null>(null);
+  const [chinaError, setChinaError] = useState('');
+  useEffect(()=>{
+    let active=true;setChinaSnapshot(null);setChinaError('');
+    if(workspace!=='OEM') chinaStockRequest(workspace).then(v=>{if(active)setChinaSnapshot(v);}).catch(e=>{if(active)setChinaError(e.message);});
+    return()=>{active=false;};
+  },[workspace,revision]);
 
   useEffect(() => { setQuery(''); setLocation('all'); }, [workspace]);
   useEffect(() => {
@@ -48,16 +56,20 @@ export default function InventoryOverview() {
 
   const rows = useMemo(() => {
     if (workspace === 'OEM') return [];
-    const china: InventoryRow[] = phase1.getChinaStockBalances(workspace).map(b => ({
+    const china: InventoryRow[] = (chinaSnapshot?.workspace===workspace ? chinaSnapshot.balances : []).map(b => ({
       id: `china:${b.styleNo}:${b.color}`, sku: b.styleNo, name: b.styleName, color: b.color,
-      location: 'china', quantity: b.onHand, pending: null, basis: 'on-hand', source: 'ERP 중국 장부 · 이 브라우저',
+      location: 'china', quantity: b.onHand, pending: null, basis: 'on-hand', source: 'ERP 중국 서버 장부',
     }));
-    return [...(snapshot?.workspace === workspace ? snapshot.rows : []), ...china];
-  }, [workspace, snapshot, revision]);
+    const transit: InventoryRow[] = (chinaSnapshot?.workspace===workspace ? chinaSnapshot.transfers : []).filter(t=>t.status==='in_transit').map(t=>({
+      id:`transfer:${t.id}`,sku:t.style_no,name:t.style_no,color:t.color,location:'in-transit',quantity:Number(t.qty),pending:null,basis:'on-hand',source:`ERP 이동 ${t.id}` }));
+    return [...(snapshot?.workspace === workspace ? snapshot.rows : []), ...china,...transit];
+  }, [workspace, snapshot, chinaSnapshot]);
   const filtered = rows.filter(row => (location === 'all' || row.location === location)
     && `${row.sku} ${row.name} ${row.color}`.toLowerCase().includes(query.trim().toLowerCase()));
   const china = rows.filter(row => row.location === 'china');
-  const chinaQty = china.length ? china.reduce((sum, row) => sum + row.quantity!, 0) : null;
+  const chinaQty = chinaSnapshot?.workspace===workspace ? china.reduce((sum, row) => sum + row.quantity!, 0) : null;
+  const transitQty = chinaSnapshot?.workspace===workspace ? rows.filter(r=>r.location==='in-transit').reduce((sum,r)=>sum+r.quantity!,0) : null;
+  const legacyCount=workspace==='OEM'?0:phase1.getChinaStockMoves(workspace).filter(m=>!chinaSnapshot?.moves.some(v=>v.id===m.id || m.receiptLogId && v.receiptLogId===m.receiptLogId)).length;
 
   if (workspace === 'OEM') return <div className="p-6 text-sm text-muted-foreground">대표님, 브랜드를 선택하시면 전체 재고를 확인할 수 있습니다.</div>;
   return <div className="p-4 md:p-6 space-y-4">
@@ -72,16 +84,18 @@ export default function InventoryOverview() {
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">국내 가용 · PMS 기록</p><p className="mt-1 text-2xl font-semibold">{number(inventorySubtotal(rows, 'domestic'))}</p></div>
-      <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">중국 보유 · 이 브라우저 장부</p><p className="mt-1 text-2xl font-semibold">{number(chinaQty)}</p></div>
-      <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">중국 → 한국 이동 중</p><p className="mt-1 text-sm">미연동 · 0개로 간주하지 않음</p></div>
+      <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">중국 보유 · 서버 기록</p><p className="mt-1 text-2xl font-semibold">{number(chinaQty)}</p></div>
+      <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">중국 → 한국 이동 중 · 서버 기록</p><p className="mt-1 text-2xl font-semibold">{number(transitQty)}</p></div>
     </div>
     <div className="rounded-lg border bg-card p-4 text-sm space-y-1">
       <p>중국·매장·해외·출고대기·채널 할당을 국내 가용에 더하지 않습니다.</p>
       <p className="text-muted-foreground">{snapshot?.workspace === workspace ? snapshot.warning : '원본 조회 전 · 국내 수량 미확인'} 전체 물리 재고 합계는 검증 전 미산출입니다.</p>
-      <p className="text-muted-foreground">중국 장부는 아직 브라우저 저장 자료입니다. EZ 해외와 중국 장부의 동일 재고 여부·SKU/컬러 매칭은 확인이 필요합니다.</p>
+      <p className="text-muted-foreground">중국·운송중은 서버 장부입니다. EZ 해외와 중국의 동일 풀 여부·SKU/컬러 매칭은 확인 전이며 한국 도착 처리로 EZ 재고를 추가하지 않습니다.</p>
+      {legacyCount>0 && <p>이 브라우저의 미반영 이력 {legacyCount}건 · 중국 입출고 관리에서 확인 후 가져오기</p>}
     </div>
     <div role="status" aria-live="polite" className="text-sm text-muted-foreground">{busy ? '재고 원본 조회 중…' : error || `${filtered.length}행 · 빈 수량은 미확인`}</div>
     {error && <p role="alert" className="text-sm text-destructive">국내·매장 원본을 읽지 못했습니다. 중국 장부만 표시되며 전체 조회 성공이 아닙니다.</p>}
+    {chinaError && <p role="alert" className="text-sm text-destructive">{chinaError} · 중국·운송중 수량은 미확인입니다.</p>}
     <div className="flex flex-wrap gap-2 items-center">
       <label htmlFor="inventory-location" className="text-sm">위치</label>
       <select id="inventory-location" className="h-9 rounded-md border bg-background px-3 text-sm" value={location} onChange={e => setLocation(e.target.value as typeof location)}>
@@ -95,7 +109,7 @@ export default function InventoryOverview() {
         <thead><tr>{['SKU / 품번', '품명', '컬러', '위치', '수량', '수량 기준', '출고대기', '출처'].map(h => <th key={h} scope="col">{h}</th>)}</tr></thead>
         <tbody>{filtered.length ? filtered.map(row => <tr key={row.id}>
           <td>{row.sku}</td><td>{row.name}</td><td>{row.color || '—'}</td><td>{LOCATIONS[row.location]}</td>
-          <td className="num">{number(row.quantity)}</td><td>{row.basis === 'available' ? '가용 · 물리재고 아님' : '보유'}</td>
+          <td className="num">{number(row.quantity)}</td><td>{row.location === 'in-transit' ? '운송중 · 판매불가' : row.basis === 'available' ? '가용 · 물리재고 아님' : '보유'}</td>
           <td className="num">{row.location === 'domestic' ? number(row.pending) : '—'}</td><td className="text-xs text-muted-foreground">{row.source}</td>
         </tr>) : <tr><td colSpan={8} className="py-10 text-center text-muted-foreground">{busy ? '불러오는 중…' : '해당 위치의 확인된 자료가 없습니다'}</td></tr>}</tbody>
       </table>

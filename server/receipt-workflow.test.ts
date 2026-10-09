@@ -7,7 +7,7 @@ test('receipt input rejects malformed quantity, date and disposition', () => {
   assert.equal(validReceipt(v), true);
   for (const patch of [{ qty: 0 }, { qty: 1.1 }, { qty: Infinity }, { qty: '10' }, { qty: 2147483648 },
     { defectQty: -1 }, { defectQty: 11 }, { receivedDate: '2026-02-30' }, { createPayable: 'true' },
-    { disposition: 'unknown' }, { id: '' }, { memo: {} }, { isAdvance: 'false' }]) {
+    { disposition: 'unknown' }, { id: '' }, { memo: {} }, { isAdvance: 'false' }, {destination:'unknown'}]) {
     assert.equal(validReceipt({ ...v, ...patch }), false);
   }
 });

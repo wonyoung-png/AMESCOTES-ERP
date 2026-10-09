@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import router from './inventory';
+import router, {validChinaMove} from './inventory';
 import { inventoryFromSheet, inventoryQuantity, inventorySubtotal } from '../shared/inventory';
 
 const sheet = { headers: ['SKU', '상품명', '총잔여', 'EZ가용', '출고대기', 'EZ해외', '쇼피파이', '카페24', '신세계센텀', '한남쇼룸'],
@@ -51,4 +51,10 @@ test('재고 조회는 비로그인 요청을 차단한다', async () => {
     const response = await fetch(`http://127.0.0.1:${port}/api/inventory/overview?workspace=LUMEN`);
     assert.equal(response.status, 401);
   } finally { await new Promise<void>((resolve, reject) => server.close(e => e ? reject(e) : resolve())); }
+});
+test('중국 장부 입력 경계에서 브랜드·정수·날짜·조정 사유를 확인한다',()=>{
+  const v={id:'test',workspace:'LUMEN',styleNo:'S',color:'BLACK',qty:1,moveType:'outbound',moveDate:'2026-10-09'};
+  assert.ok(validChinaMove(v));
+  for(const patch of [{workspace:'OEM'},{qty:NaN},{qty:1.2},{qty:-1},{qty:0},{moveDate:'2026-02-30'},{color:''},{id:{}},{moveType:'adjust'}]) assert.equal(validChinaMove({...v,...patch}),false);
+  assert.ok(validChinaMove({...v,qty:-1,moveType:'adjust',memo:'실사'}));
 });

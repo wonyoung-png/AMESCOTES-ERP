@@ -1,4 +1,4 @@
-export type InventoryLocation = 'domestic' | 'ez-overseas' | 'hannam' | 'centum' | 'china';
+export type InventoryLocation = 'domestic' | 'ez-overseas' | 'hannam' | 'centum' | 'china' | 'in-transit';
 export interface InventoryRow {
   id: string;
   sku: string;

@@ -331,87 +331,22 @@ export default function BrandOrders() {
       toast.error('컬러를 선택하세요 (품목·컬러별 관리)');
       return;
     }
-    const order = orders.find(o => o.id === detailRow.orderId);
-    if (recvForm.destination === 'korea') {
+    {
       setReceiptBusy(true);
       try {
         const result = await phase1.saveKoreaReceipt({ id: receiptRequestId, orderId: detailRow.orderId,
           qty: recvForm.qty, defectQty: 0, receivedDate: recvForm.date, color: recvForm.color.trim(),
           memo: recvForm.memo, isAdvance: recvForm.isAdvance || detailRow.productionStatus !== 'produced',
-          createPayable: recvForm.createPayable, disposition: 'deduct' });
+          createPayable: recvForm.createPayable, disposition: 'deduct', destination: recvForm.destination });
         store.cacheOrderReceipt(result.order);
         if (recvForm.createPayable && !result.payable) toast.warning('입고 저장 완료 · 공장 원화 단가 미확정으로 미지급은 생성하지 않았습니다');
-        toast.success(`한국입고 ${recvForm.qty}개 저장${result.payable ? ' · 미지급 연결' : ''}`);
+        toast.success(`${recvForm.destination === 'china' ? '중국입고 · 서버 재고 반영' : '한국입고'} ${recvForm.qty}개 저장${result.payable ? ' · 미지급 연결' : ''}`);
         setRecvOpen(false); setDetailRow(null); refresh();
         queryClient.invalidateQueries({ queryKey: ['payables'] });
       } catch (error) { toast.error((error as Error).message); }
       finally { setReceiptBusy(false); }
       return;
     }
-    const log = phase1.addReceiptLog({
-      orderId: detailRow.orderId,
-      orderNo: detailRow.orderNo,
-      projectNo: detailRow.projectNo,
-      logType: 'inbound',
-      qty: recvForm.qty,
-      defectQty: 0,
-      receivedDate: recvForm.date,
-      memo: recvForm.memo,
-      destination: recvForm.destination,
-      color: recvForm.color.trim(),
-      isAdvance: recvForm.isAdvance || detailRow.productionStatus !== 'produced',
-    });
-    const sum = phase1.getOrderReceiptSummary(detailRow.orderId, detailRow.qty);
-    const updates: Record<string, unknown> = {
-      receivedQty: sum.receivedQty,
-      receivedDate: recvForm.date,
-    };
-    if (sum.remaining <= 0) updates.status = '입고완료';
-    store.updateOrder(detailRow.orderId, updates as Partial<ProductionOrder>);
-
-    let payableCreated = false;
-    if (recvForm.createPayable) {
-      const cn = ensureChinaCorpVendor();
-      payableCreated = !!phase1.createPayableFromReceipt(log, {
-        unitPriceKrw: detailRow.factoryUnitPriceKrw || order?.factoryUnitPriceKrw || 0,
-        factoryVendorId: detailRow.vendorId || order?.vendorId,
-        factoryVendorName: detailRow.vendorName || order?.vendorName,
-        chinaCorpVendorId: cn.id,
-        chinaCorpVendorName: cn.name,
-      });
-      if (!payableCreated) toast.warning('공장 단가가 미확정이라 미지급 초안을 생성하지 못했습니다');
-    }
-
-    if (recvForm.destination === 'china') {
-      const stock = phase1.postChinaInboundFromReceipt(log, {
-        workspace: (detailRow.workspace === 'AETALOOF' ? 'AETALOOF' : 'LUMEN'),
-        styleNo: detailRow.styleNo,
-        styleName: detailRow.styleName,
-        color: recvForm.color.trim(),
-      });
-      if (stock) {
-        toast.success(`중국입고 ${recvForm.qty}개 · 중국창고 반영${payableCreated ? ' · 미지급 초안' : ''}`);
-      } else {
-        toast.success(`중국입고 ${recvForm.qty}개 기록`);
-      }
-    } else if (payableCreated) {
-      toast.success(`한국입고 ${recvForm.qty}개 · 미지급 초안 생성`);
-    } else {
-      toast.success(`한국입고 ${recvForm.qty}개 기록`);
-    }
-    setRecvOpen(false);
-    refresh();
-    const updated = phase1.getReorderOrderBoard(
-      store.getOrders().map(o => ({
-        id: o.id, orderNo: o.orderNo, styleNo: o.styleNo, styleName: o.styleName,
-        revision: o.revision, isReorder: o.isReorder, brandBatchId: o.brandBatchId,
-        orderDate: o.orderDate, createdAt: o.createdAt, qty: o.qty, status: o.status,
-        colorQtys: o.colorQtys, vendorId: o.vendorId, vendorName: o.vendorName,
-        workspace: o.workspace, projectNo: o.projectNo, factoryUnitPriceKrw: o.factoryUnitPriceKrw,
-      })),
-      ws,
-    ).flatMap(g => g.rows).find(r => r.orderId === detailRow.orderId);
-    if (updated) setDetailRow(updated);
   };
 
   const createPayables = (row: ReorderOrderRow) => {

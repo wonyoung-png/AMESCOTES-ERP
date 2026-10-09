@@ -619,7 +619,7 @@ export const phase1 = {
   saveKoreaReceipt: async (input: {
     id: string; orderId: string; qty: number; defectQty: number; receivedDate: string;
     createPayable: boolean; disposition: DefectDisposition; color?: string; memo?: string;
-    defectNote?: string; isAdvance?: boolean;
+    defectNote?: string; isAdvance?: boolean; destination?: ReceiptDestination;
   }) => {
     const response = await fetch(`/api/orders/${encodeURIComponent(input.orderId)}/receive`, {
       method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
