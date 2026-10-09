@@ -826,6 +826,12 @@ function saveTradeStatements(list: TradeStatement[]) {
   import('./tradeStatementQueries').then(m => m.pushTradeStatements(list)).catch(() => {});
 }
 
+/** 정산·미수금 저장 — 로컬 표시와 서버 공유를 함께 유지한다. */
+function saveSettlements(list: Settlement[]) {
+  setAll(KEYS.settlements, list);
+  import('./settlementQueries').then(m => m.pushSettlements(list)).catch(() => {});
+}
+
 // ─── 매출 (간단 버전) ───
 export interface SalesRecord {
   id: string;
@@ -1531,10 +1537,14 @@ export const store = {
 
   // Settlements
   getSettlements: () => getAll<Settlement>(KEYS.settlements),
-  setSettlements: (v: Settlement[]) => setAll(KEYS.settlements, v),
-  addSettlement: (v: Settlement) => { const a = getAll<Settlement>(KEYS.settlements); a.push(v); setAll(KEYS.settlements, a); },
-  updateSettlement: (id: string, u: Partial<Settlement>) => { const a = getAll<Settlement>(KEYS.settlements); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.settlements, a); } },
-  deleteSettlement: (id: string) => setAll(KEYS.settlements, getAll<Settlement>(KEYS.settlements).filter(x => x.id !== id)),
+  setSettlements: (v: Settlement[]) => saveSettlements(v),
+  hydrateSettlements: (v: Settlement[]) => setAll(KEYS.settlements, v),
+  addSettlement: (v: Settlement) => { const a = getAll<Settlement>(KEYS.settlements); a.push(v); saveSettlements(a); },
+  updateSettlement: (id: string, u: Partial<Settlement>) => { const a = getAll<Settlement>(KEYS.settlements); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; saveSettlements(a); } },
+  deleteSettlement: (id: string) => {
+    setAll(KEYS.settlements, getAll<Settlement>(KEYS.settlements).filter(x => x.id !== id));
+    import('./settlementQueries').then(m => m.deleteSettlementSB(id)).catch(() => {});
+  },
 
   // Expenses
   getExpenses: () => getAll<Expense>(KEYS.expenses),

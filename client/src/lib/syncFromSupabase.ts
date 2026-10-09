@@ -333,6 +333,9 @@ export async function syncFromSupabase(): Promise<void> {
     const ts = await import('./tradeStatementQueries');
     await mergeTable('trade_statements', 'ames_trade_statements', '거래명세표',
       ts.tradeStatementRow, ts.fromRow);
+    const settlements = await import('./settlementQueries');
+    await mergeTable('settlements', 'ames_settlements', '정산·미수금',
+      settlements.settlementRow, settlements.settlementFromRow);
     console.log('[syncFromSupabase] Phase1 테이블 동기화 완료');
   } catch (e) {
     console.warn('[syncFromSupabase] Phase1 동기화 스킵 (테이블 미생성 시 migration 실행):', e);

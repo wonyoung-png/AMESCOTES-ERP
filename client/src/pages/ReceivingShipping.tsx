@@ -2,9 +2,9 @@
 import { useMemo, useState } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { store, formatNumber, genId } from '@/lib/store';
+import { store, formatNumber, genId, type TradeStatement } from '@/lib/store';
 import { phase1, DEFECT_DISPOSITION_LABEL, type DeliveryMarket, type ReceiptLogType, type DefectDisposition } from '@/lib/phase1';
-import { fetchOrders, upsertOrder } from '@/lib/supabaseQueries';
+import { fetchItems, fetchOrders, fetchVendors, upsertOrder } from '@/lib/supabaseQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +24,8 @@ const LOG_LABELS: Record<ReceiptLogType, string> = {
 export default function ReceivingShipping() {
   const queryClient = useQueryClient();
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
+  const { data: items = [] } = useQuery({ queryKey: ['items'], queryFn: fetchItems });
+  const { data: vendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const today = new Date().toISOString().slice(0, 10);
   const { data: shippingPlans = [] } = useQuery({ queryKey: ['shippingPlans'], queryFn: () => fetchShippingPlans(), retry: false });
   const [filter, setFilter] = usePersistedState<'all' | 'pending' | 'partial' | 'done'>('receiving.filter', 'all');
@@ -113,6 +115,39 @@ export default function ReceivingShipping() {
       memo: form.memo,
       deliveryMarket: isInbound ? undefined : form.deliveryMarket,
     });
+    if (modal.logType === 'outbound_oem' && newShipped >= o.qty) {
+      const marker = `[AUTO-ORDER:${o.id}]`;
+      const exists = store.getTradeStatements().some(s => s.memo?.includes(marker));
+      const buyer = vendors.find(v => v.id === o.buyerId);
+      if (!exists && buyer) {
+        const item = items.find(i => i.id === o.styleId || i.styleNo === o.styleNo);
+        const statement: TradeStatement = {
+          id: genId(),
+          statementNo: store.getNextStatementNo(buyer.code || 'XXX'),
+          vendorId: buyer.id,
+          vendorName: buyer.name,
+          vendorCode: buyer.code || 'XXX',
+          issueDate: form.date,
+          lines: [{
+            id: genId(),
+            description: `[${o.styleNo}] ${o.styleName}`,
+            qty: newShipped,
+            unitPrice: item?.salePriceKrw ?? 0,
+            taxType: '과세',
+            taxRate: 0.1,
+          }],
+          status: '미청구',
+          projectNo: o.projectNo,
+          workspace: o.workspace ?? 'OEM',
+          memo: `${marker} OEM 직출고 완료 자동 초안`,
+          createdAt: new Date().toISOString(),
+        };
+        store.addTradeStatement(statement);
+        toast.success(`거래명세표 ${statement.statementNo} 초안 자동 생성`);
+      } else if (!exists && !buyer) {
+        toast.warning('바이어가 없어 거래명세표 초안은 생성하지 못했습니다');
+      }
+    }
     if (form.defectQty > 0 && modal.logType === 'inbound') {
       const unit = o.factoryUnitPriceKrw || 0;
       phase1.addDefectCarryover({
