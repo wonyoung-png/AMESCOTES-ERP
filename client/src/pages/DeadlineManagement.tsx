@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ProductionRiskPanel from '@/components/ProductionRiskPanel';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { phase1 } from '@/lib/phase1';
 
 const MILESTONE_LABELS: Partial<Record<MilestoneStage, string>> = {
   '샘플1차': '샘플1차',
@@ -30,7 +32,9 @@ const MILESTONE_LABELS: Partial<Record<MilestoneStage, string>> = {
 };
 
 export default function DeadlineManagement() {
-  const { data: orders = [], refetch: refetchOrders } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
+  const { workspace } = useWorkspace();
+  const { data: allOrders = [], refetch: refetchOrders } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
+  const orders = allOrders.filter(o => (o.workspace || 'OEM') === workspace || (workspace !== 'OEM' && o.brandBatchId && phase1.getBrandBatch(o.brandBatchId)?.workspace === workspace));
   const items = store.getItems();
   const [view, setView] = useState('list');
 

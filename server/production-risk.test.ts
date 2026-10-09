@@ -1,8 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { productionRisks } from './production-risk';
+import { productionRisks, productionScope } from './production-risk';
 
 const base = { id: 'O1', order_no: 'PO1', quantity: 100, received_qty: 100, delivery_date: '2026-10-09', status: '생산중' };
+test('브랜드의 OEM 의뢰는 포함하되 다른 브랜드의 의뢰는 섞지 않는다', () => {
+  const scope = decodeURIComponent(productionScope('LUMEN', [{ id: 'L1', workspace: 'LUMEN' }, { id: 'A1', workspace: 'AETALOOF' }]));
+  assert.equal(scope, 'or=(workspace.eq.LUMEN,brand_batch_id.in.("L1"))');
+  assert.equal(productionScope('AETALOOF', []), 'workspace=eq.AETALOOF');
+});
 test('입고 이력이 상태·발주 누계보다 우선하며 출고를 입고로 더하지 않는다', () => {
   const rows = [{ order_id: 'O1', log_type: 'inbound', qty: 40 }, { order_id: 'O1', log_type: 'outbound_oem', qty: 60 }];
   const result = productionRisks([base], rows, '2026-10-09')[0];

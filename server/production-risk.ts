@@ -1,4 +1,10 @@
 /** 날짜·입고 근거만으로 위험을 분류한다. 완료 상태나 발주 수량은 변경하지 않는다. */
+export function productionScope(workspace: string, batches: { id: string; workspace: string }[]) {
+  if (workspace === 'OEM') return 'or=(workspace.eq.OEM,workspace.is.null)';
+  const ids = batches.filter(b => b.workspace === workspace).map(b => `"${String(b.id).replace(/"/g, '')}"`);
+  return ids.length ? `or=(workspace.eq.${workspace},brand_batch_id.in.(${encodeURIComponent(ids.join(','))}))` : `workspace=eq.${workspace}`;
+}
+
 export function productionRisks(orders: any[], receipts: any[], today: string) {
   const inbound = new Map<string, number>();
   for (const r of receipts) if (r.log_type === 'inbound') {
