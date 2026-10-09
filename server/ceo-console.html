@@ -434,7 +434,8 @@ function agentList() {
     const org = D.org.teams.find(x => x.key === k);
     const a = by.get(k) || { team: k, status: t.open ? 'work' : 'idle', headline: '아직 점검 전이에요', summary: null, needs: [], stats: {}, created_at: null };
     const w = (D.watch || []).find(x => x.team === k);
-    return { ...a, division: org ? org.division : '대표 직속', status: t.overdue || w?.alerts ? 'warn' : a.stale ? (t.open ? 'work' : 'idle') : a.status,
+    return { ...a, division: org ? org.division : '대표 직속', status: t.overdue || w?.alerts ? 'warn'
+      : D.decide.some(c => c.kind === 'request_check' && c._org === k) ? 'report' : t.open || t.newToday ? 'work' : 'idle',
       headline: (a.stale ? '[오늘 이전 보고] ' : '') + a.headline,
       stats: { ...a.stats, open: t.open, overdue: t.overdue, doneToday: t.doneToday, newToday: t.newToday,
         toCeo: D.decide.filter(c => c.kind === 'request_check' && c._org === k).length,
