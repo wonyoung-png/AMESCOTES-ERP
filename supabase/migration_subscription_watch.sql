@@ -136,10 +136,11 @@ end $$;
 
 revoke all on function public.answer_subscription_check(text, text, text, text, text, text) from public;
 revoke all on function public.answer_subscription_check(text, text, text, text, text, text) from anon;
-revoke all on function public.answer_subscription_check(text, text, text, text, text, text) from authenticated;
+do $$ begin if exists (select 1 from pg_roles where rolname = 'authenticated') then revoke all on function public.answer_subscription_check(text, text, text, text, text, text) from authenticated; end if; end $$;
 grant execute on function public.answer_subscription_check(text, text, text, text, text, text) to erp_server;
 
 revoke all on public.card_transactions, public.subscription_candidates, public.subscriptions, public.subscription_usage_checks from public;
 revoke all on public.card_transactions, public.subscription_candidates, public.subscriptions, public.subscription_usage_checks from anon;
-revoke all on public.card_transactions, public.subscription_candidates, public.subscriptions, public.subscription_usage_checks from authenticated;
+-- 새 서버 DB 에는 authenticated 역할이 없다 (10/9 적용 중 오류) — 있을 때만 회수
+do $$ begin if exists (select 1 from pg_roles where rolname = 'authenticated') then revoke all on public.card_transactions, public.subscription_candidates, public.subscriptions, public.subscription_usage_checks from authenticated; end if; end $$;
 grant all on public.card_transactions, public.subscription_candidates, public.subscriptions, public.subscription_usage_checks to erp_server;
