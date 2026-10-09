@@ -2,6 +2,8 @@
 // 기존 AMESCOTES 생산 기능 유지 · 브랜드운영·AI 메뉴는 Phase 2
 
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchCapturePendingCount } from '@/lib/captureQueries';
 import { OS_URL, CEO_URL, linkOr } from '@/lib/hosts';
 import { toast } from 'sonner';
 import { useLocation, Link } from 'wouter';
@@ -247,6 +249,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
   // 업무 피드 숫자(안 본 카드 + 내 할 일) — 업무 비서 위젯이 1분마다 읽어 알려준다
   const [workUnread, setWorkUnread] = useState(0);
+  const { data: captureCount } = useQuery({ queryKey: ['capturePendingCount'], queryFn: fetchCapturePendingCount, refetchInterval: 30000 });
   React.useEffect(() => {
     const on = (e: Event) => setWorkUnread(Number((e as CustomEvent).detail) || 0);
     window.addEventListener('work:unread', on);
@@ -317,7 +320,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
       collapsed={collapsed}
       onToggleFav={toggleFavorite}
       onNavigate={() => setSidebarOpen(false)}
-      badge={item.path === '/work' ? workUnread : undefined}
+      badge={item.path === '/work' ? workUnread + (captureCount?.pending || 0) : undefined}
     />
   );
 
