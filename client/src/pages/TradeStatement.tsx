@@ -1243,7 +1243,6 @@ function TradeStatementDetailModal({
                             value={line.qty}
                             onChange={e => updateItemPrice(line.id, 'qty', parseInt(e.target.value) || 1)}
                             className="h-8 text-sm text-right border border-border rounded px-2 w-16"
-                            min={1}
                           />
                         ) : (
                           <span className="text-right block text-foreground">{formatNumber(line.qty)}</span>
@@ -1256,7 +1255,6 @@ function TradeStatementDetailModal({
                             value={line.unitPrice}
                             onChange={e => updateItemPrice(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                             className="h-8 text-sm text-right border border-border rounded px-2 w-28"
-                            min={0}
                           />
                         ) : (
                           <span className={`text-right block ${line.unitPrice === 0 ? 'text-[var(--system-red)] italic' : 'text-foreground'}`}>

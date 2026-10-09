@@ -410,8 +410,6 @@ export default function SampleManagement() {
     skipNextDirtyRef.current = true;
     setForm(initial);
     setEditId(null);
-    setCreateTempMode(false);
-    setTempStyleName('');
     setIsDirty(false);
     setShowModal(true);
   };
@@ -421,7 +419,6 @@ export default function SampleManagement() {
     skipNextDirtyRef.current = true;
     setForm({ ...s });
     setEditId(s.id);
-    setCreateTempMode(false);
     setIsDirty(false);
     setShowModal(true);
   };
@@ -754,7 +751,6 @@ export default function SampleManagement() {
       assignee: nextRoundAssignee || src.assignee,
       requestDate: today,
       expectedDate: undefined,
-      approvedDate: undefined,
       approvedBy: undefined,
       receivedDate: undefined,
       billingStatus: '미청구',

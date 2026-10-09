@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { store, formatNumber, type OrderStatus } from '@/lib/store';
+import { store, formatNumber, type OrderStatus, type ProductionOrder } from '@/lib/store';
 import {
   phase1, pullBrandOrders, CHINA_CORP_VENDOR_CODE, CHINA_CORP_VENDOR_NAME,
   type BrandOrderBatch, type OrderDisplayStatus, type ReceiptDestination, type ReorderOrderRow,
@@ -302,7 +302,7 @@ export default function BrandOrders() {
       receivedDate: recvForm.date,
     };
     if (sum.remaining <= 0) updates.status = '입고완료';
-    store.updateOrder(detailRow.orderId, updates as Partial<typeof order>);
+    store.updateOrder(detailRow.orderId, updates as Partial<ProductionOrder>);
 
     if (recvForm.createPayable) {
       const cn = ensureChinaCorpVendor();

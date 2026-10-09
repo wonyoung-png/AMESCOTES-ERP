@@ -154,8 +154,8 @@ router.post('/api/yardage/parse', upload.single('file'), (req: Request, res: Res
 
       const name = String(row[nameKey] ?? '').trim();
       const sizeStr = String(row[sizeKey] ?? '');
-      const qty = parseInt(String(row[qtyKey] ?? '1'), 10) || 1;
-      const group = String(row[groupKey] ?? '').trim();
+      const qty = parseInt(String(row[qtyKey!] ?? '1'), 10) || 1;
+      const group = String(row[groupKey!] ?? '').trim();
 
       if (!name || !sizeStr) continue;
 

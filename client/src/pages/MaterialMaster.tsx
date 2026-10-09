@@ -624,7 +624,7 @@ export default function MaterialMaster() {
                       <div key={r.color} className="flex items-center justify-between px-3 py-1.5 text-sm">
                         <span>{r.color}</span>
                         <span className="font-mono">
-                          {r.price != null ? `${CURRENCY_SIGN[r.currency || currencyOf(detail)] || ''}${Number(r.price).toLocaleString()}` : '—'}
+                          {r.price != null ? `${CURRENCY_SIGN[(r.currency || currencyOf(detail)) as PriceCurrency] || ''}${Number(r.price).toLocaleString()}` : '—'}
                         </span>
                       </div>
                     ))}
@@ -636,7 +636,7 @@ export default function MaterialMaster() {
                 <p className="text-sm">
                   <span className="text-muted-foreground text-xs mr-2">금형비</span>
                   {detail.moldCostAmount != null
-                    ? `${CURRENCY_SIGN[detail.moldCostCurrency || currencyOf(detail)] || ''}${Number(detail.moldCostAmount).toLocaleString()}`
+                    ? `${CURRENCY_SIGN[(detail.moldCostCurrency || currencyOf(detail)) as PriceCurrency] || ''}${Number(detail.moldCostAmount).toLocaleString()}`
                     : detail.moldCost}
                 </p>
               )}

@@ -73,6 +73,7 @@ interface BomPnlAssumptions {
   wholesaleDiscountRate?: number;
   /** Wholesale (해외 홀세일가) = Global × (1 − 할인율) */
   wholesalePrice?: number;
+  factoryUnitCostKrw?: number;
 }
 
 // 컬러별 BOM (전체 섹션 독립 관리)
@@ -115,7 +116,7 @@ interface ExtBom {
   sourceFileName?: string;
   // 사전원가 추가 설정
   preCurrency?: 'CNY' | 'USD' | 'KRW';
-  preManufacturingCountry?: '중국' | '한국' | '기타';
+  preManufacturingCountry?: string;
   preExchangeRateCny?: number;   // 사전원가 CNY 환율 (없으면 snapshotCnyKrw 사용)
   preExchangeRateUsd?: number;   // 사전원가 USD 환율
   preSourceFileName?: string;
@@ -126,9 +127,10 @@ interface ExtBom {
   postMaterials?: ExtBomLine[];
   postProcessingFee?: number;
   currency?: 'CNY' | 'USD' | 'KRW';
-  manufacturingCountry?: '중국' | '한국' | '기타';
+  manufacturingCountry?: string;
   exchangeRateCny?: number;
   exchangeRateUsd?: number;
+  postExchangeRateCny?: number;
   postDeliveryPrice?: number;
   postSourceFileName?: string;
   createdAt: string;
@@ -145,6 +147,7 @@ interface ExtBomLine {
   category: BomCategory;
   subPart?: BomSubPart;     // 품목 부위 (원자재 구분 시만)
   itemName: string;
+  materialName?: string;
   color?: string;           // @deprecated — 컬러별 BOM 탭 방식으로 전환. 하위 호환성을 위해 optional 유지
   spec?: string;
   unit: string;
@@ -2413,7 +2416,7 @@ export default function BomManagement() {
 
     if (item?.erpCategory === 'PACK') {
       setMainTab('pack');
-      setPackLines(linesFromPackBom(loadedBom, materials as Material[]));
+      setPackLines(linesFromPackBom(loadedBom as unknown as Bom, materials as Material[]));
       setActivePreColor('기본');
       setActivePostColor('');
       return;
@@ -2984,7 +2987,7 @@ export default function BomManagement() {
 
   const handlePackLinesChange = useCallback((lines: PackBomLine[]) => {
     setPackLines(lines);
-    setEditBom(prev => prev ? applyPackLinesToBom(prev as any, lines) as ExtBom : prev);
+    setEditBom(prev => prev ? applyPackLinesToBom(prev as any, lines) as unknown as ExtBom : prev);
     markDirty();
   }, []);
 
@@ -3011,7 +3014,7 @@ export default function BomManagement() {
     if (!editBom.styleId) { toast.error('스타일을 선택해주세요'); return; }
     let updated: ExtBom = { ...editBom, updatedAt: new Date().toISOString() };
     if (isPackMode) {
-      updated = applyPackLinesToBom(updated as any, packLines) as ExtBom;
+      updated = applyPackLinesToBom(updated as any, packLines) as unknown as ExtBom;
     }
     const existing = extBoms.find(b => b.id === updated.id);
     let newBoms: ExtBom[];
@@ -3912,8 +3915,8 @@ export default function BomManagement() {
                       const linkedItem = items.find(i => i.id === editBom.styleId);
                       const existingColors = (addColorForTab === 'post' ? (editBom.postColorBoms || []) : (editBom.colorBoms || [])).map(cb => cb.color);
                       const itemColors = (linkedItem?.colors || [])
-                        .map(c => typeof c === 'string' ? c : c.name)
-                        .filter(name => name && !existingColors.includes(name));
+                        .map((c: any) => typeof c === 'string' ? c : c.name)
+                        .filter((name: string) => name && !existingColors.includes(name));
                       if (itemColors.length === 0) return null;
                       const btnClass = addColorForTab === 'post'
                         ? 'border-primary/30 text-primary bg-primary/5 hover:bg-primary/15'
@@ -3922,7 +3925,7 @@ export default function BomManagement() {
                         <div className="mt-2">
                           <p className="text-[11px] text-muted-foreground mb-1">품목 마스터 컬러에서 선택:</p>
                           <div className="flex flex-wrap gap-1">
-                            {itemColors.map(name => (
+                            {itemColors.map((name: string) => (
                               <button
                                 key={name}
                                 onClick={() => {
@@ -4033,7 +4036,7 @@ export default function BomManagement() {
                     {/* 통화 선택 */}
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block font-medium">입력 통화</label>
-                      <Select value={preCur} onValueChange={v => updateField('preCurrency', v)}>
+                      <Select value={preCur} onValueChange={v => updateField('preCurrency', v as ExtBom['preCurrency'])}>
                         <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {CURRENCY_OPTIONS.map(cur => (
@@ -4631,7 +4634,7 @@ export default function BomManagement() {
                   {/* 통화 선택 (3가지) */}
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block font-medium">입력 통화</label>
-                    <Select value={editBom.currency || 'CNY'} onValueChange={v => updateField('currency', v)}>
+                    <Select value={editBom.currency || 'CNY'} onValueChange={v => updateField('currency', v as ExtBom['currency'])}>
                       <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {CURRENCY_OPTIONS.map(cur => (
@@ -5846,7 +5849,7 @@ export default function BomManagement() {
             <VendorQuoteModal
               bom={editBom}
               onClose={() => setShowQuote(false)}
-              tab={mainTab}
+              tab={mainTab === 'post' ? 'post' : 'pre'}
               colorBom={mainTab === 'post' ? activePostColorBom : activeColorBom}
             />
           )}

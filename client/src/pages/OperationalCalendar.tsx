@@ -23,6 +23,7 @@ import { store } from '@/lib/store';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const VIEW_MODES: CalendarViewMode[] = ['year', 'half', 'quarter', 'month', 'week', 'day'];
+type CampaignChannel = typeof CAMPAIGN_CHANNELS[number];
 
 const STATUS_LABEL: Record<CampaignStatus, string> = {
   draft: '미온보딩',
@@ -85,7 +86,7 @@ export default function OperationalCalendar() {
       loadProjects();
     } catch (e: any) { toast.error('생성 실패: ' + (e?.message || e)); }
   };
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{ title: string; channel: CampaignChannel; startDate: string; endDate: string; discountRate: number; productDiscounts: ProductDiscount[]; categoryDiscounts: CategoryDiscount[] }>({
     title: '', channel: CAMPAIGN_CHANNELS[0], startDate: '', endDate: '', discountRate: 15, productDiscounts: [] as ProductDiscount[], categoryDiscounts: [] as CategoryDiscount[],
   });
 
@@ -132,7 +133,7 @@ export default function OperationalCalendar() {
   };
 
   /** 캘린더 빈 칸을 누르면 그 날짜가 채워진 채로 등록창이 열린다 */
-  const openNewCampaignAt = (ds: string, channel: string) => {
+  const openNewCampaignAt = (ds: string, channel: CampaignChannel) => {
     setForm(f => ({ ...f, startDate: ds, endDate: ds, channel }));
     setShowNew(true);
   };
@@ -404,7 +405,7 @@ export default function OperationalCalendar() {
               <div className="space-y-1.5">
                 <Label>채널</Label>
                 <select className="w-full border border-border rounded-md h-9 px-2 text-sm bg-card" value={form.channel}
-                  onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}>
+                  onChange={e => setForm(f => ({ ...f, channel: e.target.value as CampaignChannel }))}>
                   {CAMPAIGN_CHANNELS.map(ch => <option key={ch} value={ch}>{ch}</option>)}
                 </select>
               </div>

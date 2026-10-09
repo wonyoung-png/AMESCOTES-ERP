@@ -922,10 +922,11 @@ export default function ProductionOrders() {
         deliveryDate: row.deliveryDate || undefined,
         status: '발주생성',
         poBatchNo: batchNo,
+        hqSupplyItems: [],
         attachments: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      } as ProductionOrder;
+      };
       try {
         await upsertOrder(order);
         known.push(order as any);
@@ -1328,11 +1329,6 @@ export default function ProductionOrders() {
     setWorkOrderTarget(order);
     setWorkOrderNote('');
     setWorkOrderWithBom(withBom);
-    // 본사제공 자재 수령 체크란 초기화
-    const { bom } = getBomForOrderFromList(boms as Bom[], order.styleNo);
-    const bomLines = bom ? ((bom.postMaterials && bom.postMaterials.length > 0) ? bom.postMaterials : (bom.lines || [])) : [];
-    const hqMats = bomLines.filter((l: any) => l.isHqProvided);
-    setHqReceive(hqMats.map(() => ({ received: '', checked: false })));
     setWorkOrderModal(true);
   };
 

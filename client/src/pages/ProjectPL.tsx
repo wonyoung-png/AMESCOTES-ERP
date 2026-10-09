@@ -12,6 +12,9 @@ import { Input } from '@/components/ui/input';
 import { fetchSalesRecords, upsertSalesRecord } from '@/lib/salesRecords';
 
 export default function ProjectPL() {
+  const { workspace } = useWorkspace();
+  const queryClient = useQueryClient();
+  const { data: remoteSales = [] } = useQuery({ queryKey: ['salesRecords'], queryFn: fetchSalesRecords });
   const [, tick] = useState(0);
   const refresh = () => tick(n => n + 1);
   const orders = store.getOrders();

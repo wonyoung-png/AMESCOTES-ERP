@@ -8,7 +8,7 @@ import {
   type PurchaseItem, type TradeStatement, type Settlement, type Expense,
   type PostCost, type BomLine, type PostProcessLine, type ColorBom,
 } from './store';
-import { phase1, type BrandOrderBatch, type BrandOrderLine, type Campaign } from './phase1';
+import { phase1, ensureProject, type BrandOrderBatch, type BrandOrderLine, type Campaign } from './phase1';
 import {
   upsertVendor, upsertItem, upsertMaterial, upsertSample, upsertBom, upsertOrder,
   upsertPurchaseItem,
@@ -168,21 +168,21 @@ export async function seedDemoIntegrationData(): Promise<SeedResult> {
       category: '토트백', erpCategory: 'HB', designer: 'OEM팀', material: '나파',
       deliveryPrice: 89000, marginRate: 0.35, hasBom: true, baseCostKrw: 42000,
       colors: [{ name: '블랙', leatherColor: 'BLK' }, { name: '브라운', leatherColor: 'BRN' }],
-      buyerId: DEMO.vendorBuyer, createdAt: ts, updatedAt: ts,
+      buyerId: DEMO.vendorBuyer, createdAt: ts,
     },
     {
       id: DEMO.itemLumen, styleNo: 'LLL6F92SB', name: '리나 숄더백', season: '26SS',
       category: '숄더백', erpCategory: 'HB', designer: 'LUMEN MD', material: '양가죽',
       deliveryPrice: 298000, marginRate: 0.55, hasBom: true, baseCostKrw: 98000,
       colors: [{ name: '샌드베이지', leatherColor: 'SB' }, { name: '블랙', leatherColor: 'BLK' }, { name: '브라운', leatherColor: 'BRN' }],
-      buyerId: DEMO.vendorBuyer, createdAt: ts, updatedAt: ts,
+      buyerId: DEMO.vendorBuyer, createdAt: ts,
     },
     {
       id: DEMO.itemMini, styleNo: 'OEM-26SS-MINI', name: '미니 크로스백', season: '26SS',
       category: '크로스백', erpCategory: 'HB', designer: 'OEM팀', material: '스웨이드',
       deliveryPrice: 65000, marginRate: 0.30, hasBom: true, baseCostKrw: 32000,
       colors: [{ name: '카멜', leatherColor: 'CML' }],
-      buyerId: DEMO.vendorBuyer, createdAt: ts, updatedAt: ts,
+      buyerId: DEMO.vendorBuyer, createdAt: ts,
     },
   ];
   let iList = store.getItems();
@@ -193,10 +193,10 @@ export async function seedDemoIntegrationData(): Promise<SeedResult> {
 
   // ── 3. 자재 마스터 ──
   const materials: Material[] = [
-    { id: DEMO.matLeather, itemCode: 'MAT-DEMO-001', name: '나파가죽', spec: '1.2mm BLACK', unit: 'SF', category: '원자재', vendorId: DEMO.vendorMat, unitPriceUsd: 12.5, priceCurrency: 'USD', orderStatus: '입고완료', orderQty: 120, orderVendorName: '홍콩원단', createdAt: ts },
-    { id: DEMO.matLining, itemCode: 'MAT-DEMO-002', name: '면안감', spec: '210T BEIGE', unit: 'YD', category: '원자재', vendorId: DEMO.vendorMat, unitPriceUsd: 3.2, priceCurrency: 'USD', orderStatus: '발주완료', orderQty: 80, orderVendorName: '홍콩원단', createdAt: ts },
-    { id: DEMO.matZipper, itemCode: 'MAT-DEMO-003', name: 'YKK 지퍼', spec: '#5 60cm', unit: 'EA', category: '부자재', vendorId: DEMO.vendorMat, unitPriceUsd: 0.85, priceCurrency: 'USD', orderStatus: '미발주', orderQty: 0, orderVendorName: '홍콩원단', createdAt: ts },
-    { id: DEMO.matChain, itemCode: 'MAT-DEMO-004', name: '체인스트랩', spec: '120cm 골드', unit: 'EA', category: '부자재', vendorId: DEMO.vendorMat, unitPriceUsd: 4.5, priceCurrency: 'USD', orderStatus: '입고완료', orderQty: 200, orderVendorName: '홍콩원단', createdAt: ts },
+    { id: DEMO.matLeather, itemCode: 'MAT-DEMO-001', name: '나파가죽', spec: '1.2mm BLACK', unit: 'SF', category: '가죽', vendorId: DEMO.vendorMat, unitPriceUsd: 12.5, priceCurrency: 'USD', orderStatus: '입고완료', orderQty: 120, orderVendorName: '홍콩원단', createdAt: ts },
+    { id: DEMO.matLining, itemCode: 'MAT-DEMO-002', name: '면안감', spec: '210T BEIGE', unit: 'YD', category: '원단', vendorId: DEMO.vendorMat, unitPriceUsd: 3.2, priceCurrency: 'USD', orderStatus: '발주중', orderQty: 80, orderVendorName: '홍콩원단', createdAt: ts },
+    { id: DEMO.matZipper, itemCode: 'MAT-DEMO-003', name: 'YKK 지퍼', spec: '#5 60cm', unit: 'EA', category: '지퍼', vendorId: DEMO.vendorMat, unitPriceUsd: 0.85, priceCurrency: 'USD', orderQty: 0, orderVendorName: '홍콩원단', createdAt: ts },
+    { id: DEMO.matChain, itemCode: 'MAT-DEMO-004', name: '체인스트랩', spec: '120cm 골드', unit: 'EA', category: '장식', vendorId: DEMO.vendorMat, unitPriceUsd: 4.5, priceCurrency: 'USD', orderStatus: '입고완료', orderQty: 200, orderVendorName: '홍콩원단', createdAt: ts },
   ];
   let mList = store.getMaterials();
   materials.forEach(m => { mList = upsertById(mList, m); });
@@ -262,27 +262,27 @@ export async function seedDemoIntegrationData(): Promise<SeedResult> {
   const oemPreBlk = colorBom('BLK', [
     bomLine('나파가죽', 1.2, 11, { hq: true, subPart: '바디' }),
     bomLine('면안감', 0.8, 2.5, { hq: true, unit: 'YD' }),
-    bomLine('YKK 지퍼', 1, 2.5, { category: '부자재', unit: 'EA' }),
-    bomLine('금속 장식', 2, 1.2, { category: '부자재', unit: 'EA' }),
+    bomLine('YKK 지퍼', 1, 2.5, { category: '지퍼', unit: 'EA' }),
+    bomLine('금속 장식', 2, 1.2, { category: '장식', unit: 'EA' }),
   ], [postLine('칼라불박 로고', 1, 3.5)], 28);
 
   const oemPostBlk = colorBom('BLK', [
     bomLine('나파가죽', 1.25, 11.5, { hq: true, subPart: '바디' }),
     bomLine('면안감', 0.85, 2.6, { hq: true, unit: 'YD' }),
-    bomLine('YKK 지퍼', 1, 2.8, { category: '부자재', unit: 'EA' }),
-    bomLine('금속 장식', 2, 1.3, { category: '부자재', unit: 'EA' }),
+    bomLine('YKK 지퍼', 1, 2.8, { category: '지퍼', unit: 'EA' }),
+    bomLine('금속 장식', 2, 1.3, { category: '장식', unit: 'EA' }),
   ], [postLine('칼라불박 로고', 1, 3.8)], 30);
 
   const lumenPre = colorBom('SB', [
     bomLine('양가죽', 1.5, 13, { subPart: '바디' }),
-    bomLine('체인스트랩', 1, 4, { category: '부자재', unit: 'EA' }),
-    bomLine('자석 클로저', 1, 2.2, { category: '부자재', unit: 'EA' }),
+    bomLine('체인스트랩', 1, 4, { category: '장식', unit: 'EA' }),
+    bomLine('자석 클로저', 1, 2.2, { category: '장식', unit: 'EA' }),
   ], [postLine('엣지코팅', 1, 5)], 32);
 
   const lumenPost = colorBom('SB', [
     bomLine('양가죽', 1.55, 13.5, { subPart: '바디' }),
-    bomLine('체인스트랩', 1, 4.2, { category: '부자재', unit: 'EA' }),
-    bomLine('자석 클로저', 1, 2.4, { category: '부자재', unit: 'EA' }),
+    bomLine('체인스트랩', 1, 4.2, { category: '장식', unit: 'EA' }),
+    bomLine('자석 클로저', 1, 2.4, { category: '장식', unit: 'EA' }),
   ], [postLine('엣지코팅', 1, 5.5)], 34);
 
   const boms = [
@@ -320,11 +320,11 @@ export async function seedDemoIntegrationData(): Promise<SeedResult> {
       styleId: DEMO.itemMini, erpCategory: '크로스백',
       colorBoms: [colorBom('CML', [
         bomLine('스웨이드', 0.9, 9.5, { subPart: '바디' }),
-        bomLine('조절 스트랩', 1, 3, { category: '부자재', unit: 'EA' }),
+        bomLine('조절 스트랩', 1, 3, { category: '장식', unit: 'EA' }),
       ], [], 22)],
       postColorBoms: [colorBom('CML', [
         bomLine('스웨이드', 0.95, 10, { subPart: '바디' }),
-        bomLine('조절 스트랩', 1, 3.2, { category: '부자재', unit: 'EA' }),
+        bomLine('조절 스트랩', 1, 3.2, { category: '장식', unit: 'EA' }),
       ], [], 24)],
       lines: [], postMaterials: [], postProcessLines: [], processingFee: 22,
       isSimpleCost: false, exchangeRateCny: 191, snapshotCnyKrw: 191,
@@ -339,9 +339,9 @@ export async function seedDemoIntegrationData(): Promise<SeedResult> {
   summary.push(`BOM ${boms.length}건 (사전·사후 컬러별)`);
 
   // ── 6. 프로젝트 ──
-  phase1.ensureProject(DEMO.projectOem, 'OEM', 'OEM 데모 — LLL 하네스');
-  phase1.ensureProject(DEMO.projectLumen, 'LUMEN', 'LUMEN 데모 — 리나 리오더');
-  phase1.ensureProject(DEMO.projectMini, 'OEM', 'OEM 데모 — 미니 크로스');
+  ensureProject(DEMO.projectOem, 'OEM', 'OEM 데모 — LLL 하네스');
+  ensureProject(DEMO.projectLumen, 'LUMEN', 'LUMEN 데모 — 리나 리오더');
+  ensureProject(DEMO.projectMini, 'OEM', 'OEM 데모 — 미니 크로스');
   summary.push(`프로젝트 3건`);
 
   // ── 7. 생산발주 ──
@@ -512,8 +512,8 @@ export async function seedDemoIntegrationData(): Promise<SeedResult> {
 
   // ── 10. 자재구매 ──
   const purchases: PurchaseItem[] = [
-    { id: DEMO.purchase, orderId: DEMO.orderOem, orderNo: DEMO.orderNoOem, purchaseDate: '2026-07-03', itemName: '나파가죽 BLACK', qty: 620, unit: 'SF', unitPriceCny: 11, currency: 'CNY', appliedRate: 191, amountKrw: 1304620, vendorId: DEMO.vendorMat, vendorName: '홍콩원단', paymentMethod: 'T/T', purchaseStatus: '구매완료', projectNo: DEMO.projectOem, createdAt: ts },
-    { id: DEMO.purchase2, orderId: DEMO.orderLumen, orderNo: DEMO.orderNoLumen, purchaseDate: '2026-07-10', itemName: '양가죽 SB', qty: 480, unit: 'SF', unitPriceCny: 13, currency: 'CNY', appliedRate: 191, amountKrw: 1193040, vendorId: DEMO.vendorMat, vendorName: '홍콩원단', paymentMethod: 'T/T', purchaseStatus: '발주완료', projectNo: DEMO.projectLumen, createdAt: ts },
+    { id: DEMO.purchase, orderId: DEMO.orderOem, orderNo: DEMO.orderNoOem, purchaseDate: '2026-07-03', itemName: '나파가죽 BLACK', qty: 620, unit: 'SF', unitPriceCny: 11, currency: 'CNY', appliedRate: 191, amountKrw: 1304620, vendorId: DEMO.vendorMat, vendorName: '홍콩원단', paymentMethod: '계좌이체', purchaseStatus: '입고완료', projectNo: DEMO.projectOem, createdAt: ts },
+    { id: DEMO.purchase2, orderId: DEMO.orderLumen, orderNo: DEMO.orderNoLumen, purchaseDate: '2026-07-10', itemName: '양가죽 SB', qty: 480, unit: 'SF', unitPriceCny: 13, currency: 'CNY', appliedRate: 191, amountKrw: 1193040, vendorId: DEMO.vendorMat, vendorName: '홍콩원단', paymentMethod: '계좌이체', purchaseStatus: '발주완료', projectNo: DEMO.projectLumen, createdAt: ts },
     { id: DEMO.purchase3, orderId: DEMO.orderOem, orderNo: DEMO.orderNoOem, purchaseDate: '2026-07-12', itemName: 'YKK 지퍼 #5', qty: 520, unit: 'EA', unitPriceCny: 2.5, currency: 'CNY', appliedRate: 191, amountKrw: 248300, vendorId: DEMO.vendorMat, vendorName: '홍콩원단', paymentMethod: '기타', purchaseStatus: '미발주', projectNo: DEMO.projectOem, createdAt: ts },
   ];
   let pList = store.getPurchaseItems();
@@ -581,8 +581,8 @@ export async function seedDemoIntegrationData(): Promise<SeedResult> {
 
   // ── 14. 지출전표 ──
   const expenses: Expense[] = [
-    { id: DEMO.expense, expenseDate: '2026-07-10', expenseType: 'T/T', category: '자재구매', description: '나파가죽 선금', amountKrw: 500000, vendorId: DEMO.vendorMat, vendorName: '홍콩원단', hasTaxInvoice: false, lines: [{ id: genId(), description: '나파가죽 선금', qty: 1, unit: '건', unitPrice: 500000, amountKrw: 500000 }], orderId: DEMO.orderOem, orderNo: DEMO.orderNoOem, createdAt: ts, memo: `project: ${DEMO.projectOem}` },
-    { id: DEMO.expense2, expenseDate: '2026-08-01', expenseType: '물류비', category: '물류', description: '7월 컨테이너 운임', amountKrw: 850000, vendorId: DEMO.vendor3pl, vendorName: '이천3PL', hasTaxInvoice: true, lines: [{ id: genId(), description: 'SH→ICN 운임', qty: 1, unit: '건', unitPrice: 850000, amountKrw: 850000 }], orderId: DEMO.orderOem, orderNo: DEMO.orderNoOem, createdAt: ts },
+    { id: DEMO.expense, expenseDate: '2026-07-10', expenseType: '계좌이체', category: '자재구매', description: '나파가죽 선금', amountKrw: 500000, vendorId: DEMO.vendorMat, vendorName: '홍콩원단', hasTaxInvoice: false, lines: [{ id: genId(), description: '나파가죽 선금', qty: 1, unit: '건', unitPrice: 500000, amountKrw: 500000 }], orderId: DEMO.orderOem, orderNo: DEMO.orderNoOem, createdAt: ts, memo: `project: ${DEMO.projectOem}` },
+    { id: DEMO.expense2, expenseDate: '2026-08-01', expenseType: '계좌이체', category: '물류비', description: '7월 컨테이너 운임', amountKrw: 850000, vendorId: DEMO.vendor3pl, vendorName: '이천3PL', hasTaxInvoice: true, lines: [{ id: genId(), description: 'SH→ICN 운임', qty: 1, unit: '건', unitPrice: 850000, amountKrw: 850000 }], orderId: DEMO.orderOem, orderNo: DEMO.orderNoOem, createdAt: ts },
   ];
   let eList = store.getExpenses();
   expenses.forEach(e => { eList = upsertById(eList, e); });
@@ -630,8 +630,8 @@ export async function seedDemoIntegrationData(): Promise<SeedResult> {
   const campaigns: Campaign[] = [
     { id: 'demo-camp-1', workspace: 'LUMEN', title: 'Lumen with SUMMER', channel: '자사몰', startDate: '2026-07-01', endDate: '2026-07-13', status: 'active', discountRate: 10, pushSkus: ['LLL6F92SB'], owner: 'MD', tasks: [], createdAt: ts, updatedAt: ts },
     { id: 'demo-camp-2', workspace: 'LUMEN', title: '여름 시즌오프', channel: '자사몰', startDate: '2026-07-06', endDate: '2026-07-12', status: 'active', discountRate: 15, pushSkus: ['LLL6F92SB'], tasks: [], createdAt: ts, updatedAt: ts },
-    { id: 'demo-camp-3', workspace: 'LUMEN', title: '백화점 VIP 프리뷰', channel: '백화점', startDate: '2026-08-01', endDate: '2026-08-14', status: 'planned', discountRate: 0, pushSkus: ['LLL6F92SB'], owner: '쇼룸', tasks: [], createdAt: ts, updatedAt: ts },
-    { id: 'demo-camp-4', workspace: 'OEM', title: 'LLL 26SS 프리오더', channel: 'B2B', startDate: '2026-06-01', endDate: '2026-06-30', status: 'ended', discountRate: 0, pushSkus: ['OEM-26SS-001'], owner: '영업', tasks: [], createdAt: ts, updatedAt: ts },
+    { id: 'demo-camp-3', workspace: 'LUMEN', title: '백화점 VIP 프리뷰', channel: '백화점', startDate: '2026-08-01', endDate: '2026-08-14', status: 'draft', discountRate: 0, pushSkus: ['LLL6F92SB'], owner: '쇼룸', tasks: [], createdAt: ts, updatedAt: ts },
+    { id: 'demo-camp-4', workspace: 'LUMEN', title: 'LLL 26SS 프리오더', channel: 'B2B', startDate: '2026-06-01', endDate: '2026-06-30', status: 'closed', discountRate: 0, pushSkus: ['OEM-26SS-001'], owner: '영업', tasks: [], createdAt: ts, updatedAt: ts },
   ];
   localStorage.setItem('ames_campaigns', JSON.stringify(
     campaigns.reduce((acc, c) => upsertById(acc, c), JSON.parse(localStorage.getItem('ames_campaigns') || '[]')),
@@ -645,9 +645,9 @@ export async function seedDemoIntegrationData(): Promise<SeedResult> {
     usdKrw: settings.usdKrw || 1380,
     cnyKrw: settings.cnyKrw || 191,
     exchangeHistory: settings.exchangeHistory?.length ? settings.exchangeHistory : [
-      { date: '2026-07-01', usdKrw: 1375, cnyKrw: 190 },
-      { date: '2026-07-08', usdKrw: 1380, cnyKrw: 191 },
-      { date: today(), usdKrw: 1382, cnyKrw: 191 },
+      { id: genId(), date: '2026-07-01', usdKrw: 1375, cnyKrw: 190 },
+      { id: genId(), date: '2026-07-08', usdKrw: 1380, cnyKrw: 191 },
+      { id: genId(), date: today(), usdKrw: 1382, cnyKrw: 191 },
     ],
   });
 

@@ -241,7 +241,6 @@ function ExpenseDetailModal({
                             }
                           }}
                           className="h-8 text-sm text-right w-16"
-                          min={0}
                         />
                       </td>
                       <td>
@@ -259,7 +258,6 @@ function ExpenseDetailModal({
                             value={line.unitPrice}
                             onChange={e => updateDetailLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                             className="h-8 text-sm text-right w-24"
-                            min={0}
                           />
                           {line.unitPrice > 0 && (
                             <div className="text-right text-[11px] text-muted-foreground">{formatKRW(line.unitPrice)}</div>
@@ -766,7 +764,6 @@ export default function ExpenseEntry() {
                           value={line.qty}
                           onChange={e => updateLine(line.id, 'qty', parseFloat(e.target.value) || 0)}
                           className="h-8 text-sm text-right"
-                          min={0}
                         />
                       </td>
                       <td>
@@ -784,7 +781,6 @@ export default function ExpenseEntry() {
                             value={line.unitPrice}
                             onChange={e => updateLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                             className="h-8 text-sm text-right"
-                            min={0}
                           />
                           {line.unitPrice > 0 && (
                             <div className="text-right text-[11px] text-muted-foreground">{formatKRW(line.unitPrice)}</div>

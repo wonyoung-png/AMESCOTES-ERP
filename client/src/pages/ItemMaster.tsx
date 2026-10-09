@@ -3857,7 +3857,7 @@ function MultiBulkOrderModal({
     const trimmed = colorName.trim();
     if (!trimmed) return;
     // 품목 마스터에서 기존 컬러 정보 로드
-    const masterItem = items.find((i: any) => i.id === itemId);
+    const masterItem = store.getItems().find((i: any) => i.id === itemId);
     const masterColors = normalizeColors(masterItem?.colors || []);
     const existingMasterColor = masterColors.find(c => c.name === trimmed);
     setItemStates(prev => prev.map(s => {

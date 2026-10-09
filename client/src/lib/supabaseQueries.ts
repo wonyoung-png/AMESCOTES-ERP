@@ -3,6 +3,7 @@
 
 import { supabase } from './supabase';
 import { store, normalizeMaterialCategory, COMMON_BRAND } from './store';
+import type { Bom, Material, ProductionOrder, PurchaseItem, Sample, Vendor } from './store';
 import { filterForTable, toSnakeCase } from './tableColumns';
 
 async function withLocalFallback<T>(remote: () => Promise<T[]>, local: () => T[]): Promise<T[]> {
@@ -285,8 +286,8 @@ function convertBomFromDB(row: any) {
 // VENDORS
 // ─────────────────────────────────────────────
 
-export async function fetchVendors() {
-  return withLocalFallback(async () => {
+export async function fetchVendors(): Promise<Vendor[]> {
+  return withLocalFallback<Vendor>(async () => {
   const { data, error } = await supabase
     .from('vendors')
     .select('*')
@@ -510,8 +511,8 @@ export async function deleteItem(id: string) {
 // BOMS
 // ─────────────────────────────────────────────
 
-export async function fetchBoms() {
-  return withLocalFallback(async () => {
+export async function fetchBoms(): Promise<Bom[]> {
+  return withLocalFallback<Bom>(async () => {
   const { data, error } = await supabase
     .from('boms')
     .select('*')
@@ -537,8 +538,8 @@ const BOM_LIGHT_COLS = [
   'created_at', 'updated_at',
 ].join(',');
 
-export async function fetchBomsLight() {
-  return withLocalFallback(async () => {
+export async function fetchBomsLight(): Promise<Bom[]> {
+  return withLocalFallback<Bom>(async () => {
   const { data, error } = await supabase
     .from('boms')
     .select(BOM_LIGHT_COLS)
@@ -622,8 +623,8 @@ export async function deleteBom(id: string) {
 // SAMPLES
 // ─────────────────────────────────────────────
 
-export async function fetchSamples() {
-  return withLocalFallback(async () => {
+export async function fetchSamples(): Promise<Sample[]> {
+  return withLocalFallback<Sample>(async () => {
   const { data, error } = await supabase
     .from('samples')
     .select('*')
@@ -716,8 +717,8 @@ export async function deleteSample(id: string) {
 // PRODUCTION ORDERS
 // ─────────────────────────────────────────────
 
-export async function fetchOrders() {
-  return withLocalFallback(async () => {
+export async function fetchOrders(): Promise<ProductionOrder[]> {
+  return withLocalFallback<ProductionOrder>(async () => {
   const { data, error } = await supabase
     .from('production_orders')
     .select('*')
@@ -853,8 +854,8 @@ export async function deleteOrder(id: string) {
 // MATERIALS
 // ─────────────────────────────────────────────
 
-export async function fetchMaterials() {
-  return withLocalFallback(async () => {
+export async function fetchMaterials(): Promise<Material[]> {
+  return withLocalFallback<Material>(async () => {
   const { data, error } = await supabase
     .from('materials')
     .select('*')
@@ -966,8 +967,8 @@ export async function deleteMaterial(id: string) {
 // PURCHASE ITEMS
 // ─────────────────────────────────────────────
 
-export async function fetchPurchaseItems() {
-  return withLocalFallback(async () => {
+export async function fetchPurchaseItems(): Promise<PurchaseItem[]> {
+  return withLocalFallback<PurchaseItem>(async () => {
   const { data, error } = await supabase
     .from('purchase_items')
     .select('*')

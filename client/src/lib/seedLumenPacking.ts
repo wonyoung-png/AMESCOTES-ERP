@@ -359,7 +359,7 @@ export async function seedLumenPackingData(): Promise<{
   store.setBoms(boms);
 
   localStorage.setItem('ames_pack_kits', JSON.stringify(kits));
-  kits.forEach(k => summary.push(`${k.name}(${k.styleNo}): ₩${k.totalCostKrw.toLocaleString('ko-KR')} (${k.lines.length}자재)`));
+  kits.forEach(k => summary.push(`${k.label}(${k.styleNo}): ₩${k.totalCostKrw.toLocaleString('ko-KR')} (${k.lines.length}자재)`));
   summary.push(`핸드백 패키지 ${HB_BOX_KITS.length}건 (박스SS~박스XL-HB)`);
 
   localStorage.setItem(PACK_SEED_FLAG, ts);

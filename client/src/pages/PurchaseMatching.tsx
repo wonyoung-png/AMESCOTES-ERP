@@ -1740,7 +1740,6 @@ function ExpenseDetailInlineModal({
                         value={line.qty}
                         onChange={e => updateDetailLine(line.id, 'qty', parseFloat(e.target.value) || 0)}
                         className="h-8 text-sm text-right border border-border rounded px-2 w-16"
-                        min={0}
                       />
                     </td>
                     <td>
@@ -1757,7 +1756,6 @@ function ExpenseDetailInlineModal({
                         value={line.unitPrice}
                         onChange={e => updateDetailLine(line.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                         className="h-8 text-sm text-right border border-border rounded px-2 w-24"
-                        min={0}
                       />
                     </td>
                     <td className="num text-sm font-medium text-foreground">

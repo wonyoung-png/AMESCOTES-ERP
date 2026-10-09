@@ -354,7 +354,7 @@ export interface HqSupplyItem {
   unitPrice?: number;
   currency?: Currency;
   vendorId?: string;
-  purchaseStatus: '미구매' | '구매완료' | '발송완료';
+  purchaseStatus: '미발주' | '미구매' | '구매완료' | '발송완료';
   memo?: string;
 }
 
@@ -620,7 +620,7 @@ export interface PurchaseItem {
   vendorId?: string;
   vendorName?: string;
   paymentMethod: ExpenseType | '기타';
-  purchaseStatus: '미구매' | '구매완료' | '발송완료';
+  purchaseStatus: '미발주' | '발주완료' | '입고완료' | '발송완료';
   /** 연결 지출결의(payable) id — 구 지출전표 id도 호환 */
   statementNo?: string;
   memo?: string;
