@@ -1,4 +1,3 @@
 @echo off
-REM Daily Supabase JSON backup (scheduled task, 21:00)
-cd /d "%~dp0"
-node scripts\backup-supabase.mjs
+REM PostgreSQL backup runs on the AWS server and uploads to the private S3 bucket.
+echo ERP backup is managed automatically on the AWS server.

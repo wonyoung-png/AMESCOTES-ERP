@@ -2,7 +2,7 @@
 //
 // ⚠️ CLAUDE.md "절대 수정 금지" 연동 흐름의 구현체입니다.
 //    거래처별 발주서 → "✅ 발주 확정" 클릭 시:
-//      1. fetchMaterials() 조회 후 upsertMaterial() → Supabase materials 저장
+//      1. fetchMaterials() 조회 후 upsertMaterial() → 서버 DB materials 저장
 //      2. upsertPurchaseItem() → 자재구매(PurchaseMatching) 탭에 표시
 //      3. store.clearMaterialCart() → 장바구니 비우기
 //      4. queryClient.invalidateQueries(['materials'])   ← 호출부 책임
@@ -14,11 +14,11 @@
 // 이 파일은 양쪽의 올바른 동작을 합친 것이다.
 
 import { store, genId, type CartItem, type ProductionOrder, type Vendor } from './store';
-import { fetchMaterials, upsertMaterial, fetchPurchaseItems, upsertPurchaseItem } from './supabaseQueries';
+import { fetchMaterials, upsertMaterial, fetchPurchaseItems, upsertPurchaseItem } from './dbQueries';
 
 export interface ConfirmMaterialOrderParams {
   cartItems: CartItem[];
-  /** 발주번호 매칭용 — Supabase에서 조회한 발주 목록 */
+  /** 발주번호 매칭용 — 서버 DB에서 조회한 발주 목록 */
   orders: ProductionOrder[];
   vendors: Vendor[];
   /** CNY→KRW 환율 */
@@ -48,7 +48,7 @@ export async function confirmMaterialOrder(
     .map(item => ({ item, orderQty: Math.max(0, item.qty - (item.stockQty ?? 0)) }))
     .filter(t => t.orderQty > 0);
 
-  // ── 1단계: Supabase materials 저장 ──
+  // ── 1단계: 서버 DB materials 저장 ──
   const existingMaterials = await fetchMaterials();
   let materialCount = 0;
   for (const { item, orderQty } of targets) {

@@ -1,4 +1,4 @@
-import { supabase } from './supabase'; // AWS EC2 PostgREST 호환 클라이언트
+import { db } from './db';
 
 export type ShippingMethod = 'air' | 'sea';
 export type ShippingPlanStatus = 'pending' | 'confirmed';
@@ -34,7 +34,7 @@ const fromRow = (row: any): ShippingPlan => ({
 });
 
 export async function fetchShippingPlans(date?: string): Promise<ShippingPlan[]> {
-  let query = supabase.from('shipping_plans').select('*').order('ship_date').order('created_at');
+  let query = db.from('shipping_plans').select('*').order('ship_date').order('created_at');
   if (date) query = query.eq('ship_date', date);
   const { data, error } = await query;
   if (error) throw error;
@@ -43,7 +43,7 @@ export async function fetchShippingPlans(date?: string): Promise<ShippingPlan[]>
 
 export async function upsertShippingPlan(plan: Partial<ShippingPlan> & Pick<ShippingPlan, 'id' | 'shipDate' | 'method' | 'description'>): Promise<void> {
   const now = new Date().toISOString();
-  const { error } = await supabase.from('shipping_plans').upsert({
+  const { error } = await db.from('shipping_plans').upsert({
     id: plan.id,
     ship_date: plan.shipDate,
     method: plan.method,
@@ -62,7 +62,7 @@ export async function upsertShippingPlan(plan: Partial<ShippingPlan> & Pick<Ship
 
 export async function confirmShippingPlan(id: string, confirmedBy: string): Promise<void> {
   const now = new Date().toISOString();
-  const { error } = await supabase.from('shipping_plans').update({
+  const { error } = await db.from('shipping_plans').update({
     status: 'confirmed',
     confirmed_by: confirmedBy,
     confirmed_at: now,

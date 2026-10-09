@@ -1,6 +1,6 @@
-// AMESCOTES ERP — Supabase 테이블별 허용 컬럼 정본 (Single Source of Truth)
+// AMESCOTES ERP — 서버 DB 테이블별 허용 컬럼 정본 (Single Source of Truth)
 //
-// ⚠️ 이 파일이 유일한 컬럼 목록입니다. store.ts / supabaseQueries.ts 등
+// ⚠️ 이 파일이 유일한 컬럼 목록입니다. store.ts / dbQueries.ts 등
 //    어디에도 사본을 만들지 마세요.
 //    (사본이 갈라지면서 입고수량·마일스톤 등이 무음 탈락하던 버그가 있었습니다)
 //

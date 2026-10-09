@@ -14,7 +14,7 @@ import {
   DEFAULT_YARD_CFG, YARD_KINDS,
   type Material, type MaterialCategory, type YardCfg, type YardKind, type YardRow,
 } from '@/lib/store';
-import { fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
+import { fetchMaterials, upsertMaterial } from '@/lib/dbQueries';
 
 /** 배정 단위 — 부위 4개 + 보강재. 소요량은 이 단위로 따로 나온다 */
 const BUCKETS = ['바디', '트림1', '트림2', '안감', '보강재'] as const;

@@ -4,7 +4,7 @@ import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import { store, genId, normalizeBrands, type Vendor, type VendorType, type VendorRegion, type Currency, type BillingType } from '@/lib/store';
-import { fetchVendors, upsertVendor, deleteVendor as deleteVendorSB } from '@/lib/supabaseQueries';
+import { fetchVendors, upsertVendor, deleteVendor as deleteVendorSB } from '@/lib/dbQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

@@ -1,5 +1,5 @@
 // Phase 1 제조 ERP — project_no, 입고·출고, 미지급, 브랜드 발주·R3
-import { supabase } from './supabase';
+import { db } from './db';
 import { toast } from 'sonner';
 import type { ColorQty } from './store';
 
@@ -515,12 +515,12 @@ export function ensureProject(projectNo: string, workspace: Workspace, title?: s
   };
   all.push(p);
   setAll(KEYS.projects, all);
-  syncProjectToSupabase(p).catch(reportSyncFail('발주 손익'));
+  syncProjectToDb(p).catch(reportSyncFail('발주 손익'));
   return p;
 }
 
-async function syncProjectToSupabase(p: Project) {
-  await supabase.from('projects').upsert({
+async function syncProjectToDb(p: Project) {
+  await db.from('projects').upsert({
     id: p.id,
     project_no: p.projectNo,
     workspace: p.workspace,
@@ -817,7 +817,7 @@ export const phase1 = {
   deleteBrandLine: (id: string) => {
     setAll(KEYS.brandLines, getAll<BrandOrderLine>(KEYS.brandLines).filter(l => l.id !== id));
     // 서버에서도 지워야 한다. 안 지우면 다음 조회 때 되살아난다
-    supabase.from('brand_order_lines').delete().eq('id', id)
+    db.from('brand_order_lines').delete().eq('id', id)
       .then(({ error }) => { if (error) reportSyncFail('발주 라인 삭제')(error); });
   },
 
@@ -851,7 +851,7 @@ export const phase1 = {
     if (batch.status !== 'draft') return { ok: false, reason: '발주를 먼저 취소하세요' };
     batch.lines.forEach(l => phase1.deleteBrandLine(l.id));
     setAll(KEYS.brandBatches, getAll<BrandOrderBatch>(KEYS.brandBatches).filter(b => b.id !== batchId));
-    supabase.from('brand_order_batches').delete().eq('id', batchId)
+    db.from('brand_order_batches').delete().eq('id', batchId)
       .then(({ error }) => { if (error) reportSyncFail('발주 삭제')(error); });
     return { ok: true };
   },
@@ -902,11 +902,10 @@ export const phase1 = {
    * 발주서는 공장 1곳에 1장이다. 두 공장이 든 발주서는 공장이 남의 물량을 보게 되므로
    * 발주서가 아니다. 여기서 나온 번호(LUM-260810-01-A)를 OEM이 PO로 그대로 받는다.
    */
-  /** 발주 — 담은 상품을 공장·경로별로 갈라 발주서를 낸다. 초안이면 바로 나간다 */
+  /** 발주 — 승인 완료된 상품을 공장·경로별로 갈라 발주서를 낸다. */
   issueBrandBatch: (batchId: string) => {
     const batch = phase1.getBrandBatch(batchId);
-    // 이미 나간 것만 막는다. 옛 승인단계(in_approval)에 걸려 있던 발주도 그대로 내보낸다
-    if (!batch || batch.status === 'issued' || batch.status === 'split') return [];
+    if (!batch || batch.status !== 'approved') return [];
     if (!batch.lines.length) return [];
     const byFactory = new Map<string, BrandOrderLine[]>();
     batch.lines.forEach(l => {
@@ -1562,7 +1561,7 @@ export const phase1 = {
 };
 
 async function syncReceiptLog(log: ReceiptLog) {
-  await supabase.from('receipt_logs').upsert({
+  await db.from('receipt_logs').upsert({
     id: log.id,
     order_id: log.orderId,
     order_no: log.orderNo,
@@ -1582,7 +1581,7 @@ async function syncReceiptLog(log: ReceiptLog) {
 }
 
 async function syncDefect(d: DefectCarryover) {
-  await supabase.from('defect_carryovers').upsert({
+  await db.from('defect_carryovers').upsert({
     id: d.id,
     style_no: d.styleNo,
     order_no: d.orderNo,
@@ -1601,7 +1600,7 @@ async function syncDefect(d: DefectCarryover) {
 }
 
 async function syncPayable(p: Payable) {
-  await supabase.from('payables').upsert({
+  await db.from('payables').upsert({
     id: p.id,
     vendor_id: p.vendorId,
     vendor_name: p.vendorName,
@@ -1643,9 +1642,9 @@ const rowToLine = (r: any): BrandOrderLine => ({
 /** 서버가 정본. LUMEN이 만든 발주를 OEM이 보려면 이게 있어야 한다 */
 export async function pullBrandOrders(): Promise<number> {
   const [b, l, g] = await Promise.all([
-    supabase.from('brand_order_batches').select('*'),
-    supabase.from('brand_order_lines').select('*'),
-    supabase.from('approval_logs').select('*'),
+    db.from('brand_order_batches').select('*'),
+    db.from('brand_order_lines').select('*'),
+    db.from('approval_logs').select('*'),
   ]);
   if (b.error) throw b.error;
   setAll(KEYS.brandBatches, (b.data || []).map(rowToBatch));
@@ -1660,7 +1659,7 @@ export async function pullBrandOrders(): Promise<number> {
 }
 
 async function syncBrandBatch(b: BrandOrderBatch) {
-  const { error } = await supabase.from('brand_order_batches').upsert({
+  const { error } = await db.from('brand_order_batches').upsert({
     id: b.id,
     workspace: b.workspace,
     project_no: b.projectNo,
@@ -1678,7 +1677,7 @@ async function syncBrandBatch(b: BrandOrderBatch) {
 }
 
 async function syncBrandLine(l: BrandOrderLine) {
-  const { error } = await supabase.from('brand_order_lines').upsert({
+  const { error } = await db.from('brand_order_lines').upsert({
     id: l.id,
     batch_id: l.batchId,
     style_no: l.styleNo,
@@ -1699,7 +1698,7 @@ async function syncBrandLine(l: BrandOrderLine) {
 }
 
 async function syncApprovalLog(l: ApprovalLog) {
-  await supabase.from('approval_logs').upsert({
+  await db.from('approval_logs').upsert({
     id: l.id,
     batch_id: l.batchId,
     step: l.step,
@@ -1711,13 +1710,13 @@ async function syncApprovalLog(l: ApprovalLog) {
   });
 }
 
-/** localStorage → Supabase 일괄 동기화 (정산 테이블) */
-export async function migrateLocalToSupabase() {
+/** localStorage → 서버 DB 일괄 동기화 (정산 테이블) */
+export async function migrateLocalToDb() {
   const tradeStatements = JSON.parse(localStorage.getItem('ames_trade_statements') || '[]');
   const settlements = JSON.parse(localStorage.getItem('ames_settlements') || '[]');
   const purchases = JSON.parse(localStorage.getItem('ames_purchases') || '[]');
   for (const s of tradeStatements) {
-    await supabase.from('trade_statements').upsert({
+    await db.from('trade_statements').upsert({
       id: s.id,
       statement_no: s.statementNo,
       vendor_id: s.vendorId,
@@ -1734,7 +1733,7 @@ export async function migrateLocalToSupabase() {
     });
   }
   for (const s of settlements) {
-    await supabase.from('settlements').upsert({
+    await db.from('settlements').upsert({
       id: s.id,
       buyer_id: s.buyerId,
       buyer_name: s.buyerName,
@@ -1753,7 +1752,7 @@ export async function migrateLocalToSupabase() {
     });
   }
   for (const p of purchases) {
-    await supabase.from('purchase_items').upsert({
+    await db.from('purchase_items').upsert({
       id: p.id,
       order_id: p.orderId,
       order_no: p.orderNo,
@@ -1777,8 +1776,8 @@ export async function migrateLocalToSupabase() {
   }
 }
 
-/** Supabase → localStorage 복원 */
-export async function syncPhase1FromSupabase() {
+/** 서버 DB → localStorage 복원 */
+export async function syncPhase1FromDb() {
   const tables: Array<{ table: string; key: string; map: (r: Record<string, unknown>) => unknown }> = [
     {
       table: 'projects',
@@ -1855,12 +1854,12 @@ export async function syncPhase1FromSupabase() {
     },
   ];
   for (const { table, key, map } of tables) {
-    const { data, error } = await supabase.from(table).select('*');
+    const { data, error } = await db.from(table).select('*');
     if (!error && data?.length) {
       localStorage.setItem(key, JSON.stringify(data.map(map)));
     }
   }
-  const { data: batches } = await supabase.from('brand_order_batches').select('*');
+  const { data: batches } = await db.from('brand_order_batches').select('*');
   if (batches?.length) {
     localStorage.setItem(KEYS.brandBatches, JSON.stringify(batches.map(r => ({
       id: r.id,
@@ -1878,7 +1877,7 @@ export async function syncPhase1FromSupabase() {
       updatedAt: r.updated_at,
     }))));
   }
-  const { data: lines } = await supabase.from('brand_order_lines').select('*');
+  const { data: lines } = await db.from('brand_order_lines').select('*');
   if (lines?.length) {
     localStorage.setItem(KEYS.brandLines, JSON.stringify(lines.map(r => ({
       id: r.id,

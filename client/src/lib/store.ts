@@ -1,76 +1,75 @@
 // AMESCOTES ERP — Data Store
-// localStorage(캐시) + Supabase DB 동시 저장 구조
+// localStorage(캐시) + 서버 DB DB 동시 저장 구조
 
-import { supabase } from './supabase';
+import { db } from './db';
 import { filterForTable, toSnakeCase } from './tableColumns';
 
 /**
- * PostgREST 직접 호출용 — supabase.ts 와 같은 곳을 본다.
- * 예전엔 이관 전 Supabase 클라우드 주소가 소스에 박혀 있었다.
+ * PostgREST 직접 호출용 — db.ts와 같은 자체 서버를 본다.
+ * 예전엔 이관 전 서버 DB 클라우드 주소가 소스에 박혀 있었다.
  * 그 인스턴스가 아직 살아 있어서, 실패가 아니라 얼어붙은 옛 DB 를 조용히 읽고 있었다.
  */
 const restUrl = () =>
-  `${(import.meta.env.VITE_SUPABASE_URL as string) || window.location.origin}/rest/v1`;
-const restHeaders = () => {
-  const key = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
-  const token = localStorage.getItem('erp_token') || key;
-  return { apikey: key, Authorization: `Bearer ${token}` } as Record<string, string>;
+  `${window.location.origin}/rest/v1`;
+const restHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem('erp_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 // ─────────────────────────────────────────────
-// Supabase 쓰기 실패 알림
+// 서버 DB 쓰기 실패 알림
 //
 // 호출부 21곳이 전부 fire-and-forget(await 없음)이라 throw하면
 // unhandled rejection만 남고 사용자는 여전히 모릅니다.
 // 그래서 throw 대신 화면에 띄웁니다 — 저장 실패를 성공으로 착각하는 게 최악입니다.
 // ─────────────────────────────────────────────
-type SbWriteFailure = { table: string; op: string; message: string };
-let onSbWriteFailure: ((f: SbWriteFailure) => void) | null = null;
+type DbWriteFailure = { table: string; op: string; message: string };
+let onDbWriteFailure: ((f: DbWriteFailure) => void) | null = null;
 
 /** 앱 시작 시 1회 등록 (main/App에서 toast 연결) */
-export function setSbWriteFailureHandler(fn: (f: SbWriteFailure) => void): void {
-  onSbWriteFailure = fn;
+export function setDbWriteFailureHandler(fn: (f: DbWriteFailure) => void): void {
+  onDbWriteFailure = fn;
 }
 
-function reportSbFailure(table: string, op: string, message: string): void {
+function reportDbFailure(table: string, op: string, message: string): void {
   console.error(`[store] ${table} ${op} 실패:`, message);
   try {
-    onSbWriteFailure?.({ table, op, message });
+    onDbWriteFailure?.({ table, op, message });
   } catch (e) {
     console.error('[store] 실패 핸들러 오류:', e);
   }
 }
 
-async function sbUpsert(table: string, data: Record<string, any>): Promise<void> {
+async function dbUpsert(table: string, data: Record<string, any>): Promise<void> {
   try {
     const row = filterForTable(table, toSnakeCase(data));
-    const { error } = await supabase.from(table).upsert(row);
-    if (error) reportSbFailure(table, 'upsert', error.message);
+    const { error } = await db.from(table).upsert(row);
+    if (error) reportDbFailure(table, 'upsert', error.message);
   } catch (e) {
-    reportSbFailure(table, 'upsert', String(e));
+    reportDbFailure(table, 'upsert', String(e));
   }
 }
 
-async function sbUpdate(table: string, id: string, patch: Record<string, any>): Promise<void> {
+async function dbUpdate(table: string, id: string, patch: Record<string, any>): Promise<void> {
   try {
     const row = filterForTable(table, toSnakeCase(patch));
     if (Object.keys(row).length === 0) {
-      reportSbFailure(table, 'update', `저장 가능한 컬럼이 없습니다 (${Object.keys(toSnakeCase(patch)).join(', ')})`);
+      reportDbFailure(table, 'update', `저장 가능한 컬럼이 없습니다 (${Object.keys(toSnakeCase(patch)).join(', ')})`);
       return;
     }
-    const { error } = await supabase.from(table).update(row).eq('id', id);
-    if (error) reportSbFailure(table, 'update', error.message);
+    const { error } = await db.from(table).update(row).eq('id', id);
+    if (error) reportDbFailure(table, 'update', error.message);
   } catch (e) {
-    reportSbFailure(table, 'update', String(e));
+    reportDbFailure(table, 'update', String(e));
   }
 }
 
-async function sbDelete(table: string, id: string): Promise<void> {
+async function dbDelete(table: string, id: string): Promise<void> {
   try {
-    const { error } = await supabase.from(table).delete().eq('id', id);
-    if (error) reportSbFailure(table, 'delete', error.message);
+    const { error } = await db.from(table).delete().eq('id', id);
+    if (error) reportDbFailure(table, 'delete', error.message);
   } catch (e) {
-    reportSbFailure(table, 'delete', String(e));
+    reportDbFailure(table, 'delete', String(e));
   }
 }
 
@@ -100,7 +99,7 @@ export const MATERIAL_SUB_TYPES: Partial<Record<MaterialCategory, string[]>> = {
     '개고리', '지퍼 슬라이더', '자석', '오브제 장식 (키·볼·팁)', '봉장식 / 바장식',
   ],
 };
-// 소요량 계산 상수·타입은 lib/yardBom.ts 에 있다 (supabase 의존 없이 그대로 돌려보기 위해)
+// 소요량 계산 상수·타입은 lib/yardBom.ts 에 있다 (db 의존 없이 그대로 돌려보기 위해)
 export {
   YARD_KINDS, YARD_PARTS, YARD_UNIT, ROLL_52IN, DEFAULT_YARD_CFG,
 } from './yardBom';
@@ -395,7 +394,7 @@ export interface ProductionOrder {
   colorQtys?: ColorQty[];         // 컬러별 수량 (합계 = qty)
   vendorId: string;
   vendorName: string;
-  buyerId?: string;               // 바이어 ID (Supabase buyer_id 컬럼 연동)
+  buyerId?: string;               // 바이어 ID (서버 DB buyer_id 컬럼 연동)
   orderDate?: string;           // 발주일 (등록일)
   status: OrderStatus;
   milestones?: OrderMilestone[]; // 납기 마일스톤 목록
@@ -922,7 +921,7 @@ export const store = {
   // Materials
   getMaterials: () => getAll<Material>(KEYS.materials),
   setMaterials: (v: Material[]) => setAll(KEYS.materials, v),
-  /** 카테고리별 다음 품번. list 를 넘기면(=Supabase 조회분) 그 목록 기준으로 채번한다. */
+  /** 카테고리별 다음 품번. list 를 넘기면(=서버 DB 조회분) 그 목록 기준으로 채번한다. */
   getNextItemCode: (category: MaterialCategory, list?: Material[], brandCode?: string): string => {
     const PREFIX: Record<string, string> = {
       '가죽': 'L', '원단': 'W', '지퍼': 'Z', '장식': 'H', '보강재': 'R',
@@ -942,19 +941,19 @@ export const store = {
     const nextNum = existing.length > 0 ? Math.max(...existing) + 1 : 1;
     return `${head}${String(nextNum).padStart(2, '0')}`;
   },
-  addMaterial: (v: Material) => { const a = getAll<Material>(KEYS.materials); a.push(v); setAll(KEYS.materials, a); sbUpsert('materials', v); },
-  updateMaterial: (id: string, u: Partial<Material>) => { const a = getAll<Material>(KEYS.materials); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.materials, a); sbUpdate('materials', id, u); } },
-  deleteMaterial: (id: string) => { setAll(KEYS.materials, getAll<Material>(KEYS.materials).filter(x => x.id !== id)); sbDelete('materials', id); },
+  addMaterial: (v: Material) => { const a = getAll<Material>(KEYS.materials); a.push(v); setAll(KEYS.materials, a); dbUpsert('materials', v); },
+  updateMaterial: (id: string, u: Partial<Material>) => { const a = getAll<Material>(KEYS.materials); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.materials, a); dbUpdate('materials', id, u); } },
+  deleteMaterial: (id: string) => { setAll(KEYS.materials, getAll<Material>(KEYS.materials).filter(x => x.id !== id)); dbDelete('materials', id); },
 
   // Items
   getItems: () => getAll<Item>(KEYS.items),
   setItems: (v: Item[]) => setAll(KEYS.items, v),
-  addItem: (v: Item) => { const a = getAll<Item>(KEYS.items); a.push(v); setAll(KEYS.items, a); sbUpsert('items', v); },
+  addItem: (v: Item) => { const a = getAll<Item>(KEYS.items); a.push(v); setAll(KEYS.items, a); dbUpsert('items', v); },
   updateItem: (id: string, u: Partial<Item>) => {
     const a = getAll<Item>(KEYS.items);
     const i = a.findIndex(x => x.id === id);
     if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.items, a); }
-    // Supabase에 snake_case로 명시적 변환 후 저장
+    // 서버 DB에 snake_case로 명시적 변환 후 저장
     const snakeU: Record<string, unknown> = {};
     if (u.hasBom !== undefined) snakeU.has_bom = u.hasBom;
     if (u.baseCostKrw !== undefined) snakeU.base_cost_krw = u.baseCostKrw;
@@ -968,9 +967,9 @@ export const store = {
     if (u.material !== undefined) snakeU.material = u.material;
     if (u.erpCategory !== undefined) snakeU.erp_category = u.erpCategory;
     if (u.buyerId !== undefined) snakeU.buyer_id = u.buyerId;
-    if (Object.keys(snakeU).length > 0) sbUpdate('items', id, snakeU);
+    if (Object.keys(snakeU).length > 0) dbUpdate('items', id, snakeU);
   },
-  deleteItem: (id: string) => { setAll(KEYS.items, getAll<Item>(KEYS.items).filter(x => x.id !== id)); sbDelete('items', id); },
+  deleteItem: (id: string) => { setAll(KEYS.items, getAll<Item>(KEYS.items).filter(x => x.id !== id)); dbDelete('items', id); },
   addItemColor: (itemId: string, color: ItemColor | string) => {
     const a = getAll<Item>(KEYS.items);
     const i = a.findIndex(x => x.id === itemId);
@@ -988,14 +987,14 @@ export const store = {
   getBoms: () => getAll<Bom>(KEYS.boms),
   setBoms: (v: Bom[]) => setAll(KEYS.boms, v),
   getBomByStyle: (styleId: string) => getAll<Bom>(KEYS.boms).filter(b => b.styleId === styleId),
-  addBom: (v: Bom) => { const a = getAll<Bom>(KEYS.boms); a.push(v); setAll(KEYS.boms, a); sbUpsert('boms', v); },
-  updateBom: (id: string, u: Partial<Bom>) => { const a = getAll<Bom>(KEYS.boms); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.boms, a); sbUpdate('boms', id, u); } },
-  deleteBom: (id: string) => { setAll(KEYS.boms, getAll<Bom>(KEYS.boms).filter(x => x.id !== id)); sbDelete('boms', id); },
+  addBom: (v: Bom) => { const a = getAll<Bom>(KEYS.boms); a.push(v); setAll(KEYS.boms, a); dbUpsert('boms', v); },
+  updateBom: (id: string, u: Partial<Bom>) => { const a = getAll<Bom>(KEYS.boms); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.boms, a); dbUpdate('boms', id, u); } },
+  deleteBom: (id: string) => { setAll(KEYS.boms, getAll<Bom>(KEYS.boms).filter(x => x.id !== id)); dbDelete('boms', id); },
 
   /**
-   * ExtBom(BomManagement.tsx 형식) → Supabase boms 테이블에 upsert
+   * ExtBom(BomManagement.tsx 형식) → 서버 DB boms 테이블에 upsert
    * colorBoms, postColorBoms, postProcessLines 등 JSONB 필드 완전 지원
-   * sbUpsert는 내부에서 toSnakeCase를 또 호출하므로, 직접 supabase client 사용
+   * dbUpsert는 내부에서 toSnakeCase를 또 호출하므로, 직접 db client 사용
    */
   saveBom: (bom: any): void => {
     // localStorage 저장 (ames_boms 키)
@@ -1008,7 +1007,7 @@ export const store = {
     }
     setAll(KEYS.boms, boms);
 
-    // Supabase에 snake_case로 직접 변환 후 upsert
+    // 서버 DB에 snake_case로 직접 변환 후 upsert
     // 실제 boms 테이블 컬럼에 맞춰 명시적 매핑
     const snakeBom: Record<string, any> = {
       id: bom.id,
@@ -1046,11 +1045,11 @@ export const store = {
       updated_at: new Date().toISOString(),
     };
 
-    // 직접 supabase client로 upsert (toSnakeCase 이중 변환 방지)
-    Promise.resolve(supabase.from('boms').upsert(snakeBom))
+    // 직접 db client로 upsert (toSnakeCase 이중 변환 방지)
+    Promise.resolve(db.from('boms').upsert(snakeBom))
       .then(({ error }) => {
         if (error) {
-          console.warn('[store.saveBom] Supabase upsert 실패:', error.message, error.details);
+          console.warn('[store.saveBom] 서버 DB upsert 실패:', error.message, error.details);
         } else {
           console.log('[store.saveBom] BOM 저장 완료:', bom.styleNo, bom.id);
         }
@@ -1118,7 +1117,7 @@ export const store = {
       currency: v.factoryCurrency ?? 'KRW',
     };
     const filtered = filterForTable('production_orders', row);
-    Promise.resolve(supabase.from('production_orders').upsert(filtered))
+    Promise.resolve(db.from('production_orders').upsert(filtered))
       .then(({ error }) => { if (error) console.warn('[store] production_orders upsert 실패:', error.message); })
       .catch((e: unknown) => console.warn('[store] production_orders upsert 오류:', e));
   },
@@ -1128,12 +1127,12 @@ export const store = {
     if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.orders, a); }
     // camelCase → snake_case 자동 변환 후 화이트리스트(tableColumns.ts)로 거른다.
     // 예전엔 필드를 하나씩 손으로 나열해서 defectQty/shippedQty/receivedDate/defectNote가
-    // 통째로 누락됐고, 입고·출고 기록이 Supabase에 저장되지 않았다.
+    // 통째로 누락됐고, 입고·출고 기록이 서버 DB에 저장되지 않았다.
     const patch: Record<string, unknown> = { ...u };
     if (u.qty !== undefined) { patch.quantity = u.qty; delete patch.qty; } // qty만 컬럼명이 다름
-    sbUpdate('production_orders', id, patch);
+    dbUpdate('production_orders', id, patch);
   },
-  deleteOrder: (id: string) => { setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).filter(x => x.id !== id)); sbDelete('production_orders', id); },
+  deleteOrder: (id: string) => { setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).filter(x => x.id !== id)); dbDelete('production_orders', id); },
   getNextRevision: (styleNo: string) => { const orders = getAll<ProductionOrder>(KEYS.orders).filter(o => o.styleNo === styleNo); return orders.length > 0 ? Math.max(...orders.map(o => o.revision)) + 1 : 1; },
 
   // ─── 발주용 BOM 함수 ───
@@ -1492,8 +1491,8 @@ export const store = {
   // Samples
   getSamples: () => getAll<Sample>(KEYS.samples),
   setSamples: (v: Sample[]) => setAll(KEYS.samples, v),
-  addSample: (v: Sample) => { const a = getAll<Sample>(KEYS.samples); a.push(v); setAll(KEYS.samples, a); sbUpsert('samples', v); },
-  updateSample: (id: string, u: Partial<Sample>) => { const a = getAll<Sample>(KEYS.samples); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.samples, a); sbUpdate('samples', id, u); } },
+  addSample: (v: Sample) => { const a = getAll<Sample>(KEYS.samples); a.push(v); setAll(KEYS.samples, a); dbUpsert('samples', v); },
+  updateSample: (id: string, u: Partial<Sample>) => { const a = getAll<Sample>(KEYS.samples); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.samples, a); dbUpdate('samples', id, u); } },
   /**
    * 샘플 삭제 — 로컬을 먼저 지우고 서버 삭제 결과를 돌려준다.
    * 서버가 실패해도 화면에서는 사라지므로, 호출부가 결과를 보고 사용자에게 알려야 한다.
@@ -1501,11 +1500,11 @@ export const store = {
   deleteSample: async (id: string): Promise<{ ok: boolean; error?: string }> => {
     setAll(KEYS.samples, getAll<Sample>(KEYS.samples).filter(x => x.id !== id));
     try {
-      const { error } = await supabase.from('samples').delete().eq('id', id);
-      if (error) { reportSbFailure('samples', 'delete', error.message); return { ok: false, error: error.message }; }
+      const { error } = await db.from('samples').delete().eq('id', id);
+      if (error) { reportDbFailure('samples', 'delete', error.message); return { ok: false, error: error.message }; }
       return { ok: true };
     } catch (e: any) {
-      reportSbFailure('samples', 'delete', String(e));
+      reportDbFailure('samples', 'delete', String(e));
       return { ok: false, error: String(e?.message || e) };
     }
   },
@@ -1524,16 +1523,16 @@ export const store = {
   getPurchaseItems: () => getAll<PurchaseItem>(KEYS.purchaseItems),
   setPurchaseItems: (v: PurchaseItem[]) => setAll(KEYS.purchaseItems, v),
   // 자재구매는 브라우저에만 남아 다른 PC 에서 안 보이던 문제 → 서버에도 함께 저장
-  addPurchaseItem: (v: PurchaseItem) => { const a = getAll<PurchaseItem>(KEYS.purchaseItems); a.push(v); setAll(KEYS.purchaseItems, a); sbUpsert('purchase_items', v); },
-  updatePurchaseItem: (id: string, u: Partial<PurchaseItem>) => { const a = getAll<PurchaseItem>(KEYS.purchaseItems); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.purchaseItems, a); sbUpsert('purchase_items', a[i]); } },
+  addPurchaseItem: (v: PurchaseItem) => { const a = getAll<PurchaseItem>(KEYS.purchaseItems); a.push(v); setAll(KEYS.purchaseItems, a); dbUpsert('purchase_items', v); },
+  updatePurchaseItem: (id: string, u: Partial<PurchaseItem>) => { const a = getAll<PurchaseItem>(KEYS.purchaseItems); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.purchaseItems, a); dbUpsert('purchase_items', a[i]); } },
   deletePurchaseItem: (id: string) => setAll(KEYS.purchaseItems, getAll<PurchaseItem>(KEYS.purchaseItems).filter(x => x.id !== id)),
 
   // Vendors
   getVendors: () => getAll<Vendor>(KEYS.vendors),
   setVendors: (v: Vendor[]) => setAll(KEYS.vendors, v),
-  addVendor: (v: Vendor) => { const a = getAll<Vendor>(KEYS.vendors); a.push(v); setAll(KEYS.vendors, a); sbUpsert('vendors', v); },
-  updateVendor: (id: string, u: Partial<Vendor>) => { const a = getAll<Vendor>(KEYS.vendors); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.vendors, a); sbUpdate('vendors', id, u); } },
-  deleteVendor: (id: string) => { setAll(KEYS.vendors, getAll<Vendor>(KEYS.vendors).filter(x => x.id !== id)); sbDelete('vendors', id); },
+  addVendor: (v: Vendor) => { const a = getAll<Vendor>(KEYS.vendors); a.push(v); setAll(KEYS.vendors, a); dbUpsert('vendors', v); },
+  updateVendor: (id: string, u: Partial<Vendor>) => { const a = getAll<Vendor>(KEYS.vendors); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.vendors, a); dbUpdate('vendors', id, u); } },
+  deleteVendor: (id: string) => { setAll(KEYS.vendors, getAll<Vendor>(KEYS.vendors).filter(x => x.id !== id)); dbDelete('vendors', id); },
 
   // Settlements
   getSettlements: () => getAll<Settlement>(KEYS.settlements),
@@ -1739,7 +1738,7 @@ export function dDayLabel(d: number): string {
 
 // ─────────────────────────────────────────────
 // 외부 boms 배열을 받는 BOM 유틸 함수
-// (Supabase 직접 연동으로 전환 시 useQuery 데이터를 직접 전달)
+// (서버 DB 직접 연동으로 전환 시 useQuery 데이터를 직접 전달)
 // ─────────────────────────────────────────────
 
 export { getBomForOrderFromList } from './bomLookup';

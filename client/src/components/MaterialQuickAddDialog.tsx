@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import {
   store, genId, MATERIAL_CATEGORIES, MATERIAL_SUB_TYPES, COMMON_BRAND,
   type Material, type MaterialCategory, type Vendor, normalizeBrands } from '@/lib/store';
-import { fetchMaterials, fetchVendors, upsertMaterial } from '@/lib/supabaseQueries';
+import { fetchMaterials, fetchVendors, upsertMaterial } from '@/lib/dbQueries';
 
 const UNITS = ['SF', 'YD', 'M', 'EA', 'L', '콘', 'KG', 'SET', '장', '개', 'PC', 'CM'];
 const CURRENCIES = ['KRW', 'CNY', 'USD'] as const;

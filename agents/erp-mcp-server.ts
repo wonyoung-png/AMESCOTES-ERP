@@ -1,6 +1,6 @@
 // ERP 도구 정의 — @anthropic-ai/sdk 형식 (직접 API 호출용)
 import Anthropic from '@anthropic-ai/sdk';
-import { supabase } from './supabase-client.js';
+import { db } from './db-client.js';
 
 // ─── Anthropic SDK 형식 도구 목록 ───
 export const ERP_TOOLS: Anthropic.Tool[] = [
@@ -127,7 +127,7 @@ export async function executeTool(
   try {
     switch (name) {
       case 'query_vendors': {
-        let q = supabase
+        let q = db
           .from('vendors')
           .select('id, code, name, company_name, contact_name, phone, email')
           .order('code')
@@ -141,7 +141,7 @@ export async function executeTool(
       }
 
       case 'query_items': {
-        let q = supabase
+        let q = db
           .from('items')
           .select('id, style_no, name, category, buyer_id, designer, delivery_price, margin_rate')
           .order('style_no')
@@ -154,7 +154,7 @@ export async function executeTool(
       }
 
       case 'query_samples': {
-        let q = supabase
+        let q = db
           .from('samples')
           .select('id, style_no, buyer_id, stage, assignee, request_date, approved_date, cost_krw')
           .order('request_date', { ascending: false })
@@ -167,7 +167,7 @@ export async function executeTool(
       }
 
       case 'query_production_orders': {
-        let q = supabase
+        let q = db
           .from('production_orders')
           .select('id, style_no, buyer_id, vendor_id, quantity, currency, order_date, delivery_date, status, color_qtys')
           .order('order_date', { ascending: false })
@@ -180,7 +180,7 @@ export async function executeTool(
       }
 
       case 'query_boms': {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('boms')
           .select('id, style_no, exchange_rate_cny, pre_materials, post_materials, color_boms, post_color_boms, logistics_cost_krw')
           .eq('style_no', input.style_no)
@@ -190,7 +190,7 @@ export async function executeTool(
       }
 
       case 'query_materials': {
-        let q = supabase
+        let q = db
           .from('materials')
           .select('id, name, spec, unit, unit_price, currency, vendor_id, stock_qty')
           .order('name')
@@ -203,13 +203,13 @@ export async function executeTool(
       }
 
       case 'check_missing_boms': {
-        const { data: items, error: itemsErr } = await supabase
+        const { data: items, error: itemsErr } = await db
           .from('items')
           .select('id, style_no, name, buyer_id')
           .order('style_no');
         if (itemsErr) return `오류: ${itemsErr.message}`;
 
-        const { data: boms, error: bomsErr } = await supabase
+        const { data: boms, error: bomsErr } = await db
           .from('boms')
           .select('style_no');
         if (bomsErr) return `오류: ${bomsErr.message}`;
@@ -225,7 +225,7 @@ export async function executeTool(
       }
 
       case 'check_unprocessed_orders': {
-        const { data: orders, error: ordersErr } = await supabase
+        const { data: orders, error: ordersErr } = await db
           .from('production_orders')
           .select('id, style_no, buyer_id, quantity, order_date, delivery_date, status')
           .not('status', 'eq', '완료')
@@ -233,7 +233,7 @@ export async function executeTool(
           .order('order_date', { ascending: false });
         if (ordersErr) return `오류: ${ordersErr.message}`;
 
-        const { data: materials, error: matErr } = await supabase
+        const { data: materials, error: matErr } = await db
           .from('materials')
           .select('id');
         if (matErr) return `오류: ${matErr.message}`;
@@ -246,7 +246,7 @@ export async function executeTool(
       }
 
       case 'create_sample': {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('samples')
           .insert({
             style_no: input.style_no,
@@ -263,7 +263,7 @@ export async function executeTool(
       }
 
       case 'create_production_order': {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('production_orders')
           .insert({
             style_no: input.style_no,

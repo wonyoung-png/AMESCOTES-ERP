@@ -15,7 +15,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   store, genId, normalizeColors, MATERIAL_CATEGORIES, YARD_KINDS, YARD_PARTS, YARD_UNIT, DEFAULT_YARD_CFG,
   type Bom, type BomLine, type BomCategory, type BomSubPart, type Season, type Item, type Material, type Vendor, type YardKind, type YardRow, type YardCfg, normalizeBrands } from '@/lib/store';
-import { fetchBoms, upsertBom, deleteBom as deleteBomSB, fetchItems, fetchVendors, fetchMaterials, upsertMaterial } from '@/lib/supabaseQueries';
+import { fetchBoms, upsertBom, deleteBom as deleteBomSB, fetchItems, fetchVendors, fetchMaterials, upsertMaterial } from '@/lib/dbQueries';
 import { PackBomEditor } from '@/components/PackBomEditor';
 import { MaterialQuickAddDialog } from '@/components/MaterialQuickAddDialog';
 import { VendorQuickAddDialog } from '@/components/VendorQuickAddDialog';
@@ -136,7 +136,7 @@ interface ExtBom {
   createdAt: string;
   updatedAt: string;
   memo?: string;
-  // 간단 원가 (Supabase memo JSON에 저장)
+  // 간단 원가 (서버 DB memo JSON에 저장)
   simpleCostKrw?: number;
   simplePostCostKrw?: number;
   isSimpleCost?: boolean;
@@ -509,7 +509,7 @@ function saveExtBoms(boms: ExtBom[]) {
   localStorage.setItem('ames_boms', JSON.stringify(boms));
 }
 
-// (제거) syncBomToSupabase — 어디서도 부르지 않는데 이관 전 Supabase 주소로 BOM 을 쓰고 있었다
+// (제거) syncBomTo서버 DB — 어디서도 부르지 않는데 이관 전 서버 DB 주소로 BOM 을 쓰고 있었다
 
 // ─── 업체용 견적서 모달 ────────────────────────────────────────────────────────
 interface QuoteRow {
@@ -822,11 +822,11 @@ function SimpleCostModal({
             updatedAt: new Date().toISOString(),
           };
 
-      // Supabase 저장
+      // 서버 DB 저장
       await upsertBom(bomData);
 
       // 품목 마스터 업데이트 (hasBom, baseCostKrw)
-      await (import('@/lib/supabaseQueries').then(m => m.upsertItem({
+      await (import('@/lib/dbQueries').then(m => m.upsertItem({
         id: item.id,
         baseCostKrw: preCostNum,
         hasBom: true,
@@ -834,7 +834,7 @@ function SimpleCostModal({
 
       // 간단 사후원가 → items 테이블 동기화
       if (postCostNum && postCostNum > 0) {
-        import('@/lib/supabaseQueries').then(m => m.updateItemCostData(item.id, postCostNum)).catch(onSaveFail('BOM'));
+        import('@/lib/dbQueries').then(m => m.updateItemCostData(item.id, postCostNum)).catch(onSaveFail('BOM'));
       }
 
       toast.success(`[${item.styleNo}] 간단 원가 저장 완료`);
@@ -2160,27 +2160,27 @@ export default function BomManagement() {
   const [pendingColorTab, setPendingColorTab] = useState<string | null>(null);
   // activeTab 변수는 제거됨 — mainTab, activePreColor, activePostColor를 직접 사용
 
-  const { data: supabaseBoms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
+  const { data: dbBoms = [] } = useQuery({ queryKey: ['boms'], queryFn: fetchBoms });
   const [extBoms, setExtBoms] = useState<ExtBom[]>(() => getExtBoms());
-  // supabaseBoms가 로드되면 extBoms를 병합
-  // [FIX] Supabase 데이터가 localStorage보다 우선순위를 가짐 (updatedAt 기준 비교)
+  // dbBoms가 로드되면 extBoms를 병합
+  // [FIX] 서버 DB 데이터가 localStorage보다 우선순위를 가짐 (updatedAt 기준 비교)
   useEffect(() => {
-    if (supabaseBoms.length > 0) {
+    if (dbBoms.length > 0) {
       setExtBoms(prev => {
         // localStorage 데이터를 기준 Map으로 시작
         const mergedMap = new Map<string, ExtBom>(prev.map(b => [b.id, b]));
-        for (const sb of supabaseBoms as any[]) {
+        for (const sb of dbBoms as any[]) {
           const existing = mergedMap.get(sb.id);
           if (!existing) {
             // localStorage에 없는 BOM은 추가
             mergedMap.set(sb.id, sb as ExtBom);
           } else {
             // 두 곳 모두 있으면 더 최신 데이터 사용
-            // Supabase의 updatedAt이 localStorage보다 최신이거나 동일하면 Supabase 우선
+            // 서버 DB의 updatedAt이 localStorage보다 최신이거나 동일하면 서버 DB 우선
             const sbTime = new Date(sb.updatedAt || sb.createdAt || 0).getTime();
             const localTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
             if (sbTime >= localTime) {
-              // Supabase에 아직 컬럼이 없는 필드는 localStorage 값 보존
+              // 서버 DB에 아직 컬럼이 없는 필드는 localStorage 값 보존
               const merged: ExtBom = { ...sb as ExtBom };
               if (!merged.packagingCostKrw && existing.packagingCostKrw) {
                 merged.packagingCostKrw = existing.packagingCostKrw;
@@ -2196,7 +2196,7 @@ export default function BomManagement() {
         return Array.from(mergedMap.values());
       });
     }
-  }, [supabaseBoms]);
+  }, [dbBoms]);
 
   const [selectedStyleId, setSelectedStyleId] = useState<string>(() => {
     // 1) URL 파라미터 우선 처리
@@ -2390,7 +2390,7 @@ export default function BomManagement() {
     }
 
     // colorBoms 없고 lines에 실제 데이터가 있으면 자동으로 '기본' 컬러 탭 생성
-    // (Supabase에서 동기화된 기존 BOM 데이터 호환)
+    // (서버 DB에서 동기화된 기존 BOM 데이터 호환)
     if ((!loadedBom.colorBoms || loadedBom.colorBoms.length === 0) && loadedBom.lines.some(l => l.itemName)) {
       loadedBom = {
         ...loadedBom,
@@ -3025,7 +3025,7 @@ export default function BomManagement() {
     }
     saveExtBoms(newBoms);
     setExtBoms(newBoms);
-    // Supabase에 직접 저장
+    // 서버 DB에 직접 저장
     // 사후원가 계산 (품목마스터 items 테이블에도 동기화)
     const activePostCB = (updated.postColorBoms || []).find((cb: any) => (cb.lines || []).some((l: any) => l.itemName || l.unitPriceCny > 0))
       ?? (updated.postColorBoms || [])[0];
@@ -3110,7 +3110,7 @@ export default function BomManagement() {
         ],
       } : {}),
     };
-    import('@/lib/supabaseQueries').then(m => {
+    import('@/lib/dbQueries').then(m => {
       // 1. 기본 품목 정보 저장 (has_bom, colors 등 — 항상 성공해야 함)
       m.upsertItem(updatedItemData as any)
         .then(() => queryClient.invalidateQueries({ queryKey: ['items'] }))
@@ -3503,7 +3503,7 @@ export default function BomManagement() {
       const deletedIds = [...selectedBomIds];
       deletedIds.forEach(id => deleteBomSB(id).catch(onSaveFail('BOM')));
       extBoms.filter(b => selectedBomIds.has(b.id)).forEach(b => {
-        import('@/lib/supabaseQueries').then(m => m.upsertItem({ id: b.styleId, hasBom: false } as any)).catch(onSaveFail('BOM'));
+        import('@/lib/dbQueries').then(m => m.upsertItem({ id: b.styleId, hasBom: false } as any)).catch(onSaveFail('BOM'));
       });
       saveExtBoms(newBoms);
       setExtBoms(newBoms);
@@ -3565,7 +3565,7 @@ export default function BomManagement() {
       {/* 헤더 */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">BOM / 원가 관리</h1>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">BOM·원가</h1>
           <p className="text-sm text-muted-foreground mt-0.5">사전원가(BOM) 및 사후원가(공장 실적) 통합 관리</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -5116,7 +5116,7 @@ export default function BomManagement() {
                         onChange={e => {
                           const val = e.target.value === '' ? null : Number(e.target.value);
                           updateField('postDeliveryPrice', val as any);
-                          if (editBom.styleId) import('@/lib/supabaseQueries').then(m => m.upsertItem({ id: editBom.styleId, deliveryPrice: val ?? 0 } as any)).catch(onSaveFail('BOM'));
+                          if (editBom.styleId) import('@/lib/dbQueries').then(m => m.upsertItem({ id: editBom.styleId, deliveryPrice: val ?? 0 } as any)).catch(onSaveFail('BOM'));
                         }}
                         className="h-8 text-sm border-border text-right w-36 font-semibold"
                         placeholder="납품가 입력"

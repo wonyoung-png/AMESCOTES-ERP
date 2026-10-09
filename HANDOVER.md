@@ -1,5 +1,7 @@
 # AMESCOTES ERP — Railway → AWS 이전 인수인계 문서
 
+> **⛔ 아카이브:** 2026-10-09 AWS 자체 PostgreSQL·PostgREST 이전 완료로 이 문서의 Supabase·Railway 지침은 폐기되었다. 현재 배포는 `deploy/migrate/`, 현재 설계는 `DESIGN.md`를 기준으로 한다.
+
 > 작성일: 2026-07-23 · 대상: 인프라 이전 담당자
 > **핵심 요약: 옮길 것은 "앱 서버 1개"뿐이다.** DB는 Supabase(외부 관리형)라 이전 대상이 아니며,
 > 앱은 단일 Node 프로세스(Express가 정적 파일 + API를 함께 서빙)다. Docker 없이 Nixpacks로 빌드 중.
@@ -69,15 +71,13 @@ cmd = "npm run start"
 
 | 변수명 | 용도 | 구분 |
 |---|---|---|
-| `VITE_SUPABASE_URL` | Supabase 프로젝트 URL. **빌드 시점에 프론트에 박힘** (VITE_ 접두어) | 외부 서비스 |
-| `VITE_SUPABASE_ANON_KEY` | Supabase 공개(publishable) 키. 빌드 시점에 프론트에 박힘 | 외부 서비스 |
-| `SUPABASE_URL` | 서버측 Supabase URL (AI 에이전트용) | 외부 서비스 |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase 관리자 키 (서버 전용, **절대 프론트 노출 금지**). 없으면 AI 에이전트 라우트만 비활성화되고 앱은 정상 | 외부 서비스 (비밀) |
+| `POSTGREST_URL` | 서버에서 자체 PostgREST를 호출하는 내부 주소 | 내부 설정 |
+| `PGRST_JWT_SECRET` | ERP 세션·PostgREST 서비스 토큰 서명키 | 서버 비밀 |
 | `ANTHROPIC_API_KEY` | Claude API — OCR(소요량 계산·거래처 명함) 및 AI 에이전트 | 외부 서비스 (비밀) |
 | `PORT` | 서버 포트 (기본 4000) | 내부 설정 |
 | `SHARE_USER` / `SHARE_PASS` | Basic Auth 1차 게이트. **PASS가 비어있으면 게이트 꺼짐** (현재 꺼진 상태로 운영) | 내부 설정 |
 
-- ⚠️ `VITE_*` 두 개는 런타임이 아니라 **빌드 타임**에 주입됨 → AWS에서 값 바꾸면 반드시 재빌드 필요
+- 프론트 DB 주소는 항상 same-origin `/rest/v1`을 사용하므로 별도 빌드 키가 필요 없음
 - 코드상 `USERPROFILE`, `TEMP` 참조는 Windows 로컬 스크립트용 — 서버 배포와 무관
 
 ---
@@ -158,7 +158,7 @@ cmd = "npm run start"
 ## 9. 이전 담당자가 대표에게 추가로 물어봐야 할 것
 
 1. **Supabase 대시보드 접근 권한** (멤버 초대) + **DB 비밀번호/Connection string** — pg_dump와 RLS 적용에 필요
-2. **SUPABASE_SERVICE_ROLE_KEY** — Railway Variables에는 있으나 문서·저장소에는 없음
+2. **PGRST_JWT_SECRET** — 신규 서버 SSM에서만 관리
 3. **Anthropic API 키의 소유 계정과 월 사용한도** — 이전 후 키 회전 여부
 4. **GitHub 저장소 권한 이양 방식** — collaborator 초대인지, organization 이전인지
 5. **`erp.atlm.kr` 도메인 연결 의사와 atlm.kr DNS 관리처** (등록기관/네임서버 위치)

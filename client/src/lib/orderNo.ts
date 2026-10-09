@@ -3,12 +3,12 @@
 // ⚠️ CLAUDE.md 레드라인: 발주번호 중복 생성 금지.
 //
 // 예전엔 두 곳이 서로 다른 저장소를 세고 있었다:
-//   - ProductionOrders: Supabase orders의 orderNo 정규식
+//   - ProductionOrders: 서버 DB orders의 orderNo 정규식
 //   - ItemMaster: store.getNextRevision() = localStorage의 revision 필드
 // 캐시가 빈 새 PC에서 품목마스터 일괄발주를 하면 localStorage가 0건이라
-// revision=1이 나오고, 이미 Supabase에 있는 -R1과 충돌했다.
+// revision=1이 나오고, 이미 서버 DB에 있는 -R1과 충돌했다.
 //
-// 채번은 항상 "Supabase에서 조회한 발주 목록"을 근거로 한다.
+// 채번은 항상 "서버 DB에서 조회한 발주 목록"을 근거로 한다.
 // 동시 등록 경합까지 막으려면 DB UNIQUE 인덱스가 필요하다
 // → supabase/migration_unique_keys.sql
 
@@ -27,7 +27,7 @@ export function parseRevision(orderNo: string | undefined | null): number {
 /**
  * 다음 발주번호를 만든다. `{styleNo}-R{n}`
  *
- * @param orders Supabase에서 조회한 전체 발주 목록 (localStorage 아님)
+ * @param orders 서버 DB에서 조회한 전체 발주 목록 (localStorage 아님)
  * @param taken  같은 트랜잭션에서 이미 발급한 번호들 (일괄발주 시 자기들끼리 충돌 방지)
  */
 export function nextOrderNo(

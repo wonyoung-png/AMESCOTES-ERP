@@ -9,7 +9,7 @@ import {
   type SampleLocation, type SampleRevisionNote, type SampleMaterialCheckItem,
   type SampleMaterialRequest, type SampleDocument,
   type Item, type TradeStatement, type TradeStatementLine, normalizeBrands } from '@/lib/store';
-import { fetchSamples, upsertSample as upsertSampleSB, fetchItems, fetchVendors, upsertItem as upsertItemSB } from '@/lib/supabaseQueries';
+import { fetchSamples, upsertSample as upsertSampleSB, fetchItems, fetchVendors, upsertItem as upsertItemSB } from '@/lib/dbQueries';
 import { generateStyleNo, prefixCodeOf } from '@/lib/styleNo';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -662,7 +662,7 @@ export default function SampleManagement() {
         createdAt: new Date().toISOString(),
       };
 
-      store.addTradeStatement(statement); // 거래명세표는 store에 유지 (Supabase 테이블 없음)
+      store.addTradeStatement(statement); // 거래명세표는 store에 유지 (서버 DB 테이블 없음)
       createdCount++;
     });
 

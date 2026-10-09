@@ -9,7 +9,7 @@ import {
   store, genId,
   type Item, type Vendor, type Material, type Bom, type BomLine, type PackingSize,
 } from './store';
-import { upsertItem, upsertVendor, upsertMaterial, upsertBom } from './supabaseQueries';
+import { upsertItem, upsertVendor, upsertMaterial, upsertBom } from './dbQueries';
 import { applyPackLinesToBom, type PackBomLine } from './packBom';
 
 export const PACK_SEED_FLAG = 'ames_hb_pack_seed_v4';

@@ -8,7 +8,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Check, X, Clock, AlertTriangle, Image as ImageIcon } from 'lucide-react';
-import { fetchVendors, fetchOrders } from '@/lib/supabaseQueries';
+import { fetchVendors, fetchOrders } from '@/lib/dbQueries';
 import { normalizeBrands, type Vendor } from '@/lib/store';
 
 type Capture = {
@@ -330,7 +330,7 @@ export default function CaptureInbox() {
         kind === 'sample'     ? '승인 — 샘플 기록이 만들어졌습니다'
         : kind === 'delivery' ? `승인 — ${j.ref?.orderNo || ''} 출고 ${j.ref?.qty}개${stmt}`
         : `승인 — 지출결의${stmt}`);
-      // 지출결의는 서버가 정본인데 앱이 시작할 때만 내려받는다 (syncFromSupabase).
+      // 지출결의는 서버가 정본인데 앱이 시작할 때만 내려받는다 (syncFromDb).
       // 지금 내려받아 넣어주지 않으면 방금 만든 전표가 지출결의 화면에 안 보인다
       if (kind === 'material' || kind === 'delivery') {
         try {
@@ -341,8 +341,8 @@ export default function CaptureInbox() {
             store.hydrateExpenses(await fetchExpensesSB());
           } else {
             // 출고 기록과 발주 출고수량 — 둘 다 서버가 정본이라 다시 읽어 와야 화면에 보인다
-            const { syncPhase1FromSupabase } = await import('@/lib/phase1');
-            await syncPhase1FromSupabase();
+            const { syncPhase1FromDb } = await import('@/lib/phase1');
+            await syncPhase1FromDb();
             qc.invalidateQueries({ queryKey: ['orders'] });
           }
           store.hydrateTradeStatements(await fetchTradeStatementsSB() as any);

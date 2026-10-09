@@ -3,7 +3,7 @@
 import { useState, useMemo, Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { store, type Item, type ProductionOrder } from '@/lib/store';
-import { fetchItems, fetchVendors, fetchOrders } from '@/lib/supabaseQueries';
+import { fetchItems, fetchVendors, fetchOrders } from '@/lib/dbQueries';
 import { isLegacyPackConsumable } from '@/lib/seedLumenPacking';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';

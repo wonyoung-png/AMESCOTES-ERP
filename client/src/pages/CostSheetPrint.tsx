@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react';
 import { calcPostSummary } from '@/lib/costing';
 import { useSearch } from 'wouter';
-import { fetchBoms } from '@/lib/supabaseQueries';
+import { fetchBoms } from '@/lib/dbQueries';
 
 // ─── 타입 ──────────────────────────────────────────────────────────────────
 interface BomPnlAssumptions {

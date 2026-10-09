@@ -3,7 +3,7 @@ import { upsertSalesRecord } from '@/lib/salesRecords';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems, fetchMaterials, upsertMaterial, fetchPurchaseItems, upsertPurchaseItem } from '@/lib/supabaseQueries';
+import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems, fetchMaterials, upsertMaterial, fetchPurchaseItems, upsertPurchaseItem } from '@/lib/dbQueries';
 import { phase1 } from '@/lib/phase1';
 import { confirmMaterialOrder } from '@/lib/confirmMaterialOrder';
 import { addHqMaterialsToCart, pickBomForOrder, hqGroups, hqMaterialsForDisplay } from '@/lib/hqMaterialCart';
@@ -557,7 +557,7 @@ export default function ProductionOrders() {
   // BOM 기반 계산 (스타일+수량 변경 시 호출)
   const recalcBom = (styleNo: string, qty: number) => {
     if (!styleNo || qty <= 0) return;
-    // 최신 BOM 항상 Supabase에서 동기화 후 계산
+    // 최신 BOM 항상 서버 DB에서 동기화 후 계산
     store.fetchAndCacheBom(styleNo).then(() => {
       _doRecalcBom(styleNo, qty);
     });
@@ -610,7 +610,7 @@ export default function ProductionOrders() {
   const handleStyleSelect = (styleId: string) => {
     const item = items.find(i => i.id === styleId);
     if (!item) return;
-    // Supabase orders(useQuery)에서 같은 스타일 발주 조회 → 최대 revision+1
+    // 서버 DB orders(useQuery)에서 같은 스타일 발주 조회 → 최대 revision+1
     const existingForStyle = (orders as any[]).filter(o => o.styleNo === item.styleNo);
     const existingRevisions = existingForStyle.map((o: any) => {
       const match = (o.orderNo || '').match(/-R(\d+)$/);
@@ -1068,7 +1068,7 @@ export default function ProductionOrders() {
         .map(c => ({ name: c }));
       if (newColors.length > 0 && currentItem) {
         const updatedColors = [...normalizeColors(currentItem.colors || []), ...newColors];
-        import('@/lib/supabaseQueries').then(m => m.upsertItem({ ...currentItem, colors: updatedColors } as any)).catch(onSaveFail('발주'));
+        import('@/lib/dbQueries').then(m => m.upsertItem({ ...currentItem, colors: updatedColors } as any)).catch(onSaveFail('발주'));
         queryClient.setQueryData(['items'], (old: any[] = []) =>
           old.map((it: any) => it.id === form.styleId ? { ...it, colors: updatedColors } : it)
         );
@@ -1080,7 +1080,7 @@ export default function ProductionOrders() {
 
     // 발주 완료 후 액션 팝업 + 자재 장바구니 — 같은 함수로 뽑는다.
     // 예전엔 팝업과 장바구니가 서로 다른 규칙을 써서, 보여준 자재와 담긴 자재가 달랐다 (코덱스 지적).
-    // 장바구니 쪽은 이관 전 Supabase 주소를 직접 읽고 있었다. 그 인스턴스가 아직 살아 있어
+    // 장바구니 쪽은 이관 전 서버 DB 주소를 직접 읽고 있었다. 그 인스턴스가 아직 살아 있어
     // 실패가 아니라 "얼어붙은 옛 BOM"을 조용히 읽었다. 이미 메모리에 있는 BOM 을 쓴다
     const { bom: _hqBom, ambiguous: _hqAmbiguous } =
       pickBomForOrder(boms as Bom[], form.styleNo || order.styleNo, form.styleId || order.styleId, order.colorQtys, totalQty);
@@ -1499,7 +1499,7 @@ export default function ProductionOrders() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">생산 발주</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">생산 오더</h1>
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">BOM 자동 연동 · 공장/자재 발주 분리 · 소요량 자동 계산</p>
         </div>
         <div className="flex gap-2">
@@ -1720,7 +1720,7 @@ export default function ProductionOrders() {
               }
               const o = row.order;
               const totalAmtKrw = (o.factoryUnitPriceKrw || 0) * o.qty;
-              // BOM 실제 존재 여부: 발주 메타 + 품목 hasBom + Supabase bom 목록
+              // BOM 실제 존재 여부: 발주 메타 + 품목 hasBom + 서버 DB bom 목록
               const itemForOrder = items.find(i => i.styleNo === o.styleNo || i.id === o.styleId);
               const { bom: matchedBom } = getBomForOrderFromList(
                 boms as Bom[],

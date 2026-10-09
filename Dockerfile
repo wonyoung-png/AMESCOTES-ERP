@@ -8,17 +8,11 @@ COPY package.json package-lock.json .npmrc ./
 RUN npm ci --no-audit --no-fund
 
 # ─── 2) 빌드 ───
-# VITE_* 는 빌드 타임에 클라이언트 번들에 박힘 → 반드시 build arg로 주입
 FROM deps AS build
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
 # 형제 서비스 주소(daily·hr·ceo·os)의 기준. 안 주면 화면이 지금 주소에서 짐작한다
 ARG VITE_ROOT_DOMAIN
-ENV VITE_ROOT_DOMAIN=${VITE_ROOT_DOMAIN}     VITE_SUPABASE_URL=${VITE_SUPABASE_URL} \
-    VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+ENV VITE_ROOT_DOMAIN=${VITE_ROOT_DOMAIN}
 COPY . .
-# URL은 빈값 허용(빈값 → 런타임에 same-origin 사용). anon 키는 필수.
-RUN test -n "$VITE_SUPABASE_ANON_KEY" || (echo "ERROR: VITE_SUPABASE_ANON_KEY build arg 누락" && exit 1)
 RUN npm run build
 
 # ─── 3) 프로덕션 의존성만 별도 설치 ───

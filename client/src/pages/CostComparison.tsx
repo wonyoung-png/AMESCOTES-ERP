@@ -6,10 +6,10 @@
 import { useState, useMemo, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchBoms, fetchItems, fetchVendors } from '@/lib/supabaseQueries';
+import { fetchBoms, fetchItems, fetchVendors } from '@/lib/dbQueries';
 import { CATEGORY_CODE_MAP } from '@/lib/styleNo';
 import { normalizeBrands, type Category } from '@/lib/store';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -308,27 +308,27 @@ export default function CostComparison() {
       if (editingCell.field === 'pre') {
         memo.preCost = newCost;
         // items 테이블 base_cost_krw 업데이트
-        const { error: itemErr } = await supabase
+        const { error: itemErr } = await db
           .from('items')
           .update({ base_cost_krw: newCost })
           .eq('style_no', bom.styleNo);
         if (itemErr) console.warn('items 업데이트 실패:', itemErr.message);
 
-        const { error } = await supabase
+        const { error } = await db
           .from('boms')
           .update({ memo: JSON.stringify(memo) })
           .eq('id', editingCell.bomId);
         if (error) throw error;
       } else if (editingCell.field === 'salePrice') {
         // 확정판매가 → post_delivery_price 컬럼 직접 저장
-        const { error } = await supabase
+        const { error } = await db
           .from('boms')
           .update({ post_delivery_price: newCost })
           .eq('id', editingCell.bomId);
         if (error) throw error;
       } else {
         memo.postCost = newCost;
-        const { error } = await supabase
+        const { error } = await db
           .from('boms')
           .update({ memo: JSON.stringify(memo) })
           .eq('id', editingCell.bomId);

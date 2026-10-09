@@ -1,7 +1,7 @@
 /**
- * 로그인 직후 — Supabase 동기화 + 데모/패킹 데이터 보장
+ * 로그인 직후 — 서버 DB 동기화 + 데모/패킹 데이터 보장
  */
-import { syncFromSupabase } from './syncFromSupabase';
+import { syncFromDb } from './syncFromDb';
 import { seedDemoIntegrationData, DEMO_SEED_FLAG } from './seedDemoData';
 import { seedLumenPackingData, PACK_SEED_FLAG, hasPackageKitItems } from './seedLumenPacking';
 import { seedLumen27ssRrp, LUMEN_27SS_SEED_FLAG, lumen27ssMissingImages } from './seedLumen27ssRrp';
@@ -14,7 +14,7 @@ export async function ensureErpBootstrap(): Promise<{ seeded: boolean; message: 
   const last = Number(localStorage.getItem(SYNC_STAMP_KEY) || 0);
   if (Date.now() - last > SYNC_TTL_MS) {
     try {
-      await syncFromSupabase();
+      await syncFromDb();
       localStorage.setItem(SYNC_STAMP_KEY, String(Date.now()));
     } catch {
       /* DB 미연결 시 localStorage만 사용 */
@@ -45,7 +45,7 @@ export async function ensureErpBootstrap(): Promise<{ seeded: boolean; message: 
   if (!hasData) {
     const result = await seedDemoIntegrationData();
     try {
-      await syncFromSupabase();
+      await syncFromDb();
     } catch { /* ignore */ }
 
     if (!hasPackageKitItems()) {
@@ -59,7 +59,7 @@ export async function ensureErpBootstrap(): Promise<{ seeded: boolean; message: 
     return {
       seeded: true,
       message: result.errors.length
-        ? '데모 데이터 생성됨 (일부 Supabase 동기화 실패 — localStorage에는 저장됨)'
+        ? '데모 데이터 생성됨 (일부 서버 DB 동기화 실패 — localStorage에는 저장됨)'
         : `연동 데모·PACKAGE 키트 생성${lumenMsg}`,
     };
   }

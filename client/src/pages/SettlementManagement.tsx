@@ -194,7 +194,7 @@ export default function SettlementManagement() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">정산 / 미수금</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">매출·미수</h1>
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">명세표 발행 후 입금 현황 관리 · 기한 초과 자동 알림</p>
         </div>
         <Button onClick={openNew} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">

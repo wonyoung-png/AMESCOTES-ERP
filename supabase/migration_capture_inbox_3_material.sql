@@ -3,7 +3,7 @@
 -- 샘플과 같은 함수에 종류 하나를 더한다. 승인 한 번에
 -- "원본 레코드 생성 + 접수함 상태 변경"이 한 트랜잭션으로 끝나는 구조는 그대로다.
 --
--- 지출결의(expenses)는 서버가 정본이다 (syncFromSupabase.ts:182 "지출결의·기획전 — 서버가 정본").
+-- 지출결의(expenses)는 서버가 정본이다 (syncFromDb.ts의 "지출결의·기획전 — 서버가 정본").
 -- 그래서 여기서 넣으면 다음 동기화 때 화면에 나온다.
 
 create or replace function public.approve_capture(

@@ -9,7 +9,7 @@
 - `git commit` · `git push` · `git pull --rebase`
 - 서버 배포(SSM) — **항상 1건씩, 여러 작업을 모아서 마지막에 한 번**
 - 공용 파일 수정: `components/Layout.tsx` · `App.tsx` · `lib/store.ts` · `lib/phase1.ts`
-  · `lib/tableColumns.ts` · `lib/auth.ts` · `lib/supabaseQueries.ts` · `supabase/schema.sql`
+  · `lib/tableColumns.ts` · `lib/auth.ts` · `lib/dbQueries.ts` · `supabase/schema.sql`
 - DB 스키마 변경(ALTER TABLE)
 
 ### 에이전트에게 맡기는 것
@@ -81,36 +81,36 @@ EC2 t4g.small = 메모리 2GB. 스왑이 없어 docker 빌드 중 **서버 전�
 
 ## 🔴 레드라인 (자동 차단)
 - **빌드 실패 상태로 커밋 금지** → pre-commit hook이 자동 차단
-- **Supabase 테이블 DROP/DELETE 금지** → 데이터 복구 불가
+- **AWS 자체 PostgreSQL/PostgREST 테이블 DROP/DELETE 금지** → 데이터 복구 불가
 - **발주번호/스타일번호/거래처명 중복 생성 금지**
 
 ## 🟡 주의사항 (확인 후 진행)
-- Supabase 스키마 변경 시 → 올리브에게 보고 후 진행
+- AWS 자체 PostgreSQL/PostgREST 스키마 변경 시 → 올리브에게 보고 후 진행
 - 기존 기능 제거 시 → 대표님 확인 후 진행
 - 대량 데이터 수정 시 → 백업 후 진행
 
 ## ✅ 작업 시작 전 필수 확인
 1. `npx vite build` — 현재 빌드 상태 확인
-2. Supabase 연결 상태 확인 (linzfvhgswrnoukssqyi.supabase.co)
+2. AWS 자체 PostgreSQL/PostgREST 연결 상태 확인 (erp.ameserp.kr/rest/v1)
 3. 개발 서버 실행 상태 확인 (localhost:3000)
 
 ## 📋 작업 완료 체크리스트 (베라 검수용)
 - [ ] `npx vite build` 성공 (오류 0개)
 - [ ] 요구사항 모든 항목 구현
-- [ ] Supabase 연동 정상 (데이터 저장/조회 확인)
+- [ ] AWS 자체 PostgreSQL/PostgREST 연동 정상 (데이터 저장/조회 확인)
 - [ ] 삭제 기능에 confirm 팝업 있음
 - [ ] `git add -A && git commit && git push` 완료
 - [ ] 발주번호/스타일번호/거래처명 중복 없음
 
 ## 🏗️ 코드 구조 규칙
-- 모든 데이터 저장: Supabase 우선 (localStorage는 캐시만)
+- 모든 데이터 저장: AWS 자체 PostgreSQL/PostgREST 우선 (localStorage는 캐시만)
 - BOM: 사후원가(postColorBoms) 우선 적용, 없으면 사전원가 폴백
 - 공장단가 = 공장구매자재 + 임가공비 + 후가공비 (관세/본사제공/업체제공 제외)
 - 10원 단위 올림 적용 (견적서 금액)
 
 ## 📁 핵심 파일
-- `client/src/lib/store.ts` — 데이터 CRUD, Supabase 연동
-- `client/src/lib/syncFromSupabase.ts` — 시작 시 동기화
+- `client/src/lib/store.ts` — 데이터 CRUD, AWS 자체 PostgreSQL/PostgREST 연동
+- `client/src/lib/syncFromDb.ts` — 시작 시 동기화
 - `client/src/pages/BomManagement.tsx` — BOM 관리
 - `client/src/pages/ProductionOrders.tsx` — 생산발주
 - `client/src/pages/ItemMaster.tsx` — 품목마스터
@@ -149,21 +149,21 @@ EC2 t4g.small = 메모리 2GB. 스왑이 없어 docker 빌드 중 **서버 전�
 
 ### 발주 → 자재구매 연동 흐름 (절대 변경 금지)
 ```
-생산발주 등록 → upsertOrder() → Supabase production_orders 저장 → queryClient.invalidateQueries(['orders']) → 생산발주 목록 갱신
+생산발주 등록 → upsertOrder() → AWS 자체 PostgreSQL/PostgREST production_orders 저장 → queryClient.invalidateQueries(['orders']) → 생산발주 목록 갱신
 
 발주 완료 팝업 → "📦 자재 장바구니 담기" → store.addToMaterialCart()
 
 거래처별 발주서 → "✅ 발주 확정" 클릭 →
-  1. fetchMaterials() 조회 후 upsertMaterial() → Supabase materials 저장
+  1. fetchMaterials() 조회 후 upsertMaterial() → AWS 자체 PostgreSQL/PostgREST materials 저장
   2. store.addPurchaseItem() → localStorage 저장 → 자재구매(PurchaseMatching) 탭에 표시
   3. store.clearMaterialCart() → 장바구니 비우기
   4. queryClient.invalidateQueries(['materials'])
 ```
 
 ### 핵심 규칙
-- 생산발주 목록: useQuery({ queryKey: ['orders'], queryFn: fetchOrders }) — Supabase
+- 생산발주 목록: useQuery({ queryKey: ['orders'], queryFn: fetchOrders }) — AWS 자체 PostgreSQL/PostgREST
 - 자재구매 탭(PurchaseMatching): store.getPurchaseItems() — localStorage (별도 테이블)
-- 자재마스터 탭(MaterialMaster): useQuery({ queryKey: ['materials'], queryFn: fetchMaterials }) — Supabase
+- 자재마스터 탭(MaterialMaster): useQuery({ queryKey: ['materials'], queryFn: fetchMaterials }) — AWS 자체 PostgreSQL/PostgREST
 - 발주 확정은 위 두 곳 모두에 저장해야 함
 
 ### 컬러별 BOM 소요량 계산
@@ -180,8 +180,8 @@ EC2 t4g.small = 메모리 2GB. 스왑이 없어 docker 빌드 중 **서버 전�
 - **시작:** `ERP_시작.bat` 더블클릭 또는 `PORT=4000 node dist/index.js`
 - **빌드:** `npm run build` (Vite + esbuild)
 - **환경변수:** `.env` 파일 (gitignore 됨, 별도 백업 필요)
-  - `VITE_SUPABASE_URL`
-  - `VITE_SUPABASE_ANON_KEY`
+  - `PGRST_JWT_SECRET`
+  - `POSTGREST_URL`
   - `ANTHROPIC_API_KEY` (OCR용)
   - `PORT`
 
@@ -207,7 +207,7 @@ EC2 t4g.small = 메모리 2GB. 스왑이 없어 docker 빌드 중 **서버 전�
 5. Claude에게: "CLAUDE.md, WORKFLOW.md, PLAN.md 읽고 다음 작업 항목부터 시작해라"
 
 ### 알려진 이슈 / 잠정 결정
-- `linzfvhgswrnoukssqyi.supabase.co` 사용 (Supabase 운영 DB)
+- `erp.ameserp.kr/rest/v1` 사용 (AWS 자체 PostgreSQL/PostgREST 운영 DB)
 - Anthropic Key는 Downloads/.env에서 가져옴 (별도 백업 필요)
 - B2B 전환 시 Login/MaterialMaster/TradeStatement 페이지의 워크플로우 정합성 추가 검토 필요
 - 빌드 결과물(dist/) 2.4MB — 코드 스플리팅 향후 작업

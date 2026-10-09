@@ -148,10 +148,10 @@ export default function ExchangeSettings() {
     try {
       const result = await seedDemoIntegrationData();
       if (result.errors.length) {
-        toast.warning(`데모 생성 완료 (Supabase 일부 실패 ${result.errors.length}건)`);
+        toast.warning(`데모 생성 완료 (서버 DB 일부 실패 ${result.errors.length}건)`);
         console.warn('[seedDemo]', result.errors);
       } else {
-        toast.success('데모 데이터 생성 + Supabase 동기화 완료');
+        toast.success('데모 데이터 생성 + 서버 DB 동기화 완료');
       }
       setPackKits(getPackKits());
       toast.info(`핵심 연동: ${DEMO.orderNoOem} → ${DEMO.projectOem}`, { duration: 6000 });

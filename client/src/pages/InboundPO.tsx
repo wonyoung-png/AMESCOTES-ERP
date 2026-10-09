@@ -9,8 +9,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { phase1, pullBrandOrders, type InboundPO as InboundPOType } from '@/lib/phase1';
-import { store, genId, formatNumber } from '@/lib/store';
-import { fetchOrders, upsertOrder } from '@/lib/supabaseQueries';
+import { store, genId, formatNumber, type Vendor } from '@/lib/store';
+import { fetchOrders, upsertOrder } from '@/lib/dbQueries';
 import { nextOrderNo } from '@/lib/orderNo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,7 @@ export default function InboundPO() {
 
   const pos = useMemo(() => phase1.getInboundPOs(), [pulled, busy]);
   const items = store.getItems();
+  const vendors = store.getVendors();
 
   /** 발주서 1장 → 스타일별 생산발주. 번호는 발주서 번호를 PO로 승계한다 */
   const accept = async (po: InboundPOType) => {
@@ -37,6 +38,25 @@ export default function InboundPO() {
     setBusy(po.poNo);
     try {
       const known = [...orders] as any[];
+      const batch = phase1.getBrandBatches().find(b => b.projectNo === po.projectNo);
+      let buyer = vendors.find(v =>
+        v.type === '바이어' && (
+          v.name.toUpperCase() === po.workspace
+          || v.companyName?.toUpperCase() === po.workspace
+          || v.code?.toUpperCase() === (po.workspace === 'LUMEN' ? 'LLL' : 'AET')
+        ),
+      );
+      if (!buyer) {
+        buyer = {
+          id: `vendor-internal-${po.workspace.toLowerCase()}`,
+          name: po.workspace,
+          code: po.workspace === 'LUMEN' ? 'LLL' : 'AET',
+          companyName: po.workspace,
+          type: '바이어', country: '한국', currency: 'KRW', contactHistory: [],
+          createdAt: new Date().toISOString(), memo: '브랜드 내부거래 바이어 자동 생성',
+        } satisfies Vendor;
+        store.addVendor(buyer);
+      }
       for (const l of po.lines) {
         const item = items.find(i => i.styleNo === l.styleNo);
         const orderNo = nextOrderNo(l.styleNo, known);
@@ -44,7 +64,10 @@ export default function InboundPO() {
           id: genId(),
           orderNo,
           workspace: 'OEM',
-          poBatchNo: po.poNo,          // ← 브랜드 발주서 번호를 PO로 그대로 승계
+          poBatchNo: po.poNo,          // 브랜드 발주서 번호는 묶음 참조번호로 유지
+          projectNo: po.projectNo,
+          brandBatchId: batch?.id,
+          buyerId: buyer.id,
           styleId: item?.id || l.styleNo,
           styleNo: l.styleNo,
           styleName: l.styleName,
@@ -53,6 +76,8 @@ export default function InboundPO() {
           colorQtys: l.colorQtys,
           vendorId: l.factoryId || '',
           vendorName: l.factoryName || '',
+          productionOrigin: l.productionOrigin,
+          isEmployeePurchase: l.isEmployeePurchase,
           deliveryDate: due,        // ← 회신 납기. 브랜드 오더관리에 그대로 뜬다
           status: '발주생성',
           hqSupplyItems: [],
@@ -65,7 +90,6 @@ export default function InboundPO() {
       }
       phase1.markPOAccepted(po.poNo);
       // 브랜드 쪽 발주에도 확정 납기를 남긴다 — MD는 이 날짜를 보고 판매를 짠다
-      const batch = phase1.getBrandBatches().find(b => b.projectNo === po.projectNo);
       if (batch) phase1.updateBrandBatch(batch.id, { expectedDely: due });
       qc.invalidateQueries({ queryKey: ['orders'] });
       qc.invalidateQueries({ queryKey: ['brandOrders'] });

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { genId, type Item, type Vendor, type ProductionOrder } from '@/lib/store';
-import { fetchItems, fetchVendors, fetchOrders, upsertOrder } from '@/lib/supabaseQueries';
+import { fetchItems, fetchVendors, fetchOrders, upsertOrder } from '@/lib/dbQueries';
 import { phase1 } from '@/lib/phase1';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -170,7 +170,7 @@ export default function QuickEntry() {
   return (
     <div className="p-4 md:p-6 max-w-xl mx-auto space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">간편등록</h1>
+        <h1 className="text-2xl font-bold">간편 등록</h1>
         <p className="text-sm text-muted-foreground mt-0.5">밖에서 최소한만 입력하고, 상세는 자리에서 마무리합니다</p>
       </div>
 

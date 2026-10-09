@@ -2,7 +2,7 @@
 //
 // localStorage에만 두면 만든 사람 브라우저에서만 보인다 — 경리가 못 본다.
 // store의 쓰기가 setAll(KEYS.expenses, ...) 한 곳을 지나므로 거기서 서버에도 올린다.
-import { supabase } from './supabase';
+import { db } from './db';
 import { filterForTable } from './tableColumns';
 
 const toRow = (e: any) => filterForTable('expenses', {
@@ -43,7 +43,7 @@ const fromRow = (r: any) => ({
 });
 
 export async function fetchExpensesSB(): Promise<any[]> {
-  const { data, error } = await supabase.from('expenses').select('*');
+  const { data, error } = await db.from('expenses').select('*');
   if (error) throw error;
   return (data || []).map(fromRow);
 }
@@ -51,7 +51,7 @@ export async function fetchExpensesSB(): Promise<any[]> {
 /** 화면을 막지 않는다 — 저장 실패는 콘솔로만 알리고 로컬 값은 그대로 둔다 */
 export function pushExpenses(list: any[]): void {
   if (!list?.length) return;
-  supabase.from('expenses').upsert(list.map(toRow)).then(({ error }) => {
+  db.from('expenses').upsert(list.map(toRow)).then(({ error }) => {
     if (error) console.warn('[expenses] 서버 저장 실패:', error.message);
   });
 }
@@ -59,7 +59,7 @@ export function pushExpenses(list: any[]): void {
 /** 프로젝트 항목별 실제 집행액 — 예산 보기의 '집행' 열 */
 export async function fetchSpentByItem(itemIds: string[]): Promise<Record<string, number>> {
   if (itemIds.length === 0) return {};
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('expenses').select('project_item_id,amount_krw').in('project_item_id', itemIds);
   if (error) throw error;
   const out: Record<string, number> = {};

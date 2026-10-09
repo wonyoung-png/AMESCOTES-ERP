@@ -3,7 +3,7 @@
  * 관련 생산발주·브랜드라인·입고로그 color도 맞춰 재적용한다.
  */
 import { store, normalizeColors, type Item, type ItemColor, type ProductionOrder } from './store';
-import { upsertItem, upsertOrder } from './supabaseQueries';
+import { upsertItem, upsertOrder } from './dbQueries';
 import { phase1, type BrandOrderLine, type ChinaStockMove } from './phase1';
 
 export const ITEM_COLOR_FILL_FLAG = 'ames_item_color_fill_v2';

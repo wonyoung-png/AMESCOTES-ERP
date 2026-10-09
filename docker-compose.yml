@@ -1,14 +1,13 @@
 # AMESCOTES ERP — 자체 호스팅 전체 스택 (앱 + Caddy + Postgres + PostgREST)
 #
 # 아키텍처: 브라우저 → Caddy(:80/:443)
-#   /rest/v1/*  → PostgREST → Postgres  (기존 Supabase REST 프로토콜 그대로)
+#   /rest/v1/*  → PostgREST → Postgres
 #   그 외       → Express 앱(:4000)
 #
 # 로컬 검증:  docker compose up -d --build  →  http://localhost
 # EC2 운영:   동일 (SITE_ADDRESS만 도메인으로)
 #
-# 필요 .env: POSTGRES_PASSWORD, PGRST_AUTHENTICATOR_PASSWORD, PGRST_JWT_SECRET,
-#            VITE_SUPABASE_ANON_KEY(자체 발급 anon JWT), SITE_ADDRESS
+# 필요 .env: POSTGRES_PASSWORD, PGRST_AUTHENTICATOR_PASSWORD, PGRST_JWT_SECRET, SITE_ADDRESS
 
 services:
   db:
@@ -59,9 +58,6 @@ services:
   app:
     build:
       context: .
-      args:
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
-        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     image: amescotes-erp:local
     restart: unless-stopped
     depends_on:

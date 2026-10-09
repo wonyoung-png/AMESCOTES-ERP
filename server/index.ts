@@ -81,7 +81,7 @@ async function startServer() {
   app.use(ceoRouter);
   app.use(gcalRouter);
 
-  // AI 에이전트 API 라우터 — Supabase service key 없으면 스킵
+  // AI 에이전트 API 라우터 — PostgREST 서명키가 없으면 비활성화
   try {
     const { default: agentRoutes } = await import("./agent-routes.js");
     app.use(agentRoutes);

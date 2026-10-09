@@ -3,7 +3,7 @@
 // 테이블은 진작 있었는데 올리는 길이 '매출·영업이익' 화면을 열 때 도는 일괄 업로드 하나뿐이고,
 // 내려받는 길은 아예 없었다. 그래서 만든 사람 브라우저에만 남았다 — 경리도 다른 담당자도 못 본다.
 // expenses 와 같은 방식으로 맞춘다: store 의 쓰기가 한 곳을 지나니 거기서 서버에도 올린다.
-import { supabase } from './supabase';
+import { db } from './db';
 
 export const tradeStatementRow = (s: any) => ({
   id: s.id,
@@ -43,7 +43,7 @@ export const fromRow = (r: any) => ({
 });
 
 export async function fetchTradeStatementsSB(): Promise<any[]> {
-  const { data, error } = await supabase.from('trade_statements').select('*');
+  const { data, error } = await db.from('trade_statements').select('*');
   if (error) throw error;
   return (data || []).map(fromRow);
 }
@@ -61,7 +61,7 @@ const queue = (fn: () => PromiseLike<unknown>) => { chain = chain.then(fn, fn); 
 export function pushTradeStatements(list: any[]): void {
   if (!list?.length) return;
   const rows = list.map(tradeStatementRow);
-  queue(() => supabase.from('trade_statements').upsert(rows).then(({ error }) => {
+  queue(() => db.from('trade_statements').upsert(rows).then(({ error }) => {
     if (error) console.warn('[trade_statements] 서버 저장 실패:', error.message);
   }));
 }
@@ -71,7 +71,7 @@ export function pushTradeStatements(list: any[]): void {
  * 남은 것만 다시 upsert 하면 지운 행은 서버에 그대로 남아, 다음 접속에 되살아난다.
  */
 export function deleteTradeStatementSB(id: string): void {
-  queue(() => supabase.from('trade_statements').delete().eq('id', id).then(({ error }) => {
+  queue(() => db.from('trade_statements').delete().eq('id', id).then(({ error }) => {
     if (error) console.warn('[trade_statements] 서버 삭제 실패:', error.message);
   }));
 }
@@ -82,7 +82,7 @@ export function deleteTradeStatementSB(id: string): void {
  */
 export async function fetchOpenStatements(vendorId: string): Promise<any[]> {
   if (!vendorId) return [];
-  const { data, error } = await supabase.from('trade_statements')
+  const { data, error } = await db.from('trade_statements')
     .select('*').eq('vendor_id', vendorId).eq('status', '미청구')
     .order('issue_date', { ascending: false }).limit(20);
   if (error) throw error;

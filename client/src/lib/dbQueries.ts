@@ -1,7 +1,7 @@
-// AMESCOTES ERP — Supabase 직접 쿼리 함수 모음
-// Supabase 우선 · 비어있거나 실패 시 localStorage 폴백
+// AMESCOTES ERP — 서버 DB 직접 쿼리 함수 모음
+// 서버 DB 우선 · 비어있거나 실패 시 localStorage 폴백
 
-import { supabase } from './supabase';
+import { db } from './db';
 import { store, normalizeMaterialCategory, COMMON_BRAND } from './store';
 import type { Bom, Material, ProductionOrder, PurchaseItem, Sample, Vendor } from './store';
 import { filterForTable, toSnakeCase } from './tableColumns';
@@ -11,10 +11,10 @@ async function withLocalFallback<T>(remote: () => Promise<T[]>, local: () => T[]
     const rows = await remote();
     if (rows.length > 0) return rows;
   } catch (e) {
-    console.warn('[supabaseQueries] 원격 조회 실패 → localStorage 폴백', e);
+    console.warn('[dbQueries] 원격 조회 실패 → localStorage 폴백', e);
   }
   const cached = local();
-  if (cached.length > 0) console.info('[supabaseQueries] localStorage 폴백', cached.length, '건');
+  if (cached.length > 0) console.info('[dbQueries] localStorage 폴백', cached.length, '건');
   return cached;
 }
 
@@ -288,7 +288,7 @@ function convertBomFromDB(row: any) {
 
 export async function fetchVendors(): Promise<Vendor[]> {
   return withLocalFallback<Vendor>(async () => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('vendors')
     .select('*')
     .order('created_at', { ascending: false });
@@ -367,12 +367,12 @@ export async function upsertVendor(vendor: Record<string, any>) {
     custom_material_type: vendor.customMaterialType,
     contact_history: vendor.contactHistory,
   });
-  const { error } = await supabase.from('vendors').upsert(row);
+  const { error } = await db.from('vendors').upsert(row);
   if (error) throw error;
 }
 
 export async function deleteVendor(id: string) {
-  const { error } = await supabase.from('vendors').delete().eq('id', id);
+  const { error } = await db.from('vendors').delete().eq('id', id);
   if (error) throw error;
 }
 
@@ -382,7 +382,7 @@ export async function deleteVendor(id: string) {
 
 export async function fetchItems() {
   const remote = await withLocalFallback(async () => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('items')
     .select('*')
     .order('created_at', { ascending: false });
@@ -413,7 +413,7 @@ export async function fetchItems() {
     updatedAt: row.updated_at,
   }));
   }, () => []);
-  // Supabase에 없어도 로컬 PACK(LPKG-*) 등은 항상 목록에 표시
+  // 서버 DB에 없어도 로컬 PACK(LPKG-*) 등은 항상 목록에 표시
   return mergeByIdStyleNo(remote, store.getItems() as any[]);
 }
 
@@ -438,7 +438,7 @@ export async function upsertItem(item: Record<string, any>) {
     console.warn('[upsertItem] localStorage 저장 실패', e);
   }
 
-  // 2) Supabase 동기화 시도 (실패해도 로컬 저장은 유지)
+  // 2) 서버 DB 동기화 시도 (실패해도 로컬 저장은 유지)
   const row = filterForTable('items', {
     id: item.id,
     style_no: item.styleNo,
@@ -463,12 +463,12 @@ export async function upsertItem(item: Record<string, any>) {
     colors: item.colors ?? [],
   });
   try {
-    const { error } = await supabase.from('items').upsert(row);
+    const { error } = await db.from('items').upsert(row);
     if (error) {
-      console.warn('[upsertItem] Supabase 동기화 실패 (로컬에는 저장됨):', error.message);
+      console.warn('[upsertItem] 서버 DB 동기화 실패 (로컬에는 저장됨):', error.message);
     }
   } catch (e) {
-    console.warn('[upsertItem] Supabase 네트워크 오류 (로컬에는 저장됨):', e);
+    console.warn('[upsertItem] 서버 DB 네트워크 오류 (로컬에는 저장됨):', e);
   }
 }
 
@@ -478,7 +478,7 @@ export async function updateItemCostData(id: string, postCostKrw: number, confir
   if (confirmedSalePrice !== undefined && confirmedSalePrice > 0) {
     patch.confirmed_sale_price = confirmedSalePrice;
   }
-  const { error } = await supabase.from('items').update(patch).eq('id', id);
+  const { error } = await db.from('items').update(patch).eq('id', id);
   if (error) {
     // 컬럼 미존재(마이그레이션 미실행) 시 경고만 출력, throw 안 함
     console.warn('[updateItemCostData] 사후원가 저장 실패 (SQL 마이그레이션 필요):', error.message);
@@ -487,12 +487,12 @@ export async function updateItemCostData(id: string, postCostKrw: number, confir
 
 // 확정판매가만 단독 저장 (delivery_price/post_cost_krw 건드리지 않음)
 export async function saveConfirmedSalePrice(id: string, confirmedSalePrice: number) {
-  const { error } = await supabase.from('items').update({ confirmed_sale_price: confirmedSalePrice }).eq('id', id);
+  const { error } = await db.from('items').update({ confirmed_sale_price: confirmedSalePrice }).eq('id', id);
   if (error) throw error;
 }
 
 export async function deleteItem(id: string) {
-  const { error } = await supabase.from('items').delete().eq('id', id);
+  const { error } = await db.from('items').delete().eq('id', id);
   if (error) throw error;
   // upsertItem이 localStorage에도 복제해 두고 fetchItems가 그걸 병합하므로,
   // 로컬 사본을 같이 지우지 않으면 삭제한 품목이 새로고침 때 되살아난다.
@@ -513,7 +513,7 @@ export async function deleteItem(id: string) {
 
 export async function fetchBoms(): Promise<Bom[]> {
   return withLocalFallback<Bom>(async () => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('boms')
     .select('*')
     .order('created_at', { ascending: false });
@@ -540,7 +540,7 @@ const BOM_LIGHT_COLS = [
 
 export async function fetchBomsLight(): Promise<Bom[]> {
   return withLocalFallback<Bom>(async () => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('boms')
     .select(BOM_LIGHT_COLS)
     .order('created_at', { ascending: false });
@@ -610,12 +610,12 @@ export async function upsertBom(bom: any) {
   };
   // 허용 컬럼만 필터링
   const filtered = filterForTable('boms', snakeBom);
-  const { error } = await supabase.from('boms').upsert(filtered);
+  const { error } = await db.from('boms').upsert(filtered);
   if (error) throw error;
 }
 
 export async function deleteBom(id: string) {
-  const { error } = await supabase.from('boms').delete().eq('id', id);
+  const { error } = await db.from('boms').delete().eq('id', id);
   if (error) throw error;
 }
 
@@ -625,7 +625,7 @@ export async function deleteBom(id: string) {
 
 export async function fetchSamples(): Promise<Sample[]> {
   return withLocalFallback<Sample>(async () => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('samples')
     .select('*')
     .order('created_at', { ascending: false });
@@ -704,12 +704,12 @@ export async function upsertSample(sample: Record<string, any>) {
     billing_date: sample.billingDate,
     collected_date: sample.collectedDate,
   });
-  const { error } = await supabase.from('samples').upsert(row);
+  const { error } = await db.from('samples').upsert(row);
   if (error) throw error;
 }
 
 export async function deleteSample(id: string) {
-  const { error } = await supabase.from('samples').delete().eq('id', id);
+  const { error } = await db.from('samples').delete().eq('id', id);
   if (error) throw error;
 }
 
@@ -719,7 +719,7 @@ export async function deleteSample(id: string) {
 
 export async function fetchOrders(): Promise<ProductionOrder[]> {
   return withLocalFallback<ProductionOrder>(async () => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('production_orders')
     .select('*')
     .order('created_at', { ascending: false });
@@ -841,12 +841,12 @@ export async function upsertOrder(order: Record<string, any>) {
     updated_at: order.updatedAt ?? new Date().toISOString(),
     created_at: order.createdAt ?? new Date().toISOString(),
   });
-  const { error } = await supabase.from('production_orders').upsert(row, { onConflict: 'id' });
+  const { error } = await db.from('production_orders').upsert(row, { onConflict: 'id' });
   if (error) throw error;
 }
 
 export async function deleteOrder(id: string) {
-  const { error } = await supabase.from('production_orders').delete().eq('id', id);
+  const { error } = await db.from('production_orders').delete().eq('id', id);
   if (error) throw error;
 }
 
@@ -856,7 +856,7 @@ export async function deleteOrder(id: string) {
 
 export async function fetchMaterials(): Promise<Material[]> {
   return withLocalFallback<Material>(async () => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('materials')
     .select('*')
     .order('created_at', { ascending: false });
@@ -935,9 +935,9 @@ export async function upsertMaterial(mat: Record<string, any>): Promise<void> {
   if (!mat.id) row.created_at = mat.createdAt || new Date().toISOString();
 
   // ponytail: 운영 DB가 코드보다 뒤처져 있으면(brand/name_en/단가 컬럼 미생성) 그 컬럼만 떼고 재시도.
-  //           supabase/migrations/20260806_materials_brand.sql 적용 후엔 첫 시도에서 끝난다.
+  //           db/migrations/20260806_materials_brand.sql 적용 후엔 첫 시도에서 끝난다.
   for (let i = 0; i < 6; i++) {
-    const { error } = await supabase.from('materials').upsert(row, { onConflict: 'id' });
+    const { error } = await db.from('materials').upsert(row, { onConflict: 'id' });
     if (!error) return;
     const missing = /Could not find the '([^']+)' column/.exec(error.message)?.[1];
     if (!missing || !(missing in row)) throw error;
@@ -948,18 +948,18 @@ export async function upsertMaterial(mat: Record<string, any>): Promise<void> {
 
 export async function updateMaterialStatus(id: string, status: '발주중' | '입고완료', extra?: Record<string, any>): Promise<void> {
   const update: Record<string, any> = { order_status: status, updated_at: new Date().toISOString(), ...extra };
-  const { error } = await supabase.from('materials').update(update).eq('id', id);
+  const { error } = await db.from('materials').update(update).eq('id', id);
   if (error) throw error;
 }
 
 export async function updateMaterial(id: string, patch: Record<string, any>) {
   const snakePatch = toSnakeCase(patch);
-  const { error } = await supabase.from('materials').update(snakePatch).eq('id', id);
+  const { error } = await db.from('materials').update(snakePatch).eq('id', id);
   if (error) throw error;
 }
 
 export async function deleteMaterial(id: string) {
-  const { error } = await supabase.from('materials').delete().eq('id', id);
+  const { error } = await db.from('materials').delete().eq('id', id);
   if (error) throw error;
 }
 
@@ -969,7 +969,7 @@ export async function deleteMaterial(id: string) {
 
 export async function fetchPurchaseItems(): Promise<PurchaseItem[]> {
   return withLocalFallback<PurchaseItem>(async () => {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('purchase_items')
     .select('*')
     .order('created_at', { ascending: false });
@@ -1051,18 +1051,18 @@ export async function upsertPurchaseItem(item: Record<string, any>): Promise<voi
     else list.push(local);
     localStorage.setItem(key, JSON.stringify(list));
   } catch { /* ignore */ }
-  const { error } = await supabase.from('purchase_items').upsert(row, { onConflict: 'id' });
+  const { error } = await db.from('purchase_items').upsert(row, { onConflict: 'id' });
   if (error) throw error;
 }
 
 export async function deletePurchaseItem(id: string): Promise<void> {
-  const { error } = await supabase.from('purchase_items').delete().eq('id', id);
+  const { error } = await db.from('purchase_items').delete().eq('id', id);
   if (error) throw error;
 }
 
 export async function updatePurchaseItemStatus(id: string, status: string, extra?: Record<string, any>): Promise<void> {
   const update: Record<string, any> = { purchase_status: status, ...extra };
-  const { error } = await supabase.from('purchase_items').update(update).eq('id', id);
+  const { error } = await db.from('purchase_items').update(update).eq('id', id);
   if (error) throw error;
 }
 
@@ -1087,7 +1087,7 @@ export type PriceHistoryRow = {
 export async function recordPriceChange(row: Omit<PriceHistoryRow, 'id' | 'changedAt'>): Promise<void> {
   if (row.prevPrice != null && Number(row.prevPrice) === Number(row.unitPrice)) return;
   if (!Number.isFinite(Number(row.unitPrice))) return;
-  const { error } = await supabase.from('price_history').insert({
+  const { error } = await db.from('price_history').insert({
     id: `ph_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     kind: row.kind,
     ref_id: row.refId || null,
@@ -1108,7 +1108,7 @@ export async function fetchPriceHistory(
   kind: 'material' | 'factory',
   opts: { refId?: string; refName?: string; limit?: number },
 ): Promise<PriceHistoryRow[]> {
-  let q = supabase.from('price_history').select('*').eq('kind', kind)
+  let q = db.from('price_history').select('*').eq('kind', kind)
     .order('changed_at', { ascending: false }).limit(opts.limit ?? 20);
   if (opts.refId) q = q.eq('ref_id', opts.refId);
   else if (opts.refName) q = q.eq('ref_name', opts.refName);

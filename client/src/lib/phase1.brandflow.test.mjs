@@ -24,12 +24,12 @@ const stub = {
   name: 'stub',
   setup(b) {
     // 서버·토스트는 이 점검의 대상이 아니다
-    b.onResolve({ filter: /(^\.\/supabase$|^sonner$|^\.\/store$)/ }, a => ({
+    b.onResolve({ filter: /(^\.\/db$|^sonner$|^\.\/store$)/ }, a => ({
       path: a.path, namespace: 'stub',
     }));
     b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
       contents: `
-        export const supabase = { from: () => ({ upsert: async () => ({ error: null }),
+        export const db = { from: () => ({ upsert: async () => ({ error: null }),
           select: () => ({ then: r => r({ data: [], error: null }) }) }) };
         export const toast = { error(){}, success(){} };
       `,

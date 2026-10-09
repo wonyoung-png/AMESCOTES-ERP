@@ -35,14 +35,10 @@ rm -rf /tmp/erp-auto
 git clone -q -b "$BRANCH" --depth 1 "$REPO_URL" /tmp/erp-auto
 log "$(cd /tmp/erp-auto && git log --oneline -1)"
 
-ANON_KEY=$(grep '^PGRST_JWT_SECRET=' /opt/app/.env | cut -d= -f2-)
-
 # 지금 돌던 이미지를 되돌리기용으로 남긴다
 docker tag "$IMAGE" "$PREV" 2>/dev/null || true
 
 if ! docker buildx build --platform linux/arm64 --load \
-      --build-arg VITE_SUPABASE_URL=https://54-116-241-64.sslip.io \
-      --build-arg VITE_SUPABASE_ANON_KEY="$ANON_KEY" \
       -t "$IMAGE" /tmp/erp-auto >>"$LOG" 2>&1; then
   log "빌드 실패 — 돌던 버전 그대로 둔다"
   exit 1

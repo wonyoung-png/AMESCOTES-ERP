@@ -1,7 +1,7 @@
 // AMESCOTES ERP — 지출 전표 (거래명세표 방식: 여러 항목 입력)
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchOrders, fetchVendors } from '@/lib/supabaseQueries';
+import { fetchOrders, fetchVendors } from '@/lib/dbQueries';
 import {
   store, genId, formatKRW, formatNumber,
   type Expense, type ExpenseLine, type ExpenseType, type ExpenseCategory,

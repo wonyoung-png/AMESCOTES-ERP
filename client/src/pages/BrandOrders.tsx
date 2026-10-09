@@ -8,7 +8,7 @@ import {
   phase1, pullBrandOrders, CHINA_CORP_VENDOR_CODE, CHINA_CORP_VENDOR_NAME,
   type BrandOrderBatch, type OrderDisplayStatus, type ReceiptDestination, type ReorderOrderRow,
 } from '@/lib/phase1';
-import { fetchOrders } from '@/lib/supabaseQueries';
+import { fetchOrders } from '@/lib/dbQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -369,14 +369,14 @@ export default function BrandOrders() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">리오더 · 오더관리</h1>
+          <h1 className="text-2xl font-bold text-foreground">브랜드 생산 의뢰</h1>
           <p className="text-sm text-muted-foreground">{ws} — 차수별 잔량·선입고 · 한국/중국 입고 · 미지급 등록</p>
         </div>
       </div>
 
       <Tabs value={mainTab} onValueChange={setMainTab}>
         <TabsList>
-          <TabsTrigger value="mgmt">오더관리</TabsTrigger>
+          <TabsTrigger value="mgmt">생산 의뢰</TabsTrigger>
           <TabsTrigger value="approval">발주 작성</TabsTrigger>
         </TabsList>
 

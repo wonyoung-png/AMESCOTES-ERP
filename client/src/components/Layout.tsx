@@ -52,7 +52,7 @@ const navGroups: NavGroup[] = [
     label: '',
     items: [
       { path: '/', label: '대시보드', icon: <BarChart3 size={17} />, table: '생산 현황' },
-      { path: '/quick', label: '간편등록', icon: <Zap size={17} />, table: '밖에서 빠르게 · 초안 저장' },
+      { path: '/quick', label: '간편 등록', icon: <Zap size={17} />, table: '밖에서 빠르게 · 초안 저장' },
       { path: '/work', label: '업무 피드', icon: <MessageSquare size={17} />, table: '업무 비서에서 올린 것이 팀별로' },
       { path: '/my-calendar', label: '내 캘린더', icon: <CalendarDays size={17} />, table: '구글 캘린더 + ATLM 업무' },
   { path: '/capture', label: '현장 접수', icon: <Camera size={17} />, table: '사진 한 장 + 한 줄' },
@@ -61,7 +61,7 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: '기획 & 일정',
+    label: '기획·일정',
     brandOnly: true,
     items: [
       { path: '/projects', label: '프로젝트', icon: <ClipboardList size={17} />, table: 'projects' },
@@ -70,7 +70,7 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: '마스터',
+    label: '상품·기준정보',
     items: [
       { path: '/vendors', label: '거래처 마스터', icon: <Building2 size={17} />, table: 'vendors' },
       { path: '/samples', label: '샘플 관리', icon: <FlaskConical size={17} />, table: 'samples' },
@@ -79,38 +79,35 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: '생산',
-    items: [
-      { path: '/bom', label: 'BOM / 원가', icon: <ClipboardList size={17} />, table: 'boms', oemOnly: true },
-      { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} />, table: 'boms', oemOnly: true },
-      { path: '/inbound-po', label: '수주함', icon: <Inbox size={17} />, table: 'brand_order_lines', oemOnly: true },
-      { path: '/orders', label: '생산 발주', icon: <Factory size={17} />, table: 'production_orders', oemOnly: true },
-      { path: '/brand-orders', label: '오더관리', icon: <Factory size={17} />, table: 'production_orders', lumenOnly: true },
-      { path: '/receiving', label: '입고 · 출고 · 선적', icon: <Truck size={17} />, table: 'receipt_logs' },
-      { path: '/deadlines', label: '납기 캘린더', icon: <CalendarClock size={17} />, table: 'milestones', oemOnly: true },
-    ],
-  },
-  {
-    label: '물류',
-    brandOnly: true,
-    items: [
-      { path: '/china-warehouse', label: '중국창고', icon: <Warehouse size={17} />, table: 'china_stock' },
-    ],
-  },
-  {
-    label: '구매',
+    label: '수주·생산',
     oemOnly: true,
     items: [
+      { path: '/bom', label: 'BOM·원가', icon: <ClipboardList size={17} />, table: 'boms', oemOnly: true },
+      { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} />, table: 'boms', oemOnly: true },
+      { path: '/inbound-po', label: '수주함', icon: <Inbox size={17} />, table: 'brand_order_lines', oemOnly: true },
+      { path: '/orders', label: '생산 오더', icon: <Factory size={17} />, table: 'production_orders', oemOnly: true },
+      { path: '/receiving', label: '입고 · 출고 · 선적', icon: <Truck size={17} />, table: 'receipt_logs' },
+      { path: '/deadlines', label: '납기 캘린더', icon: <CalendarClock size={17} />, table: 'milestones', oemOnly: true },
       { path: '/purchase', label: '자재 구매', icon: <ShoppingCart size={17} />, table: 'purchase_items' },
     ],
   },
   {
-    label: '정산',
+    label: '생산 의뢰·입고',
+    brandOnly: true,
+    items: [
+      { path: '/brand-orders', label: '브랜드 생산 의뢰', icon: <Factory size={17} />, table: 'production_orders', lumenOnly: true },
+      { path: '/orders', label: '생산 오더', icon: <Factory size={17} />, table: 'production_orders', lumenOnly: true },
+      { path: '/receiving', label: '3PL 입고', icon: <Truck size={17} />, table: 'receipt_logs', lumenOnly: true },
+      { path: '/china-warehouse', label: '중국창고', icon: <Warehouse size={17} />, table: 'china_stock' },
+    ],
+  },
+  {
+    label: '정산·자금',
     items: [
       { path: '/trade-statement', label: '거래명세표', icon: <FileText size={17} />, table: 'trade_statements', oemOnly: true },
-      { path: '/settlement', label: '미수금 / 정산', icon: <Receipt size={17} />, table: 'settlements', oemOnly: true },
+      { path: '/settlement', label: '매출·미수', icon: <Receipt size={17} />, table: 'settlements', oemOnly: true },
       { path: '/cash-plan', label: '자금계획', icon: <TrendingUp size={17} />, table: 'settlements' },
-      { path: '/payables', label: '미지급 · 불량차감', icon: <Wallet size={17} />, table: 'payables' },
+      { path: '/payables', label: '매입·미지급', icon: <Wallet size={17} />, table: 'payables' },
       { path: '/expense', label: '지출결의', icon: <Receipt size={17} />, table: 'expenses' },
       { path: '/project-pl', label: '매출 · 영업이익', icon: <BarChart3 size={17} />, table: 'projects' },
       { path: '/sales-summary', label: '매출집계', icon: <LineChart size={17} />, table: '누적생산량', oemOnly: true },
@@ -118,11 +115,11 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: '설정',
+    label: '관리',
     items: [
-      { path: '/settings', label: '환율 / 설정', icon: <Settings size={17} />, table: 'exchange_rates' },
+      { path: '/settings', label: '환율·기초설정', icon: <Settings size={17} />, table: 'exchange_rates' },
       { path: '/users', label: '사용자 관리', icon: <UserRound size={17} />, table: 'app_users', adminOnly: true },
-      { path: '/org', label: '조직도 · R3담당', icon: <Network size={17} />, table: 'org_chart' },
+      { path: '/org', label: '조직·업무 담당', icon: <Network size={17} />, table: 'org_chart' },
     ],
   },
 ];
@@ -132,6 +129,14 @@ const bottomTabs = [
   { path: '/orders', label: '발주', icon: <Factory size={20} /> },
   { path: '/purchase', label: '구매', icon: <ShoppingCart size={20} /> },
   { path: '/trade-statement', label: '명세', icon: <FileText size={20} /> },
+  { path: '/', label: '더보기', icon: <MoreHorizontal size={20} />, isMore: true },
+];
+
+const brandBottomTabs = [
+  { path: '/', label: '오늘', icon: <BarChart3 size={20} /> },
+  { path: '/brand-orders', label: '생산 의뢰', icon: <Factory size={20} /> },
+  { path: '/calendar', label: '일정', icon: <CalendarDays size={20} /> },
+  { path: '/pms?tab=%EC%83%81%ED%92%88%EA%B4%80%EB%A6%AC', label: '상품', icon: <Package size={20} /> },
   { path: '/', label: '더보기', icon: <MoreHorizontal size={20} />, isMore: true },
 ];
 
@@ -170,6 +175,15 @@ const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
   { group: '실행 & 일정', label: '사이트 진단', icon: <Globe size={17} /> },
   { group: '실행 & 일정', label: '업로드 캘린더', icon: <CalendarDays size={17} /> },
   { group: '실행 & 일정', label: '일정 목록', icon: <CalendarDays size={17} /> },
+];
+
+/** 사이드바에는 의사결정 단위만 노출하고, 세부 탭은 PMS 작업공간 안에서 선택한다. */
+const brandWorkspaces = [
+  { label: '오늘', target: '일일점검', icon: <BarChart3 size={17} /> },
+  { label: '상품', target: '상품관리', icon: <Package size={17} /> },
+  { label: '판매·고객', target: '채널별 매출', icon: <LineChart size={17} /> },
+  { label: '콘텐츠', target: '상품 콘텐츠', icon: <ImageIcon size={17} /> },
+  { label: '캠페인·분석', target: '채널 플랜', icon: <TrendingUp size={17} /> },
 ];
 
 /** PMS 탭을 ERP 내부 라우트로 연다. 인증 전달은 PmsWorkspace가 맡는다. */
@@ -463,21 +477,18 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           })}
           {isBrand && (
             <>
-            {/* LUMEN/AETALOOF: PMS를 ERP 내부 화면으로 연다 */}
-            {pmsTabs.map((tab, ti) => {
-              const groupStart = ti === 0 || pmsTabs[ti - 1].group !== tab.group;
+            {/* LUMEN/AETALOOF: 세부 탭을 5개 작업공간으로 압축한다. */}
+            {!collapsed && (
+              <div className="px-3 pt-4 pb-1.5">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase">브랜드 운영</span>
+              </div>
+            )}
+            {collapsed && <div className="my-2 mx-2 h-px bg-border" />}
+            {brandWorkspaces.map((tab) => {
               return (
                 <div key={tab.label} className="mb-0.5">
-                  {groupStart && !collapsed && (
-                    <div className="px-3 pt-4 pb-1.5">
-                      <span className="text-[11px] font-semibold text-muted-foreground uppercase">
-                        {tab.group}
-                      </span>
-                    </div>
-                  )}
-                  {groupStart && collapsed && ti !== 0 && <div className="my-2 mx-2 h-px bg-border" />}
                   <Link
-                    href={pmsTabUrl(tab.label)}
+                    href={pmsTabUrl(tab.target)}
                     onClick={() => setSidebarOpen(false)}
                     className={`
                       relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 outline-none focus-visible:outline-none
@@ -613,7 +624,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
       <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-card border-t border-border z-20 safe-area-pb">
         <div className="flex items-center justify-around">
-          {bottomTabs.map((tab) => {
+          {(isBrand ? brandBottomTabs : bottomTabs).map((tab) => {
             const active = tab.isMore ? false : isActive(tab.path);
             return (
               <Link

@@ -1,8 +1,8 @@
-// Supabase → localStorage 동기화
+// 서버 DB → localStorage 동기화
 // 앱 시작 시 한 번 실행. 실패해도 localStorage 데이터 그대로 유지.
 
-import { supabase } from './supabase';
-import { syncPhase1FromSupabase } from './phase1';
+import { db } from './db';
+import { syncPhase1FromDb } from './phase1';
 import { filterForTable, toSnakeCase } from './tableColumns';
 
 // snake_case → camelCase 변환 (shallow, 최상위 키만)
@@ -18,12 +18,12 @@ function toCamelCase(obj: Record<string, any>): Record<string, any> {
 // BOM 행(ExtBomLine) 배열 정규화 — snake_case/camelCase 혼용 처리
 function normalizeBomLine(l: any): any {
   if (!l || typeof l !== 'object') return l;
-  // Supabase에서 저장된 단순 형식 (name, qty, unit_price) 지원
+  // 서버 DB에서 저장된 단순 형식 (name, qty, unit_price) 지원
   const itemName = l.itemName ?? l.item_name ?? l.name ?? '';
   const unitPriceCny = l.unitPriceCny ?? l.unit_price_cny ?? l.unitPrice ?? l.unit_price ?? 0;
-  // qty가 있고 netQty가 없으면 qty를 netQty로 사용 (Supabase 단순 형식)
+  // qty가 있고 netQty가 없으면 qty를 netQty로 사용 (서버 DB 단순 형식)
   const netQty = l.netQty ?? l.net_qty ?? l.qty ?? 0;
-  // Supabase 단순 형식에서 total이 있으면 total/unit_price로 qty 역산
+  // 서버 DB 단순 형식에서 total이 있으면 total/unit_price로 qty 역산
   const effectiveQty = netQty || (unitPriceCny > 0 && l.total ? parseFloat((l.total / unitPriceCny).toFixed(4)) : 0);
   return {
     id: l.id ?? Math.random().toString(36).slice(2),
@@ -86,7 +86,7 @@ function findItemIdByStyleNo(styleNo: string): string | undefined {
 }
 
 // BOM 데이터 특수 변환
-// Supabase boms 테이블: snake_case 컬럼 + JSONB 필드
+// 서버 DB boms 테이블: snake_case 컬럼 + JSONB 필드
 // 앱에서 사용하는 ExtBom 구조(camelCase + colorBoms)로 완전 변환
 function convertBomRow(row: Record<string, any>): Record<string, any> {
   const base = toCamelCase(row);
@@ -114,7 +114,7 @@ function convertBomRow(row: Record<string, any>): Record<string, any> {
   } else if (Array.isArray(base.color_boms) && base.color_boms.length > 0) {
     colorBoms = base.color_boms.map(normalizeColorBom);
   } else {
-    // Supabase에서 pre_materials로만 저장된 경우 → '기본' 컬러 탭으로 변환
+    // 서버 DB에서 pre_materials로만 저장된 경우 → '기본' 컬러 탭으로 변환
     colorBoms = [{
       color: '기본',
       lines,
@@ -198,11 +198,11 @@ const TABLE_KEY_MAP: { table: string; key: string; converter?: (row: Record<stri
   { table: 'boms',              key: 'ames_boms', converter: convertBomRow },
   { table: 'production_orders', key: 'ames_orders' },
 ];
-// 미지급·입출고·불량차감·발주손익은 syncPhase1FromSupabase() 가 이미 내려받는다.
+// 미지급·입출고·불량차감·발주손익은 syncPhase1FromDb()가 이미 내려받는다.
 // 자재구매(purchase_items)만 빠져 있었는데, 이건 통째로 덮어쓰면 서버에 없던
 // 로컬 전용 구매건이 지워지므로 아래 mergePurchaseItems 로 따로 병합한다.
 
-export async function syncFromSupabase(): Promise<void> {
+export async function syncFromDb(): Promise<void> {
   // items를 먼저 처리해서 boms 변환 시 styleId 매핑 가능하게
   const sortedMap = [...TABLE_KEY_MAP].sort((a, b) => {
     if (a.table === 'items') return -1;
@@ -211,9 +211,9 @@ export async function syncFromSupabase(): Promise<void> {
   });
   for (const { table, key, converter } of sortedMap) {
     try {
-      const { data, error } = await supabase.from(table).select('*');
+      const { data, error } = await db.from(table).select('*');
       if (error) {
-        console.warn(`[syncFromSupabase] ${table} 조회 실패:`, error.message);
+        console.warn(`[syncFromDb] ${table} 조회 실패:`, error.message);
         continue;
       }
       if (!data || data.length === 0) {
@@ -225,9 +225,9 @@ export async function syncFromSupabase(): Promise<void> {
       );
 
       // ─── BOM 테이블은 스마트 병합으로 동기화 ───
-      // 변환된 Supabase BOM(ExtBom 형식, colorBoms 포함)과 localStorage를 병합.
+      // 변환된 서버 DB BOM(ExtBom 형식, colorBoms 포함)과 localStorage를 병합.
       // - 로컬에 없는 BOM → 추가
-      // - 로컬에 있지만 colorBoms가 없는(구형식) BOM → Supabase 버전으로 교체
+      // - 로컬에 있지만 colorBoms가 없는(구형식) BOM → 서버 DB 버전으로 교체
       // - 로컬에 있고 colorBoms가 이미 있는 BOM → 로컬 유지 (앱에서 수정한 데이터 보호)
       if (key === 'ames_boms') {
         try {
@@ -251,7 +251,7 @@ export async function syncFromSupabase(): Promise<void> {
               merged.push(remote);
               added++;
             } else if (!Array.isArray(local.colorBoms) || local.colorBoms.length === 0) {
-              // 로컬에 있지만 colorBoms 없음(구형식) → Supabase 버전으로 교체
+              // 로컬에 있지만 colorBoms 없음(구형식) → 서버 DB 버전으로 교체
               const idx = merged.findIndex(b => b.id === remote.id);
               if (idx >= 0) merged[idx] = remote;
               updated++;
@@ -262,9 +262,9 @@ export async function syncFromSupabase(): Promise<void> {
           }
 
           localStorage.setItem(key, JSON.stringify(merged));
-          console.log(`[syncFromSupabase] boms 병합 완료 — 신규 ${added}건 추가, 업데이트 ${updated}건(colorBoms 복원), 유지 ${kept}건`);
+          console.log(`[syncFromDb] boms 병합 완료 — 신규 ${added}건 추가, 업데이트 ${updated}건(colorBoms 복원), 유지 ${kept}건`);
         } catch (mergeErr) {
-          console.warn('[syncFromSupabase] boms 병합 중 오류, 로컬 데이터 유지:', mergeErr);
+          console.warn('[syncFromDb] boms 병합 중 오류, 로컬 데이터 유지:', mergeErr);
         }
         continue;
       }
@@ -313,21 +313,21 @@ export async function syncFromSupabase(): Promise<void> {
             }
           });
           localStorage.setItem(key, JSON.stringify(merged));
-          console.log(`[syncFromSupabase] items 스마트 병합 완료 (${merged.length}건, colors/hasBom/PACK 보존)`);
+          console.log(`[syncFromDb] items 스마트 병합 완료 (${merged.length}건, colors/hasBom/PACK 보존)`);
         } catch (e) {
           localStorage.setItem(key, JSON.stringify(converted));
         }
       } else {
         localStorage.setItem(key, JSON.stringify(converted));
-        console.log(`[syncFromSupabase] ${table} 동기화 완료 (${converted.length}건)`);
+        console.log(`[syncFromDb] ${table} 동기화 완료 (${converted.length}건)`);
       }
     } catch (err) {
-      console.warn(`[syncFromSupabase] ${table} 동기화 중 오류:`, err);
+      console.warn(`[syncFromDb] ${table} 동기화 중 오류:`, err);
     }
   }
 
   try {
-    await syncPhase1FromSupabase();
+    await syncPhase1FromDb();
     await mergeTable('purchase_items', 'ames_purchases', '자재구매');
     // 거래명세표 — tax_invoice / lines 가 jsonb 라 자동 변환으로는 모양이 안 맞는다
     const ts = await import('./tradeStatementQueries');
@@ -336,9 +336,9 @@ export async function syncFromSupabase(): Promise<void> {
     const settlements = await import('./settlementQueries');
     await mergeTable('settlements', 'ames_settlements', '정산·미수금',
       settlements.settlementRow, settlements.settlementFromRow);
-    console.log('[syncFromSupabase] Phase1 테이블 동기화 완료');
+    console.log('[syncFromDb] Phase1 테이블 동기화 완료');
   } catch (e) {
-    console.warn('[syncFromSupabase] Phase1 동기화 스킵 (테이블 미생성 시 migration 실행):', e);
+    console.warn('[syncFromDb] Phase1 동기화 스킵 (테이블 미생성 시 migration 실행):', e);
   }
 }
 
@@ -356,8 +356,8 @@ async function mergeTable(
   fromRow: (row: Record<string, any>) => Record<string, any> = toCamelCase,
 ): Promise<void> {
   try {
-    const { data, error } = await supabase.from(table).select('*');
-    if (error) { console.warn(`[syncFromSupabase] ${table} 조회 실패:`, error.message); return; }
+    const { data, error } = await db.from(table).select('*');
+    if (error) { console.warn(`[syncFromDb] ${table} 조회 실패:`, error.message); return; }
 
     const localRaw = localStorage.getItem(KEY);
     const local: Array<Record<string, any>> = localRaw ? JSON.parse(localRaw) : [];
@@ -373,15 +373,15 @@ async function mergeTable(
     // 서버에 없던 로컬 건을 올린다 — 다음 접속부터는 다른 PC 에서도 보인다
     for (const row of localOnly) {
       try {
-        await supabase.from(table).upsert(toRow(row));
+        await db.from(table).upsert(toRow(row));
       } catch (e) {
-        console.warn(`[syncFromSupabase] ${table} 업로드 실패:`, String(e));
+        console.warn(`[syncFromDb] ${table} 업로드 실패:`, String(e));
       }
     }
     if (localOnly.length > 0) {
-      console.info(`[syncFromSupabase] ${label} 로컬 전용 ${localOnly.length}건 서버로 올림`);
+      console.info(`[syncFromDb] ${label} 로컬 전용 ${localOnly.length}건 서버로 올림`);
     }
   } catch (e) {
-    console.warn(`[syncFromSupabase] ${table} 병합 실패:`, String(e));
+    console.warn(`[syncFromDb] ${table} 병합 실패:`, String(e));
   }
 }

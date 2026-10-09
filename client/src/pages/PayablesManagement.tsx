@@ -76,7 +76,7 @@ export default function PayablesManagement() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-wrap justify-between items-start gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">미지급 · 불량차감</h1>
+          <h1 className="text-2xl font-bold text-foreground">매입·미지급</h1>
           <p className="text-sm text-muted-foreground">매입 미지급 · 불량 차감 이월 · 재작업/수정 추적</p>
         </div>
         <Button onClick={() => setPayModal(true)}>+ 미지급 등록</Button>

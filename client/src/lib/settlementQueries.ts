@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { db } from './db';
 
 export const settlementRow = (s: any) => ({
   id: s.id,
@@ -41,13 +41,13 @@ const queue = (fn: () => PromiseLike<unknown>) => { chain = chain.then(fn, fn); 
 
 export function pushSettlements(list: any[]): void {
   if (!list?.length) return;
-  queue(() => supabase.from('settlements').upsert(list.map(settlementRow)).then(({ error }) => {
+  queue(() => db.from('settlements').upsert(list.map(settlementRow)).then(({ error }) => {
     if (error) console.warn('[settlements] 서버 저장 실패:', error.message);
   }));
 }
 
 export function deleteSettlementSB(id: string): void {
-  queue(() => supabase.from('settlements').delete().eq('id', id).then(({ error }) => {
+  queue(() => db.from('settlements').delete().eq('id', id).then(({ error }) => {
     if (error) console.warn('[settlements] 서버 삭제 실패:', error.message);
   }));
 }

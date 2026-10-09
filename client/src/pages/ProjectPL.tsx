@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { phase1 } from '@/lib/phase1';
 import { store, formatKRW } from '@/lib/store';
 import { Button } from '@/components/ui/button';
-import { migrateLocalToSupabase } from '@/lib/phase1';
+import { migrateLocalToDb } from '@/lib/phase1';
 import { toast } from 'sonner';
 import { Database } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -43,10 +43,10 @@ export default function ProjectPL() {
   };
   const projOrders = orders.filter(o => o.orderNo === selectedNo);
 
-  const syncToSupabase = async () => {
+  const syncToDb = async () => {
     try {
-      await migrateLocalToSupabase();
-      toast.success('정산 데이터 Supabase 동기화 완료');
+      await migrateLocalToDb();
+      toast.success('정산 데이터 서버 DB 동기화 완료');
       refresh();
     } catch {
       toast.error('동기화 실패 — migration SQL 실행 확인');
@@ -62,7 +62,7 @@ export default function ProjectPL() {
             발주번호 — 자재·임가공(미지급) · 품목/컬러 배분 원가
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={syncToSupabase}>
+        <Button variant="outline" size="sm" onClick={syncToDb}>
           <Database className="w-4 h-4 mr-1" />정산 → AWS
         </Button>
       </div>

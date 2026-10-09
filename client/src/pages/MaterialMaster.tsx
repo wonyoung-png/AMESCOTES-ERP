@@ -1,10 +1,10 @@
-// AMESCOTES ERP — 자재 마스터 (Supabase 전환 완료)
+// AMESCOTES ERP — 자재 마스터 (서버 DB 전환 완료)
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, MATERIAL_CATEGORIES, MATERIAL_SUB_TYPES, PLATING_COLORS, COMMON_BRAND, type Material, type MaterialCategory, type Vendor } from '@/lib/store';
 import { Link } from 'wouter';
-import { fetchMaterials, upsertMaterial, deleteMaterial as deleteMaterialSB, fetchVendors, updateMaterialStatus, recordPriceChange, fetchPriceHistory, type PriceHistoryRow } from '@/lib/supabaseQueries';
+import { fetchMaterials, upsertMaterial, deleteMaterial as deleteMaterialSB, fetchVendors, updateMaterialStatus, recordPriceChange, fetchPriceHistory, type PriceHistoryRow } from '@/lib/dbQueries';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

@@ -4,7 +4,7 @@ import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, formatNumber, genId, type TradeStatement } from '@/lib/store';
 import { phase1, DEFECT_DISPOSITION_LABEL, type DeliveryMarket, type ReceiptLogType, type DefectDisposition } from '@/lib/phase1';
-import { fetchItems, fetchOrders, fetchVendors, upsertOrder } from '@/lib/supabaseQueries';
+import { fetchItems, fetchOrders, fetchVendors, upsertOrder } from '@/lib/dbQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

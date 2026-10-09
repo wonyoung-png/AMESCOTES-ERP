@@ -1,6 +1,6 @@
 // AMESCOTES ERP — 납기 관리
 import { useQuery } from '@tanstack/react-query';
-import { fetchOrders, upsertOrder } from '@/lib/supabaseQueries';
+import { fetchOrders, upsertOrder } from '@/lib/dbQueries';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Package } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';

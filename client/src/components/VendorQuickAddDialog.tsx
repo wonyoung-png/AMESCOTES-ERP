@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { store, genId, type Vendor, type VendorRegion } from '@/lib/store';
-import { fetchVendors, upsertVendor } from '@/lib/supabaseQueries';
+import { fetchVendors, upsertVendor } from '@/lib/dbQueries';
 
 const MATERIAL_TYPE_OPTIONS: ('장식' | '원단' | '가죽' | '기타')[] = ['장식', '원단', '가죽', '기타'];
 

@@ -6,7 +6,7 @@ import { calcPostSummary } from '@/lib/costing';
 import { nextOrderNo, parseRevision } from '@/lib/orderNo';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type PackingSize, type ProductionOrder, type ColorQty, type Vendor, normalizeBrands } from '@/lib/store';
-import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, fetchBomsLight, updateItemCostData, saveConfirmedSalePrice, fetchMaterials, fetchOrders } from '@/lib/supabaseQueries';
+import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, fetchBomsLight, updateItemCostData, saveConfirmedSalePrice, fetchMaterials, fetchOrders } from '@/lib/dbQueries';
 import { PackBomEditor } from '@/components/PackBomEditor';
 import {
   applyPackLinesToBom, createEmptyPackBom, linesFromPackBom, packLinesTotal, type PackBomLine,
@@ -574,7 +574,7 @@ export default function ItemMaster() {
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [seasonStatsTarget, setSeasonStatsTarget] = useState('전체');
   const [customCategory, setCustomCategory] = useState(''); // 세부 카테고리 직접 입력
-  const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: () => import('@/lib/supabaseQueries').then(m => m.fetchOrders()) }); // 미발주·발주차수·누적생산
+  const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: () => import('@/lib/dbQueries').then(m => m.fetchOrders()) }); // 미발주·발주차수·누적생산
   const imageFileRef = useRef<HTMLInputElement>(null);
   const excelUploadRef = useRef<HTMLInputElement>(null);
   // 공장 원가표 일괄 업로드
@@ -1083,7 +1083,7 @@ export default function ItemMaster() {
     setIsSyncing(true);
     let bomSynced = 0, bomFailed = 0;
 
-    // Step 1: localStorage BOM → Supabase 동기화
+    // Step 1: localStorage BOM → 서버 DB 동기화
     // postMaterials 또는 비용 필드가 있는 BOM은 무조건 upsert (타임스탬프 비교 제거)
     const localBoms = store.getBoms() as any[];
     for (const lb of localBoms) {
@@ -1335,7 +1335,7 @@ export default function ItemMaster() {
       displayColors: string[];
     }>();
 
-    // localStorage bom 맵 — Supabase에 비용 필드가 없을 때 보완용
+    // localStorage bom 맵 — 서버 DB에 비용 필드가 없을 때 보완용
     const localBoms = store.getBoms() as any[];
     const localBomMap = new Map<string, any>();
     for (const b of localBoms) {
@@ -1346,7 +1346,7 @@ export default function ItemMaster() {
     for (const item of items as Item[]) {
       const bom = bomMap.get(item.id) ?? bomMap.get(item.styleNo) ?? bomMap.get(item.styleNo?.trim());
       const localBom = localBomMap.get(item.id) ?? localBomMap.get(item.styleNo) ?? localBomMap.get(item.styleNo?.trim());
-      // Supabase bom이 없으면 localBom 기본, 있으면 Supabase 우선 + 빈 필드는 localStorage 보완
+      // 서버 DB bom이 없으면 localBom 기본, 있으면 서버 DB 우선 + 빈 필드는 localStorage 보완
       const baseBom = bom || localBom;
       const mergedBom = baseBom ? {
         ...(localBom || {}),
@@ -1841,8 +1841,8 @@ export default function ItemMaster() {
           const linkedSampleId = sessionStorage.getItem('ames_link_sampleId');
           if (linkedSampleId) {
             try {
-              const { upsertSample } = await import('@/lib/supabaseQueries');
-              const samples = (await import('@/lib/supabaseQueries').then(m => m.fetchSamples()));
+              const { upsertSample } = await import('@/lib/dbQueries');
+              const samples = (await import('@/lib/dbQueries').then(m => m.fetchSamples()));
               const linkedSample = samples.find((s: any) => s.id === linkedSampleId);
               if (linkedSample) {
                 await upsertSample({ ...linkedSample, styleId: itemData.id, styleNo: itemData.styleNo });
@@ -3933,7 +3933,7 @@ function MultiBulkOrderModal({
     setSubmitting(true);
     try {
       const createdOrders: ProductionOrder[] = [];
-      // 채번은 Supabase 발주 목록 기준 (localStorage의 store.getNextRevision을 쓰면
+      // 채번은 서버 DB 발주 목록 기준 (localStorage의 store.getNextRevision을 쓰면
       // 캐시가 빈 새 PC에서 이미 존재하는 발주번호와 충돌한다 — CLAUDE.md 레드라인)
       const allOrders = await fetchOrders();
       const issuedOrderNos = new Set<string>(); // 이번 일괄발주 안에서의 충돌도 방지

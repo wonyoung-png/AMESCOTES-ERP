@@ -119,11 +119,11 @@ const OEM_PRE: FlowNode[] = [
   { id: 'vendors', label: '거래처', sub: '바이어 · 공장 · 자재처', path: '/vendors', icon: <Building2 size={16} />, tone: 'master' },
   { id: 'samples', label: '샘플', sub: '개발 · 승인', path: '/samples', icon: <FlaskConical size={16} />, tone: 'master' },
   { id: 'items', label: '품목', sub: '스타일 · 컬러', path: '/items', icon: <Package size={16} />, tone: 'master' },
-  { id: 'bom', label: 'BOM / 원가 / 견적', sub: '원가 산출 후 견적서 출력', path: '/bom', icon: <ClipboardList size={16} />, tone: 'master' },
+  { id: 'bom', label: 'BOM·원가·견적', sub: '원가 산출 후 견적서 출력', path: '/bom', icon: <ClipboardList size={16} />, tone: 'master' },
 ];
 
 const OEM_MAIN: FlowNode[] = [
-  { id: 'orders', label: '생산 발주', sub: '공장 PO · project_no', path: '/orders', icon: <Factory size={16} />, tone: 'produce' },
+  { id: 'orders', label: '생산 오더', sub: '공장 PO · project_no', path: '/orders', icon: <Factory size={16} />, tone: 'produce' },
   { id: 'docs', label: '작업지시서 / 공장발주서', sub: '서류 출력 · 공장 전달', path: '/documents', icon: <FileText size={16} />, tone: 'produce' },
 ];
 
@@ -137,16 +137,16 @@ const OEM_FACTORY_ONLY: FlowNode = {
 const OEM_AFTER: FlowNode[] = [
   { id: 'recv', label: '입고 · 출고 · 선적', sub: '부분입고 · 직출고 · 선적계획', path: '/receiving', icon: <Truck size={16} />, tone: 'produce' },
   { id: 'trade', label: '거래명세표', sub: '청구 · 세금계산서', path: '/trade-statement', icon: <FileText size={16} />, tone: 'settle' },
-  { id: 'settle', label: '미수금 / 정산', sub: '수금 · D-day', path: '/settlement', icon: <Receipt size={16} />, tone: 'settle' },
-  { id: 'pay', label: '미지급 · 불량차감', sub: '자재·임가공 결제', path: '/payables', icon: <Wallet size={16} />, tone: 'settle' },
+  { id: 'settle', label: '매출·미수', sub: '청구·수금·연체', path: '/settlement', icon: <Receipt size={16} />, tone: 'settle' },
+  { id: 'pay', label: '매입·미지급', sub: '자재·임가공 결제', path: '/payables', icon: <Wallet size={16} />, tone: 'settle' },
   { id: 'pl', label: '매출 · 영업이익', sub: '품목·컬러 원가', path: '/project-pl', icon: <BarChart3 size={16} />, tone: 'settle' },
 ];
 
 const BRAND_PRE: FlowNode[] = [
   { id: 'b-items', label: '품목 · 샘플 · BOM', sub: '브랜드 전용 스타일', path: '/items', icon: <Package size={16} />, tone: 'brand' },
-  { id: 'b-orders', label: '리오더 · 오더관리', sub: '묶음 발주 · R3 승인', path: '/brand-orders', icon: <ClipboardCheck size={16} />, tone: 'brand' },
-  { id: 'b-org', label: '조직도 · R3담당', sub: '역할·승인자', path: '/org', icon: <Network size={16} />, tone: 'brand' },
-  { id: 'b-po', label: '생산 발주', sub: '승인 후 자동생성', path: '/orders', icon: <Factory size={16} />, tone: 'produce' },
+  { id: 'b-orders', label: '브랜드 생산 의뢰', sub: '묶음 발주·승인', path: '/brand-orders', icon: <ClipboardCheck size={16} />, tone: 'brand' },
+  { id: 'b-org', label: '조직·업무 담당', sub: '역할·승인자', path: '/org', icon: <Network size={16} />, tone: 'brand' },
+  { id: 'b-po', label: '생산 오더', sub: '승인 후 자동 생성', path: '/orders', icon: <Factory size={16} />, tone: 'produce' },
   { id: 'b-docs', label: '작업지시서 / 공장발주서', sub: '서류 출력 · 공장 전달', path: '/documents', icon: <FileText size={16} />, tone: 'produce' },
 ];
 
@@ -162,7 +162,7 @@ const QUICK_LINKS: FlowNode[] = [
   { id: 'q-cal', label: '운영 캘린더', path: '/calendar', icon: <CalendarDays size={14} /> },
   { id: 'q-dead', label: '납기 캘린더', path: '/deadlines', icon: <CalendarDays size={14} /> },
   { id: 'q-mat', label: '자재 마스터', path: '/materials', icon: <Package size={14} /> },
-  { id: 'q-set', label: '환율 / 설정', path: '/settings', icon: <Settings size={14} /> },
+  { id: 'q-set', label: '환율·기초설정', path: '/settings', icon: <Settings size={14} /> },
 ];
 
 export default function WorkflowGuide() {

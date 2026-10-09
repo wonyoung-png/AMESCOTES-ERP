@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchPurchaseItems, upsertPurchaseItem, deletePurchaseItem as deletePurchaseItemSB,
   updatePurchaseItemStatus, fetchOrders, upsertOrder, fetchVendors,
-} from '@/lib/supabaseQueries';
+} from '@/lib/dbQueries';
 import {
   store, genId, formatKRW, formatNumber,
   type PurchaseItem, type Currency, type ExpenseType, type Expense, type ExpenseCategory,
@@ -234,7 +234,7 @@ export default function PurchaseMatching() {
   const refreshCart = () => setCartItems(store.getMaterialCart());
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['purchaseItems'] });
 
-  // (Supabase 전환 후 orderNo 동기화 로직 불필요 - Supabase가 단일 소스)
+  // (서버 DB 전환 후 orderNo 동기화 로직 불필요 - 서버 DB가 단일 소스)
 
   const filtered = useMemo(() => {
     let list = purchases;
@@ -1220,7 +1220,7 @@ export default function PurchaseMatching() {
                 className="h-8 text-xs"
                 onClick={async () => {
                   // 정본: lib/confirmMaterialOrder.ts
-                  // 예전엔 여기 사본에 1단계(Supabase materials 저장)와
+                  // 예전엔 여기 사본에 1단계(서버 DB materials 저장)와
                   // invalidateQueries(['materials'])가 통째로 빠져 있어서,
                   // 같은 버튼인데 생산발주 탭에서 누를 때와 결과가 달랐다.
                   try {

@@ -2,7 +2,7 @@
 //
 // 지금까지 localStorage에만 있어서 대표가 만든 기획전을 직원이 못 봤다.
 // phase1의 쓰기가 전부 setAll(KEYS.campaigns, ...) 한 곳을 지나므로 거기서 서버에도 올린다.
-import { supabase } from './supabase';
+import { db } from './db';
 import { filterForTable } from './tableColumns';
 
 const toRow = (c: any) => filterForTable('campaigns', {
@@ -37,7 +37,7 @@ const fromRow = (r: any) => ({
 });
 
 export async function fetchCampaignsSB(): Promise<any[]> {
-  const { data, error } = await supabase.from('campaigns').select('*');
+  const { data, error } = await db.from('campaigns').select('*');
   if (error) throw error;
   return (data || []).map(fromRow);
 }
@@ -45,13 +45,13 @@ export async function fetchCampaignsSB(): Promise<any[]> {
 /** 화면을 막지 않는다 — 저장 실패는 콘솔로만 알리고 로컬 값은 그대로 둔다 */
 export function pushCampaigns(list: any[]): void {
   if (!list?.length) return;
-  supabase.from('campaigns').upsert(list.map(toRow)).then(({ error }) => {
+  db.from('campaigns').upsert(list.map(toRow)).then(({ error }) => {
     if (error) console.warn('[campaigns] 서버 저장 실패:', error.message);
   });
 }
 
 export function deleteCampaignSB(id: string): void {
-  supabase.from('campaigns').delete().eq('id', id).then(({ error }) => {
+  db.from('campaigns').delete().eq('id', id).then(({ error }) => {
     if (error) console.warn('[campaigns] 서버 삭제 실패:', error.message);
   });
 }

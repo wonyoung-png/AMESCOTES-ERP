@@ -1,5 +1,5 @@
 // 소요량 계산 OCR 전용 라우터 — 손글씨 치수표 이미지 → JSON
-// ⚠ agent-team / Supabase 의존성 없음. ANTHROPIC_API_KEY 만 필요.
+// ⚠ agent-team / 서버 DB 의존성 없음. ANTHROPIC_API_KEY 만 필요.
 //    agent-routes가 죽어도 OCR은 항상 작동하도록 독립 분리.
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';

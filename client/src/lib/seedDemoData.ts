@@ -12,7 +12,7 @@ import { phase1, ensureProject, type BrandOrderBatch, type BrandOrderLine, type 
 import {
   upsertVendor, upsertItem, upsertMaterial, upsertSample, upsertBom, upsertOrder,
   upsertPurchaseItem,
-} from './supabaseQueries';
+} from './dbQueries';
 import { seedLumenPackingData } from './seedLumenPacking';
 
 /** 버전 올리면 로그인 시 자동 재시드 */

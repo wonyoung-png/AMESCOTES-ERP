@@ -5,7 +5,7 @@
 import products from './data/lumen-27ss-products.json';
 import imageMap from './data/lumen-27ss-images.json';
 import { store, type Item, type Category, type ErpCategory, type Season, type Vendor } from './store';
-import { upsertItem, upsertVendor, saveConfirmedSalePrice, fetchVendors, fetchItems } from './supabaseQueries';
+import { upsertItem, upsertVendor, saveConfirmedSalePrice, fetchVendors, fetchItems } from './dbQueries';
 
 export const LUMEN_27SS_SEED_FLAG = 'ames_lumen_27ss_rrp_v3';
 export const LUMEN_BUYER_ID = 'vendor-lumen-buyer';

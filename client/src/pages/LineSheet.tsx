@@ -4,7 +4,7 @@
 import { useMemo, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Redirect } from 'wouter';
-import { fetchItems, fetchBoms } from '@/lib/supabaseQueries';
+import { fetchItems, fetchBoms } from '@/lib/dbQueries';
 import { formatKRW, normalizeColors, type Item } from '@/lib/store';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { DEFAULT_GLOBAL_MARKUP } from '@/lib/salesPricing';

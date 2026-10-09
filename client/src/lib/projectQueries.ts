@@ -1,5 +1,5 @@
 // 대형 프로젝트 — 서버 저장. 직원들이 함께 보는 자료라 localStorage에 두면 안 된다.
-import { supabase } from './supabase';
+import { db } from './db';
 import { filterForTable } from './tableColumns';
 
 export type ProjectStatus = '진행' | '보류' | '완료';
@@ -56,12 +56,12 @@ const rowToItem = (r: any): ProjectItem => ({
 });
 
 export async function fetchProjects(workspace: 'LUMEN' | 'AETALOOF'): Promise<Project[]> {
-  const { data: ps, error } = await supabase
+  const { data: ps, error } = await db
     .from('projects').select('*').eq('workspace', workspace);
   if (error) throw error;
   const rows = (ps || []).filter((p: any) => p.end_date || p.anchor_date || p.kind);  // 발주 손익용 행은 제외
   if (rows.length === 0) return [];
-  const { data: its } = await supabase
+  const { data: its } = await db
     .from('project_items').select('*').in('project_id', rows.map((p: any) => p.id));
   const byProject = new Map<string, ProjectItem[]>();
   (its || []).forEach((r: any) => {
@@ -87,7 +87,7 @@ export async function upsertProject(p: Partial<Project> & { id: string }) {
     status: p.status, owner: p.owner, budget_cap: p.budgetCap, memo: p.memo,
     updated_at: new Date().toISOString(),
   });
-  const { error } = await supabase.from('projects').upsert(row);
+  const { error } = await db.from('projects').upsert(row);
   if (error) throw error;
 }
 
@@ -102,19 +102,19 @@ export async function upsertItems(items: ProjectItem[]) {
   }));
   // 붙여넣기 임포트는 한 번에 70건 넘게 들어온다 — 나눠 보낸다
   for (let i = 0; i < rows.length; i += 100) {
-    const { error } = await supabase.from('project_items').upsert(rows.slice(i, i + 100));
+    const { error } = await db.from('project_items').upsert(rows.slice(i, i + 100));
     if (error) throw error;
   }
 }
 
 export async function deleteProject(id: string) {
-  await supabase.from('project_items').delete().eq('project_id', id);
-  const { error } = await supabase.from('projects').delete().eq('id', id);
+  await db.from('project_items').delete().eq('project_id', id);
+  const { error } = await db.from('projects').delete().eq('id', id);
   if (error) throw error;
 }
 
 export async function deleteItem(id: string) {
-  const { error } = await supabase.from('project_items').delete().eq('id', id);
+  const { error } = await db.from('project_items').delete().eq('id', id);
   if (error) throw error;
 }
 
