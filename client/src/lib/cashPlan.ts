@@ -5,19 +5,26 @@ import type { TradeStatement } from './store';
 export type PlannedExpenseStage = '예상' | '확정';
 export type PlannedExpenseWorkspace = 'OEM' | 'LUMEN' | 'AETALOOP';
 export type PlannedExpenseTaxType = '과세' | '면세' | '불공제';
+export type PlannedExpenseDocument = { type: '견적서' | '계약서' | '세금계산서' | '기타'; name: string; url: string };
 export const ASSET_ACCOUNTS = ['건설중인자산', '시설장치', '비품', '임차보증금'] as const;
 export const PLANNED_EXPENSE_ACCOUNTS = [...ASSET_ACCOUNTS, '수선비', '광고선전비', '지급수수료', '기타'] as const;
 export const DEFAULT_ACCOUNT_BY_CATEGORY: Record<string, string> = { 인테리어: '건설중인자산', 집기: '비품', 보증금: '임차보증금', 촬영: '지급수수료', 마케팅: '광고선전비', 팝업: '광고선전비', 기타: '기타' };
-export const encodePlannedExpense = (workspace: PlannedExpenseWorkspace, category: string, stage: PlannedExpenseStage, description: string, groupId?: string, installment?: string, account?: string, taxType?: PlannedExpenseTaxType) =>
-  `[자금계획|${workspace}|${category}|${stage}${groupId ? `|${groupId}|${installment || '지급'}${account ? `|${account}|${taxType || '과세'}|${ASSET_ACCOUNTS.includes(account as typeof ASSET_ACCOUNTS[number]) ? '자산' : '비용'}` : ''}` : ''}] ${description.trim()}`;
+export const encodePlannedExpense = (workspace: PlannedExpenseWorkspace, category: string, stage: PlannedExpenseStage, description: string, groupId?: string, installment?: string, account?: string, taxType?: PlannedExpenseTaxType, budgetKrw?: number, documents: PlannedExpenseDocument[] = []) =>
+  `[자금계획|${workspace}|${category}|${stage}${groupId ? `|${groupId}|${installment || '지급'}${account ? `|${account}|${taxType || '과세'}|${ASSET_ACCOUNTS.includes(account as typeof ASSET_ACCOUNTS[number]) ? '자산' : '비용'}${budgetKrw ? `|${budgetKrw}|${encodeURIComponent(JSON.stringify(documents))}` : ''}` : ''}` : ''}] ${description.trim()}`;
 export const parsePlannedExpense = (memo?: string) => {
-  const match = memo?.match(/^\[자금계획\|(OEM|LUMEN|AETALOOP)\|([^|]+)\|(예상|확정)(?:\|([^|]+)\|([^|\]]+)(?:\|([^|]+)\|(과세|면세|불공제)\|(자산|비용))?)?\]\s*(.*)$/);
-  return match ? { workspace: match[1] as PlannedExpenseWorkspace, category: match[2], stage: match[3] as PlannedExpenseStage, groupId: match[4], installment: match[5], account: match[6], taxType: match[7] as PlannedExpenseTaxType | undefined, assetType: match[8], description: match[9] } : null;
+  const match = memo?.match(/^\[자금계획\|(OEM|LUMEN|AETALOOP)\|([^|]+)\|(예상|확정)(?:\|([^|]+)\|([^|\]]+)(?:\|([^|]+)\|(과세|면세|불공제)\|(자산|비용)(?:\|(\d+)\|([^\]]+))?)?)?\]\s*(.*)$/);
+  if (!match) return null;
+  let documents: PlannedExpenseDocument[] | undefined;
+  try { documents = match[10] ? JSON.parse(decodeURIComponent(match[10])) : undefined; } catch { documents = undefined; }
+  return { workspace: match[1] as PlannedExpenseWorkspace, category: match[2], stage: match[3] as PlannedExpenseStage, groupId: match[4], installment: match[5], account: match[6], taxType: match[7] as PlannedExpenseTaxType | undefined, assetType: match[8], budgetKrw: match[9] ? Number(match[9]) : undefined, documents, description: match[11] };
 };
 export const confirmPlannedExpenseMemo = (memo?: string) => memo?.replace(/^(\[자금계획\|[^|]+\|[^|]+\|)예상(?=\||\])/, '$1확정');
 export const splitPlannedExpenseAmount = (gross: number, taxType?: PlannedExpenseTaxType) => {
   const tax = taxType === '과세' ? Math.round(gross / 11) : 0;
   return { supply: gross - tax, tax, gross };
+};
+export const isSafeDocumentUrl = (value: string) => {
+  try { return ['http:', 'https:'].includes(new URL(value).protocol); } catch { return false; }
 };
 
 export const statementTotal = (s: TradeStatement) => s.lines.reduce((sum, line) => {

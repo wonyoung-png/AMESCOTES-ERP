@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMonthlyCashPlan, confirmPlannedExpenseMemo, DEFAULT_ACCOUNT_BY_CATEGORY, encodePlannedExpense, parsePlannedExpense, splitPlannedExpenseAmount } from './cashPlan';
+import { buildMonthlyCashPlan, confirmPlannedExpenseMemo, DEFAULT_ACCOUNT_BY_CATEGORY, encodePlannedExpense, isSafeDocumentUrl, parsePlannedExpense, splitPlannedExpenseAmount } from './cashPlan';
 
 test('미수·미지급 잔액을 예정월별로 합산하고 완납·지급완료는 제외한다', () => {
   const result = buildMonthlyCashPlan([
@@ -39,14 +39,14 @@ test('LUMEN 비정기 지출은 예상 단계로 분류하고 메타정보를 �
   const memo = encodePlannedExpense('LUMEN', '인테리어', '예상', '성수점 계약금');
   const result = buildMonthlyCashPlan([], [{ id: 'p1', vendorName: '시공사', sourceType: 'manual', amountKrw: 5000, paidAmountKrw: 0, dueDate: '2026-11-05', status: 'pending', memo, createdAt: '' }], [], new Date(2026, 10, 1), 1);
 
-  assert.deepEqual(parsePlannedExpense(memo), { workspace: 'LUMEN', category: '인테리어', stage: '예상', groupId: undefined, installment: undefined, account: undefined, taxType: undefined, assetType: undefined, description: '성수점 계약금' });
+  assert.deepEqual(parsePlannedExpense(memo), { workspace: 'LUMEN', category: '인테리어', stage: '예상', groupId: undefined, installment: undefined, account: undefined, taxType: undefined, assetType: undefined, budgetKrw: undefined, documents: undefined, description: '성수점 계약금' });
   assert.equal(result[0].expectedOutgoing, 5000);
   assert.equal(result[0].confirmedOutgoing, 0);
 });
 
 test('분할지급은 같은 묶음과 각 회차를 보존한다', () => {
   const memo = encodePlannedExpense('LUMEN', '인테리어', '예상', '성수점 공사', 'project-1', '중도금');
-  assert.deepEqual(parsePlannedExpense(memo), { workspace: 'LUMEN', category: '인테리어', stage: '예상', groupId: 'project-1', installment: '중도금', account: undefined, taxType: undefined, assetType: undefined, description: '성수점 공사' });
+  assert.deepEqual(parsePlannedExpense(memo), { workspace: 'LUMEN', category: '인테리어', stage: '예상', groupId: 'project-1', installment: '중도금', account: undefined, taxType: undefined, assetType: undefined, budgetKrw: undefined, documents: undefined, description: '성수점 공사' });
   assert.equal(parsePlannedExpense(confirmPlannedExpenseMemo(memo))?.stage, '확정');
 });
 
@@ -56,4 +56,12 @@ test('계정과목과 부가세를 보존하고 지급총액을 공급가액과 
   assert.equal(parsePlannedExpense(memo)?.assetType, '자산');
   assert.deepEqual(splitPlannedExpenseAmount(1100000, '과세'), { supply: 1000000, tax: 100000, gross: 1100000 });
   assert.equal(DEFAULT_ACCOUNT_BY_CATEGORY.보증금, '임차보증금');
+});
+
+test('프로젝트 예산과 증빙 링크를 회차마다 보존한다', () => {
+  const documents = [{ type: '계약서' as const, name: '성수점 계약서', url: 'https://example.com/contract' }];
+  const memo = encodePlannedExpense('LUMEN', '인테리어', '예상', '성수점 공사', 'project-1', '계약금', '건설중인자산', '과세', 33000000, documents);
+  assert.equal(parsePlannedExpense(memo)?.budgetKrw, 33000000);
+  assert.deepEqual(parsePlannedExpense(memo)?.documents, documents);
+  assert.equal(isSafeDocumentUrl('javascript:alert(1)'), false);
 });

@@ -1,8 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowDownCircle, ArrowUpCircle, CalendarRange, Plus, Trash2, TriangleAlert } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, CalendarRange, ExternalLink, Plus, Trash2, TriangleAlert } from 'lucide-react';
 import { phase1 } from '@/lib/phase1';
 import { formatKRW, store } from '@/lib/store';
-import { ASSET_ACCOUNTS, buildMonthlyCashPlan, confirmPlannedExpenseMemo, DEFAULT_ACCOUNT_BY_CATEGORY, encodePlannedExpense, expectedStatementDate, parsePlannedExpense, PLANNED_EXPENSE_ACCOUNTS, splitPlannedExpenseAmount, statementTotal, type PlannedExpenseTaxType, type PlannedExpenseWorkspace } from '@/lib/cashPlan';
+import { ASSET_ACCOUNTS, buildMonthlyCashPlan, confirmPlannedExpenseMemo, DEFAULT_ACCOUNT_BY_CATEGORY, encodePlannedExpense, expectedStatementDate, isSafeDocumentUrl, parsePlannedExpense, PLANNED_EXPENSE_ACCOUNTS, splitPlannedExpenseAmount, statementTotal, type PlannedExpenseDocument, type PlannedExpenseTaxType, type PlannedExpenseWorkspace } from '@/lib/cashPlan';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ export default function CashPlan() {
   const statements = store.getTradeStatements();
   const vendors = store.getVendors();
   const [planOpen, setPlanOpen] = useState(false);
-  const [plan, setPlan] = useState({ workspace: 'LUMEN' as PlannedExpenseWorkspace, category: '인테리어', account: '건설중인자산', taxType: '과세' as PlannedExpenseTaxType, description: '', vendorId: '', vendorName: '', projectNo: '', installments: [{ label: '계약금', amountKrw: 0, dueDate: '' }] });
+  const [plan, setPlan] = useState({ workspace: 'LUMEN' as PlannedExpenseWorkspace, category: '인테리어', account: '건설중인자산', taxType: '과세' as PlannedExpenseTaxType, description: '', vendorId: '', vendorName: '', projectNo: '', budgetKrw: 0, documents: [] as PlannedExpenseDocument[], installments: [{ label: '계약금', amountKrw: 0, dueDate: '' }] });
   const months = useMemo(() => buildMonthlyCashPlan(settlements, payables, statements), [settlements, payables, statements]);
   const [selected, setSelected] = useState(months[0].key);
   const current = months.find(m => m.key === selected) ?? months[0];
@@ -30,11 +30,19 @@ export default function CashPlan() {
     const stage = p.sourceType === 'processing' ? '예상' : planned?.stage || '확정';
     return { id: p.id, name: p.vendorName, date: p.dueDate, amount: Math.max(0, p.amountKrw - p.paidAmountKrw - confirmed), note: `${stage} · ${planned ? `${planned.workspace} · ${planned.account || planned.category}${planned.installment ? ` · ${planned.installment}` : ''} · ${planned.description}` : p.orderNo || p.memo || ''}`, action: planned?.stage === '예상' ? () => { phase1.updatePayable(p.id, { memo: confirmPlannedExpenseMemo(p.memo) }); tick(n => n + 1); toast.success('계획지출을 확정했습니다'); } : undefined };
   }).filter(r => r.amount > 0);
+  const plannedProjects = useMemo(() => {
+    const groups = new Map<string, { name: string; budget: number; planned: number; paid: number; documents: PlannedExpenseDocument[] }>();
+    payables.forEach(p => { const meta = parsePlannedExpense(p.memo); if (!meta?.groupId) return; const row = groups.get(meta.groupId) || { name: p.projectNo || meta.description, budget: meta.budgetKrw || 0, planned: 0, paid: 0, documents: meta.documents || [] }; row.planned += p.amountKrw; row.paid += p.paidAmountKrw; groups.set(meta.groupId, row); });
+    return [...groups.entries()].map(([id, row]) => ({ id, ...row, budget: row.budget || row.planned }));
+  }, [payables]);
 
   const addPlan = () => {
     if (!plan.description.trim() || !plan.vendorName.trim() || plan.installments.some(x => !x.label.trim() || x.amountKrw <= 0 || !x.dueDate)) return toast.error('내용·지급처와 모든 지급회차의 명칭·금액·예정일을 입력하세요');
+    if (plan.documents.some(d => !d.name.trim() || !isSafeDocumentUrl(d.url))) return toast.error('증빙 문서명과 올바른 http(s) 공유 링크를 입력하세요');
     const groupId = crypto.randomUUID();
-    plan.installments.forEach(x => phase1.addPayable({ vendorId: plan.vendorId || undefined, vendorName: plan.vendorName.trim(), projectNo: plan.projectNo || undefined, sourceType: 'manual', amountKrw: x.amountKrw, dueDate: x.dueDate, memo: encodePlannedExpense(plan.workspace, plan.category, '예상', plan.description, groupId, x.label.trim(), plan.account, plan.taxType) }));
+    const plannedTotal = plan.installments.reduce((sum, x) => sum + x.amountKrw, 0);
+    const budgetKrw = plan.budgetKrw || plannedTotal;
+    plan.installments.forEach(x => phase1.addPayable({ vendorId: plan.vendorId || undefined, vendorName: plan.vendorName.trim(), projectNo: plan.projectNo || undefined, sourceType: 'manual', amountKrw: x.amountKrw, dueDate: x.dueDate, memo: encodePlannedExpense(plan.workspace, plan.category, '예상', plan.description, groupId, x.label.trim(), plan.account, plan.taxType, budgetKrw, plan.documents.filter(d => d.name.trim() && d.url.trim())) }));
     setPlanOpen(false); tick(n => n + 1); toast.success(`${plan.installments.length}개 지급회차가 자금계획에 반영됐습니다`);
   };
 
@@ -66,6 +74,7 @@ export default function CashPlan() {
         <Detail title="예상입금 상세" empty="예정된 입금이 없습니다" rows={incomingRows} />
         <Detail title="예상지출 상세" empty="예정된 지출이 없습니다" rows={outgoingRows} />
       </div>
+      {plannedProjects.length > 0 && <div className="rounded-lg border bg-card overflow-x-auto"><div className="px-4 py-3 border-b font-semibold text-sm">프로젝트 예산 대비 실적</div><table className="w-full min-w-[720px] text-sm"><thead><tr className="border-b text-muted-foreground"><th>프로젝트</th><th className="num">예산</th><th className="num">지급예정</th><th className="num">실지급</th><th className="num">가용잔액</th><th>증빙</th></tr></thead><tbody className="divide-y">{plannedProjects.map(p => <tr key={p.id}><td className="font-medium">{p.name}</td><td className="num">{formatKRW(p.budget)}</td><td className="num">{formatKRW(p.planned)}</td><td className="num">{formatKRW(p.paid)}</td><td className={`num font-semibold ${p.budget - p.planned < 0 ? 'text-[var(--system-red)]' : ''}`}>{formatKRW(p.budget - p.planned)}</td><td><div className="flex flex-wrap gap-1">{p.documents.length ? p.documents.map((d, i) => <a key={`${d.url}-${i}`} href={d.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">{d.type}<ExternalLink className="w-3 h-3" /></a>) : <span className="text-xs text-muted-foreground">없음</span>}</div></td></tr>)}</tbody></table></div>}
       <p className="text-xs text-muted-foreground">예정 금액을 추가하려면 미수금 또는 미지급 화면에 예정일과 금액을 등록하세요.</p>
 
       <Dialog open={planOpen} onOpenChange={setPlanOpen}><DialogContent><DialogHeader><DialogTitle>비정기 계획지출 등록</DialogTitle></DialogHeader><div className="grid gap-3 sm:grid-cols-2">
@@ -76,10 +85,12 @@ export default function CashPlan() {
         <div className="sm:col-span-2"><Label>내용</Label><Input value={plan.description} onChange={e => setPlan(p => ({ ...p, description: e.target.value }))} placeholder="예: 성수점 인테리어 계약금" /></div>
         <div><Label>지급처</Label><Input list="cash-plan-vendors" value={plan.vendorName} onChange={e => { const vendor = vendors.find(v => v.name === e.target.value); setPlan(p => ({ ...p, vendorName: e.target.value, vendorId: vendor?.id || '' })); }} /><datalist id="cash-plan-vendors">{vendors.map(v => <option key={v.id} value={v.name} />)}</datalist></div>
         <div><Label>프로젝트명</Label><Input value={plan.projectNo} onChange={e => setPlan(p => ({ ...p, projectNo: e.target.value }))} placeholder="예: LUMEN 성수점" /></div>
+        <div><Label>총예산</Label><Input type="number" min="0" value={plan.budgetKrw || ''} onChange={e => setPlan(p => ({ ...p, budgetKrw: Number(e.target.value) }))} placeholder="미입력 시 지급예정 합계" /></div>
         <div className="sm:col-span-2 space-y-2"><div className="flex items-center justify-between"><Label>분할지급</Label><Button type="button" size="sm" variant="outline" onClick={() => setPlan(p => ({ ...p, installments: [...p.installments, { label: p.installments.length === 1 ? '중도금' : '잔금', amountKrw: 0, dueDate: '' }] }))}><Plus className="w-3.5 h-3.5 mr-1" />회차 추가</Button></div>
           {plan.installments.map((item, index) => <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"><Input value={item.label} onChange={e => setPlan(p => ({ ...p, installments: p.installments.map((x, i) => i === index ? { ...x, label: e.target.value } : x) }))} placeholder="계약금" /><Input type="number" min="0" value={item.amountKrw || ''} onChange={e => setPlan(p => ({ ...p, installments: p.installments.map((x, i) => i === index ? { ...x, amountKrw: Number(e.target.value) } : x) }))} placeholder="금액" /><Input type="date" value={item.dueDate} onChange={e => setPlan(p => ({ ...p, installments: p.installments.map((x, i) => i === index ? { ...x, dueDate: e.target.value } : x) }))} />{plan.installments.length > 1 && <Button type="button" size="icon" variant="ghost" aria-label={`${item.label || index + 1} 회차 삭제`} onClick={() => setPlan(p => ({ ...p, installments: p.installments.filter((_, i) => i !== index) }))}><Trash2 className="w-4 h-4" /></Button>}</div>)}
           {(() => { const amount = splitPlannedExpenseAmount(plan.installments.reduce((sum, x) => sum + x.amountKrw, 0), plan.taxType); return <p className="text-xs text-muted-foreground text-right">공급가액 {formatKRW(amount.supply)} · 부가세 {formatKRW(amount.tax)} · 총 {formatKRW(amount.gross)}</p>; })()}
         </div>
+        <div className="sm:col-span-2 space-y-2"><div className="flex items-center justify-between"><Label>증빙 링크</Label><Button type="button" size="sm" variant="outline" onClick={() => setPlan(p => ({ ...p, documents: [...p.documents, { type: '견적서', name: '', url: '' }] }))}><Plus className="w-3.5 h-3.5 mr-1" />증빙 추가</Button></div>{plan.documents.map((doc, index) => <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-[110px_1fr_1.5fr_auto]"><select className="h-9 rounded-md border bg-background px-2 text-sm" value={doc.type} onChange={e => setPlan(p => ({ ...p, documents: p.documents.map((x, i) => i === index ? { ...x, type: e.target.value as PlannedExpenseDocument['type'] } : x) }))}><option>견적서</option><option>계약서</option><option>세금계산서</option><option>기타</option></select><Input value={doc.name} onChange={e => setPlan(p => ({ ...p, documents: p.documents.map((x, i) => i === index ? { ...x, name: e.target.value } : x) }))} placeholder="문서명" /><Input type="url" value={doc.url} onChange={e => setPlan(p => ({ ...p, documents: p.documents.map((x, i) => i === index ? { ...x, url: e.target.value } : x) }))} placeholder="공유 링크" /><Button type="button" size="icon" variant="ghost" aria-label="증빙 삭제" onClick={() => setPlan(p => ({ ...p, documents: p.documents.filter((_, i) => i !== index) }))}><Trash2 className="w-4 h-4" /></Button></div>)}</div>
       </div><DialogFooter><Button variant="outline" onClick={() => setPlanOpen(false)}>취소</Button><Button onClick={addPlan}>예상지출 등록</Button></DialogFooter></DialogContent></Dialog>
     </div>
   );
