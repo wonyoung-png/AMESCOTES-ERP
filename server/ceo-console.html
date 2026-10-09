@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;600&display=swap">
 <style>
 /*
  * 대표실 — 대표 한 사람이 회사 전체를 보고, 결정하고, 묻는 화면.
@@ -19,7 +18,7 @@
   --hover:#f0f0ed; --accent:#2c5446; --accent-ink:#ffffff; --sun:#e2a93b; --danger:#b4413a; --ok:#2f7a55;
   --sky1:#bcd6ee; --sky2:#e7f0f8; --cloud:rgba(255,255,255,.85);
   --sans:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;
-  --serif:"Noto Serif KR","Apple Myungjo",serif;
+  --serif:var(--sans);
   --ease:cubic-bezier(.2,0,0,1); --fast:140ms; --slow:280ms;
 }
 @media (prefers-color-scheme:dark){:root{
@@ -144,13 +143,13 @@ button,input,textarea{font:inherit;color:inherit}
 .map-link.work{stroke:var(--accent);animation:flow 1.4s linear infinite}
 .map-link.report,.map-link.warn{stroke:var(--danger);animation:flow .7s linear infinite}
 .map-node{cursor:pointer;outline:none}
-.map-node rect.card{fill:var(--panel);stroke:var(--line);transition:stroke var(--fast) var(--ease)}
-.map-node:hover rect.card,.map-node:focus-visible rect.card,.map-node.sel rect.card{stroke:var(--ink);stroke-width:1.5}
+.map-node circle.card{fill:var(--panel);stroke:var(--line);transition:stroke var(--fast) var(--ease),fill var(--fast) var(--ease)}
+.map-node:hover circle.card,.map-node:focus-visible circle.card,.map-node.sel circle.card{stroke:var(--sun);stroke-width:2;fill:#1d2922}
 .map-node text{fill:var(--ink);font:600 13px var(--sans)}
 .map-node text.s{fill:var(--sub);font:400 11px var(--sans)}
 .map-pulse{fill:none;stroke:var(--accent);transform-box:fill-box;transform-origin:center;animation:pulse 2.6s ease-out infinite}
 .map-pulse.report,.map-pulse.warn{stroke:var(--danger)}
-.map-core rect{fill:var(--ink)}.map-core text{fill:var(--canvas);font:600 14px var(--serif)}
+.map-core circle{fill:var(--sun)}.map-core text{fill:#172019;font:700 14px var(--sans)}
 @keyframes flow{to{stroke-dashoffset:-16}}
 @keyframes pulse{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.8)}}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--sub)}
@@ -201,6 +200,11 @@ button,input,textarea{font:inherit;color:inherit}
 .facts summary{cursor:pointer;font-size:13px;color:var(--sub)}
 .facts pre{margin:8px 0 0;white-space:pre-wrap;font:12px/1.6 var(--sans);color:var(--sub);background:var(--canvas);border:1px solid var(--line);border-radius:10px;padding:10px 12px;max-height:320px;overflow:auto}
 .order input[type=date]{border:1px solid var(--line);border-radius:8px;background:var(--canvas);padding:6px 8px;font:inherit}
+
+/* C direction — 대표 전용 원형 조직 지도 */
+:root{color-scheme:dark;--canvas:#0f1511;--panel:#161d18;--ink:#edf2ed;--sub:#a6b0a8;--faint:#7f8c83;--line:#2d3932;--hover:#1d2720;--accent:#d9bb62;--accent-ink:#172019;--sun:#d9bb62;--danger:#d87563;--ok:#79bb8a;--sans:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;--serif:var(--sans)}
+.cover{display:none}.hello h1{font:650 30px/1.25 var(--sans);letter-spacing:-.035em}.app{grid-template-columns:224px minmax(0,1fr) 400px}.nav{background:#111713}.nav a.on{background:#edf2ed;color:#172019;box-shadow:none}.brand i{border-radius:50%;background:var(--sun)}
+.stat,.list,.team,.agent,.mapbox{box-shadow:none}.mapbox{background:#111713;padding:18px}.map-ring{stroke:#314138}.map-link{stroke:#33423a}.map-node text{font-family:var(--sans)}
 </style>
 </head>
 <body>
@@ -450,10 +454,10 @@ function mapView() {
   const nodes = list.map((a, i) => {
     const [x, y] = pos[i], st = AST[a.status] || AST.idle;
     return `<g class="map-node${a.team === selTeam ? ' sel' : ''}" data-team="${esc(a.team)}" transform="translate(${x},${y})" tabindex="0" role="button" aria-label="${esc(a.team)} ${st[0]}">
-      ${a.status !== 'idle' ? `<rect class="map-pulse ${esc(a.status)}" x="-58" y="-24" width="116" height="48" rx="12"/>` : ''}
-      <rect class="card" x="-58" y="-24" width="116" height="48" rx="12"/>
-      <circle cx="-42" cy="-7" r="4" fill="${st[2]}"/><text x="-32" y="-2">${esc(a.team)}</text>
-      <text class="s" x="-42" y="15">${st[0]}${a.stats?.open ? ' · ' + a.stats.open + '건' : ''}</text></g>`;
+      ${a.status !== 'idle' ? `<circle class="map-pulse ${esc(a.status)}" r="47"/>` : ''}
+      <circle class="card" r="42"/>
+      <circle cx="0" cy="-17" r="4" fill="${st[2]}"/><text x="0" y="1" text-anchor="middle">${esc(a.team)}</text>
+      <text class="s" x="0" y="20" text-anchor="middle">${st[0]}${a.stats?.open ? ' · ' + a.stats.open + '건' : ''}</text></g>`;
   }).join('');
   const a = list.find(x => x.team === selTeam);
   const st = a ? (AST[a.status] || AST.idle) : null;
@@ -480,7 +484,7 @@ function mapView() {
       <button class="btn pri" type="button" data-run="" style="margin-left:auto">전체 지금 점검</button></div>
     <div class="mapbox"><svg viewBox="-480 -300 960 600" role="img" aria-label="팀 에이전트 지도">
       <ellipse class="map-ring" rx="${RX}" ry="${RY}"/><ellipse class="map-ring" rx="${RX * .45}" ry="${RY * .45}" stroke-dasharray="2 6"/>
-      ${links}<g class="map-core"><rect x="-54" y="-19" width="108" height="38" rx="10"/><text x="0" y="5" text-anchor="middle">대표실</text></g>${dnodes}${nodes}</svg></div>
+      ${links}<g class="map-core"><circle r="48"/><text x="0" y="5" text-anchor="middle">MASTER</text></g>${dnodes}${nodes}</svg></div>
     <div class="legend"><span><i style="background:#2f7a55"></i>작업 중 — 파동</span><span><i style="background:#8a5a00"></i>보고 중 — 대표에게 빠르게 흐름</span><span><i style="background:#b3392f"></i>막힘 — 마감 지남</span><span><i style="background:#5d5f64"></i>대기</span></div>
     ${detail}`;
 }

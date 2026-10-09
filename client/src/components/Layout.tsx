@@ -204,15 +204,12 @@ const SideLink = React.memo(function SideLink({ item, active, fav, collapsed, on
         className={`
           relative flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-150 mb-0.5 outline-none focus-visible:outline-none
           ${active
-            ? 'bg-[var(--fill-quaternary)] text-foreground font-medium'
+            ? 'bg-card text-foreground font-semibold shadow-[var(--shadow-sm)]'
             : 'text-sidebar-foreground hover:text-foreground hover:bg-[var(--fill-quaternary)]'
           }
           ${collapsed ? 'justify-center px-2' : 'pr-8'}
         `}
       >
-        {active && (
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-[var(--accent-mint)]" />
-        )}
         <span className={`relative shrink-0 ${active ? 'text-sidebar-primary' : ''}`}>
           {item.icon}
           {collapsed && !!badge && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--system-red)]" />}
@@ -364,7 +361,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           fixed inset-y-0 left-0 z-40
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           md:flex
-          ${collapsed ? 'w-16' : 'w-[240px]'}
+          ${collapsed ? 'w-16' : 'w-[232px]'}
         `}
       >
         <div className={`flex items-center gap-3 px-4 py-5 border-b border-sidebar-border ${collapsed ? 'justify-center px-2' : ''}`}>
@@ -529,7 +526,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="h-12 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0">
+        <header className="h-14 bg-background/95 border-b border-border flex items-center justify-between px-4 md:px-7 shrink-0 backdrop-blur-sm">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -609,7 +606,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
+        <main className="flex-1 overflow-y-auto pb-16 md:pb-0 bg-background">
           {children}
         </main>
       </div>

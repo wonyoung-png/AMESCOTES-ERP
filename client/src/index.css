@@ -61,22 +61,22 @@
 
   /* 중립 램프 — 배경이 따뜻한 종이톤이라 글자·선도 같은 온도로 맞춘다.
      순수 회색(#111/#6b6b6b)을 베이지 위에 얹으면 탁해 보이던 문제 해결. */
-  --bg-canvas: #f5f2ed;
+  --bg-canvas: #f5f5f2;
   --bg-surface: #ffffff;
-  --bg-surface-2: #faf8f5;
-  --bg-subtle: #efece6;
-  --separator: #e6e1d9;
-  --separator-strong: #d3ccc1;
-  --label-primary: #1a1815;
-  --label-secondary: #6b6560;
-  --label-tertiary: #9c958c;
-  --fill-primary: rgba(26, 24, 21, 0.10);
-  --fill-secondary: rgba(26, 24, 21, 0.065);
-  --fill-tertiary: rgba(26, 24, 21, 0.045);
-  --fill-quaternary: rgba(26, 24, 21, 0.028);
+  --bg-surface-2: #f8f8f5;
+  --bg-subtle: #efefeb;
+  --separator: #deded8;
+  --separator-strong: #c8c9c2;
+  --label-primary: #252824;
+  --label-secondary: #62665f;
+  --label-tertiary: #7c8179;
+  --fill-primary: rgba(37, 40, 36, 0.10);
+  --fill-secondary: rgba(37, 40, 36, 0.065);
+  --fill-tertiary: rgba(37, 40, 36, 0.045);
+  --fill-quaternary: rgba(37, 40, 36, 0.032);
 
-  --accent-mint: #3dffa2;
-  --accent-mint-weak: rgba(61, 255, 162, 0.18);
+  --accent-mint: #3e7252;
+  --accent-mint-weak: rgba(62, 114, 82, 0.14);
   --highlight-top: none;
 
   --status-high-bg: #ffe9eb; --status-high-fg: #c4303f;
@@ -111,7 +111,7 @@
   --card-foreground: var(--label-primary);
   --popover: var(--bg-surface);
   --popover-foreground: var(--label-primary);
-  --primary: #1a1815;
+  --primary: #252824;
   --primary-foreground: #ffffff;
   --secondary: var(--bg-subtle);
   --secondary-foreground: var(--label-primary);
@@ -123,13 +123,13 @@
   --destructive-foreground: #ffffff;
   --border: var(--separator);
   --input: var(--separator);
-  --ring: #1a1815;
+  --ring: #3e7252;
   --chart-1: #111111;
   --chart-2: #6b6b6b;
   --chart-3: #9a9a9a;
   --chart-4: #c9c5be;
   --chart-5: #8e8e93;
-  --sidebar: var(--bg-surface);
+  --sidebar: #efefeb;
   --sidebar-foreground: var(--label-secondary);
   --sidebar-primary: #111111;
   --sidebar-primary-foreground: #ffffff;
@@ -228,11 +228,11 @@
   body {
     @apply bg-background text-foreground font-sans;
     -webkit-font-smoothing: antialiased;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.012em;
     font-variant-numeric: tabular-nums;
   }
   h1, h2, h3 {
-    letter-spacing: -0.02em;
+    letter-spacing: -0.035em;
   }
   /* 다크 elevation — 카드 상단 미세 하이라이트 (BGROW §1-A) */
   .bg-card {

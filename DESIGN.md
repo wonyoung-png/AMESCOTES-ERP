@@ -547,6 +547,7 @@ cost_view_options (
 
 | 날짜 | 내용 |
 |------|------|
+| 2026-10-09 | UI 방향 확정 — 전 직원 ERP는 A형 Quiet Precision, 대표실은 C형 Company Orbit, 전 화면 Pretendard Variable 단일 폰트 |
 | 2026-07-10 | B12 · production_origin · brand_order_lines 확장 |
 | 2026-07-10 | §9.1 패킹자재 분리·원가 옵션 토글 |
 | 2026-07-10 | v1 Design Lock — OEM+브랜드 생산 범위 확정 |
