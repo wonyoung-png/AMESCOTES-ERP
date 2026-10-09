@@ -154,7 +154,7 @@ export default function PayablesManagement() {
               const isExpectedPlan = planned?.stage === '예상';
               return (
               <tr key={p.id} className="hover:bg-[var(--fill-quaternary)]">
-                <td><p className="font-medium">{p.vendorName}</p>{planned && <p className="text-[11px] text-muted-foreground">{planned.workspace} · {planned.category}</p>}</td>
+                <td><p className="font-medium">{p.vendorName}</p>{planned && <p className="text-[11px] text-muted-foreground">{planned.workspace} · {planned.account || planned.category}{planned.taxType ? ` · ${planned.taxType}` : ''}</p>}</td>
                 <td>
                   {p.payeeType === 'china_corp' ? (
                     <span className="text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">중국법인</span>
