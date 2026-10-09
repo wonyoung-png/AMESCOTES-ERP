@@ -1,6 +1,7 @@
 // AMESCOTES ERP — 거래명세표 (Phase 1 신규)
 // 전표번호: YYYYMM-거래처코드-순번 (예: 202603-LLL-001)
 import { useState, useMemo, useRef } from 'react';
+import { useLocation } from 'wouter';
 import {
   store, genId, formatKRW, formatNumber,
   type TradeStatement, type TradeStatementLine, type TradeStatementStatus, type TaxType,
@@ -76,6 +77,7 @@ function ensureReceivable(statement: TradeStatement, invoiceDate: string) {
 const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 export default function TradeStatement() {
+  const [, navigate] = useLocation();
   const [statements, setStatements] = useState<TradeStatement[]>(() => store.getTradeStatements());
   const vendors = store.getVendors();
 
@@ -394,6 +396,7 @@ export default function TradeStatement() {
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">전표번호: YYYYMM-거래처코드-순번 · 건별 세율 설정 지원</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/settlement')}>매출·미수</Button>
           <Button
             variant="outline"
             onClick={() => { openNew(); setShowOrderModal(true); }}

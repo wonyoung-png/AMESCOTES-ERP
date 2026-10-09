@@ -2149,6 +2149,7 @@ export default function ItemMaster() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {isBrand && <Button variant="outline" size="sm" onClick={() => navigate('/line-sheet')}>라인시트</Button>}
           <Button variant="outline" size="sm" onClick={() => setColSettingsOpen(true)} className="gap-2">
             <Columns3 size={16} />열 설정
           </Button>

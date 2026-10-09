@@ -1,5 +1,6 @@
 // AMESCOTES ERP — 환율 설정
 import { useState } from 'react';
+import { useLocation } from 'wouter';
 import { store, genId, type SystemSettings, type Season } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +17,7 @@ import { seedLumen27ssRrp, getLumen27ssProductCount, LUMEN_27SS_SEED_FLAG } from
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 
 export default function ExchangeSettings() {
+  const [, navigate] = useLocation();
   const [settings, setSettings] = useState<SystemSettings>(() => store.getSettings());
   const [usdInput, setUsdInput] = useState(String(settings.usdKrw));
   const [cnyInput, setCnyInput] = useState(String(settings.cnyKrw));
@@ -211,9 +213,15 @@ export default function ExchangeSettings() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">환율 설정</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">현재 적용 환율 및 시스템 설정 관리</p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">관리·설정</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">환율 및 시스템 설정 관리</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/users')}>사용자</Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/org')}>조직·업무 담당</Button>
+        </div>
       </div>
 
       {/* 현재 환율 + 시스템 설정 */}

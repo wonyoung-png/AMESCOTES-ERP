@@ -3569,6 +3569,7 @@ export default function BomManagement() {
           <p className="text-sm text-muted-foreground mt-0.5">사전원가(BOM) 및 사후원가(공장 실적) 통합 관리</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => setLocation('/cost-comparison')}>원가 비교</Button>
           <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handleExcelUpload} className="hidden" />
           <input ref={preFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePreExcelUpload} className="hidden" />
           <input ref={postFileRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handlePostExcelUpload} className="hidden" />

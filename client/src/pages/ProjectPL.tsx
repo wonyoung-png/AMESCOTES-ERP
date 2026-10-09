@@ -1,5 +1,6 @@
 // 발주 손익 — 발주번호(orderNo) 기준 BOM vs 실제 · 품목/컬러 배분
 import { useMemo, useState } from 'react';
+import { useLocation } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { phase1 } from '@/lib/phase1';
 import { store, formatKRW } from '@/lib/store';
@@ -12,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { fetchSalesRecords, upsertSalesRecord } from '@/lib/salesRecords';
 
 export default function ProjectPL() {
+  const [, navigate] = useLocation();
   const { workspace } = useWorkspace();
   const queryClient = useQueryClient();
   const { data: remoteSales = [] } = useQuery({ queryKey: ['salesRecords'], queryFn: fetchSalesRecords });
@@ -62,9 +64,12 @@ export default function ProjectPL() {
             발주번호 — 자재·임가공(미지급) · 품목/컬러 배분 원가
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={syncToDb}>
-          <Database className="w-4 h-4 mr-1" />정산 → AWS
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/sales-summary')}>생산 집계</Button>
+          <Button variant="outline" size="sm" onClick={syncToDb}>
+            <Database className="w-4 h-4 mr-1" />정산 → AWS
+          </Button>
+        </div>
       </div>
 
       <section className="space-y-3">

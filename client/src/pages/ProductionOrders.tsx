@@ -1,6 +1,7 @@
 import { upsertSalesRecord } from '@/lib/salesRecords';
 // AMESCOTES ERP — 생산 발주 관리 (BOM 연동)
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useLocation } from 'wouter';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems, fetchMaterials, upsertMaterial, fetchPurchaseItems, upsertPurchaseItem } from '@/lib/dbQueries';
@@ -74,6 +75,7 @@ interface BomCalcResult {
 }
 
 export default function ProductionOrders() {
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
   const setOrders = (_v: ProductionOrder[]) => {}; // no-op
@@ -1503,6 +1505,7 @@ export default function ProductionOrders() {
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">BOM 자동 연동 · 공장/자재 발주 분리 · 소요량 자동 계산</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/documents')}>서류 출력</Button>
           <button
             onClick={() => setShowFactoryView(v => !v)}
             className={`hidden sm:block px-3 py-2 rounded-md border text-xs font-medium transition-colors ${showFactoryView ? 'bg-primary/10 border-primary/30 text-primary' : 'border-border text-muted-foreground hover:bg-[var(--fill-quaternary)]'}`}

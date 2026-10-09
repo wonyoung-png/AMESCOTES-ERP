@@ -2,7 +2,7 @@
 // 발주는 '초안' 상태로 저장되고, 생산발주 화면에서 확정하면 정식 발주번호가 붙는다.
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { genId, type Item, type Vendor, type ProductionOrder } from '@/lib/store';
 import { fetchItems, fetchVendors, fetchOrders, upsertOrder } from '@/lib/dbQueries';
 import { phase1 } from '@/lib/phase1';
@@ -10,11 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Factory, Package, AlertTriangle, ChevronRight, Search, Check } from 'lucide-react';
+import { Factory, Package, AlertTriangle, ChevronRight, Search, Check, Camera } from 'lucide-react';
 
 type Mode = 'menu' | 'order' | 'receive' | 'defect';
 
 export default function QuickEntry() {
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const { data: items = [] } = useQuery({ queryKey: ['items'], queryFn: fetchItems });
   const { data: vendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
@@ -188,6 +189,7 @@ export default function QuickEntry() {
           <Tile icon={<Factory className="w-5 h-5" />} title="발주 초안" desc="스타일 · 수량 · 공장 · 납기만" onClick={() => setMode('order')} />
           <Tile icon={<Package className="w-5 h-5" />} title="입고 기록" desc="발주번호 · 수량" onClick={() => { setMode('receive'); }} />
           <Tile icon={<AlertTriangle className="w-5 h-5" />} title="불량 차감" desc="발주번호 · 금액 · 사유" onClick={() => { setMode('defect'); }} />
+          <Tile icon={<Camera className="w-5 h-5" />} title="사진·메모 접수" desc="팀장 승인 후 전표 생성" onClick={() => navigate('/capture')} />
         </div>
       )}
 

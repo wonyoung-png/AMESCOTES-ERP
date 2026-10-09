@@ -19,9 +19,9 @@ import {
   BarChart3, Zap, Package, ClipboardList, FlaskConical, Factory,
   ShoppingCart, Building2, FileText, Receipt, Settings,
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
-  Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Network,
-  GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight,
-  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp, Inbox, Warehouse, Star, Camera, Store, MessageSquare, CreditCard,
+  Menu, X, MoreHorizontal, Truck, Wallet, CalendarClock, CalendarDays,
+  UserRound, Moon, Sun, ArrowUpRight,
+  LineChart, Image as ImageIcon, TrendingUp, Inbox, Warehouse, Star, MessageSquare, CreditCard,
 } from 'lucide-react';
 
 interface NavItem {
@@ -53,12 +53,10 @@ const navGroups: NavGroup[] = [
     label: '',
     items: [
       { path: '/', label: '대시보드', icon: <BarChart3 size={17} />, table: '생산 현황' },
-      { path: '/quick', label: '간편 등록', icon: <Zap size={17} />, table: '밖에서 빠르게 · 초안 저장' },
+      { path: '/quick', label: '빠른 등록', icon: <Zap size={17} />, table: '발주·입고·불량·현장 접수' },
       { path: '/work', label: '업무 피드', icon: <MessageSquare size={17} />, table: '업무 비서에서 올린 것이 팀별로' },
       { path: '/my-calendar', label: '내 캘린더', icon: <CalendarDays size={17} />, table: '구글 캘린더 + ATLM 업무' },
-  { path: '/capture', label: '현장 접수', icon: <Camera size={17} />, table: '사진 한 장 + 한 줄' },
       { path: '/inbox', label: '접수함', icon: <Inbox size={17} />, table: '승인하면 전표가 생긴다' },
-      { path: '/workflow', label: '워크플로우', icon: <GitBranch size={17} />, table: '클릭 → 탭 이동' },
     ],
   },
   {
@@ -67,7 +65,6 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/projects', label: '프로젝트', icon: <ClipboardList size={17} />, table: 'projects' },
       { path: '/calendar', label: '운영 캘린더 · 기획전', icon: <CalendarDays size={17} />, table: 'campaigns' },
-      { path: '/line-sheet', label: '라인시트', icon: <FileSpreadsheet size={17} />, table: 'items', lumenOnly: true },
     ],
   },
   {
@@ -84,11 +81,10 @@ const navGroups: NavGroup[] = [
     oemOnly: true,
     items: [
       { path: '/bom', label: 'BOM·원가', icon: <ClipboardList size={17} />, table: 'boms', oemOnly: true },
-      { path: '/cost-comparison', label: '원가 비교', icon: <GitCompare size={17} />, table: 'boms', oemOnly: true },
       { path: '/inbound-po', label: '수주함', icon: <Inbox size={17} />, table: 'brand_order_lines', oemOnly: true },
       { path: '/orders', label: '생산 오더', icon: <Factory size={17} />, table: 'production_orders', oemOnly: true },
       { path: '/receiving', label: '입고 · 출고 · 선적', icon: <Truck size={17} />, table: 'receipt_logs' },
-      { path: '/deadlines', label: '납기 캘린더', icon: <CalendarClock size={17} />, table: 'milestones', oemOnly: true },
+      { path: '/deadlines', label: '납기 일정', icon: <CalendarClock size={17} />, table: 'milestones', oemOnly: true },
       { path: '/purchase', label: '자재 구매', icon: <ShoppingCart size={17} />, table: 'purchase_items' },
     ],
   },
@@ -105,23 +101,18 @@ const navGroups: NavGroup[] = [
   {
     label: '정산·자금',
     items: [
-      { path: '/trade-statement', label: '거래명세표', icon: <FileText size={17} />, table: 'trade_statements', oemOnly: true },
-      { path: '/settlement', label: '매출·미수', icon: <Receipt size={17} />, table: 'settlements', oemOnly: true },
+      { path: '/trade-statement', label: '청구·수금', icon: <FileText size={17} />, table: 'trade_statements', oemOnly: true },
       { path: '/cash-plan', label: '자금계획', icon: <TrendingUp size={17} />, table: 'settlements' },
       { path: '/payables', label: '매입·미지급', icon: <Wallet size={17} />, table: 'payables' },
       { path: '/expense', label: '지출결의', icon: <Receipt size={17} />, table: 'expenses' },
       { path: '/subscriptions', label: '구독 관리', icon: <CreditCard size={17} />, table: 'subscriptions', subscriptionOnly: true },
-      { path: '/project-pl', label: '매출 · 영업이익', icon: <BarChart3 size={17} />, table: 'projects' },
-      { path: '/sales-summary', label: '매출집계', icon: <LineChart size={17} />, table: '누적생산량', oemOnly: true },
-      { path: '/documents', label: '서류 출력', icon: <FileText size={17} />, table: '공장PO · PI · PL', oemOnly: true },
+      { path: '/project-pl', label: '매출·손익', icon: <BarChart3 size={17} />, table: 'projects' },
     ],
   },
   {
     label: '관리',
     items: [
-      { path: '/settings', label: '환율·기초설정', icon: <Settings size={17} />, table: 'exchange_rates' },
-      { path: '/users', label: '사용자 관리', icon: <UserRound size={17} />, table: 'app_users', adminOnly: true },
-      { path: '/org', label: '조직·업무 담당', icon: <Network size={17} />, table: 'org_chart' },
+      { path: '/settings', label: '관리·설정', icon: <Settings size={17} />, table: '환율 · 사용자 · 조직', adminOnly: true },
     ],
   },
 ];
@@ -143,41 +134,6 @@ const brandBottomTabs = [
 ];
 
 // 주소는 lib/hosts 가 지금 보고 있는 주소에서 계산한다
-
-/**
- * LUMEN/AETALOOF 탭 사이드바 = PMS 탭 미러.
- * PMS(atlm-daily-check web/src/App.tsx) 탭 구조와 동기 — PMS 탭이 바뀌면 이 배열만 갱신.
- * 링크는 PMS의 location.hash 라우팅(#탭이름)으로 해당 탭 직행. 인증은 ERP 쿠키 SSO.
- */
-const pmsTabs: { group: string; label: string; icon: React.ReactNode }[] = [
-  { group: '데이터 & 점검', label: '일일점검', icon: <BarChart3 size={17} /> },
-  { group: '데이터 & 점검', label: '채널별 매출', icon: <LineChart size={17} /> },
-  { group: '데이터 & 점검', label: '상품 성과', icon: <TrendingUp size={17} /> },
-  { group: '데이터 & 점검', label: '상품관리', icon: <Package size={17} /> },   // 리오더·시즌 계획·상품 수명 → 상품관리 서브탭 (10/7)
-  { group: '데이터 & 점검', label: '주문관리', icon: <Truck size={17} /> },
-  { group: '데이터 & 점검', label: '국가별 주간', icon: <Globe size={17} /> },
-  { group: '데이터 & 점검', label: '주간·일회성', icon: <FileSpreadsheet size={17} /> },
-  { group: '데이터 & 점검', label: '점검 가이드', icon: <BookOpen size={17} /> },
-  { group: '데이터 & 점검', label: '상품 리스트', icon: <Package size={17} /> },
-  { group: '데이터 & 점검', label: '상품 손익', icon: <FileSpreadsheet size={17} /> },
-  { group: '데이터 & 점검', label: '재고관리', icon: <Layers size={17} /> },
-  { group: '데이터 & 점검', label: '채널 플랜', icon: <FileSpreadsheet size={17} /> },
-  // PMS 에서 채널 대조는 시트 탭이라 '데이터 & 점검'에 있다. 마케팅 대시보드는 PMS 에서 없어져(8월) 뺐다 — 누르면 아무 데도 안 갔다 (10/8)
-  { group: '데이터 & 점검', label: '채널 대조', icon: <ClipboardCheck size={17} /> },
-  { group: '상품 운영', label: '상품 콘텐츠', icon: <Package size={17} /> },
-  { group: '상품 운영', label: '상세페이지 교정', icon: <ClipboardCheck size={17} /> },
-  { group: '상품 운영', label: '자사몰관리', icon: <Store size={17} /> },
-  { group: '콘텐츠 제작', label: '이미지 생성', icon: <ImageIcon size={17} /> },
-  { group: '브랜드 인텔리전스', label: '브랜드 분석', icon: <Building2 size={17} /> },
-  { group: '분석 & 진단', label: '매출분석', icon: <BarChart3 size={17} /> },
-  { group: '분석 & 진단', label: '체크아웃 퍼널', icon: <LineChart size={17} /> },
-  { group: '분석 & 진단', label: 'AI 유입 구매', icon: <Globe size={17} /> },
-  { group: '실행 & 일정', label: '할인 캠페인', icon: <Percent size={17} /> },
-  { group: '실행 & 일정', label: '배송비 분석', icon: <Truck size={17} /> },
-  { group: '실행 & 일정', label: '사이트 진단', icon: <Globe size={17} /> },
-  { group: '실행 & 일정', label: '업로드 캘린더', icon: <CalendarDays size={17} /> },
-  { group: '실행 & 일정', label: '일정 목록', icon: <CalendarDays size={17} /> },
-];
 
 /** 사이드바에는 의사결정 단위만 노출하고, 세부 탭은 PMS 작업공간 안에서 선택한다. */
 const brandWorkspaces = [
@@ -601,6 +557,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onSelect={() => navigate('/workflow')}>업무 흐름 안내</DropdownMenuItem>
                   {/* 업무 비서 위젯이 이 이벤트를 받아 프로필 화면을 연다 */}
                   <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event('work:open-profile'))}>
                     내 업무 프로필
