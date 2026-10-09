@@ -11,6 +11,7 @@ import { kstToday } from './work.js';
 import { allRows } from './work-records.js';
 import { productionRisks } from './production-risk.js';
 import { buildMonthlyCashPlan, statementTotal } from '../client/src/lib/cashPlan.js';
+import { orgTeam } from './org.js';
 
 export type Watch = { facts: string[]; alerts: number };
 
@@ -36,7 +37,7 @@ const stmtAmount = (s: any) => statementTotal({ ...s, lines: Array.isArray(s.lin
 
 export const campaignTeams = (team: string, workspace: string) => team === '디자인'
   ? workspace === 'LUMEN' ? ['루멘 디자인'] : workspace === 'AETALOOF' ? ['에탈루프 디자인'] : []
-  : TASK_TEAM[team] || [];
+  : TASK_TEAM[team] || (orgTeam(team) ? [team] : []);
 
 /** 팀 → 감시 데이터. 한 표를 못 읽으면 그 표를 쓰는 팀만 "읽지 못함"으로 남기고 나머지는 진행 */
 export async function gatherWatch(read = restAsServer, readPms = pms): Promise<Map<string, Watch>> {

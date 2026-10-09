@@ -947,6 +947,7 @@ export const phase1 = {
     const m = new Map<string, InboundPO>();
     lines.forEach(l => {
       const b = batches.find(x => x.id === l.batchId);
+      if (!b || !['issued', 'split'].includes(b.status)) return;
       const g = m.get(l.poNo!) || {
         poNo: l.poNo!, workspace: b?.workspace || '', projectNo: b?.projectNo || '',
         title: b?.title || '', factoryId: l.factoryId, factoryName: l.factoryName || '미지정',
@@ -1649,6 +1650,8 @@ export async function pullBrandOrders(): Promise<number> {
     db.from('approval_logs').select('*'),
   ]);
   if (b.error) throw b.error;
+  if (l.error) throw l.error;
+  if (g.error) throw g.error;
   setAll(KEYS.brandBatches, (b.data || []).map(rowToBatch));
   if (!l.error) setAll(KEYS.brandLines, (l.data || []).map(rowToLine));
   if (!g.error) {

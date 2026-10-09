@@ -81,6 +81,10 @@ assert.equal(inbox.length, 1, `수주함은 1장이어야 한다 (받은 것: ${
 assert.equal(inbox[0].poNo, oem.poNo, '수주함에 온 것은 경유 건이어야 한다');
 assert.equal(inbox[0].lines.length, 2);
 assert.ok(!inbox.some(p => p.lines.some(l => l.route === 'direct')), '직발주가 수주함에 오면 안 된다');
+// 취소/초안 상태에 과거 PO 값이 남아도 수주함에는 표시하지 않는다.
+phase1.updateBrandBatch(batch.id, { status: 'draft' });
+assert.equal(phase1.getInboundPOs().length, 0, '초안의 과거 PO가 수주함에 표시되면 안 된다');
+phase1.updateBrandBatch(batch.id, { status: 'issued' });
 
 // ── 4. 받으면 수주함에서 빠진다 (두 번 받아 발주가 겹치는 사고 방지)
 phase1.markPOAccepted(oem.poNo);

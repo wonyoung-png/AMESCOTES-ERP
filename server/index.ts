@@ -22,6 +22,7 @@ import gcalRouter, { startGcalSync } from "./gcal.js";
 import pixelRouter from "./pixel.js";
 import subscriptionsRouter from "./subscriptions.js";
 import productionRiskRouter from "./production-risk-routes.js";
+import brandWorkflowRouter from "./brand-workflow.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,6 +74,7 @@ async function startServer() {
   // Daily 데이터 브리지 (플랫폼 간 연계)
   app.use(dailyBridgeRouter);
   app.use(reorderBridgeRouter);
+  app.use(brandWorkflowRouter);
 
   // OCR 라우터
   app.use(yardageOcrRouter);

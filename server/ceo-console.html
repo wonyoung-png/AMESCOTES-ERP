@@ -262,6 +262,7 @@ async function api(path, body) {
     headers: body ? {'Content-Type':'application/json'} : undefined, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw Object.assign(new Error(j.message || j.error || 'HTTP ' + r.status), { status: r.status });
+  if (j.notified === false) alert('저장은 완료됐지만 알림 전달에 실패했습니다. 업무함에서 공유 기록을 확인해주세요.');
   return j;
 }
 

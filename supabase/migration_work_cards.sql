@@ -77,6 +77,7 @@ declare
   v_end    date;
   v_rate   numeric;
   v_ws     text;
+  v_payload jsonb;
 begin
   select * into v_card from public.work_cards where id = p_id for update;
   if not found then raise exception 'not_found'; end if;
@@ -89,15 +90,20 @@ begin
   begin v_start := (p_payload->>'startDate')::date;
   exception when others then v_start := null; end;
   if v_start is null then raise exception 'start_required'; end if;
+  if (p_payload->>'startDate') is distinct from to_char(v_start,'YYYY-MM-DD') then raise exception 'start_required'; end if;
 
-  begin v_end := coalesce((p_payload->>'endDate')::date, v_start);
-  exception when others then v_end := v_start; end;
-  if v_end < v_start then v_end := v_start; end if;
+  begin v_end := coalesce(nullif(p_payload->>'endDate','')::date, v_start);
+  exception when others then raise exception 'end_invalid'; end;
+  if v_end < v_start or (nullif(p_payload->>'endDate','') is not null and p_payload->>'endDate'<>to_char(v_end,'YYYY-MM-DD')) then raise exception 'end_invalid'; end if;
 
   begin v_rate := nullif(p_payload->>'discountRate', '')::numeric;
-  exception when others then v_rate := null; end;
+  exception when others then raise exception 'discount_invalid'; end;
+  if v_rate<0 or v_rate>100 then raise exception 'discount_invalid'; end if;
 
-  v_ws := case when p_payload->>'workspace' = 'AETALOOF' then 'AETALOOF' else 'LUMEN' end;
+  v_ws := p_payload->>'workspace';
+  if v_ws is null or v_ws not in ('LUMEN','AETALOOF') then raise exception 'workspace_required'; end if;
+  if coalesce(p_payload->>'channel','') not in ('자사몰','센텀','29CM','W컨셉','쇼룸','해외') then raise exception 'channel_required'; end if;
+  v_payload:=p_payload||jsonb_build_object('title',v_title,'startDate',to_char(v_start,'YYYY-MM-DD'),'endDate',to_char(v_end,'YYYY-MM-DD'),'discountRate',v_rate);
   v_cid := 'cmp_' || to_char(clock_timestamp(), 'YYMMDDHH24MISS') || substr(md5(random()::text), 1, 4);
 
   insert into public.campaigns (
@@ -110,7 +116,7 @@ begin
   );
 
   update public.work_cards set
-    status = 'done', confirmed_payload = p_payload, shared_teams = coalesce(p_shared, '{}'),
+    status = 'done', confirmed_payload = v_payload, shared_teams = coalesce(p_shared, '{}'),
     result_ref = jsonb_build_object('table', 'campaigns', 'id', v_cid),
     done_by_name = p_actor_name, done_at = now(), updated_at = now()
   where id = p_id;

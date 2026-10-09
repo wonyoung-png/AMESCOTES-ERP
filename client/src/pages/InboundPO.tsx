@@ -9,10 +9,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { phase1, pullBrandOrders, type InboundPO as InboundPOType } from '@/lib/phase1';
-import { store, genId, formatNumber, type Vendor } from '@/lib/store';
-import { deleteOrder, fetchOrders, upsertOrder } from '@/lib/dbQueries';
-import { saveInboundOrders } from '@/lib/inboundOrderSave';
-import { nextOrderNo } from '@/lib/orderNo';
+import { formatNumber } from '@/lib/store';
+import { brandWorkflow } from '@/lib/brandWorkflow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -24,82 +22,30 @@ export default function InboundPO() {
   const [busy, setBusy] = useState('');
   /** PO별 납기 회신 — 여기서 정한 날이 브랜드 오더관리의 확정 납기가 된다 */
   const [dely, setDely] = useState<Record<string, string>>({});
-  const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
   // 서버가 정본 — 발주서를 만든 사람과 받는 사람은 다른 브라우저다
   const { data: pulled = 0 } = useQuery({ queryKey: ['brandOrders'], queryFn: pullBrandOrders });
 
   const pos = useMemo(() => phase1.getInboundPOs(), [pulled, busy]);
-  const items = store.getItems();
-  const vendors = store.getVendors();
 
   /** 발주서 1장 → 스타일별 생산발주. 번호는 발주서 번호를 PO로 승계한다 */
   const accept = async (po: InboundPOType) => {
     const due = dely[po.poNo] || '';
     if (!due) { toast.error('납기(예상입고일)를 먼저 입력하세요'); return; }
     setBusy(po.poNo);
+    let saved = false;
     try {
-      const known = [...orders] as any[];
-      const batch = phase1.getBrandBatches().find(b => b.projectNo === po.projectNo);
-      let buyer = vendors.find(v =>
-        v.type === '바이어' && (
-          v.name.toUpperCase() === po.workspace
-          || v.companyName?.toUpperCase() === po.workspace
-          || v.code?.toUpperCase() === (po.workspace === 'LUMEN' ? 'LLL' : 'AET')
-        ),
-      );
-      if (!buyer) {
-        buyer = {
-          id: `vendor-internal-${po.workspace.toLowerCase()}`,
-          name: po.workspace,
-          code: po.workspace === 'LUMEN' ? 'LLL' : 'AET',
-          companyName: po.workspace,
-          type: '바이어', country: '한국', currency: 'KRW', contactHistory: [],
-          createdAt: new Date().toISOString(), memo: '브랜드 내부거래 바이어 자동 생성',
-        } satisfies Vendor;
-        store.addVendor(buyer);
-      }
-      const newOrders = po.lines.map(l => {
-        const item = items.find(i => i.styleNo === l.styleNo);
-        const orderNo = nextOrderNo(l.styleNo, known);
-        const order: any = {
-          id: genId(),
-          orderNo,
-          workspace: 'OEM',
-          poBatchNo: po.poNo,          // 브랜드 발주서 번호는 묶음 참조번호로 유지
-          projectNo: po.projectNo,
-          brandBatchId: batch?.id,
-          buyerId: buyer.id,
-          styleId: item?.id || l.styleNo,
-          styleNo: l.styleNo,
-          styleName: l.styleName,
-          season: item?.season,
-          qty: l.qty || l.colorQtys.reduce((s, c) => s + c.qty, 0),
-          colorQtys: l.colorQtys,
-          vendorId: l.factoryId || '',
-          vendorName: l.factoryName || '',
-          productionOrigin: l.productionOrigin,
-          isEmployeePurchase: l.isEmployeePurchase,
-          deliveryDate: due,        // ← 회신 납기. 브랜드 오더관리에 그대로 뜬다
-          status: '발주생성',
-          hqSupplyItems: [],
-          attachments: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        known.push(order);
-        return order;
-      });
-      await saveInboundOrders(newOrders, upsertOrder, deleteOrder);
-      phase1.markPOAccepted(po.poNo);
-      // 브랜드 쪽 발주에도 확정 납기를 남긴다 — MD는 이 날짜를 보고 판매를 짠다
-      if (batch) phase1.updateBrandBatch(batch.id, { expectedDely: due });
+      const result = await brandWorkflow(`brand-pos/${encodeURIComponent(po.poNo)}/accept`, { dueDate: due });
+      saved = true;
+      await pullBrandOrders();
       qc.invalidateQueries({ queryKey: ['orders'] });
       qc.invalidateQueries({ queryKey: ['brandOrders'] });
-      toast.success(`${po.poNo} 수주 — 생산발주 ${po.lines.length}건 · 납기 ${due}`);
+      toast.success(result.already ? `${po.poNo} 이미 수주 처리됐습니다 — 중복 생성하지 않았습니다`
+        : `${po.poNo} 수주 — 생산발주 ${result.count}건 · 납기 ${due}`);
     } catch (e: any) {
       qc.invalidateQueries({ queryKey: ['orders'] });
       qc.invalidateQueries({ queryKey: ['brandOrders'] });
-      toast.error('생산발주 등록 실패: ' + (e?.message || e));
+      if (saved) toast.warning('수주는 저장됐지만 목록 조회에 실패했습니다 — 새로고침해주세요');
+      else toast.error('수주 결과 확인: ' + (e?.message || e));
     } finally {
       setBusy('');
     }
@@ -110,7 +56,7 @@ export default function InboundPO() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">수주함</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          브랜드가 넘긴 발주서. 납기를 회신하면 발주서 번호가 그대로 PO가 되고 스타일별 생산발주가 생깁니다
+          브랜드가 넘긴 발주서. 납기 회신·생산발주 생성·수주 완료를 함께 저장합니다. 발주서 번호는 원본 참조로 유지됩니다.
         </p>
       </div>
 
@@ -118,7 +64,7 @@ export default function InboundPO() {
         <div className="bg-card rounded-lg border p-12 text-center">
           <Inbox className="w-8 h-8 mx-auto text-muted-foreground mb-3" />
           <p className="text-sm text-muted-foreground">
-            받을 발주서가 없습니다. 브랜드 오더관리에서 「발주」를 누르면 여기로 옵니다.
+            받을 발주서가 없습니다. 브랜드 오더관리에서 대표 승인 후 「발주서 발행」을 누르면 여기로 옵니다.
           </p>
         </div>
       ) : (

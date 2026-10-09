@@ -8,6 +8,7 @@ import { Link } from 'wouter';
 import { toast } from 'sonner';
 import { fetchCampaignsSB } from '@/lib/campaignQueries';
 import { CAMPAIGN_TEAMS } from '@/lib/phase1';
+import { schedulePayload } from '../../../shared/schedule';
 
 export type Card = {
   id: string; created_at: string; created_by: string; created_by_name: string; team: string;
@@ -67,6 +68,7 @@ export async function postWork(text: string): Promise<Card | null> {
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { toast.error(j.error === 'no_session' ? '로그인이 풀렸습니다' : '올리기 실패'); return null; }
+    if (j.notified === false) toast.warning('업무는 저장됐지만 확인 요청 알림 전달에 실패했습니다 — 업무함에서 확인해주세요');
     return j.card as Card;
   } catch { toast.error('올리기 실패 — 통신 상태를 확인해주세요'); return null; }
 }
@@ -96,7 +98,7 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState({
-    title: p.title || '', channel: CHANNELS.includes(p.channel) ? p.channel : '',
+    title: p.title || '', channel: CHANNELS.includes(p.channel) ? p.channel : '', workspace: p.workspace || '',
     startDate: p.startDate || '', endDate: p.endDate || '', discountRate: p.discountRate ?? '',
   });
   // 같이 알릴 팀 — AI 추천이 먼저 체크돼 있고, 확정하는 사람이 고친다
@@ -124,7 +126,8 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { toast.error(j.message || (j.error === 'already' ? '이미 처리됐습니다' : '처리 실패')); return false; }
-      toast.success(ok);
+      if (j.notified === false) toast.warning('저장은 완료됐지만 알림 전달에 실패했습니다 — 업무함에서 확인해주세요');
+      else toast.success(ok);
       onDone();
       return true;
     } catch { toast.error('처리 실패 — 통신 상태를 확인해주세요'); return false; }
@@ -133,7 +136,9 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
 
   const confirm = async () => {
     if (!f.title.trim() || !f.startDate) { toast.error('이름과 시작일은 있어야 합니다'); return; }
-    const payload = { ...f, discountRate: f.discountRate === '' ? null : Number(f.discountRate), workspace: p.workspace };
+    let payload;
+    try { payload = schedulePayload(f); }
+    catch (e) { toast.error((e as Error).message); return; }
     const ok = teams.length ? `운영캘린더에 등록하고 ${teams.join('·')}에 알렸습니다` : '운영캘린더에 등록했습니다 (알린 팀 없음)';
     if (await post('confirm', { payload, shareTeams: teams }, ok)) {
       // 캘린더는 로컬 사본을 읽는다. 앱을 다시 열 때까지 기다리지 않게 새 기획전을 바로 내려받는다
@@ -208,6 +213,9 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
         <div className="mt-2 grid grid-cols-2 gap-2">
           <input value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="기획전 이름"
             className={`col-span-2 ${input}`} />
+          <select aria-label="기획전 브랜드" value={f.workspace} onChange={e => setF({ ...f, workspace: e.target.value })} className={`col-span-2 ${input}`}>
+            <option value="">브랜드 선택</option><option>LUMEN</option><option>AETALOOF</option>
+          </select>
           <select value={f.channel} onChange={e => setF({ ...f, channel: e.target.value })} className={input}>
             <option value="">채널 선택</option>
             {CHANNELS.map(ch => <option key={ch}>{ch}</option>)}

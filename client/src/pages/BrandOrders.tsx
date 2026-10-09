@@ -20,6 +20,7 @@ import { Send, Package, Factory, Trash2, Undo2 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import StylePickerSheet, { type PickedLine } from '@/components/StylePickerSheet';
 import ReorderImport from '@/components/ReorderImport';
+import { brandWorkflow } from '@/lib/brandWorkflow';
 
 const PIPELINE = ['발주', '진행중', '생산완료', '한국/중국입고', '미지급 등록', '공장결제'] as const;
 
@@ -63,6 +64,7 @@ export default function BrandOrders() {
   const { data: pulled = 0 } = useQuery({ queryKey: ['brandOrders'], queryFn: pullBrandOrders });
   const [tickN, tick] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [workflowBusy, setWorkflowBusy] = useState(false);
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['orders'] });
     queryClient.invalidateQueries({ queryKey: ['brandOrders'] });
@@ -177,13 +179,22 @@ export default function BrandOrders() {
   };
 
   /** 발주 취소 — 수주함이 받기 전이면 초안으로 되돌린다 */
-  const cancelIssue = () => {
-    if (!detail) return;
+  const cancelIssue = async () => {
+    if (!detail || workflowBusy) return;
     if (!confirm(`${detail.projectNo} 발주를 취소합니다. 초안으로 되돌아갑니다.`)) return;
-    const r = phase1.cancelBrandIssue(detail.id);
-    if (!r.ok) { toast.error(r.reason || '취소 실패'); return; }
-    refresh(); setSelected(phase1.getBrandBatch(detail.id) || null);
-    toast.success('발주 취소 — 다시 수정할 수 있습니다');
+    setWorkflowBusy(true);
+    let saved = false;
+    try {
+      await brandWorkflow(`brand-batches/${encodeURIComponent(detail.id)}/cancel-issue`);
+      saved = true;
+      await pullBrandOrders();
+      refresh(); setSelected(phase1.getBrandBatch(detail.id) || null);
+      toast.success('발주 취소 — 다시 수정 후 대표 승인이 필요합니다');
+    } catch (e: any) {
+      refresh();
+      if (saved) toast.warning('취소는 저장됐지만 목록 조회에 실패했습니다 — 새로고침해주세요');
+      else toast.error(e.message || '취소 실패');
+    } finally { setWorkflowBusy(false); }
   };
 
   /** 발주 삭제 — 안 나간 것만 */
@@ -224,20 +235,50 @@ export default function BrandOrders() {
   };
 
   /** 발주서 발행 — 공장별로 1장. 이 번호가 AMESCOTES의 PO가 된다 */
-  const issue = () => {
+  const approve = async () => {
+    if (!detail || workflowBusy) return;
+    setWorkflowBusy(true);
+    let saved = false;
+    try {
+      await brandWorkflow(`brand-batches/${encodeURIComponent(detail.id)}/approve`);
+      saved = true;
+      await pullBrandOrders();
+      setSelected(phase1.getBrandBatch(detail.id) || null);
+      refresh();
+      toast.success('대표 승인 완료 — 발주서를 발행할 수 있습니다');
+    } catch (e: any) {
+      refresh();
+      if (saved) toast.warning('승인은 저장됐지만 목록 조회에 실패했습니다 — 새로고침해주세요');
+      else toast.error(e.message || '승인 실패');
+    }
+    finally { setWorkflowBusy(false); }
+  };
+  const issue = async () => {
     if (!detail) return;
-    const issued = phase1.issueBrandBatch(detail.id);
-    if (!issued.length) { toast.error('승인 완료된 발주만 발행 가능'); return; }
-    toast.success(
-      `발주서 ${issued.length}장 발행 — ${issued.map(i => `${i.poNo} ${i.route === 'direct' ? '[직발주]' : ''}(${i.factoryName})`).join(' · ')}`,
-    );
-    refresh();
+    if (workflowBusy) return;
+    setWorkflowBusy(true);
+    let saved = false;
+    try {
+      const issued = await brandWorkflow(`brand-batches/${encodeURIComponent(detail.id)}/issue`) as { poNo: string; route: string; factoryName: string }[];
+      saved = true;
+      await pullBrandOrders();
+      setSelected(phase1.getBrandBatch(detail.id) || null);
+      refresh();
+      toast.success(`발주서 ${issued.length}장 발행 — ${issued.map(i => `${i.poNo} ${i.route === 'direct' ? '[직발주]' : ''}(${i.factoryName})`).join(' · ')}`);
+    } catch (e: any) {
+      refresh();
+      if (saved) toast.warning('발주서는 저장됐지만 목록 조회에 실패했습니다 — 새로고침해주세요');
+      else toast.error(e.message || '발행 실패');
+    }
+    finally { setWorkflowBusy(false); }
   };
 
   /** 발주가 지금 어디까지 왔는지 — 담는 중 → 발주 → 납기확정 → 분할 */
   const stepLabel = (batch: BrandOrderBatch) => {
     if (batch.status === 'split') return '생산발주 완료';
     if (batch.status === 'issued') return batch.expectedDely ? `납기 ${batch.expectedDely}` : '납기 대기';
+    if (batch.status === 'approved') return '승인 완료 · 발행 대기';
+    if (batch.status === 'in_approval') return '승인 대기';
     return '작성중';
   };
 
@@ -549,15 +590,18 @@ export default function BrandOrders() {
                         );
                       })()}
                       {!detail.lines.some(l => l.acceptedAt) && (
-                        <Button size="sm" variant="outline" className="h-7 text-xs ml-auto" onClick={cancelIssue}>
+                        <Button size="sm" variant="outline" className="h-7 text-xs ml-auto" onClick={cancelIssue} disabled={workflowBusy}>
                           <Undo2 className="w-3 h-3 mr-1" />발주 취소
                         </Button>
                       )}
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Button size="sm" onClick={issue} disabled={detail.lines.length === 0}>
-                        <Send className="w-3 h-3 mr-1" />발주
+                      {['draft', 'in_approval'].includes(detail.status) && getCurrentUser()?.role === '대표' && (
+                        <Button size="sm" onClick={approve} disabled={workflowBusy || detail.lines.length === 0}>대표 승인</Button>
+                      )}
+                      <Button size="sm" onClick={issue} disabled={workflowBusy || detail.status !== 'approved' || detail.lines.length === 0}>
+                        <Send className="w-3 h-3 mr-1" />발주서 발행
                       </Button>
                       <span className="text-[11px] text-muted-foreground">
                         AMESCOTES 수주함으로 넘어갑니다. 납기는 수주함에서 회신됩니다

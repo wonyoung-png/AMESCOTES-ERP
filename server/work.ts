@@ -10,6 +10,7 @@ import { requireUser, requireRole, userOf, restAsServer, CEO_EMAILS, type Sessio
 import { syncSoon, myUpcoming } from './gcal.js';
 import { ORG } from './org.js';
 import { searchCards, prioritizeCards, allRows } from './work-records.js';
+import { schedulePayload, SCHEDULE_CHANNELS } from '../shared/schedule.js';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ type Kind = typeof KINDS[number];
 export const CLASSIFY_MODEL = 'claude-sonnet-5-5';
 export const ANSWER_MODEL = 'claude-opus-5-5';
 
-const CHANNELS = ['자사몰', '센텀', '29CM', 'W컨셉', '쇼룸', '해외'];
+const CHANNELS = SCHEDULE_CHANNELS;
 
 /** 회사 팀 — client/src/lib/phase1.ts CAMPAIGN_TEAMS 와 같다 */
 const TEAMS = ORG.map(t => t.key);
@@ -73,15 +74,18 @@ function leadersOf(team: string, all: Member[]): Member[] {
   return all.filter(m => m.role === '대표' && m.email.endsWith('@atlm.kr'));
 }
 
-export async function notify(rows: Array<{ user_id: string; card_id: string; title: string; body?: string }>) {
+export async function notify(rows: Array<{ user_id: string; card_id: string; title: string; body?: string }>, write = restAsServer) {
   const uniq = new Map(rows.map(r => [r.user_id, r]));
-  if (!uniq.size) return;
-  const r = await restAsServer('notifications', {
-    method: 'POST',
-    body: JSON.stringify(Array.from(uniq.values()).map(n => ({ id: genId('ntf'), link: '/work', ...n }))),
-  });
-  // 알림이 안 가도 카드는 남아 있다. 저장을 되돌릴 일은 아니고 로그만 남긴다
-  if (!r.ok) console.error('[work] 알림 저장 실패:', (await r.text()).slice(0, 300));
+  if (!uniq.size) return true;
+  try {
+    const r = await write('notifications', {
+      method: 'POST',
+      body: JSON.stringify(Array.from(uniq.values()).map(n => ({ id: genId('ntf'), link: '/work', ...n }))),
+    });
+    // 저장된 업무는 유지하고 알림 실패만 별도로 반환한다.
+    if (!r.ok) console.error('[work] 알림 저장 실패:', (await r.text()).slice(0, 300));
+    return r.ok;
+  } catch (e) { console.error('[work] 알림 저장 실패', e); return false; }
 }
 
 // ───────────────────────── AI 판정
@@ -118,9 +122,9 @@ async function classify(opts: {
 브랜드가 에탈루프(AETALOOF)면 workspace=AETALOOF, 아니면 LUMEN.
 
 schedule 이면 shareTeams 에 같이 알아야 할 팀을 이 중에서 고른다: ${TEAMS.join(' | ')} (쓴 사람 팀은 빼고)
-- 기획전·할인: 마케팅(광고·콘텐츠), 물류CS(출고·고객 문의)는 거의 늘 필요하다
-- 매장·쇼룸 판매가 걸리면 쇼룸, 배너·상세 이미지가 새로 필요하면 비주얼컨텐츠·디자인
-- 해외 채널이면 해외영업, 생산·입고 일정이 걸리면 생산
+- 기획전·할인: 마케팅, 물류·CS는 거의 늘 필요하다
+- 매장·쇼룸 판매가 걸리면 리테일, 배너·상세 이미지가 새로 필요하면 비주얼·콘텐츠 및 해당 브랜드 디자인 팀
+- 해외 채널이면 글로벌 MD, 생산·입고 일정이 걸리면 생산관리
 - 필요 없는 팀까지 넣지 마라. 다른 kind 면 [] 로 둔다
 
 이 팀에 열려 있는 카드:
@@ -245,7 +249,7 @@ ${esc(cards.map(fmtCard).join('\n')) || '(없음)'}
  *  확인 요청 → 쓴 사람의 팀장 (팀장이 쓰면 대표). 받을 사람이 없거나 대표가 쓴 것이면 본인 할 일로
  *  할 일     → 쓴 사람
  */
-function routeFor(kind: Kind, author: Member, all: Member[]): { kind: Kind; owner?: Member } {
+export function routeFor(kind: Kind, author: Member, all: Member[]): { kind: Kind; owner?: Member } {
   if (kind === 'request_check') {
     const leads = leadersOf(author.team, all).filter(m => m.id !== author.id);
     const a = leads[0] || leadersOf('', all).find(m => m.id !== author.id);
@@ -303,11 +307,10 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
     });
     if (!r.ok) { res.status(502).json({ error: 'save_failed', detail: (await r.text()).slice(0, 300) }); return; }
 
-    if (assignee) {
-      await notify([{ user_id: assignee.id, card_id: card.id, title: `${me.name} — 확인 요청`, body: text }]);
-    }
+    const notified = assignee
+      ? await notify([{ user_id: assignee.id, card_id: card.id, title: `${me.name} — 확인 요청`, body: text }]) : true;
     syncSoon(); // 마감 있는 할 일이면 구글 캘린더에도
-    res.json({ ok: true, card: (await r.json())[0] });
+    res.json({ ok: true, card: (await r.json())[0], notified });
   } catch (e) {
     console.error('POST /api/work 실패:', e);
     res.status(500).json({ error: 'internal' });
@@ -387,10 +390,9 @@ router.post('/api/work/:id/reply', requireUser(), async (req: Request, res: Resp
     if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
     if (!(await r.json()).length) { res.status(409).json({ error: 'already' }); return; }
 
-    if (card.created_by && card.created_by !== me.id) {
-      await notify([{ user_id: card.created_by, card_id: card.id, title: `${me.name} — 답변`, body: text }]);
-    }
-    res.json({ ok: true });
+    const notified = card.created_by && card.created_by !== me.id
+      ? await notify([{ user_id: card.created_by, card_id: card.id, title: `${me.name} — 답변`, body: text }]) : true;
+    res.json({ ok: true, notified });
   } catch (e) {
     console.error('POST /api/work/:id/reply 실패:', e);
     res.status(500).json({ error: 'internal' });
@@ -463,11 +465,10 @@ router.post('/api/work/:id/kind', requireUser(), async (req: Request, res: Respo
     if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
     if (!(await r.json()).length) { res.status(409).json({ error: 'already' }); return; }
 
-    if (routed.kind === 'request_check' && routed.owner) {
-      await notify([{ user_id: routed.owner.id, card_id: card.id, title: `${author.name} — 확인 요청`, body: card.raw_text }]);
-    }
+    const notified = routed.kind === 'request_check' && routed.owner
+      ? await notify([{ user_id: routed.owner.id, card_id: card.id, title: `${author.name} — 확인 요청`, body: card.raw_text }]) : true;
     syncSoon();
-    res.json({ ok: true, kind: routed.kind });
+    res.json({ ok: true, kind: routed.kind, notified });
   } catch (e) {
     console.error('POST /api/work/:id/kind 실패:', e);
     res.status(500).json({ error: 'internal' });
@@ -537,8 +538,9 @@ router.post('/api/work/:id/confirm', requireUser(), async (req: Request, res: Re
     const { all, me, card, leader } = ctx;
     if (!(card.created_by === me.id || leader || isBoss(me))) { res.status(403).json({ error: 'forbidden' }); return; }
 
-    const payload = { ...(card.parsed || {}), ...((req.body ?? {}).payload || {}) };
-    if (payload.channel && !CHANNELS.includes(payload.channel)) payload.channel = '';
+    let payload;
+    try { payload = schedulePayload({ ...(card.parsed || {}), ...((req.body ?? {}).payload || {}) }); }
+    catch (e) { res.status(400).json({ error: 'invalid_schedule', message: (e as Error).message }); return; }
     // 확정하는 사람이 고른 팀 > AI 추천 > 기본값 순. 빈 배열도 "아무 팀에도 안 알림"이라는 선택이다
     const shared = cleanTeams((req.body ?? {}).shareTeams, card.team)
       ?? cleanTeams(card.parsed?.shareTeams, card.team)
@@ -567,14 +569,14 @@ router.post('/api/work/:id/confirm', requireUser(), async (req: Request, res: Re
     const title = String(payload.title || card.raw_text);
     const when = payload.startDate === payload.endDate || !payload.endDate
       ? payload.startDate : `${payload.startDate}~${payload.endDate}`;
-    await notify([
+    const notified = await notify([
       ...all.filter(m => shared.includes(m.team) && m.id !== me.id)
         .map(m => ({ user_id: m.id, card_id: card.id, title: `[${card.team || '팀'}] 일정 공유`, body: `${when} ${title}` })),
       ...(card.created_by && card.created_by !== me.id
         ? [{ user_id: card.created_by, card_id: card.id, title: `${me.name} — 캘린더 등록`, body: `${when} ${title}` }] : []),
     ]);
     syncSoon(); // 공유받은 팀원들 구글 캘린더에 기획전
-    res.json({ ok: true, ref, shared });
+    res.json({ ok: true, ref, shared, notified: notified !== false });
   } catch (e) {
     console.error('POST /api/work/:id/confirm 실패:', e);
     res.status(500).json({ error: 'internal' });
