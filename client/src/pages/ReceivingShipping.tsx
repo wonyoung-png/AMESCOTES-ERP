@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { CheckCircle2, Package, Plane, Ship, Truck, Warehouse } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { confirmShippingPlan, fetchShippingPlans, upsertShippingPlan, type ShippingMethod } from '@/lib/shippingPlans';
+import { validDate } from '../../../shared/schedule';
 
 const LOG_LABELS: Record<ReceiptLogType, string> = {
   inbound: '입고',
@@ -74,7 +75,9 @@ export default function ReceivingShipping() {
   };
 
   const submitLog = async () => {
-    if (!modal || form.qty <= 0) { toast.error('수량을 입력하세요'); return; }
+    if (!modal || !Number.isInteger(form.qty) || form.qty <= 0) { toast.error('수량은 양의 정수로 입력하세요'); return; }
+    if (!Number.isInteger(form.defectQty) || form.defectQty < 0) { toast.error('불량수량은 0 이상의 정수여야 합니다'); return; }
+    if (!validDate(form.date)) { toast.error('올바른 입출고 날짜를 입력하세요'); return; }
     const o = orders.find(x => x.id === modal.orderId);
     if (!o) return;
     const cur = phase1.getOrderReceiptSummary(o.id, o.qty);
@@ -116,11 +119,12 @@ export default function ReceivingShipping() {
       deliveryMarket: isInbound ? undefined : form.deliveryMarket,
     });
     if (isInbound) {
-      phase1.createPayableFromReceipt(receiptLog, {
+      const payable = phase1.createPayableFromReceipt(receiptLog, {
         unitPriceKrw: o.factoryUnitPriceKrw || 0,
         factoryVendorId: o.vendorId,
         factoryVendorName: o.vendorName,
       });
+      if (!payable) toast.warning('입고 기록과 별개로 공장 단가가 미확정이라 미지급을 생성하지 못했습니다');
     }
     if (modal.logType === 'outbound_oem' && newShipped >= o.qty) {
       const marker = `[AUTO-ORDER:${o.id}]`;

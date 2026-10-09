@@ -23,6 +23,7 @@ import pixelRouter from "./pixel.js";
 import subscriptionsRouter from "./subscriptions.js";
 import productionRiskRouter from "./production-risk-routes.js";
 import brandWorkflowRouter from "./brand-workflow.js";
+import payablePaymentRouter from "./payable-payment.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,6 +76,7 @@ async function startServer() {
   app.use(dailyBridgeRouter);
   app.use(reorderBridgeRouter);
   app.use(brandWorkflowRouter);
+  app.use(payablePaymentRouter);
 
   // OCR 라우터
   app.use(yardageOcrRouter);

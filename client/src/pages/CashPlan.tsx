@@ -32,7 +32,10 @@ export default function CashPlan() {
     const confirmed = p.sourceType === 'processing' ? payables.filter(x => x.sourceType === 'order_receipt' && x.orderId === p.orderId).reduce((sum, x) => sum + x.amountKrw, 0) : 0;
     const planned = parsePlannedExpense(p.memo);
     const stage = p.sourceType === 'processing' ? '예상' : planned?.stage || '확정';
-    return { id: p.id, name: p.vendorName, date: p.dueDate, amount: Math.max(0, p.amountKrw - p.paidAmountKrw - confirmed), note: `${stage} · ${planned ? `${planned.workspace} · ${planned.account || planned.category}${planned.installment ? ` · ${planned.installment}` : ''} · ${planned.description}` : p.orderNo || p.memo || ''}`, action: planned?.stage === '예상' ? () => { phase1.updatePayable(p.id, { memo: confirmPlannedExpenseMemo(p.memo) }); tick(n => n + 1); toast.success('계획지출을 확정했습니다'); } : undefined };
+    return { id: p.id, name: p.vendorName, date: p.dueDate, amount: Math.max(0, p.amountKrw - p.paidAmountKrw - confirmed), note: `${stage} · ${planned ? `${planned.workspace} · ${planned.account || planned.category}${planned.installment ? ` · ${planned.installment}` : ''} · ${planned.description}` : p.orderNo || p.memo || ''}`, action: planned?.stage === '예상' ? async () => {
+      try { await phase1.updatePayable(p.id, { memo: confirmPlannedExpenseMemo(p.memo) }); tick(n => n + 1); toast.success('계획지출을 확정했습니다'); }
+      catch (e: any) { toast.error('계획 확정 저장 실패: ' + (e.message || e)); }
+    } : undefined };
   }).filter(r => r.amount > 0);
   const plannedProjects = useMemo(() => buildPlannedExpenseProjects(payables), [payables]);
   const projection = opening !== '' && Number.isFinite(Number(opening)) ? dailyCashProjection(selected, Number(opening), incomingRows, outgoingRows) : [];

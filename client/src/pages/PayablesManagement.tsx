@@ -1,7 +1,8 @@
 // 미지급 · 불량 차감 이월
 import { useMemo, useState } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { phase1, DEFECT_DISPOSITION_LABEL } from '@/lib/phase1';
+import { phase1, pullPayables, DEFECT_DISPOSITION_LABEL } from '@/lib/phase1';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, formatKRW, formatNumber } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,11 @@ import { parsePlannedExpense } from '@/lib/cashPlan';
 export default function PayablesManagement() {
   const [, tick] = useState(0);
   const refresh = () => tick(n => n + 1);
-  const payables = phase1.getPayables();
+  const queryClient = useQueryClient();
+  const { data: serverPayables, isError, isLoading } = useQuery({ queryKey: ['payables'], queryFn: pullPayables, retry: false });
+  const payables = serverPayables || phase1.getPayables();
+  const [paymentBusy, setPaymentBusy] = useState('');
+  const [saveBusy, setSaveBusy] = useState(false);
   const defects = phase1.getDefectCarryovers();
   const vendors = store.getVendors();
 
@@ -50,15 +55,18 @@ export default function PayablesManagement() {
   const resetFilters = () => { setFVendor('all'); setFStatus('all'); setFSearch(''); };
 
   const stats = useMemo(() => ({
-    pending: payables.filter(p => p.status === 'pending' && parsePlannedExpense(p.memo)?.stage !== '예상').reduce((s, p) => s + p.amountKrw - p.paidAmountKrw, 0),
+    pending: payables.filter(p => p.status !== 'paid' && parsePlannedExpense(p.memo)?.stage !== '예상').reduce((s, p) => s + Math.max(0, p.amountKrw - p.paidAmountKrw), 0),
     defectPending: defects.filter(d => d.status === 'pending').reduce((s, d) => s + d.amountKrw, 0),
     partial: payables.filter(p => p.status === 'partial').length,
-    overdue: payables.filter(p => p.status !== 'paid' && p.dueDate && p.dueDate < new Date().toISOString().split('T')[0]).length,
+    overdue: payables.filter(p => p.status !== 'paid' && parsePlannedExpense(p.memo)?.stage !== '예상' && p.dueDate && p.dueDate < new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })).length,
   }), [payables, defects, tick]);
 
-  const addPayable = () => {
-    if (!payForm.vendorName || payForm.amountKrw <= 0) { toast.error('거래처와 금액 필수'); return; }
-    phase1.addPayable({
+  const addPayable = async () => {
+    if (saveBusy) return;
+    if (!payForm.vendorName.trim() || !Number.isFinite(payForm.amountKrw) || payForm.amountKrw <= 0) { toast.error('거래처와 금액 필수'); return; }
+    setSaveBusy(true);
+    try {
+    await phase1.savePayable({
       vendorId: payForm.vendorId,
       vendorName: payForm.vendorName,
       projectNo: payForm.projectNo || undefined,
@@ -67,9 +75,29 @@ export default function PayablesManagement() {
       dueDate: payForm.dueDate || new Date().toISOString().split('T')[0],
       memo: payForm.memo,
     });
+    queryClient.setQueryData(['payables'], phase1.getPayables());
+    await queryClient.invalidateQueries({ queryKey: ['payables'] });
     toast.success('미지급 등록');
     setPayModal(false);
     refresh();
+    } catch (e: any) { toast.error('미지급 서버 저장 실패: ' + (e.message || e)); }
+    finally { setSaveBusy(false); }
+  };
+
+  const recordPayment = async (id: string) => {
+    const amount = payAmount[id];
+    if (!Number.isFinite(amount) || amount <= 0 || paymentBusy) return;
+    setPaymentBusy(id);
+    try {
+      await phase1.recordPayablePayment(id, amount);
+      queryClient.setQueryData(['payables'], phase1.getPayables());
+      await queryClient.invalidateQueries({ queryKey: ['payables'] });
+      setPayAmount(a => ({ ...a, [id]: 0 }));
+      toast.success('지급 기록 저장 완료 (실제 송금은 별도)');
+    } catch (e: any) {
+      toast.error(e.message || '지급 결과 확인 실패');
+      await queryClient.invalidateQueries({ queryKey: ['payables'] });
+    } finally { setPaymentBusy(''); refresh(); }
   };
 
   return (
@@ -81,6 +109,8 @@ export default function PayablesManagement() {
         </div>
         <Button onClick={() => setPayModal(true)}>+ 미지급 등록</Button>
       </div>
+
+      {isError && <p role="alert" className="text-sm text-[var(--system-orange)]">미지급 조회 실패 — 이전 자료일 수 있습니다. 새로고침 전에는 지급을 기록할 수 없습니다.</p>}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <div className="bg-card rounded-lg border p-4">
@@ -180,13 +210,8 @@ export default function PayablesManagement() {
                         value={payAmount[p.id] ?? ''}
                         onChange={e => setPayAmount(a => ({ ...a, [p.id]: +e.target.value }))}
                         placeholder="금액" />
-                      <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={() => {
-                        const amt = payAmount[p.id];
-                        if (!amt || amt <= 0) return;
-                        phase1.recordPayablePayment(p.id, amt);
-                        toast.success('지급 기록');
-                        refresh();
-                      }}>지급</Button>
+                      <Button size="sm" variant="secondary" className="h-7 text-xs" disabled={!!paymentBusy || isError || isLoading}
+                        onClick={() => recordPayment(p.id)}>{paymentBusy === p.id ? '저장 중…' : '지급 기록'}</Button>
                     </div>
                   )}
                 </td>
@@ -276,7 +301,7 @@ export default function PayablesManagement() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayModal(false)}>취소</Button>
-            <Button onClick={addPayable}>등록</Button>
+            <Button onClick={addPayable} disabled={saveBusy}>{saveBusy ? '저장 중…' : '등록'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

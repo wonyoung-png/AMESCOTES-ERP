@@ -660,28 +660,34 @@ export const phase1 = {
     const a = getAll<Payable>(KEYS.payables);
     a.push(row);
     setAll(KEYS.payables, a);
-    syncPayable(row).catch(reportSyncFail('미지급'));
+    syncPayable(row, true).catch(reportSyncFail('미지급'));
     return row;
   },
-  updatePayable: (id: string, updates: Partial<Payable>) => {
+  savePayable: async (v: Omit<Payable, 'id' | 'createdAt' | 'paidAmountKrw' | 'status'>) => {
+    const row: Payable = { ...v, id: uid(), paidAmountKrw: 0, status: 'pending', createdAt: new Date().toISOString() };
+    await syncPayable(row, true);
+    setAll(KEYS.payables, [...getAll<Payable>(KEYS.payables), row]);
+    return row;
+  },
+  updatePayable: async (id: string, updates: Partial<Payable>) => {
     const all = getAll<Payable>(KEYS.payables);
     const index = all.findIndex(p => p.id === id);
-    if (index < 0) return null;
-    all[index] = { ...all[index], ...updates };
-    setAll(KEYS.payables, all);
-    syncPayable(all[index]).catch(reportSyncFail('미지급'));
-    return all[index];
+    if (index < 0) throw new Error('미지급을 찾을 수 없습니다');
+    const updated = { ...all[index], ...updates };
+    await syncPayable(updated);
+    setAll(KEYS.payables, getAll<Payable>(KEYS.payables).map(p => p.id === id ? updated : p));
+    return updated;
   },
-  recordPayablePayment: (id: string, amount: number) => {
+  recordPayablePayment: async (id: string, amount: number) => {
     const a = getAll<Payable>(KEYS.payables);
     const i = a.findIndex(x => x.id === id);
-    if (i < 0) return;
-    const paid = (a[i].paidAmountKrw || 0) + amount;
-    const status: PayableStatus =
-      paid >= a[i].amountKrw ? 'paid' : paid > 0 ? 'partial' : 'pending';
-    a[i] = { ...a[i], paidAmountKrw: paid, status };
-    setAll(KEYS.payables, a);
-    syncPayable(a[i]).catch(reportSyncFail('미지급'));
+    if (i < 0) throw new Error('미지급을 찾을 수 없습니다');
+    const r = await fetch(`/api/payables/${encodeURIComponent(id)}/payment`, { method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, expectedPaid: a[i].paidAmountKrw || 0 }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.message || '지급 기록 저장 실패');
+    const current = getAll<Payable>(KEYS.payables);
+    setAll(KEYS.payables, current.map(p => p.id === id ? rowToPayable(j.item) : p));
   },
 
   /** 자재구매 → 미지급 (Expense 대신 Payable). 동일 purchaseItem 중복 방지 */
@@ -1564,7 +1570,7 @@ export const phase1 = {
 };
 
 async function syncReceiptLog(log: ReceiptLog) {
-  await db.from('receipt_logs').upsert({
+  const { error } = await db.from('receipt_logs').upsert({
     id: log.id,
     order_id: log.orderId,
     order_no: log.orderNo,
@@ -1581,10 +1587,11 @@ async function syncReceiptLog(log: ReceiptLog) {
     delivery_market: log.deliveryMarket,
     created_at: log.createdAt,
   });
+  if (error) throw error;
 }
 
 async function syncDefect(d: DefectCarryover) {
-  await db.from('defect_carryovers').upsert({
+  const { error } = await db.from('defect_carryovers').upsert({
     id: d.id,
     style_no: d.styleNo,
     order_no: d.orderNo,
@@ -1600,10 +1607,11 @@ async function syncDefect(d: DefectCarryover) {
     applied_statement_id: d.appliedStatementId,
     created_at: d.createdAt,
   });
+  if (error) throw error;
 }
 
-async function syncPayable(p: Payable) {
-  await db.from('payables').upsert({
+async function syncPayable(p: Payable, isNew = false) {
+  const row = {
     id: p.id,
     vendor_id: p.vendorId,
     vendor_name: p.vendorName,
@@ -1611,16 +1619,37 @@ async function syncPayable(p: Payable) {
     source_type: p.sourceType,
     source_id: p.sourceId,
     amount_krw: p.amountKrw,
-    paid_amount_krw: p.paidAmountKrw,
     due_date: p.dueDate,
-    status: p.status,
     memo: p.memo,
     payee_type: p.payeeType,
     order_id: p.orderId,
     receipt_log_ids: p.receiptLogIds,
     created_at: p.createdAt,
     updated_at: new Date().toISOString(),
-  });
+  };
+  // 상세정보 수정으로 다른 화면에서 기록한 지급액을 덮어쓰지 않는다.
+  if (isNew) {
+    const { error } = await db.from('payables').insert({ ...row, paid_amount_krw: 0, status: 'pending' });
+    if (error) throw error;
+  } else {
+    const { data, error } = await db.from('payables').update(row).eq('id', p.id).eq('paid_amount_krw', p.paidAmountKrw || 0).select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error('미지급 또는 지급액이 변경됐습니다 — 최신 자료를 조회해주세요');
+  }
+}
+
+const rowToPayable = (r: any): Payable => ({ id: r.id, vendorId: r.vendor_id, vendorName: r.vendor_name,
+  projectNo: r.project_no, sourceType: r.source_type, sourceId: r.source_id, amountKrw: Number(r.amount_krw),
+  paidAmountKrw: Number(r.paid_amount_krw || 0), dueDate: r.due_date, status: r.status, memo: r.memo,
+  payeeType: r.payee_type, orderId: r.order_id, receiptLogIds: r.receipt_log_ids || [], createdAt: r.created_at });
+
+export async function pullPayables() {
+  const r = await fetch('/api/payables', { credentials: 'include' });
+  const j = await r.json();
+  if (!r.ok || !Array.isArray(j.items)) throw new Error(j.message || '미지급 조회 실패');
+  const items = j.items.map(rowToPayable) as Payable[];
+  setAll(KEYS.payables, items);
+  return items;
 }
 
 const rowToBatch = (r: any): BrandOrderBatch => ({

@@ -21,6 +21,7 @@ import { getCurrentUser } from '@/lib/auth';
 import StylePickerSheet, { type PickedLine } from '@/components/StylePickerSheet';
 import ReorderImport from '@/components/ReorderImport';
 import { brandWorkflow } from '@/lib/brandWorkflow';
+import { validDate } from '../../../shared/schedule';
 
 const PIPELINE = ['발주', '진행중', '생산완료', '한국/중국입고', '미지급 등록', '공장결제'] as const;
 
@@ -312,7 +313,8 @@ export default function BrandOrders() {
 
   const submitRecv = () => {
     if (!detailRow) return;
-    if (recvForm.qty <= 0) { toast.error('수량을 입력하세요'); return; }
+    if (!Number.isInteger(recvForm.qty) || recvForm.qty <= 0) { toast.error('수량은 양의 정수로 입력하세요'); return; }
+    if (!validDate(recvForm.date)) { toast.error('올바른 입고 날짜를 입력하세요'); return; }
     const colorKey = recvForm.color.trim() || '(미배정)';
     const colorLine = detailRow.colorLines.find(c => c.color === colorKey || c.color === recvForm.color.trim());
     const colorRemain = colorLine ? colorLine.remaining : detailRow.remaining;
@@ -347,15 +349,17 @@ export default function BrandOrders() {
     if (sum.remaining <= 0) updates.status = '입고완료';
     store.updateOrder(detailRow.orderId, updates as Partial<ProductionOrder>);
 
+    let payableCreated = false;
     if (recvForm.createPayable) {
       const cn = ensureChinaCorpVendor();
-      phase1.createPayableFromReceipt(log, {
+      payableCreated = !!phase1.createPayableFromReceipt(log, {
         unitPriceKrw: detailRow.factoryUnitPriceKrw || order?.factoryUnitPriceKrw || 0,
         factoryVendorId: detailRow.vendorId || order?.vendorId,
         factoryVendorName: detailRow.vendorName || order?.vendorName,
         chinaCorpVendorId: cn.id,
         chinaCorpVendorName: cn.name,
       });
+      if (!payableCreated) toast.warning('공장 단가가 미확정이라 미지급 초안을 생성하지 못했습니다');
     }
 
     if (recvForm.destination === 'china') {
@@ -366,11 +370,11 @@ export default function BrandOrders() {
         color: recvForm.color.trim(),
       });
       if (stock) {
-        toast.success(`중국입고 ${recvForm.qty}개 · 중국창고 반영${recvForm.createPayable ? ' · 미지급 등록' : ''}`);
+        toast.success(`중국입고 ${recvForm.qty}개 · 중국창고 반영${payableCreated ? ' · 미지급 초안' : ''}`);
       } else {
         toast.success(`중국입고 ${recvForm.qty}개 기록`);
       }
-    } else if (recvForm.createPayable) {
+    } else if (payableCreated) {
       toast.success(`한국입고 ${recvForm.qty}개 · 미지급 초안 생성`);
     } else {
       toast.success(`한국입고 ${recvForm.qty}개 기록`);
@@ -400,7 +404,8 @@ export default function BrandOrders() {
       chinaCorpVendorId: cn.id,
       chinaCorpVendorName: cn.name,
     });
-    toast.success(`미지급 ${created.length}건 확인/등록`);
+    if (created.length) toast.success(`미지급 ${created.length}건 확인/등록`);
+    else toast.warning('등록 가능한 입고 미지급이 없습니다 — 입고 기록과 공장 단가를 확인해주세요');
     refresh();
   };
 
