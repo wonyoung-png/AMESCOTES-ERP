@@ -1,7 +1,9 @@
 import { PMS_URL } from '@/lib/hosts';
+import { useSearch } from 'wouter';
 
 export default function PmsWorkspace() {
-  const tab = new URLSearchParams(window.location.search).get('tab') || '일일점검';
+  const search = useSearch();
+  const tab = new URLSearchParams(search).get('tab') || '일일점검';
   const base = PMS_URL();
   const token = localStorage.getItem('erp_token');
 
