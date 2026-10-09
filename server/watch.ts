@@ -47,11 +47,12 @@ export async function gatherWatch(): Promise<Map<string, Watch>> {
   const today = kstToday();
   const in30 = addDays(today, 30);
   truncated = [];
-  const [orders, samples, stmts, camps, lumen, aeta] = await Promise.all([
+  const [orders, samples, stmts, camps, subscriptions, lumen, aeta] = await Promise.all([
     rows('production_orders?status=neq.초안&select=order_no,style_no,style_name,vendor_name,status,delivery_date,sent_at,confirmed_at,hq_supply_items,factory_unit_price_krw,trade_statement_id,workspace&order=delivery_date.asc').catch(e => e as Error),
     rows('samples?select=style_no,style_name,stage,expected_date,assignee,billing_status,cost_krw,brand_code').catch(e => e as Error),
     rows('trade_statements?status=in.(미청구,청구완료)&select=statement_no,vendor_name,issue_date,lines,status,workspace').catch(e => e as Error),
     rows(`campaigns?end_date=gte.${today}&start_date=lte.${in30}&select=title,channel,start_date,end_date,status,workspace,tasks&order=start_date.asc`).catch(e => e as Error),
+    rows('subscriptions?status=neq.해지됨&select=service_name,average_amount,currency,status,next_billing_on').catch(e => e as Error),
     pms('lumen'), pms('aetaloof'),
   ]);
   const out = new Map<string, Watch>();
@@ -60,6 +61,16 @@ export async function gatherWatch(): Promise<Map<string, Watch>> {
     w.facts.push(...facts); w.alerts += alerts; out.set(team, w);
   };
   const failed = (team: string, what: string, e: Error) => add(team, [`(${what}: 지금 읽지 못함 — ${e.message})`]);
+
+  // ── 구독 감시
+  if (subscriptions instanceof Error) failed('경영지원', '구독', subscriptions);
+  else {
+    const review = subscriptions.filter(s => s.status === '검토 필요');
+    const due7 = subscriptions.filter(s => s.next_billing_on && s.next_billing_on >= today && s.next_billing_on <= addDays(today, 7));
+    const krw = subscriptions.filter(s => s.currency === 'KRW').reduce((n, s) => n + (Number(s.average_amount) || 0), 0);
+    add('경영지원', [`검토 필요 구독 ${review.length}건, 이번 달 구독 합계 ${won(krw)}, 7일 안 결제 예정 ${due7.length}건`,
+      ...due7.slice(0, 8).map(s => `  · ${s.next_billing_on} ${s.service_name} ${won(Number(s.average_amount) || 0)}`)], review.length);
+  }
 
   // ── 생산 발주
   if (orders instanceof Error) ['생산관리', '물류·CS', '영업', '제품개발'].forEach(t => failed(t, '생산 발주', orders));

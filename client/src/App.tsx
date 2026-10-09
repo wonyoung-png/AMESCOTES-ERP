@@ -64,6 +64,7 @@ const LineSheet = lazyWithReload(() => import("./pages/LineSheet"));
 const NotFound = lazyWithReload(() => import("./pages/NotFound"));
 const UserManagement = lazyWithReload(() => import("./pages/UserManagement"));
 const PmsWorkspace = lazyWithReload(() => import("./pages/PmsWorkspace"));
+const SubscriptionManagement = lazyWithReload(() => import("./pages/SubscriptionManagement"));
 
 import { ensureErpBootstrap } from "@/lib/ensureErpBootstrap";
 import { setDbWriteFailureHandler } from "@/lib/store";
@@ -189,6 +190,7 @@ function Router() {
         <Route path="/materials" component={MaterialMaster} />
         <Route path="/cost-comparison" component={CostComparison} />
         <Route path="/pms" component={PmsWorkspace} />
+        <Route path="/subscriptions" component={SubscriptionManagement} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

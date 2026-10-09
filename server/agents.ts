@@ -10,6 +10,7 @@ import { restAsServer, CEO_EMAILS } from './auth.js';
 import { members, esc, kstToday, CLASSIFY_MODEL, type Member } from './work.js';
 import { ORG, orgTeam, orgTeamOfName, DEFAULT_RULES } from './org.js';
 import { gatherWatch, type Watch } from './watch.js';
+import { runSubscriptionUsageChecks } from './subscriptions.js';
 
 export type AgentStatus = 'work' | 'idle' | 'warn' | 'report';
 export type AgentRun = {
@@ -116,6 +117,7 @@ export async function loadRules(): Promise<Map<string, string>> {
 
 /** 팀 목록 = 조직도 14팀 (+ 어느 팀에도 못 붙인 카드가 있으면 '팀 미지정') */
 export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: string): Promise<AgentRun[]> {
+  await runSubscriptionUsageChecks().catch(e => console.warn('[agents] 구독 사용 확인 실패:', String(e).split('\n')[0]));
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
   const [cr, all] = await Promise.all([
     restAsServer(`work_cards?created_at=gte.${since}&select=*&order=created_at.desc&limit=600`),

@@ -21,7 +21,7 @@ import {
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, GitCompare, Truck, Wallet, ClipboardCheck, CalendarClock, CalendarDays, Network,
   GitBranch, FileSpreadsheet, UserRound, Moon, Sun, ArrowUpRight,
-  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp, Inbox, Warehouse, Star, Camera, Store, MessageSquare,
+  LineChart, Globe, BookOpen, Percent, Image as ImageIcon, TrendingUp, Inbox, Warehouse, Star, Camera, Store, MessageSquare, CreditCard,
 } from 'lucide-react';
 
 interface NavItem {
@@ -35,6 +35,7 @@ interface NavItem {
   oemOnly?: boolean;
   /** 관리자(ADMIN_EMAIL)에게만 표시 */
   adminOnly?: boolean;
+  subscriptionOnly?: boolean;
 }
 
 interface NavGroup {
@@ -109,6 +110,7 @@ const navGroups: NavGroup[] = [
       { path: '/cash-plan', label: '자금계획', icon: <TrendingUp size={17} />, table: 'settlements' },
       { path: '/payables', label: '매입·미지급', icon: <Wallet size={17} />, table: 'payables' },
       { path: '/expense', label: '지출결의', icon: <Receipt size={17} />, table: 'expenses' },
+      { path: '/subscriptions', label: '구독 관리', icon: <CreditCard size={17} />, table: 'subscriptions', subscriptionOnly: true },
       { path: '/project-pl', label: '매출 · 영업이익', icon: <BarChart3 size={17} />, table: 'projects' },
       { path: '/sales-summary', label: '매출집계', icon: <LineChart size={17} />, table: '누적생산량', oemOnly: true },
       { path: '/documents', label: '서류 출력', icon: <FileText size={17} />, table: '공장PO · PI · PL', oemOnly: true },
@@ -324,6 +326,11 @@ export default function Layout({ children, onLogout }: LayoutProps) {
   const { theme, toggleTheme } = useTheme();
   const settings = store.getSettings();
   const currentUser = getCurrentUser();
+  const [subscriptionAccess, setSubscriptionAccess] = useState(false);
+  React.useEffect(() => {
+    fetch('/api/subscriptions/access', { credentials: 'include' }).then(r => r.ok ? r.json() : null)
+      .then(j => setSubscriptionAccess(j?.allowed === true)).catch(() => {});
+  }, [currentUser?.id]);
 
   const isActive = (path: string) => {
     if (path === '/') return location === '/';
@@ -339,7 +346,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
   /** 이 워크스페이스·이 사람에게 보이는 메뉴인가 */
   const visible = (i: NavItem) =>
-    !(i.oemOnly && isBrand) && !(i.lumenOnly && !isBrand) && !(i.adminOnly && !isAdminEmail(currentUser?.email));
+    !(i.oemOnly && isBrand) && !(i.lumenOnly && !isBrand) && !(i.adminOnly && !isAdminEmail(currentUser?.email)) && !(i.subscriptionOnly && !subscriptionAccess);
 
   /** 즐겨찾기로 찍어둔 메뉴 — 저장한 순서대로, 지금 안 보이는 것은 빼고 */
   const favItems = favorites

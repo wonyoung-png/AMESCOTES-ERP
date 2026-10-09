@@ -107,6 +107,7 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
   // 답변칸은 요청을 받은 사람 몫이다. 쓴 사람 본인에게 띄우면 자기 질문에 자기가 답하게 된다
   const canReply = c.kind === 'request_check' && c.status === 'open' && !!me && c.created_by !== me.id &&
     (c.assignee_id === me.id || canAct);
+  const isSubscriptionCheck = !!p.subscriptionCheck;
   const canFinish = c.kind === 'todo' && c.status === 'open' && !!me &&
     (c.created_by === me.id || c.assignee_id === me.id || canAct);
   const [note, setNote] = useState('');
@@ -147,6 +148,16 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
 
   const input = 'h-9 rounded-md border border-border bg-background px-2 text-sm min-w-0';
 
+  const answerSubscription = async (answer: string) => {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/subscription-checks/${c.id}/answer`, { method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer }) });
+      if (!r.ok) throw new Error();
+      toast.success('사용 여부를 전달했습니다.'); onDone();
+    } catch { toast.error('사용 여부를 전달하지 못했습니다.'); } finally { setBusy(false); }
+  };
+
   return (
     <>
       {c.kind === 'question' && p.answer && (
@@ -177,7 +188,13 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
         </p>
       )}
 
-      {canReply && (
+      {canReply && isSubscriptionCheck && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {['계속 씀','안 씀','모름'].map(answer => <button key={answer} type="button" disabled={busy}
+            onClick={() => answerSubscription(answer)} className="h-9 px-3 rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40">{answer}</button>)}
+        </div>
+      )}
+      {canReply && !isSubscriptionCheck && (
         <div className="flex gap-2 mt-2">
           <input value={reply} onChange={e => setReply(e.target.value)} placeholder="답변 (예: 20%로 진행)"
             className={`flex-1 ${input}`} />
