@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Link } from 'wouter';
+import { parsePlannedExpense } from '@/lib/cashPlan';
 
 export default function PayablesManagement() {
   const [, tick] = useState(0);
@@ -49,7 +50,7 @@ export default function PayablesManagement() {
   const resetFilters = () => { setFVendor('all'); setFStatus('all'); setFSearch(''); };
 
   const stats = useMemo(() => ({
-    pending: payables.filter(p => p.status === 'pending').reduce((s, p) => s + p.amountKrw - p.paidAmountKrw, 0),
+    pending: payables.filter(p => p.status === 'pending' && parsePlannedExpense(p.memo)?.stage !== '예상').reduce((s, p) => s + p.amountKrw - p.paidAmountKrw, 0),
     defectPending: defects.filter(d => d.status === 'pending').reduce((s, d) => s + d.amountKrw, 0),
     partial: payables.filter(p => p.status === 'partial').length,
     overdue: payables.filter(p => p.status !== 'paid' && p.dueDate && p.dueDate < new Date().toISOString().split('T')[0]).length,
@@ -148,9 +149,12 @@ export default function PayablesManagement() {
                 {filterOn ? '조건에 맞는 미지급이 없습니다' : '미지급이 없습니다 — 공장 결제가 남으면 여기에 쌓입니다'}
               </td></tr>
             )}
-            {shownPayables.map(p => (
+            {shownPayables.map(p => {
+              const planned = parsePlannedExpense(p.memo);
+              const isExpectedPlan = planned?.stage === '예상';
+              return (
               <tr key={p.id} className="hover:bg-[var(--fill-quaternary)]">
-                <td className="font-medium">{p.vendorName}</td>
+                <td><p className="font-medium">{p.vendorName}</p>{planned && <p className="text-[11px] text-muted-foreground">{planned.workspace} · {planned.category}</p>}</td>
                 <td>
                   {p.payeeType === 'china_corp' ? (
                     <span className="text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">중국법인</span>
@@ -166,11 +170,11 @@ export default function PayablesManagement() {
                 <td className="num font-semibold">{formatKRW(p.amountKrw - p.paidAmountKrw)}</td>
                 <td>
                   <span className={`text-xs px-2 py-0.5 rounded ${p.status === 'paid' ? 'bg-[var(--fill-quaternary)] text-[var(--system-green)]' : p.status === 'partial' ? 'bg-[var(--fill-quaternary)] text-[var(--system-orange)]' : 'bg-[var(--fill-quaternary)] text-muted-foreground'}`}>
-                    {p.status === 'paid' ? '완료' : p.status === 'partial' ? '부분' : '대기'}
+                    {isExpectedPlan ? '계획' : p.status === 'paid' ? '완료' : p.status === 'partial' ? '부분' : '대기'}
                   </span>
                 </td>
                 <td className="act">
-                  {p.status !== 'paid' && (
+                  {p.status !== 'paid' && !isExpectedPlan && (
                     <div className="flex gap-1 items-center justify-end">
                       <Input className="h-7 w-24 text-xs" type="number" min="0"
                         value={payAmount[p.id] ?? ''}
@@ -187,7 +191,8 @@ export default function PayablesManagement() {
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         </div>

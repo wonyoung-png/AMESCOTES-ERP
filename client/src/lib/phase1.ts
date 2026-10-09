@@ -658,6 +658,15 @@ export const phase1 = {
     syncPayable(row).catch(reportSyncFail('미지급'));
     return row;
   },
+  updatePayable: (id: string, updates: Partial<Payable>) => {
+    const all = getAll<Payable>(KEYS.payables);
+    const index = all.findIndex(p => p.id === id);
+    if (index < 0) return null;
+    all[index] = { ...all[index], ...updates };
+    setAll(KEYS.payables, all);
+    syncPayable(all[index]).catch(reportSyncFail('미지급'));
+    return all[index];
+  },
   recordPayablePayment: (id: string, amount: number) => {
     const a = getAll<Payable>(KEYS.payables);
     const i = a.findIndex(x => x.id === id);

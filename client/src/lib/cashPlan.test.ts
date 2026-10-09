@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMonthlyCashPlan } from './cashPlan';
+import { buildMonthlyCashPlan, encodePlannedExpense, parsePlannedExpense } from './cashPlan';
 
 test('미수·미지급 잔액을 예정월별로 합산하고 완납·지급완료는 제외한다', () => {
   const result = buildMonthlyCashPlan([
@@ -33,4 +33,13 @@ test('미청구 명세표는 발행일 30일 뒤 예상입금으로 잡는다', 
 
   assert.equal(result[0].expectedIncoming, 2200);
   assert.equal(result[0].confirmedIncoming, 0);
+});
+
+test('LUMEN 비정기 지출은 예상 단계로 분류하고 메타정보를 보존한다', () => {
+  const memo = encodePlannedExpense('LUMEN', '인테리어', '예상', '성수점 계약금');
+  const result = buildMonthlyCashPlan([], [{ id: 'p1', vendorName: '시공사', sourceType: 'manual', amountKrw: 5000, paidAmountKrw: 0, dueDate: '2026-11-05', status: 'pending', memo, createdAt: '' }], [], new Date(2026, 10, 1), 1);
+
+  assert.deepEqual(parsePlannedExpense(memo), { workspace: 'LUMEN', category: '인테리어', stage: '예상', description: '성수점 계약금' });
+  assert.equal(result[0].expectedOutgoing, 5000);
+  assert.equal(result[0].confirmedOutgoing, 0);
 });

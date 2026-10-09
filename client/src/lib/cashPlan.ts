@@ -2,6 +2,16 @@ import type { Payable } from './phase1';
 import type { Settlement } from './store';
 import type { TradeStatement } from './store';
 
+export type PlannedExpenseStage = '예상' | '확정';
+export type PlannedExpenseWorkspace = 'OEM' | 'LUMEN' | 'AETALOOP';
+export const encodePlannedExpense = (workspace: PlannedExpenseWorkspace, category: string, stage: PlannedExpenseStage, description: string) =>
+  `[자금계획|${workspace}|${category}|${stage}] ${description.trim()}`;
+export const parsePlannedExpense = (memo?: string) => {
+  const match = memo?.match(/^\[자금계획\|(OEM|LUMEN|AETALOOP)\|([^|]+)\|(예상|확정)\]\s*(.*)$/);
+  return match ? { workspace: match[1] as PlannedExpenseWorkspace, category: match[2], stage: match[3] as PlannedExpenseStage, description: match[4] } : null;
+};
+export const confirmPlannedExpenseMemo = (memo?: string) => memo?.replace(/^(\[자금계획\|[^|]+\|[^|]+\|)예상(\])/, '$1확정$2');
+
 export const statementTotal = (s: TradeStatement) => s.lines.reduce((sum, line) => {
   const supply = line.qty * line.unitPrice;
   return sum + supply + (line.taxType === '과세' ? supply * line.taxRate : 0);
@@ -18,15 +28,19 @@ export function buildMonthlyCashPlan(settlements: Settlement[], payables: Payabl
       .filter(s => s.status === '미청구' && addDays(s.issueDate, 30).startsWith(key))
       .reduce((sum, s) => sum + statementTotal(s), 0);
     const confirmedOutgoing = payables
-      .filter(p => p.sourceType !== 'processing' && p.dueDate?.startsWith(key) && p.status !== 'paid')
+      .filter(p => p.sourceType !== 'processing' && parsePlannedExpense(p.memo)?.stage !== '예상' && p.dueDate?.startsWith(key) && p.status !== 'paid')
       .reduce((sum, p) => sum + Math.max(0, p.amountKrw - p.paidAmountKrw), 0);
-    const expectedOutgoing = payables
+    const expectedProcessing = payables
       .filter(p => p.sourceType === 'processing' && p.dueDate?.startsWith(key) && p.status !== 'paid')
       .reduce((sum, p) => {
         const confirmed = payables.filter(x => x.sourceType === 'order_receipt' && x.orderId === p.orderId)
           .reduce((total, x) => total + x.amountKrw, 0);
         return sum + Math.max(0, p.amountKrw - confirmed - p.paidAmountKrw);
       }, 0);
+    const expectedManual = payables
+      .filter(p => parsePlannedExpense(p.memo)?.stage === '예상' && p.dueDate?.startsWith(key) && p.status !== 'paid')
+      .reduce((sum, p) => sum + Math.max(0, p.amountKrw - p.paidAmountKrw), 0);
+    const expectedOutgoing = expectedProcessing + expectedManual;
     const incoming = confirmedIncoming + expectedIncoming;
     const outgoing = confirmedOutgoing + expectedOutgoing;
     return { key, label: `${date.getFullYear()}년 ${date.getMonth() + 1}월`, incoming, outgoing, net: incoming - outgoing, confirmedIncoming, expectedIncoming, confirmedOutgoing, expectedOutgoing };
