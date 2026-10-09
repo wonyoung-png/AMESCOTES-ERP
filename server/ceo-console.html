@@ -436,7 +436,9 @@ function agentList() {
     const w = (D.watch || []).find(x => x.team === k);
     return { ...a, division: org ? org.division : '대표 직속', status: t.overdue || w?.alerts ? 'warn' : a.stale ? (t.open ? 'work' : 'idle') : a.status,
       headline: (a.stale ? '[오늘 이전 보고] ' : '') + a.headline,
-      stats: { ...a.stats, open: t.open, overdue: t.overdue, doneToday: t.doneToday, newToday: t.newToday, alerts: w?.alerts || 0, facts: w?.facts || a.stats?.facts || [] } };
+      stats: { ...a.stats, open: t.open, overdue: t.overdue, doneToday: t.doneToday, newToday: t.newToday,
+        toCeo: D.decide.filter(c => c.kind === 'request_check' && c._org === k).length,
+        alerts: w?.alerts || 0, facts: w?.facts || a.stats?.facts || [] }, liveFacts: !!w };
   });
 }
 function mapView() {
@@ -470,12 +472,12 @@ function mapView() {
   const st = a ? (AST[a.status] || AST.idle) : null;
   const detail = a ? `<section class="agent" aria-live="polite">
       <div class="agent-h"><h3>${esc(a.team)} 에이전트</h3><span class="pill" style="background:${st[1]};color:${st[2]}">${st[0]}</span>
-        <small>${a.created_at ? '점검 ' + kst(a.created_at) : '점검 전'}</small>
+        <small>${a.created_at ? 'AI 보고 ' + kst(a.created_at) : 'AI 보고 전'} · 현재 조회 ${kst(D.checkedAt)}</small>
         <button class="btn" type="button" data-run="${esc(a.team)}">이 팀 지금 점검</button></div>
       <p class="head">${esc(a.headline)}</p>
       ${a.summary ? `<p class="sum">${esc(a.summary)}</p>` : ''}
       <div class="nums"><span><b>${num(a.stats?.open) ?? 0}</b>진행 중</span><span><b>${num(a.stats?.overdue) ?? 0}</b>마감 지남</span><span><b>${num(a.stats?.toCeo) ?? 0}</b>대표 확인 요청</span><span><b>${(D.orders || []).filter(o => o.team === a.team && o.status === 'open').length}</b>내 지시 진행</span><span><b>${num(a.stats?.doneToday) ?? 0}</b>오늘 완료</span></div>
-      ${a.needs?.length ? `<div><div class="sec-h"><h2>대표님이 볼 것</h2></div><ul>${a.needs.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul></div>` : ''}
+      ${a.needs?.length ? `<div><div class="sec-h"><h2>보고 당시 확인 제안</h2><span>${kst(a.created_at)} 기준 · 현재 근거 확인 후 결정</span></div><ul>${a.needs.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul></div>` : ''}
       ${facts(a)}
       ${people(a.team)}
       ${ordersOf(a.team)}
@@ -492,7 +494,7 @@ function mapView() {
     <div class="mapbox"><svg viewBox="-480 -300 960 600" role="img" aria-label="팀 에이전트 지도">
       <ellipse class="map-ring" rx="${RX}" ry="${RY}"/><ellipse class="map-ring" rx="${RX * .45}" ry="${RY * .45}" stroke-dasharray="2 6"/>
       ${links}<g class="map-core"><circle r="48"/><text x="0" y="5" text-anchor="middle">MASTER</text></g>${dnodes}${nodes}</svg></div>
-    <div class="legend"><span><i style="background:#2f7a55"></i>작업 중 — 파동</span><span><i style="background:#8a5a00"></i>보고 중 — 대표에게 빠르게 흐름</span><span><i style="background:#b3392f"></i>막힘 — 마감 지남</span><span><i style="background:#5d5f64"></i>대기</span></div>
+    <div class="legend"><span><i style="background:#2f7a55"></i>작업 중 — 파동</span><span><i style="background:#8a5a00"></i>보고 중 — 대표에게 빠르게 흐름</span><span><i style="background:#b3392f"></i>막힘 — 마감·운영 확인 필요</span><span><i style="background:#5d5f64"></i>대기</span></div>
     ${detail}`;
 }
 function people(team) {
@@ -504,7 +506,7 @@ function people(team) {
 function facts(a) {
   const f = Array.isArray(a.stats?.facts) ? a.stats.facts : [];
   if (!f.length) return '';
-  return `<details class="facts"><summary>에이전트가 본 데이터 (ERP·PMS) ${num(a.stats?.alerts) ? '· 경고 ' + num(a.stats.alerts) + '건' : ''}</summary>
+  return `<details class="facts"><summary>${a.liveFacts ? '현재 운영 점검' : '보고 당시 근거'} (ERP·PMS) ${num(a.stats?.alerts) ? '· 확인 조건 ' + num(a.stats.alerts) + '개' : ''}</summary>
     <pre>${esc(f.join('\n'))}</pre></details>`;
 }
 function watchForm(team) {
