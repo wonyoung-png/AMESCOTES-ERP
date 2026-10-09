@@ -27,7 +27,9 @@ function initial(): Workspace {
     if (q && VALID.includes(q)) {
       localStorage.setItem(KEY, q);
       // 주소창에 남겨두면 새로고침마다 되돌아간다
-      history.replaceState(null, '', location.pathname + location.hash);
+      const clean = new URL(location.href);
+      clean.searchParams.delete('ws');
+      history.replaceState(null, '', clean.pathname + clean.search + clean.hash);
       return q;
     }
     const saved = localStorage.getItem(KEY) as Workspace | null;

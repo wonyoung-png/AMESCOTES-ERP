@@ -2,6 +2,21 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildMonthlyCashPlan, buildPlannedExpenseProjects, confirmPlannedExpenseMemo, DEFAULT_ACCOUNT_BY_CATEGORY, encodePlannedExpense, isSafeDocumentUrl, parsePlannedExpense, splitPlannedExpenseAmount } from './cashPlan';
 import type { Payable } from './phase1';
+import { dailyCashProjection } from './cashPlan';
+
+test('월말 순유입이 양수여도 월초 지급 부족을 잡는다', () => {
+  const rows = dailyCashProjection('2026-11', 100, [{ date: '2026-11-20', amount: 1000 }], [{ date: '2026-11-01', amount: 500 }]);
+  assert.equal(rows[0].minimum, -400);
+  assert.equal(rows.at(-1)!.balance, 600);
+  const sameDay = dailyCashProjection('2026-11', 100, [{ date: '2026-11-01', amount: 1000 }], [{ date: '2026-11-01', amount: 500 }]);
+  assert.equal(sameDay[0].minimum, -400);
+  assert.equal(sameDay[0].balance, 600);
+});
+
+test('옛 AETALOOP 메모는 보존하면서 공식 브랜드명으로 읽는다', () => {
+  assert.equal(parsePlannedExpense('[자금계획|AETALOOP|촬영|예상] 촬영비')?.workspace, 'AETALOOF');
+  assert.equal(parsePlannedExpense(encodePlannedExpense('AETALOOF', '촬영', '예상', '촬영비'))?.workspace, 'AETALOOF');
+});
 
 test('미수·미지급 잔액을 예정월별로 합산하고 완납·지급완료는 제외한다', () => {
   const result = buildMonthlyCashPlan([

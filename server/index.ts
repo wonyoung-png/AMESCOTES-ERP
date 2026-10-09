@@ -11,6 +11,7 @@ import { fileURLToPath } from "url";
 import yardageOcrRouter from "./yardage-ocr.js";
 import sessionRouter from "./session.js";
 import dailyBridgeRouter from "./daily-bridge.js";
+import reorderBridgeRouter from "./reorder-bridge.js";
 import vendorOcrRouter from "./vendor-ocr.js";
 import captureRouter from "./capture.js";
 import workRouter from "./work.js";
@@ -70,6 +71,7 @@ async function startServer() {
 
   // Daily 데이터 브리지 (플랫폼 간 연계)
   app.use(dailyBridgeRouter);
+  app.use(reorderBridgeRouter);
 
   // OCR 라우터
   app.use(yardageOcrRouter);

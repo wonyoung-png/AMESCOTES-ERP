@@ -3,7 +3,7 @@ import type { Settlement } from './store';
 import type { TradeStatement } from './store';
 
 export type PlannedExpenseStage = '예상' | '확정';
-export type PlannedExpenseWorkspace = 'OEM' | 'LUMEN' | 'AETALOOP';
+export type PlannedExpenseWorkspace = 'OEM' | 'LUMEN' | 'AETALOOF';
 export type PlannedExpenseTaxType = '과세' | '면세' | '불공제';
 export type PlannedExpenseDocument = { type: '견적서' | '계약서' | '세금계산서' | '기타'; name: string; url: string };
 export const ASSET_ACCOUNTS = ['건설중인자산', '시설장치', '비품', '임차보증금'] as const;
@@ -12,11 +12,11 @@ export const DEFAULT_ACCOUNT_BY_CATEGORY: Record<string, string> = { 인테리�
 export const encodePlannedExpense = (workspace: PlannedExpenseWorkspace, category: string, stage: PlannedExpenseStage, description: string, groupId?: string, installment?: string, account?: string, taxType?: PlannedExpenseTaxType, budgetKrw?: number, documents: PlannedExpenseDocument[] = []) =>
   `[자금계획|${workspace}|${category}|${stage}${groupId ? `|${groupId}|${installment || '지급'}${account ? `|${account}|${taxType || '과세'}|${ASSET_ACCOUNTS.includes(account as typeof ASSET_ACCOUNTS[number]) ? '자산' : '비용'}${budgetKrw ? `|${budgetKrw}|${encodeURIComponent(JSON.stringify(documents))}` : ''}` : ''}` : ''}] ${description.trim()}`;
 export const parsePlannedExpense = (memo?: string) => {
-  const match = memo?.match(/^\[자금계획\|(OEM|LUMEN|AETALOOP)\|([^|]+)\|(예상|확정)(?:\|([^|]+)\|([^|\]]+)(?:\|([^|]+)\|(과세|면세|불공제)\|(자산|비용)(?:\|(\d+)\|([^\]]+))?)?)?\]\s*(.*)$/);
+  const match = memo?.match(/^\[자금계획\|(OEM|LUMEN|AETALOOF|AETALOOP)\|([^|]+)\|(예상|확정)(?:\|([^|]+)\|([^|\]]+)(?:\|([^|]+)\|(과세|면세|불공제)\|(자산|비용)(?:\|(\d+)\|([^\]]+))?)?)?\]\s*(.*)$/);
   if (!match) return null;
   let documents: PlannedExpenseDocument[] | undefined;
   try { documents = match[10] ? JSON.parse(decodeURIComponent(match[10])) : undefined; } catch { documents = undefined; }
-  return { workspace: match[1] as PlannedExpenseWorkspace, category: match[2], stage: match[3] as PlannedExpenseStage, groupId: match[4], installment: match[5], account: match[6], taxType: match[7] as PlannedExpenseTaxType | undefined, assetType: match[8], budgetKrw: match[9] ? Number(match[9]) : undefined, documents, description: match[11] };
+  return { workspace: (match[1] === 'AETALOOP' ? 'AETALOOF' : match[1]) as PlannedExpenseWorkspace, category: match[2], stage: match[3] as PlannedExpenseStage, groupId: match[4], installment: match[5], account: match[6], taxType: match[7] as PlannedExpenseTaxType | undefined, assetType: match[8], budgetKrw: match[9] ? Number(match[9]) : undefined, documents, description: match[11] };
 };
 export const confirmPlannedExpenseMemo = (memo?: string) => memo?.replace(/^(\[자금계획\|[^|]+\|[^|]+\|)예상(?=\||\])/, '$1확정');
 export const splitPlannedExpenseAmount = (gross: number, taxType?: PlannedExpenseTaxType) => {
@@ -76,6 +76,19 @@ export function buildMonthlyCashPlan(settlements: Settlement[], payables: Payabl
 }
 
 export const expectedStatementDate = (s: TradeStatement) => addDays(s.issueDate, 30);
+
+export function dailyCashProjection(month: string, opening: number, incoming: { date: string; amount: number }[], outgoing: { date: string; amount: number }[]) {
+  const [year, mon] = month.split('-').map(Number);
+  let balance = opening;
+  return Array.from({ length: new Date(year, mon, 0).getDate() }, (_, i) => {
+    const date = `${month}-${String(i + 1).padStart(2, '0')}`;
+    const inflow = incoming.filter(r => r.date === date).reduce((n, r) => n + r.amount, 0);
+    const outflow = outgoing.filter(r => r.date === date).reduce((n, r) => n + r.amount, 0);
+    const minimum = balance - outflow;
+    balance += inflow - outflow;
+    return { date, balance, minimum, inflow, outflow };
+  });
+}
 
 function addDays(value: string, days: number) {
   const date = new Date(`${value}T00:00:00`);

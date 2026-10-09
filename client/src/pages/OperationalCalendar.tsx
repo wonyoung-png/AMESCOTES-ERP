@@ -26,8 +26,8 @@ const VIEW_MODES: CalendarViewMode[] = ['year', 'half', 'quarter', 'month', 'wee
 type CampaignChannel = typeof CAMPAIGN_CHANNELS[number];
 
 const STATUS_LABEL: Record<CampaignStatus, string> = {
-  draft: '미온보딩',
-  onboarded: '온보딩됨',
+  draft: '예정',
+  onboarded: '준비 완료',
   active: '진행중',
   closed: '마감',
 };

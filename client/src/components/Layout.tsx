@@ -137,11 +137,11 @@ const brandBottomTabs = [
 
 /** 사이드바에는 의사결정 단위만 노출하고, 세부 탭은 PMS 작업공간 안에서 선택한다. */
 const brandWorkspaces = [
-  { label: '오늘', target: '일일점검', icon: <BarChart3 size={17} /> },
+  { label: '오늘', target: '오늘 업무', icon: <BarChart3 size={17} /> },
   { label: '상품', target: '상품관리', icon: <Package size={17} /> },
   { label: '판매·고객', target: '채널별 매출', icon: <LineChart size={17} /> },
   { label: '콘텐츠', target: '상품 콘텐츠', icon: <ImageIcon size={17} /> },
-  { label: '캠페인·분석', target: '채널 플랜', icon: <TrendingUp size={17} /> },
+  { label: '일정·마케팅', target: '업로드 캘린더', icon: <TrendingUp size={17} /> },
 ];
 
 /** PMS 탭을 ERP 내부 라우트로 연다. 인증 전달은 PmsWorkspace가 맡는다. */

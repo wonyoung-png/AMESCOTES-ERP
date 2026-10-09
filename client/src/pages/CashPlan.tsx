@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { dailyCashProjection } from '@/lib/cashPlan';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 export default function CashPlan() {
   const [, tick] = useState(0);
@@ -19,6 +21,8 @@ export default function CashPlan() {
   const [plan, setPlan] = useState({ workspace: 'LUMEN' as PlannedExpenseWorkspace, category: '인테리어', account: '건설중인자산', taxType: '과세' as PlannedExpenseTaxType, description: '', vendorId: '', vendorName: '', projectNo: '', budgetKrw: 0, documents: [] as PlannedExpenseDocument[], installments: [{ label: '계약금', amountKrw: 0, dueDate: '' }] });
   const months = useMemo(() => buildMonthlyCashPlan(settlements, payables, statements), [settlements, payables, statements]);
   const [selected, setSelected] = useState(months[0].key);
+  const [opening, setOpening] = useState('');
+  const [minimumBalance, setMinimumBalance] = useState('0');
   const current = months.find(m => m.key === selected) ?? months[0];
   const incomingRows = [
     ...settlements.filter(s => s.dueDate?.startsWith(selected) && s.status !== '완납').map(s => ({ id: s.id, name: s.buyerName, date: s.dueDate, amount: Math.max(0, s.billedAmountKrw - s.collectedAmountKrw), note: `확정 · ${s.invoiceNo || ''}` })),
@@ -31,6 +35,9 @@ export default function CashPlan() {
     return { id: p.id, name: p.vendorName, date: p.dueDate, amount: Math.max(0, p.amountKrw - p.paidAmountKrw - confirmed), note: `${stage} · ${planned ? `${planned.workspace} · ${planned.account || planned.category}${planned.installment ? ` · ${planned.installment}` : ''} · ${planned.description}` : p.orderNo || p.memo || ''}`, action: planned?.stage === '예상' ? () => { phase1.updatePayable(p.id, { memo: confirmPlannedExpenseMemo(p.memo) }); tick(n => n + 1); toast.success('계획지출을 확정했습니다'); } : undefined };
   }).filter(r => r.amount > 0);
   const plannedProjects = useMemo(() => buildPlannedExpenseProjects(payables), [payables]);
+  const projection = opening !== '' && Number.isFinite(Number(opening)) ? dailyCashProjection(selected, Number(opening), incomingRows, outgoingRows) : [];
+  const floor = Number(minimumBalance) || 0;
+  const shortage = projection.find(r => r.minimum < floor);
 
   const addPlan = () => {
     if (!plan.description.trim() || !plan.vendorName.trim() || plan.installments.some(x => !x.label.trim() || x.amountKrw <= 0 || !x.dueDate)) return toast.error('내용·지급처와 모든 지급회차의 명칭·금액·예정일을 입력하세요');
@@ -45,7 +52,7 @@ export default function CashPlan() {
   return (
     <div className="p-4 md:p-6 space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h1 className="text-2xl font-bold text-foreground">자금계획</h1><p className="text-sm text-muted-foreground">미수금·미지급 예정일을 기준으로 앞으로 12개월의 현금 유입과 유출을 봅니다.</p></div>
+        <div><h1 className="text-2xl font-bold text-foreground">자금계획 · 그룹 전체</h1><p className="text-sm text-muted-foreground">미수금·미지급 예정일 기준 12개월 전망 · 현재 잔액/미등록 거래는 포함하지 않습니다.</p></div>
         <Button onClick={() => setPlanOpen(true)}><Plus className="w-4 h-4 mr-1" />비정기 계획지출</Button>
       </div>
 
@@ -60,12 +67,20 @@ export default function CashPlan() {
           <thead><tr className="border-b text-muted-foreground"><th>월</th><th className="num">예상입금</th><th className="num">예상지출</th><th className="num">순현금흐름</th><th>상태</th></tr></thead>
           <tbody className="divide-y">
             {months.map(m => <tr key={m.key} onClick={() => setSelected(m.key)} className={`cursor-pointer hover:bg-muted/50 ${selected === m.key ? 'bg-primary/5' : ''}`}>
-              <td className="font-medium">{m.label}</td><td className="num text-[var(--system-green)]">{formatKRW(m.incoming)}</td><td className="num text-[var(--system-red)]">{formatKRW(m.outgoing)}</td><td className={`num font-semibold ${m.net < 0 ? 'text-[var(--system-red)]' : ''}`}>{formatKRW(m.net)}</td><td>{m.net < 0 ? <span className="text-[var(--system-red)]">순유출 확인</span> : '정상'}</td>
+              <td className="font-medium">{m.label}</td><td className="num text-[var(--system-green)]">{formatKRW(m.incoming)}</td><td className="num text-[var(--system-red)]">{formatKRW(m.outgoing)}</td><td className={`num font-semibold ${m.net < 0 ? 'text-[var(--system-red)]' : ''}`}>{formatKRW(m.net)}</td><td>{m.net < 0 ? <span className="text-[var(--system-red)]">순유출</span> : '순유입'}</td>
             </tr>)}
           </tbody>
         </table>
       </div>
 
+      <section className="rounded-lg border bg-card p-4 space-y-3">
+        <h2 className="font-semibold">{current.label} 자금 잔액 시뮬레이션</h2>
+        <p className="text-xs text-muted-foreground">그룹 합산 가정 · 월초 가용 잔액을 직접 입력하세요. 은행 실잔액과 미등록/연체 거래는 자동 반영되지 않습니다. 같은 날에는 지급이 입금보다 먼저라고 보수적으로 계산합니다.</p>
+        <div className="flex flex-wrap gap-3"><label className="text-sm">월초 가정 잔액<Input type="number" value={opening} onChange={e => setOpening(e.target.value)} placeholder="원" /></label><label className="text-sm">유지할 최소 잔액<Input type="number" value={minimumBalance} onChange={e => setMinimumBalance(e.target.value)} /></label></div>
+        {projection.length > 0 && <><p role="status" className={shortage ? 'text-destructive text-sm' : 'text-sm'}>{shortage ? `${shortage.date} 최소 잔액 미달 · 지급 우선 가정 ${formatKRW(shortage.minimum)}` : '등록된 예정 거래와 입력한 가정 범위에서 최소 잔액 미달 없음'} · 월말 {formatKRW(projection.at(-1)!.balance)}</p>
+          <div className="h-56"><ResponsiveContainer width="100%" height="100%"><LineChart data={projection}><XAxis dataKey="date" tickFormatter={v => String(v).slice(8)} /><YAxis tickFormatter={v => `${Math.round(Number(v) / 10000)}만`} /><Tooltip formatter={v => formatKRW(Number(v))} /><ReferenceLine y={floor} stroke="var(--system-red)" strokeDasharray="4 4" /><Line type="linear" dataKey="balance" name="일말 가정 잔액" stroke="var(--primary)" dot={false} isAnimationActive={false} /><Line type="linear" dataKey="minimum" name="지급 우선 최저 잔액" stroke="var(--system-red)" dot={false} isAnimationActive={false} /></LineChart></ResponsiveContainer></div>
+        </>}
+      </section>
       <div className="grid gap-4 lg:grid-cols-2">
         <Detail title="예상입금 상세" empty="예정된 입금이 없습니다" rows={incomingRows} />
         <Detail title="예상지출 상세" empty="예정된 지출이 없습니다" rows={outgoingRows} />
@@ -74,7 +89,7 @@ export default function CashPlan() {
       <p className="text-xs text-muted-foreground">예정 금액을 추가하려면 미수금 또는 미지급 화면에 예정일과 금액을 등록하세요.</p>
 
       <Dialog open={planOpen} onOpenChange={setPlanOpen}><DialogContent><DialogHeader><DialogTitle>비정기 계획지출 등록</DialogTitle></DialogHeader><div className="grid gap-3 sm:grid-cols-2">
-        <div><Label>사업</Label><select className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={plan.workspace} onChange={e => setPlan(p => ({ ...p, workspace: e.target.value as PlannedExpenseWorkspace }))}><option>OEM</option><option>LUMEN</option><option>AETALOOP</option></select></div>
+        <div><Label>사업</Label><select className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={plan.workspace} onChange={e => setPlan(p => ({ ...p, workspace: e.target.value as PlannedExpenseWorkspace }))}><option>OEM</option><option>LUMEN</option><option>AETALOOF</option></select></div>
         <div><Label>관리항목</Label><select className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={plan.category} onChange={e => setPlan(p => ({ ...p, category: e.target.value, account: DEFAULT_ACCOUNT_BY_CATEGORY[e.target.value] }))}>{['인테리어','집기','보증금','촬영','마케팅','팝업','기타'].map(x => <option key={x}>{x}</option>)}</select></div>
         <div><Label>계정과목</Label><select className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={plan.account} onChange={e => setPlan(p => ({ ...p, account: e.target.value }))}>{PLANNED_EXPENSE_ACCOUNTS.map(x => <option key={x}>{x}</option>)}</select><p className="mt-1 text-[11px] text-muted-foreground">{ASSET_ACCOUNTS.includes(plan.account as typeof ASSET_ACCOUNTS[number]) ? '자산등록 대상' : '당기 비용'}</p></div>
         <div><Label>부가세</Label><select className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={plan.taxType} onChange={e => setPlan(p => ({ ...p, taxType: e.target.value as PlannedExpenseTaxType }))}><option>과세</option><option>면세</option><option>불공제</option></select></div>

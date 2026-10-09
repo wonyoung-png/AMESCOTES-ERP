@@ -9,6 +9,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { requireUser, requireRole, userOf, restAsServer, CEO_EMAILS, type SessionUser } from './auth.js';
 import { syncSoon, myUpcoming } from './gcal.js';
 import { ORG } from './org.js';
+import { searchCards, prioritizeCards, allRows } from './work-records.js';
 
 const router = Router();
 
@@ -174,7 +175,7 @@ async function answer(me: Member, question: string, all: Member[]): Promise<stri
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return 'AI 키가 없어 답할 수 없습니다.';
   const since = new Date(Date.now() - 90 * 864e5).toISOString();
-  const [cr, pr, mine] = await Promise.all([
+  const [cr, pr, mine, matched] = await Promise.all([
     restAsServer(`work_cards?kind=neq.question&created_at=gte.${since}` +
       `&select=created_at,created_by_name,team,kind,raw_text,status,reply_text,replied_by_name,confirmed_payload,done_by_name` +
       `&order=created_at.desc&limit=150${visibleFilter(me)}`),
@@ -182,8 +183,10 @@ async function answer(me: Member, question: string, all: Member[]): Promise<stri
       `&end_date=gte.${new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)}&order=start_date.asc&limit=100`),
     // 본인 구글 캘린더 (연결한 사람만, 본인 질문에만)
     myUpcoming(me.id),
+    searchCards(question, visibleFilter(me)),
   ]);
-  const cards = cr.ok ? await cr.json() : [];
+  const recent = cr.ok ? await cr.json() : [];
+  const cards = prioritizeCards(Array.from(new Map([...recent, ...matched].map(c => [c.id || `${c.created_at}:${c.raw_text}`, c])).values()), question, 150);
   const camps = pr.ok ? await pr.json() : [];
   const fmtCard = (c: any) => `- ${c.created_at.slice(0, 10)} ${c.created_by_name}(${c.team || '-'}) [${c.kind}/${c.status}] ${c.raw_text}` +
     (c.reply_text ? ` → 답변 ${c.replied_by_name}: ${c.reply_text}` : '') +
@@ -200,6 +203,7 @@ async function answer(me: Member, question: string, all: Member[]): Promise<stri
   할 수 있는 일: 팀장 확인 요청 보내기 / 기획전·할인 일정을 운영캘린더에 올리기 / 팀에 업무 공유 / 쌓인 기록으로 질문에 답하기.
 - 기록에 없으면 "기록에 없습니다"라고 하고, 누구에게 물어보면 될지 한 줄 덧붙인다. 지어내지 마라.
 - 질문과 관계없는 기록은 옮기지 않는다. 답에는 근거(날짜·누가 정했는지)를 붙인다. 3~5줄 이내, 한국어.
+- 과거 검색과 최근 기록에서 뽑은 근거 표본이다. 회사 전체를 전수 확인했다고 말하지 마라. 대표에게는 존댓말을 사용한다.
 - 채팅창은 글자 그대로 보여준다. **굵게**·# 제목 같은 마크다운 기호를 쓰지 마라.`;
   // "W컨셉 건 누구한테 물어봐?" 에 답하려면 누가 뭘 맡는지 알아야 한다.
   // 묻는 사람 것은 전부, 다른 사람 것은 앞부분만 (ponytail: 직원이 수십 명이면 팀 단위로 추린다)
@@ -311,6 +315,20 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
 });
 
 // ───────────────────────── 피드
+
+router.get('/api/work/today', requireUser(), async (req: Request, res: Response) => {
+  try {
+    const all = await members();
+    const me = all.find(m => m.id === userOf(req).id);
+    if (!me) { res.status(401).json({ error: 'no_session' }); return; }
+    const rows = await allRows(`work_cards?kind=neq.question&status=eq.open&select=id,raw_text,kind,assignee_id,assignee_name,created_by,created_by_name,parsed,created_at&order=created_at.desc,id.desc${visibleFilter(me)}`);
+    const today = kstToday();
+    const mine = rows.filter(c => c.assignee_id === me.id || (!c.assignee_id && c.created_by === me.id));
+    res.json({ me: { id: me.id, name: me.name }, items: prioritizeCards(mine, '', 100),
+      counts: { open: mine.length, checks: mine.filter(c => c.kind === 'request_check').length, overdue: mine.filter(c => c.parsed?.dueDate && c.parsed.dueDate < today).length, shared: rows.length - mine.length },
+      displayed: Math.min(mine.length, 100), asof: new Date().toISOString() });
+  } catch (e) { console.error('[work] today', e); res.status(502).json({ error: '업무 조회 실패' }); }
+});
 
 router.get('/api/work', requireUser(), async (req: Request, res: Response) => {
   try {

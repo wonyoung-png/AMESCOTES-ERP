@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { Send, Package, Factory, Trash2, Undo2 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import StylePickerSheet, { type PickedLine } from '@/components/StylePickerSheet';
+import ReorderImport from '@/components/ReorderImport';
 
 const PIPELINE = ['발주', '진행중', '생산완료', '한국/중국입고', '미지급 등록', '공장결제'] as const;
 
@@ -374,6 +375,7 @@ export default function BrandOrders() {
         </div>
       </div>
 
+      <ReorderImport workspace={ws} onImported={() => { refresh(); setMainTab('approval'); }} />
       <Tabs value={mainTab} onValueChange={setMainTab}>
         <TabsList>
           <TabsTrigger value="mgmt">생산 의뢰</TabsTrigger>
