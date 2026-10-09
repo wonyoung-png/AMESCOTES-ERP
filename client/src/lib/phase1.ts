@@ -715,13 +715,29 @@ export const phase1 = {
     vendorName?: string;
     projectNo?: string;
     receivedDate?: string;
+    deliveryDate?: string;
   }, amountKrw?: number): Payable | null => {
     const amt = amountKrw ?? Math.round((order.factoryUnitPriceKrw || 0) * (order.qty || 0));
     if (amt <= 0) return null;
     const existing = getAll<Payable>(KEYS.payables).find(p =>
       p.sourceType === 'processing' && (p.sourceId === order.id || p.orderId === order.id),
     );
-    if (existing) return existing;
+    if (existing) {
+      if (existing.status !== 'paid') {
+        const updated = {
+          ...existing,
+          vendorId: order.vendorId,
+          vendorName: order.vendorName || '공장',
+          amountKrw: amt,
+          dueDate: (order.deliveryDate || order.receivedDate || existing.dueDate).slice(0, 10),
+        };
+        const all = getAll<Payable>(KEYS.payables).map(p => p.id === existing.id ? updated : p);
+        setAll(KEYS.payables, all);
+        syncPayable(updated).catch(reportSyncFail('미지급'));
+        return updated;
+      }
+      return existing;
+    }
     return phase1.addPayable({
       vendorId: order.vendorId,
       vendorName: order.vendorName || '공장',
@@ -729,7 +745,7 @@ export const phase1 = {
       sourceType: 'processing',
       sourceId: order.id,
       amountKrw: amt,
-      dueDate: (order.receivedDate || new Date().toISOString()).slice(0, 10),
+      dueDate: (order.deliveryDate || order.receivedDate || new Date().toISOString()).slice(0, 10),
       memo: `임가공 · ${order.orderNo || ''} · ${order.styleName || order.styleNo || ''}`.trim(),
       payeeType: 'factory_direct',
       orderId: order.id,
@@ -1076,6 +1092,7 @@ export const phase1 = {
       ? (opts.chinaCorpVendorName || CHINA_CORP_VENDOR_NAME)
       : (opts.factoryVendorName || '공장');
     const amountKrw = Math.round((opts.unitPriceKrw || 0) * log.qty);
+    if (amountKrw <= 0) return null;
     return phase1.addPayable({
       vendorId: vendorId || undefined,
       vendorName,
@@ -1083,7 +1100,7 @@ export const phase1 = {
       sourceType: 'order_receipt',
       sourceId: log.id,
       amountKrw,
-      dueDate: new Date().toISOString().slice(0, 10),
+      dueDate: log.receivedDate,
       memo: `${dest === 'china' ? '중국입고' : '한국입고'} · ${log.orderNo}${log.color ? ` · ${log.color}` : ''} · ${log.qty}pcs${log.isAdvance ? ' (선입)' : ''}`,
       payeeType,
       orderId: log.orderId,

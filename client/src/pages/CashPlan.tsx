@@ -2,16 +2,23 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { ArrowDownCircle, ArrowUpCircle, CalendarRange, TriangleAlert } from 'lucide-react';
 import { phase1 } from '@/lib/phase1';
 import { formatKRW, store } from '@/lib/store';
-import { buildMonthlyCashPlan } from '@/lib/cashPlan';
+import { buildMonthlyCashPlan, expectedStatementDate, statementTotal } from '@/lib/cashPlan';
 
 export default function CashPlan() {
   const settlements = store.getSettlements();
   const payables = phase1.getPayables();
-  const months = useMemo(() => buildMonthlyCashPlan(settlements, payables), [settlements, payables]);
+  const statements = store.getTradeStatements();
+  const months = useMemo(() => buildMonthlyCashPlan(settlements, payables, statements), [settlements, payables, statements]);
   const [selected, setSelected] = useState(months[0].key);
   const current = months.find(m => m.key === selected) ?? months[0];
-  const incomingRows = settlements.filter(s => s.dueDate?.startsWith(selected) && s.status !== '완납');
-  const outgoingRows = payables.filter(p => p.dueDate?.startsWith(selected) && p.status !== 'paid');
+  const incomingRows = [
+    ...settlements.filter(s => s.dueDate?.startsWith(selected) && s.status !== '완납').map(s => ({ id: s.id, name: s.buyerName, date: s.dueDate, amount: Math.max(0, s.billedAmountKrw - s.collectedAmountKrw), note: `확정 · ${s.invoiceNo || ''}` })),
+    ...statements.filter(s => s.status === '미청구' && expectedStatementDate(s).startsWith(selected)).map(s => ({ id: s.id, name: s.vendorName, date: expectedStatementDate(s), amount: statementTotal(s), note: `예상 · ${s.statementNo}` })),
+  ];
+  const outgoingRows = payables.filter(p => p.dueDate?.startsWith(selected) && p.status !== 'paid').map(p => {
+    const confirmed = p.sourceType === 'processing' ? payables.filter(x => x.sourceType === 'order_receipt' && x.orderId === p.orderId).reduce((sum, x) => sum + x.amountKrw, 0) : 0;
+    return { id: p.id, name: p.vendorName, date: p.dueDate, amount: Math.max(0, p.amountKrw - p.paidAmountKrw - confirmed), note: `${p.sourceType === 'processing' ? '예상' : '확정'} · ${p.orderNo || p.memo || ''}` };
+  }).filter(r => r.amount > 0);
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -21,8 +28,8 @@ export default function CashPlan() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Summary icon={<ArrowDownCircle />} label={`${current.label} 예상입금`} value={current.incoming} tone="text-[var(--system-green)]" />
-        <Summary icon={<ArrowUpCircle />} label={`${current.label} 예상지출`} value={current.outgoing} tone="text-[var(--system-red)]" />
+        <Summary icon={<ArrowDownCircle />} label={`${current.label} 예상입금`} value={current.incoming} sub={`확정 ${formatKRW(current.confirmedIncoming)} · 예상 ${formatKRW(current.expectedIncoming)}`} tone="text-[var(--system-green)]" />
+        <Summary icon={<ArrowUpCircle />} label={`${current.label} 예상지출`} value={current.outgoing} sub={`확정 ${formatKRW(current.confirmedOutgoing)} · 예상 ${formatKRW(current.expectedOutgoing)}`} tone="text-[var(--system-red)]" />
         <Summary icon={current.net < 0 ? <TriangleAlert /> : <CalendarRange />} label="순현금흐름" value={current.net} tone={current.net < 0 ? 'text-[var(--system-red)]' : 'text-primary'} />
       </div>
 
@@ -38,16 +45,16 @@ export default function CashPlan() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Detail title="예상입금 상세" empty="예정된 입금이 없습니다" rows={incomingRows.map(s => ({ id: s.id, name: s.buyerName, date: s.dueDate, amount: Math.max(0, s.billedAmountKrw - s.collectedAmountKrw), note: s.invoiceNo }))} />
-        <Detail title="예상지출 상세" empty="예정된 지출이 없습니다" rows={outgoingRows.map(p => ({ id: p.id, name: p.vendorName, date: p.dueDate, amount: Math.max(0, p.amountKrw - p.paidAmountKrw), note: p.orderNo || p.memo }))} />
+        <Detail title="예상입금 상세" empty="예정된 입금이 없습니다" rows={incomingRows} />
+        <Detail title="예상지출 상세" empty="예정된 지출이 없습니다" rows={outgoingRows} />
       </div>
       <p className="text-xs text-muted-foreground">예정 금액을 추가하려면 미수금 또는 미지급 화면에 예정일과 금액을 등록하세요.</p>
     </div>
   );
 }
 
-function Summary({ icon, label, value, tone }: { icon: ReactNode; label: string; value: number; tone: string }) {
-  return <div className="rounded-lg border bg-card p-4"><div className={`flex items-center gap-2 ${tone}`}>{icon}<span className="text-xs text-muted-foreground">{label}</span></div><p className={`mt-2 text-xl font-bold tabular-nums ${tone}`}>{formatKRW(value)}</p></div>;
+function Summary({ icon, label, value, tone, sub }: { icon: ReactNode; label: string; value: number; tone: string; sub?: string }) {
+  return <div className="rounded-lg border bg-card p-4"><div className={`flex items-center gap-2 ${tone}`}>{icon}<span className="text-xs text-muted-foreground">{label}</span></div><p className={`mt-2 text-xl font-bold tabular-nums ${tone}`}>{formatKRW(value)}</p>{sub && <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>}</div>;
 }
 
 function Detail({ title, empty, rows }: { title: string; empty: string; rows: Array<{ id: string; name: string; date: string; amount: number; note?: string }> }) {

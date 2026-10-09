@@ -52,6 +52,29 @@ function calcStatement(lines: TradeStatementLine[] | undefined) {
   return { taxableSupply, taxableVat, exemptAmount, grandTotal: taxableSupply + taxableVat + exemptAmount };
 }
 
+function ensureReceivable(statement: TradeStatement, invoiceDate: string) {
+  const existing = store.getSettlements().find(s => s.invoiceNo === statement.statementNo);
+  if (existing) {
+    store.updateSettlement(existing.id, {
+      buyerId: statement.vendorId, buyerName: statement.vendorName,
+      billedAmountKrw: calcStatement(statement.lines).grandTotal,
+      projectNo: statement.projectNo, workspace: statement.workspace,
+    });
+    return;
+  }
+  const due = new Date(`${invoiceDate}T00:00:00`);
+  due.setDate(due.getDate() + 30);
+  const settlement: Settlement = {
+    id: genId(), buyerId: statement.vendorId, buyerName: statement.vendorName, channel: 'B2B직납',
+    invoiceNo: statement.statementNo, invoiceDate, dueDate: localDate(due),
+    billedAmountKrw: calcStatement(statement.lines).grandTotal, collectedAmountKrw: 0, status: '정상',
+    projectNo: statement.projectNo, workspace: statement.workspace, createdAt: new Date().toISOString(),
+  };
+  store.addSettlement(settlement);
+}
+
+const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 export default function TradeStatement() {
   const [statements, setStatements] = useState<TradeStatement[]>(() => store.getTradeStatements());
   const vendors = store.getVendors();
@@ -182,7 +205,9 @@ export default function TradeStatement() {
     const vendorCode = form.vendorCode || 'XXX';
 
     if (isEdit && form.id) {
-      store.updateTradeStatement(form.id, { ...form, lines, vendorCode } as Partial<TradeStatement>);
+      const updated = { ...form, lines, vendorCode } as TradeStatement;
+      store.updateTradeStatement(form.id, updated);
+      if (updated.status === '청구완료' || updated.taxInvoice?.issued) ensureReceivable(updated, updated.issueDate);
       toast.success('거래명세표가 수정되었습니다');
     } else {
       const statementNo = store.getNextStatementNo(vendorCode);
@@ -246,7 +271,9 @@ export default function TradeStatement() {
       issued: true,
       issuedAt: new Date().toISOString(),
     };
-    store.updateTradeStatement(taxTargetId, { taxInvoice: invoiceData });
+    const target = statements.find(s => s.id === taxTargetId);
+    store.updateTradeStatement(taxTargetId, { taxInvoice: invoiceData, status: '청구완료' });
+    if (target) ensureReceivable(target, localDate());
     refresh();
     setShowTaxModal(false);
     toast.success('세금계산서가 발행되었습니다');
@@ -473,31 +500,14 @@ export default function TradeStatement() {
                   <td>
                     <Select value={s.status} onValueChange={v => {
                       const newStatus = v as TradeStatementStatus;
-                      store.updateTradeStatement(s.id, { status: newStatus });
-                      if (newStatus === '청구완료') {
-                        // 중복 방지: 이미 같은 전표번호로 정산 레코드가 있으면 skip
-                        const existingSettlements = store.getSettlements();
-                        const alreadyExists = existingSettlements.some(st => st.invoiceNo === s.statementNo);
-                        if (!alreadyExists) {
-                          const today = new Date().toISOString().split('T')[0];
-                          const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                          const calc = calcStatement(s.lines);
-                          const settlement: Settlement = {
-                            id: genId(),
-                            buyerId: s.vendorId,
-                            buyerName: s.vendorName,
-                            channel: 'B2B직납',
-                            invoiceNo: s.statementNo,
-                            invoiceDate: today,
-                            dueDate,
-                            billedAmountKrw: calc.grandTotal,
-                            collectedAmountKrw: 0,
-                            status: '정상',
-                            createdAt: new Date().toISOString(),
-                          };
-                          store.addSettlement(settlement);
-                        }
+                      const linked = store.getSettlements().find(st => st.invoiceNo === s.statementNo);
+                      if (newStatus === '미청구' && linked?.collectedAmountKrw) {
+                        toast.error('이미 입금된 명세표는 미청구로 되돌릴 수 없습니다');
+                        return;
                       }
+                      store.updateTradeStatement(s.id, { status: newStatus });
+                      if (newStatus === '청구완료') ensureReceivable(s, localDate());
+                      if (newStatus === '미청구' && linked) store.deleteSettlement(linked.id);
                       if (newStatus === '수금완료') {
                         // 연결된 정산 레코드의 collectedAmountKrw = billedAmountKrw 자동 업데이트
                         const settlements = store.getSettlements();

@@ -813,6 +813,7 @@ export default function ProductionOrders() {
         isReorder: revision >= 2,   // 같은 스타일 재발주면 -R2 이상이 붙는다
         updatedAt: new Date().toISOString(),
       });
+      phase1.createPayableFromProcessingOrder({ ...o, orderNo });
       toast.success(`발주 확정 — ${orderNo}`);
       refresh();
     } catch (e) {
@@ -1005,7 +1006,10 @@ export default function ProductionOrders() {
       const existingOrder = (orders as ProductionOrder[]).find(o => o.id === editOrderId);
       const fullUpdated = { ...(existingOrder || {}), ...updates, id: editOrderId } as ProductionOrder;
       upsertOrder(fullUpdated)
-        .then(() => { toast.success('발주가 수정되었습니다'); refresh(); setShowModal(false); setIsEditMode(false); setEditOrderId(null); })
+        .then(() => {
+          phase1.createPayableFromProcessingOrder(fullUpdated);
+          toast.success('발주가 수정되었습니다'); refresh(); setShowModal(false); setIsEditMode(false); setEditOrderId(null);
+        })
         .catch((e: Error) => toast.error(`저장 실패: ${e.message}`));
       return;
     }
@@ -1047,6 +1051,7 @@ export default function ProductionOrders() {
     // 서버 저장이 끝난 뒤에만 다음 단계로 — 실패했는데 "등록 완료" 팝업이 뜨던 문제
     try {
       await upsertOrder(order);
+      phase1.createPayableFromProcessingOrder(order);
     } catch (e) {
       toast.error(`발주 저장 실패 — 서버에 저장되지 않았습니다: ${(e as Error).message}`);
       return;

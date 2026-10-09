@@ -103,7 +103,7 @@ export default function ReceivingShipping() {
       return;
     }
     store.updateOrder(o.id, updates as Partial<typeof o>);
-    phase1.addReceiptLog({
+    const receiptLog = phase1.addReceiptLog({
       orderId: o.id,
       orderNo: o.orderNo,
       projectNo: (o as { projectNo?: string }).projectNo,
@@ -115,6 +115,13 @@ export default function ReceivingShipping() {
       memo: form.memo,
       deliveryMarket: isInbound ? undefined : form.deliveryMarket,
     });
+    if (isInbound) {
+      phase1.createPayableFromReceipt(receiptLog, {
+        unitPriceKrw: o.factoryUnitPriceKrw || 0,
+        factoryVendorId: o.vendorId,
+        factoryVendorName: o.vendorName,
+      });
+    }
     if (modal.logType === 'outbound_oem' && newShipped >= o.qty) {
       const marker = `[AUTO-ORDER:${o.id}]`;
       const exists = store.getTradeStatements().some(s => s.memo?.includes(marker));
