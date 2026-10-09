@@ -2,6 +2,8 @@
 import { db } from './db';
 import { toast } from 'sonner';
 import type { ColorQty } from './store';
+import { effectiveFactoryPayableTotal } from './factoryPayable';
+export { effectiveFactoryPayableTotal } from './factoryPayable';
 
 /** 서버 저장 실패를 드러낸다.
  *  이전에는 .catch(() => {}) 로 삼켜서, 컬럼 하나가 없어도 화면엔 저장된 것처럼 보이고
@@ -1498,7 +1500,7 @@ export const phase1 = {
     const estimatedFactory = projOrders.reduce(
       (s, o) => s + (o.factoryUnitPriceKrw || 0) * (o.receivedQty || o.qty || 0), 0,
     );
-    const payableFactory = factoryPays.reduce((s, p) => s + (p.amountKrw || 0), 0);
+    const payableFactory = effectiveFactoryPayableTotal(factoryPays);
     const actualCost = payableFactory > 0 ? payableFactory : estimatedFactory;
     const revenue = projStatements.reduce((s, st) =>
       s + (st.lines || []).reduce((ls, l) => ls + l.qty * l.unitPrice * (1 + (l.taxRate ?? 0)), 0), 0);
@@ -1524,15 +1526,12 @@ export const phase1 = {
         (p.orderId && p.orderId === o.id) || (p.orderNo && p.orderNo === o.orderNo),
       );
       const factBase = orderFactPays.length
-        ? orderFactPays.reduce((s, p) => s + (p.amountKrw || 0), 0)
+        ? effectiveFactoryPayableTotal(orderFactPays)
         : (o.factoryUnitPriceKrw || 0) * (o.receivedQty || o.qty || 0);
 
       return colors.map(cq => {
         const w = (cq.qty || 0) / totalColorQty;
-        const colorFact = orderFactPays.filter(p => p.color && p.color === cq.color);
-        const factoryCost = colorFact.length
-          ? colorFact.reduce((s, p) => s + (p.amountKrw || 0), 0)
-          : Math.round(factBase * w);
+        const factoryCost = Math.round(factBase * w);
         const materialCost = Math.round(matBase * w);
         const totalCost = materialCost + factoryCost;
         return {

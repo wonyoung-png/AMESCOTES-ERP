@@ -10,7 +10,8 @@ import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { phase1, pullBrandOrders, type InboundPO as InboundPOType } from '@/lib/phase1';
 import { store, genId, formatNumber, type Vendor } from '@/lib/store';
-import { fetchOrders, upsertOrder } from '@/lib/dbQueries';
+import { deleteOrder, fetchOrders, upsertOrder } from '@/lib/dbQueries';
+import { saveInboundOrders } from '@/lib/inboundOrderSave';
 import { nextOrderNo } from '@/lib/orderNo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,7 +58,7 @@ export default function InboundPO() {
         } satisfies Vendor;
         store.addVendor(buyer);
       }
-      for (const l of po.lines) {
+      const newOrders = po.lines.map(l => {
         const item = items.find(i => i.styleNo === l.styleNo);
         const orderNo = nextOrderNo(l.styleNo, known);
         const order: any = {
@@ -85,9 +86,10 @@ export default function InboundPO() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        await upsertOrder(order);
         known.push(order);
-      }
+        return order;
+      });
+      await saveInboundOrders(newOrders, upsertOrder, deleteOrder);
       phase1.markPOAccepted(po.poNo);
       // 브랜드 쪽 발주에도 확정 납기를 남긴다 — MD는 이 날짜를 보고 판매를 짠다
       if (batch) phase1.updateBrandBatch(batch.id, { expectedDely: due });
@@ -95,6 +97,8 @@ export default function InboundPO() {
       qc.invalidateQueries({ queryKey: ['brandOrders'] });
       toast.success(`${po.poNo} 수주 — 생산발주 ${po.lines.length}건 · 납기 ${due}`);
     } catch (e: any) {
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['brandOrders'] });
       toast.error('생산발주 등록 실패: ' + (e?.message || e));
     } finally {
       setBusy('');

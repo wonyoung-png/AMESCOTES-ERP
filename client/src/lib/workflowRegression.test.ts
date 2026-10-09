@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildMonthlyCashPlan, statementTotal } from './cashPlan';
 import { getBomForOrderFromList } from './bomLookup';
+import { effectiveFactoryPayableTotal } from './factoryPayable';
+import { saveInboundOrders } from './inboundOrderSave';
 import type { Bom, Item, ProductionOrder, PurchaseItem, TradeStatement } from './store';
 
 test('통합 회귀: 품목→BOM→발주→구매→입고→정산→자금계획 연결', () => {
@@ -35,4 +37,26 @@ test('통합 회귀: 브랜드 캠페인 일정과 OEM 프로젝트 키가 유�
   assert.equal(campaign.pushSkus[0], orderLink.styleNo);
   assert.ok(campaign.startDate <= campaign.endDate);
   assert.equal(campaign.discountRate, 20);
+});
+
+test('손익 생산비: 예정액과 부분입고 확정액을 중복 합산하지 않는다', () => {
+  const base = { sourceType: 'processing' as const, orderId: 'order-1', orderNo: 'PO-1', projectNo: 'P-1' };
+  assert.equal(effectiveFactoryPayableTotal([
+    { ...base, id: 'forecast', amountKrw: 50000000 },
+    { ...base, id: 'receipt', sourceType: 'order_receipt', amountKrw: 20000000 },
+  ]), 50000000);
+  assert.equal(effectiveFactoryPayableTotal([
+    { ...base, id: 'forecast', amountKrw: 50000000 },
+    { ...base, id: 'receipt', sourceType: 'order_receipt', amountKrw: 60000000 },
+  ]), 60000000);
+});
+
+test('수주함: 다건 저장 중 실패하면 앞서 저장한 발주를 되돌린다', async () => {
+  const removed: string[] = [];
+  await assert.rejects(saveInboundOrders(
+    [{ id: 'one' }, { id: 'two' }],
+    async order => { if (order.id === 'two') throw new Error('save failed'); },
+    async id => { removed.push(id); },
+  ));
+  assert.deepEqual(removed, ['one']);
 });
