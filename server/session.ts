@@ -2,6 +2,7 @@
 // 성공 시 PGRST_JWT_SECRET으로 서명한 12시간 토큰 발급 → PostgREST 접근은 이 토큰으로만 가능.
 import { Router, type Request, type Response } from 'express';
 import crypto from 'crypto';
+import { privateAccessAllowed } from './auth.js';
 
 const router = Router();
 
@@ -93,6 +94,10 @@ router.post('/api/login', async (req: Request, res: Response) => {
       res.status(401).json({ error: 'invalid_credentials' });
       return;
     }
+    if (!privateAccessAllowed(String(u.email))) {
+      res.status(403).json({ error: 'private_mode', message: 'ERP 준비 중입니다' });
+      return;
+    }
 
     const exp = now + SESSION_HOURS * 3600;
     const token = signJwt({ role: 'anon', iss: 'erp-server', email: u.email, name: u.name, exp });
@@ -132,7 +137,7 @@ router.get('/api/session', async (req: Request, res: Response) => {
     if (!r.ok) { res.status(502).json({ error: 'db_unavailable' }); return; }
     const rows = (await r.json()) as Array<Record<string, unknown>>;
     const u = rows[0];
-    if (!u || !u.is_active) { res.status(401).json({ error: 'no_session' }); return; }
+    if (!u || !u.is_active || !privateAccessAllowed(String(u.email))) { res.status(401).json({ error: 'no_session' }); return; }
     res.json({
       token,
       user: {

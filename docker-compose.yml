@@ -70,6 +70,7 @@ services:
       SHARE_PASS: ${SHARE_PASS:-}
       PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?}
       DAILY_URL: ${DAILY_URL:-http://daily:8000}
+      ERP_PRIVATE_MODE: ${ERP_PRIVATE_MODE:-false}
 
   caddy:
     image: caddy:2

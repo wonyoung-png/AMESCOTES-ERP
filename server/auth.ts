@@ -7,6 +7,7 @@ import type { Request, Response, NextFunction } from 'express';
 
 const SECRET = process.env.PGRST_JWT_SECRET || '';
 const POSTGREST_URL = process.env.POSTGREST_URL || 'http://postgrest:3000';
+const PRIVATE_MODE = process.env.ERP_PRIVATE_MODE === 'true';
 
 export function b64url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -73,6 +74,10 @@ export interface SessionUser {
   role: string;
 }
 
+export const CEO_EMAILS = ['wonyoung@atlm.kr'];
+export const privateAccessAllowed = (email: string, enabled = PRIVATE_MODE) =>
+  !enabled || CEO_EMAILS.includes(email.toLowerCase());
+
 /**
  * 쿠키(또는 Authorization 헤더)의 토큰으로 지금 로그인한 사람을 찾는다.
  * 토큰에 든 email 로 app_users 를 다시 읽는다 — 역할이 바뀌었거나 계정이 꺼졌으면 그 즉시 막힌다.
@@ -87,7 +92,7 @@ export async function currentUser(req: Request): Promise<SessionUser | null> {
     const r = await rest(`app_users?email=eq.${encodeURIComponent(String(payload.email).toLowerCase())}&select=*`, { role: 'erp_server' });
     if (!r.ok) return null;
     const u = (await r.json())[0];
-    if (!u || !u.is_active) return null;
+    if (!u || !u.is_active || !privateAccessAllowed(String(u.email))) return null;
     return { id: String(u.id), email: String(u.email), name: String(u.name || ''), role: String(u.role || '') };
   } catch {
     return null;
@@ -117,5 +122,3 @@ export function requireRole(...roles: string[]) {
 
 export const userOf = (req: Request): SessionUser => (req as Request & { user: SessionUser }).user;
 
-/** 대표 — 대표 콘솔(비서실)에 들어올 수 있는 유일한 계정. 이 계정은 본인만 바꿀 수 있다 (users.ts) */
-export const CEO_EMAILS = ['wonyoung@atlm.kr'];

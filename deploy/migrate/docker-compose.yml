@@ -60,6 +60,7 @@ services:
       SHARE_PASS: ""                        # 서버 검증 로그인으로 대체 (2026-08-04)
       PMS_COOKIE_DOMAIN: ".${ROOT_DOMAIN:?}"  # daily 서브도메인과 로그인 공유
       DAILY_URL: http://daily:8000
+      ERP_PRIVATE_MODE: "true"              # 완성 전 대표 계정만 허용
     depends_on: [postgrest]
     logging: *logs
 
