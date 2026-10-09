@@ -32,8 +32,11 @@ interface DbUser {
   created_at: string;
 }
 
-const ROLES: UserRole[] = ['대표', '생산관리팀장', '부관리 주임', '영업과장', '사원'];
-const TEAMS = ['국내영업', '해외영업', '비주얼컨텐츠', '디자인', '생산', '마케팅', '물류CS'];
+const ROLES: UserRole[] = ['대표', '팀장', '생산관리팀장', '부관리 주임', '영업과장', '사원'];
+const TEAMS = [
+  '루멘 디자인', '에탈루프 디자인', '비주얼·콘텐츠', '국내 MD', '글로벌 MD', '리테일',
+  '제품개발', '생산관리', '물류·CS', '일본법인', '중국법인', '경영지원', '영업', '마케팅',
+];
 
 // app_users 는 서버 API 로만 읽고 쓴다. 브라우저가 DB 에 직접 붙으면 로그인 없이도
 // 전 직원의 비밀번호 해시가 보였다. 관리자 여부도 서버가 다시 확인한다 (server/users.ts)
@@ -48,7 +51,7 @@ async function api(path: string, method = 'GET', body?: unknown) {
   return j;
 }
 
-async function saveOrg(id: string, patch: Partial<Pick<DbUser, 'team' | 'rank' | 'position' | 'is_active'>>) {
+async function saveOrg(id: string, patch: Partial<Pick<DbUser, 'role' | 'team' | 'rank' | 'position' | 'is_active'>>) {
   await api(`/api/users/${encodeURIComponent(id)}`, 'PATCH', patch);
 }
 
@@ -68,7 +71,7 @@ export default function UserManagement() {
   });
 
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [invite, setInvite] = useState({ name: '', email: '', role: '사원' as UserRole, password: '' });
+  const [invite, setInvite] = useState({ name: '', email: '', role: '사원' as UserRole, team: '', position: '', password: '' });
   const [resetTarget, setResetTarget] = useState<DbUser | null>(null);
   const [profileTarget, setProfileTarget] = useState<DbUser | null>(null);
   const [profileText, setProfileText] = useState('');
@@ -114,10 +117,10 @@ export default function UserManagement() {
     setSaving(true);
     try {
       // 해시는 서버에서 만든다
-      await api('/api/users', 'POST', { email, name, role: invite.role, password: invite.password });
+      await api('/api/users', 'POST', { ...invite, email, name });
       toast.success(`${name} 계정을 만들었습니다 — 이메일과 임시 비밀번호를 직접 전달하세요`);
       setInviteOpen(false);
-      setInvite({ name: '', email: '', role: '사원', password: '' });
+      setInvite({ name: '', email: '', role: '사원', team: '', position: '', password: '' });
       refresh();
     } catch (e: any) {
       console.error(e);
@@ -200,7 +203,11 @@ export default function UserManagement() {
                   </td>
                   <td className="text-muted-foreground">{u.email}</td>
                   <td>
-                    <span className="text-[13px] px-2 py-0.5 rounded-[6px] bg-[var(--fill-tertiary)] text-foreground">{u.role}</span>
+                    <select value={u.role} disabled={isAdminRow}
+                      onChange={async e => { await saveOrg(u.id, { role: e.target.value as UserRole }); refetch(); }}
+                      className="h-7 text-[13px] border border-border rounded-md bg-card px-1.5 disabled:opacity-60">
+                      {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
                   </td>
                   <td>
                     <select
@@ -319,6 +326,19 @@ export default function UserManagement() {
                   {ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>팀</Label>
+              <Select value={invite.team} onValueChange={team => setInvite(v => ({ ...v, team }))}>
+                <SelectTrigger><SelectValue placeholder="팀 선택" /></SelectTrigger>
+                <SelectContent>{TEAMS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-position">직책</Label>
+              <Input id="inv-position" value={invite.position}
+                onChange={e => setInvite(v => ({ ...v, position: e.target.value }))}
+                placeholder={invite.role.includes('팀장') ? '팀장' : '담당자'} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="inv-pw">임시 비밀번호 (6자 이상)</Label>

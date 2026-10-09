@@ -96,6 +96,7 @@ const ROLE_LEVEL: Record<UserRole, number> = {
   '부관리 주임': 3,
   '사원': 2,
   '영업과장': 3,
+  '팀장': 4,
 };
 
 export function hasPermission(requiredRole: UserRole): boolean {

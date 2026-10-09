@@ -6,8 +6,9 @@
 // 접수함(capture.ts)과 같은 원칙: 누가 썼는지·누가 확정했는지는 서버가 세션에서 읽는다.
 import { Router, type Request, type Response } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
-import { requireUser, requireRole, userOf, restAsServer, type SessionUser } from './auth.js';
+import { requireUser, requireRole, userOf, restAsServer, CEO_EMAILS, type SessionUser } from './auth.js';
 import { syncSoon, myUpcoming } from './gcal.js';
+import { ORG } from './org.js';
 
 const router = Router();
 
@@ -24,10 +25,10 @@ export const ANSWER_MODEL = 'claude-opus-5-5';
 const CHANNELS = ['자사몰', '센텀', '29CM', 'W컨셉', '쇼룸', '해외'];
 
 /** 회사 팀 — client/src/lib/phase1.ts CAMPAIGN_TEAMS 와 같다 */
-const TEAMS = ['국내영업', '해외영업', '비주얼컨텐츠', '디자인', '생산', '마케팅', '물류CS', '쇼룸'];
+const TEAMS = ORG.map(t => t.key);
 
 /** AI 추천이 없을 때 일정 확정 시 기본으로 알리는 팀 — 올린 팀은 빼고 보낸다 */
-const SCHEDULE_SHARE = ['마케팅', '물류CS'];
+const SCHEDULE_SHARE = ['마케팅', '물류·CS'];
 
 /** 공유 대상 팀 정리: 회사 팀 목록에 있는 것만, 올린 팀 빼고, 중복 없이 */
 const cleanTeams = (v: unknown, own: string) =>
@@ -58,11 +59,15 @@ export async function members(): Promise<Member[]> {
   }));
 }
 
-const isBoss = (m?: Member | SessionUser) => m?.role === '대표';
+const isBoss = (m?: Member | SessionUser) =>
+  !!m && m.role === '대표' && CEO_EMAILS.includes(m.email.toLowerCase());
 
 /** 팀장. 직책에 '팀장'이 든 사람. 없으면 대표(@atlm.kr)에게 간다 — 요청이 허공에 뜨면 안 된다 */
+export const isTeamLeader = (m: Pick<Member, 'position' | 'role'>) =>
+  m.position.includes('팀장') || m.role.includes('팀장');
+
 function leadersOf(team: string, all: Member[]): Member[] {
-  const lead = all.filter(m => m.team === team && m.position.includes('팀장'));
+  const lead = all.filter(m => m.team === team && isTeamLeader(m));
   if (lead.length) return lead;
   return all.filter(m => m.role === '대표' && m.email.endsWith('@atlm.kr'));
 }
@@ -318,7 +323,7 @@ router.get('/api/work', requireUser(), async (req: Request, res: Response) => {
     res.json({
       // 질문은 개인 대화다. 남의 질문은 팀 피드에 내보내지 않는다
       items: (await r.json()).filter((c: any) => c.kind !== 'question' || c.created_by === me.id),
-      me: { id: me.id, name: me.name, team: me.team, isLeader: me.position.includes('팀장'), isBoss: isBoss(me), profile: me.profile },
+      me: { id: me.id, name: me.name, team: me.team, isLeader: isTeamLeader(me), isBoss: isBoss(me), profile: me.profile },
     });
   } catch (e) {
     console.error('GET /api/work 실패:', e);
@@ -334,7 +339,7 @@ async function loadForActor(req: Request, res: Response) {
   const r = await restAsServer(`work_cards?id=eq.${encodeURIComponent(String(req.params.id))}&select=*`);
   const card = r.ok ? (await r.json())[0] : null;
   if (!card) { res.status(404).json({ error: 'not_found' }); return null; }
-  const leader = me.position.includes('팀장') && me.team === card.team;
+  const leader = isTeamLeader(me) && me.team === card.team;
   return { all, me, card, leader };
 }
 

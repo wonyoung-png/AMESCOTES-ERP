@@ -215,7 +215,7 @@ async function gather(me: SessionUser) {
     latestRuns(),
   ]);
   const cards: any[] = cr.ok ? await cr.json() : [];
-  const bossIds = new Set(all.filter(m => m.role === '대표').map(m => m.id));
+  const bossIds = new Set(all.filter(m => CEO_EMAILS.includes(m.email.toLowerCase())).map(m => m.id));
   for (const c of cards) { c._dir = isDirective(c, bossIds); c._org = orgOf(c, bossIds); }
   const captures: any[] = pr.ok ? await pr.json() : [];
   if (captures.length) {

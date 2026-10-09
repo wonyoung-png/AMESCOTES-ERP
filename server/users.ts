@@ -7,12 +7,14 @@
 //  - DB 에서 anon 권한을 거둔다 (migration_app_users_lock.sql)
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { requireUser, currentUser, restAsServer, userOf, CEO_EMAILS, type SessionUser } from './auth.js';
+import { ORG } from './org.js';
 
 const router = Router();
 
 /** client/src/lib/auth.ts ADMIN_EMAILS 와 같다. 화면 검사는 보안 경계가 아니라 여기서 다시 본다 */
 const ADMIN_EMAILS = ['wonyoung@atlm.kr', 'wonyoung@atlm.co.kr', 'saintluxpgw@bgrow.co.kr'];
-const ROLES = ['대표', '생산관리팀장', '부관리 주임', '영업과장', '사원'];
+const ROLES = ['대표', '생산관리팀장', '부관리 주임', '영업과장', '팀장', '사원'];
+const TEAMS = ORG.map(t => t.key);
 const SAFE = 'id,email,name,role,team,rank,position,work_profile,is_active,created_at';
 
 /** client/src/lib/auth.ts simpleHash 와 같은 알고리즘 (session.ts 로그인과 호환) */
@@ -61,15 +63,21 @@ router.get('/api/users', requireAdmin(), async (_req: Request, res: Response) =>
 /** 초대 — 해시는 서버에서 만든다 */
 router.post('/api/users', requireAdmin(), async (req: Request, res: Response) => {
   try {
-    const { email: e, name: n, role, password } = (req.body ?? {}) as Record<string, string>;
+    const { email: e, name: n, role, password, team: rawTeam, position: rawPosition } = (req.body ?? {}) as Record<string, string>;
     const email = String(e || '').trim().toLowerCase();
     const name = String(n || '').trim();
     if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { res.status(400).json({ error: 'bad_input' }); return; }
     if (!ROLES.includes(role)) { res.status(400).json({ error: 'bad_role' }); return; }
+    const team = String(rawTeam || '').trim();
+    const position = String(rawPosition || '').trim().slice(0, 40);
+    if (team && !TEAMS.includes(team)) { res.status(400).json({ error: 'bad_team' }); return; }
     if (typeof password !== 'string' || password.length < 6) { res.status(400).json({ error: 'weak_password' }); return; }
     const r = await restAsServer('app_users', {
       method: 'POST',
-      body: JSON.stringify({ id: email, email, name, role, password_hash: simpleHash(password), is_active: true }),
+      body: JSON.stringify({
+        id: email, email, name, role, password_hash: simpleHash(password), is_active: true,
+        team: team || null, position: position || null,
+      }),
     });
     if (!r.ok) {
       const t = await r.text();
@@ -87,6 +95,12 @@ router.patch('/api/users/:id', requireAdmin(), async (req: Request, res: Respons
     const patch: Record<string, unknown> = {};
     for (const k of ['team', 'rank', 'position'] as const) {
       if (k in body) patch[k] = body[k] == null || body[k] === '' ? null : String(body[k]).trim().slice(0, 40);
+    }
+    if (patch.team && !TEAMS.includes(String(patch.team))) { res.status(400).json({ error: 'bad_team' }); return; }
+    if ('role' in body) {
+      const role = String(body.role || '');
+      if (!ROLES.includes(role)) { res.status(400).json({ error: 'bad_role' }); return; }
+      patch.role = role;
     }
     if ('is_active' in body) patch.is_active = !!body.is_active;
     if (!Object.keys(patch).length) { res.status(400).json({ error: 'empty' }); return; }

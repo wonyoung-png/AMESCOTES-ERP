@@ -6,7 +6,7 @@
 // 하루 한 번(KST 08:30 이후 첫 점검) 자동으로 돌고, 대표 콘솔의 [지금 점검]으로도 돈다.
 // ponytail: 앱 컨테이너 안 setInterval. 컨테이너가 여러 대가 되면 DB 잠금이나 외부 스케줄러로.
 import Anthropic from '@anthropic-ai/sdk';
-import { restAsServer } from './auth.js';
+import { restAsServer, CEO_EMAILS } from './auth.js';
 import { members, esc, kstToday, CLASSIFY_MODEL, type Member } from './work.js';
 import { ORG, orgTeam, orgTeamOfName, DEFAULT_RULES } from './org.js';
 import { gatherWatch, type Watch } from './watch.js';
@@ -124,7 +124,7 @@ export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: strin
   // 업무를 못 읽었는데 빈 목록으로 진행하면 전 팀이 '대기'로 잘못 보고된다 — 점검 자체를 실패시킨다 (코덱스 지적)
   if (!cr.ok) throw new Error(`work_cards 조회 실패 ${cr.status}`);
   const cards: any[] = await cr.json();
-  const bossIds = new Set(all.filter(m => m.role === '대표').map(m => m.id));
+  const bossIds = new Set(all.filter(m => CEO_EMAILS.includes(m.email.toLowerCase())).map(m => m.id));
   const teams = new Set<string>(ORG.map(t => t.key));
   for (const c of cards) { c._dir = isDirective(c, bossIds); c._org = orgOf(c, bossIds); } // 카드마다 한 번만 판정
   cards.forEach(c => c.kind !== 'question' && c._org !== CEO_DESK && teams.add(c._org));

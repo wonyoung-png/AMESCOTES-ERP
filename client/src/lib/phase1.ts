@@ -285,12 +285,15 @@ export type CampaignTaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
 
 // 회사 팀 — 기획전·프로젝트가 같은 목록을 쓴다. 갈라지면 팀별 보기가 어긋난다.
 export const CAMPAIGN_TEAMS = [
-  '국내영업', '해외영업', '비주얼컨텐츠', '디자인', '생산', '마케팅', '물류CS', '쇼룸',
+  '루멘 디자인', '에탈루프 디자인', '비주얼·콘텐츠', '국내 MD', '글로벌 MD', '리테일',
+  '제품개발', '생산관리', '물류·CS', '일본법인', '중국법인', '경영지원', '영업', '마케팅',
 ] as const;
 
 /** 예전 표기 → 지금 팀 이름. 기존 업무가 '팀 미지정'으로 떨어지지 않게 한다 */
 export const LEGACY_TEAM_MAP: Record<string, string> = {
-  MD: '국내영업', 비주얼: '비주얼컨텐츠', 물류: '물류CS',
+  MD: '국내 MD', 국내영업: '국내 MD', 해외영업: '글로벌 MD',
+  비주얼: '비주얼·콘텐츠', 비주얼컨텐츠: '비주얼·콘텐츠', 디자인: '루멘 디자인',
+  생산: '생산관리', 물류: '물류·CS', 물류CS: '물류·CS', 쇼룸: '리테일',
 };
 export const normalizeTeam = (t?: string) => (t && LEGACY_TEAM_MAP[t]) || t || '';
 export type CampaignTeam = typeof CAMPAIGN_TEAMS[number];

@@ -745,7 +745,7 @@ export interface CartItem {
 }
 
 // ─── 사용자 / 인증 ───
-export type UserRole = '대표' | '생산관리팀장' | '부관리 주임' | '사원' | '영업과장';
+export type UserRole = '대표' | '생산관리팀장' | '부관리 주임' | '사원' | '영업과장' | '팀장';
 
 export interface AppUser {
   id: string;
