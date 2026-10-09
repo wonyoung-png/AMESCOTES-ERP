@@ -109,6 +109,7 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/trade-statement', label: '거래명세표', icon: <FileText size={17} />, table: 'trade_statements', oemOnly: true },
       { path: '/settlement', label: '미수금 / 정산', icon: <Receipt size={17} />, table: 'settlements', oemOnly: true },
+      { path: '/cash-plan', label: '자금계획', icon: <TrendingUp size={17} />, table: 'settlements' },
       { path: '/payables', label: '미지급 · 불량차감', icon: <Wallet size={17} />, table: 'payables' },
       { path: '/expense', label: '지출결의', icon: <Receipt size={17} />, table: 'expenses' },
       { path: '/project-pl', label: '매출 · 영업이익', icon: <BarChart3 size={17} />, table: 'projects' },

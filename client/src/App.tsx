@@ -42,6 +42,7 @@ const PurchaseMatching = lazyWithReload(() => import("./pages/PurchaseMatching")
 const VendorMaster = lazyWithReload(() => import("./pages/VendorMaster"));
 const TradeStatement = lazyWithReload(() => import("./pages/TradeStatement"));
 const SettlementManagement = lazyWithReload(() => import("./pages/SettlementManagement"));
+const CashPlan = lazyWithReload(() => import("./pages/CashPlan"));
 const ExpenseEntry = lazyWithReload(() => import("./pages/ExpenseEntry"));
 const DocumentOutput = lazyWithReload(() => import("./pages/DocumentOutput"));
 const ExchangeSettings = lazyWithReload(() => import("./pages/ExchangeSettings"));
@@ -172,6 +173,7 @@ function Router() {
         <Route path="/vendors" component={VendorMaster} />
         <Route path="/trade-statement" component={TradeStatement} />
         <Route path="/settlement" component={SettlementManagement} />
+        <Route path="/cash-plan" component={CashPlan} />
         <Route path="/payables" component={PayablesManagement} />
         <Route path="/project-pl" component={ProjectPL} />
         <Route path="/brand-orders" component={BrandOrders} />
