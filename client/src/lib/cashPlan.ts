@@ -27,6 +27,19 @@ export const isSafeDocumentUrl = (value: string) => {
   try { return ['http:', 'https:'].includes(new URL(value).protocol); } catch { return false; }
 };
 
+export function buildPlannedExpenseProjects(payables: Payable[]) {
+  const groups = new Map<string, { name: string; budget: number; planned: number; paid: number; documents: PlannedExpenseDocument[] }>();
+  payables.forEach(p => {
+    const meta = parsePlannedExpense(p.memo);
+    if (!meta?.groupId) return;
+    const row = groups.get(meta.groupId) || { name: p.projectNo || meta.description, budget: meta.budgetKrw || 0, planned: 0, paid: 0, documents: meta.documents || [] };
+    row.planned += p.amountKrw;
+    row.paid += p.paidAmountKrw;
+    groups.set(meta.groupId, row);
+  });
+  return Array.from(groups.entries()).map(([id, row]) => ({ id, ...row, budget: row.budget || row.planned }));
+}
+
 export const statementTotal = (s: TradeStatement) => s.lines.reduce((sum, line) => {
   const supply = line.qty * line.unitPrice;
   return sum + supply + (line.taxType === '과세' ? supply * line.taxRate : 0);

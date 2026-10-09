@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { ArrowDownCircle, ArrowUpCircle, CalendarRange, ExternalLink, Plus, Trash2, TriangleAlert } from 'lucide-react';
 import { phase1 } from '@/lib/phase1';
 import { formatKRW, store } from '@/lib/store';
-import { ASSET_ACCOUNTS, buildMonthlyCashPlan, confirmPlannedExpenseMemo, DEFAULT_ACCOUNT_BY_CATEGORY, encodePlannedExpense, expectedStatementDate, isSafeDocumentUrl, parsePlannedExpense, PLANNED_EXPENSE_ACCOUNTS, splitPlannedExpenseAmount, statementTotal, type PlannedExpenseDocument, type PlannedExpenseTaxType, type PlannedExpenseWorkspace } from '@/lib/cashPlan';
+import { ASSET_ACCOUNTS, buildMonthlyCashPlan, buildPlannedExpenseProjects, confirmPlannedExpenseMemo, DEFAULT_ACCOUNT_BY_CATEGORY, encodePlannedExpense, expectedStatementDate, isSafeDocumentUrl, parsePlannedExpense, PLANNED_EXPENSE_ACCOUNTS, splitPlannedExpenseAmount, statementTotal, type PlannedExpenseDocument, type PlannedExpenseTaxType, type PlannedExpenseWorkspace } from '@/lib/cashPlan';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -30,11 +30,7 @@ export default function CashPlan() {
     const stage = p.sourceType === 'processing' ? '예상' : planned?.stage || '확정';
     return { id: p.id, name: p.vendorName, date: p.dueDate, amount: Math.max(0, p.amountKrw - p.paidAmountKrw - confirmed), note: `${stage} · ${planned ? `${planned.workspace} · ${planned.account || planned.category}${planned.installment ? ` · ${planned.installment}` : ''} · ${planned.description}` : p.orderNo || p.memo || ''}`, action: planned?.stage === '예상' ? () => { phase1.updatePayable(p.id, { memo: confirmPlannedExpenseMemo(p.memo) }); tick(n => n + 1); toast.success('계획지출을 확정했습니다'); } : undefined };
   }).filter(r => r.amount > 0);
-  const plannedProjects = useMemo(() => {
-    const groups = new Map<string, { name: string; budget: number; planned: number; paid: number; documents: PlannedExpenseDocument[] }>();
-    payables.forEach(p => { const meta = parsePlannedExpense(p.memo); if (!meta?.groupId) return; const row = groups.get(meta.groupId) || { name: p.projectNo || meta.description, budget: meta.budgetKrw || 0, planned: 0, paid: 0, documents: meta.documents || [] }; row.planned += p.amountKrw; row.paid += p.paidAmountKrw; groups.set(meta.groupId, row); });
-    return [...groups.entries()].map(([id, row]) => ({ id, ...row, budget: row.budget || row.planned }));
-  }, [payables]);
+  const plannedProjects = useMemo(() => buildPlannedExpenseProjects(payables), [payables]);
 
   const addPlan = () => {
     if (!plan.description.trim() || !plan.vendorName.trim() || plan.installments.some(x => !x.label.trim() || x.amountKrw <= 0 || !x.dueDate)) return toast.error('내용·지급처와 모든 지급회차의 명칭·금액·예정일을 입력하세요');

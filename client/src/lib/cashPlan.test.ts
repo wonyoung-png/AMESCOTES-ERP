@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMonthlyCashPlan, confirmPlannedExpenseMemo, DEFAULT_ACCOUNT_BY_CATEGORY, encodePlannedExpense, isSafeDocumentUrl, parsePlannedExpense, splitPlannedExpenseAmount } from './cashPlan';
+import { buildMonthlyCashPlan, buildPlannedExpenseProjects, confirmPlannedExpenseMemo, DEFAULT_ACCOUNT_BY_CATEGORY, encodePlannedExpense, isSafeDocumentUrl, parsePlannedExpense, splitPlannedExpenseAmount } from './cashPlan';
+import type { Payable } from './phase1';
 
 test('미수·미지급 잔액을 예정월별로 합산하고 완납·지급완료는 제외한다', () => {
   const result = buildMonthlyCashPlan([
@@ -64,4 +65,37 @@ test('프로젝트 예산과 증빙 링크를 회차마다 보존한다', () => 
   assert.equal(parsePlannedExpense(memo)?.budgetKrw, 33000000);
   assert.deepEqual(parsePlannedExpense(memo)?.documents, documents);
   assert.equal(isSafeDocumentUrl('javascript:alert(1)'), false);
+});
+
+test('실사용 흐름: 공사 분할지급과 OEM 입고가 월별 자금·예산에 중복 없이 이어진다', () => {
+  const docs = [{ type: '계약서' as const, name: '성수점 계약서', url: 'https://example.com/contract' }];
+  const makeInstallment = (id: string, label: string, amountKrw: number, dueDate: string, stage: '예상' | '확정', paidAmountKrw = 0, status: Payable['status'] = 'pending'): Payable => ({
+    id, vendorName: '성수인테리어', projectNo: 'LUMEN 성수점', sourceType: 'manual', amountKrw, paidAmountKrw, dueDate, status,
+    memo: encodePlannedExpense('LUMEN', '인테리어', stage, '성수점 공사', 'seongsu-1', label, '건설중인자산', '과세', 36000000, docs), createdAt: '',
+  });
+  const payables: Payable[] = [
+    makeInstallment('contract', '계약금', 11000000, '2026-10-20', '확정', 5000000, 'partial'),
+    makeInstallment('middle', '중도금', 11000000, '2026-11-20', '예상'),
+    makeInstallment('balance', '잔금', 11000000, '2026-12-20', '예상'),
+    { id: 'oem-forecast', vendorName: 'OEM 공장', sourceType: 'processing', orderId: 'oem-1', amountKrw: 50000000, paidAmountKrw: 0, dueDate: '2026-11-30', status: 'pending', createdAt: '' },
+    { id: 'oem-receipt', vendorName: 'OEM 공장', sourceType: 'order_receipt', orderId: 'oem-1', amountKrw: 20000000, paidAmountKrw: 0, dueDate: '2026-11-15', status: 'pending', createdAt: '' },
+  ];
+  const settlements = [{ id: 'sale-1', buyerName: 'W컨셉', channel: 'B2B직납', invoiceDate: '2026-10-31', dueDate: '2026-11-10', billedAmountKrw: 44000000, collectedAmountKrw: 11000000, status: '정상' as const, createdAt: '' }];
+
+  const months = buildMonthlyCashPlan(settlements, payables, [], new Date(2026, 9, 1), 3);
+  assert.deepEqual(months.map(m => [m.key, m.confirmedIncoming, m.confirmedOutgoing, m.expectedOutgoing, m.outgoing]), [
+    ['2026-10', 0, 6000000, 0, 6000000],
+    ['2026-11', 33000000, 20000000, 41000000, 61000000],
+    ['2026-12', 0, 0, 11000000, 11000000],
+  ]);
+  assert.deepEqual(buildPlannedExpenseProjects(payables), [{ id: 'seongsu-1', name: 'LUMEN 성수점', budget: 36000000, planned: 33000000, paid: 5000000, documents: docs }]);
+
+  const confirmedMiddle = payables.map(p => p.id === 'middle' ? { ...p, memo: confirmPlannedExpenseMemo(p.memo)! } : p);
+  const november = buildMonthlyCashPlan(settlements, confirmedMiddle, [], new Date(2026, 10, 1), 1)[0];
+  assert.equal(november.confirmedOutgoing, 31000000);
+  assert.equal(november.expectedOutgoing, 30000000);
+  assert.equal(november.outgoing, 61000000);
+
+  const paidMiddle = confirmedMiddle.map(p => p.id === 'middle' ? { ...p, paidAmountKrw: 11000000, status: 'paid' as const } : p);
+  assert.equal(buildMonthlyCashPlan(settlements, paidMiddle, [], new Date(2026, 10, 1), 1)[0].outgoing, 50000000);
 });
