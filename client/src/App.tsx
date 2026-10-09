@@ -31,8 +31,7 @@ import Dashboard from "./pages/Dashboard";
 const ItemMaster = lazyWithReload(() => import("./pages/ItemMaster"));
 const QuickEntry = lazyWithReload(() => import("./pages/QuickEntry"));
 const CaptureUpload = lazyWithReload(() => import("./pages/CaptureUpload"));
-const CaptureInbox = lazyWithReload(() => import("./pages/CaptureInbox"));
-const WorkFeed = lazyWithReload(() => import("./pages/WorkFeed"));
+const WorkHub = lazyWithReload(() => import("./pages/WorkHub"));
 const MyCalendar = lazyWithReload(() => import("./pages/MyCalendar"));
 const SalesSummary = lazyWithReload(() => import("./pages/SalesSummary"));
 const BomManagement = lazyWithReload(() => import("./pages/BomManagement"));
@@ -160,8 +159,8 @@ function Router() {
         <Route path="/users" component={UserManagement} />
         <Route path="/quick" component={QuickEntry} />
         <Route path="/capture" component={CaptureUpload} />
-        <Route path="/inbox" component={CaptureInbox} />
-        <Route path="/work" component={WorkFeed} />
+        <Route path="/inbox"><Redirect to="/work?view=captures" /></Route>
+        <Route path="/work" component={WorkHub} />
       <Route path="/my-calendar" component={MyCalendar} />
         <Route path="/items" component={ItemMaster} />
         <Route path="/sales-summary" component={SalesSummary} />

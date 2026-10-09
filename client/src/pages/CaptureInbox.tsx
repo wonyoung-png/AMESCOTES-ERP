@@ -248,6 +248,7 @@ function DeliveryFields({
 
 export default function CaptureInbox() {
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
+  const [offset, setOffset] = useState(0);
   const [edit, setEdit] = useState<Record<string, Record<string, any>>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const qc = useQueryClient();
@@ -268,12 +269,12 @@ export default function CaptureInbox() {
     })
     .sort((a, b) => a.label.localeCompare(b.label, 'ko')), [vendors]);
 
-  const { data, refetch, isLoading } = useQuery({
-    queryKey: ['captures', tab],
+  const { data, refetch, isLoading, isError } = useQuery({
+    queryKey: ['captures', tab, offset],
     queryFn: async () => {
-      const r = await fetch(`/api/captures?status=${tab}`, { credentials: 'include' });
+      const r = await fetch(`/api/captures?status=${tab}&offset=${offset}`, { credentials: 'include' });
       if (!r.ok) throw new Error('목록을 불러오지 못했습니다');
-      return r.json() as Promise<{ items: Capture[]; canApprove: boolean }>;
+      return r.json() as Promise<{ items: Capture[]; total: number; canApprove: boolean }>;
     },
   });
   const items = data?.items || [];
@@ -350,6 +351,7 @@ export default function CaptureInbox() {
       }
       setEdit(p => { const { [c.id]: _drop, ...rest } = p; return rest; });
       refetch();
+      qc.invalidateQueries({ queryKey: ['capturePendingCount'] });
     } catch { toast.error('승인 실패'); }
     finally { setBusy(null); }
   };
@@ -367,6 +369,7 @@ export default function CaptureInbox() {
       if (!r.ok) { toast.error('반려 실패'); return; }
       toast.success('반려했습니다');
       refetch();
+      qc.invalidateQueries({ queryKey: ['capturePendingCount'] });
     } catch { toast.error('반려 실패'); }
     finally { setBusy(null); }
   };
@@ -385,7 +388,7 @@ export default function CaptureInbox() {
         </div>
         <div className="flex gap-1 bg-[var(--fill-tertiary)] rounded-md p-1">
           {(['pending', 'all'] as const).map(t => (
-            <button key={t} type="button" onClick={() => setTab(t)}
+            <button key={t} type="button" onClick={() => { setTab(t); setOffset(0); }}
               className={`px-3 h-8 text-xs rounded ${tab === t ? 'bg-card font-medium text-foreground' : 'text-muted-foreground'}`}>
               {t === 'pending' ? '승인 대기' : '전체'}
             </button>
@@ -393,14 +396,16 @@ export default function CaptureInbox() {
         </div>
       </div>
 
-      {!canApprove && (
+      {isError && <p role="alert" className="text-destructive">접수 조회 실패 <button onClick={() => refetch()}>다시 조회</button></p>}
+      {data && !canApprove && (
         <p className="text-xs text-[var(--system-orange)] border border-[var(--system-orange)]/30 bg-[var(--system-orange)]/10 rounded-md p-3">
           승인 권한이 없어 내가 올린 것만 보입니다. 승인은 대표·생산관리팀장이 합니다.
         </p>
       )}
 
       {isLoading && <p className="text-sm text-muted-foreground">불러오는 중…</p>}
-      {!isLoading && items.length === 0 && (
+      {data && <div className="flex items-center gap-3 text-sm"><span>전체 {data.total}건 · {items.length}건 표시</span><button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 200))}>이전</button><button disabled={offset + 200 >= data.total} onClick={() => setOffset(offset + 200)}>다음</button></div>}
+      {!isLoading && !isError && items.length === 0 && (
         <p className="text-sm text-muted-foreground border border-dashed border-border rounded-lg p-10 text-center">
           {tab === 'pending' ? '승인 대기 중인 접수가 없습니다' : '접수 내역이 없습니다'}
         </p>

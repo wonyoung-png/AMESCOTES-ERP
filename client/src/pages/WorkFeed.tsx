@@ -20,9 +20,11 @@ export default function WorkFeed() {
   const [items, setItems] = useState<Card[]>([]);
   const [me, setMe] = useState<Me | null>(null);
   const [tab, setTab] = useState<Tab>('todo');
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     const j = await fetchWork();
+    setLoadError(!j);
     if (j) { setItems(j.items); setMe(j.me); }
   }, []);
   useEffect(() => {
@@ -63,6 +65,7 @@ export default function WorkFeed() {
           {me && <> · {me.name} ({me.team || '팀 미지정'})</>}
         </p>
       </div>
+      {loadError && <p role="alert" className="text-sm text-destructive">업무 조회 실패 <button onClick={load}>다시 조회</button></p>}
 
       <div className="flex items-end gap-1 border-b border-border">
         {tabs.map(([k, label]) => {

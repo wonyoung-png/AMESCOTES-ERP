@@ -8,11 +8,18 @@
 import { Router, type Request, type Response } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireUser, requireRole, userOf, rest, restAsServer } from './auth.js';
+import { allRows } from './work-records.js';
 
 const router = Router();
 
 /** 승인할 수 있는 사람 */
 const APPROVER_ROLES = ['대표', '생산관리팀장'];
+
+export function captureQuery(me: { role: string; id: string }, status: string, select = '*') {
+  return [`select=${select}`, status === 'all' ? '' : `status=eq.${encodeURIComponent(status)}`,
+    APPROVER_ROLES.includes(me.role) ? '' : `created_by=eq.${encodeURIComponent(me.id)}`,
+    'order=created_at.desc,id.desc'].filter(Boolean).join('&');
+}
 
 const genId = () => `cap_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -173,22 +180,27 @@ router.post('/api/captures', requireUser(), async (req: Request, res: Response) 
 
 // ───────────────────────── 목록
 
+router.get('/api/captures/summary', requireUser(), async (req, res) => {
+  try {
+    const rows = await allRows(`capture_inbox?${captureQuery(userOf(req), 'pending', 'id')}`);
+    res.json({ pending: rows.length });
+  } catch (e) { console.error('[capture] count', e); res.status(502).json({ error: '접수 건수 조회 실패' }); }
+});
+
 router.get('/api/captures', requireUser(), async (req: Request, res: Response) => {
   try {
     const me = userOf(req);
     const status = String(req.query.status || 'pending');
     // 승인권자는 전부 본다. 나머지는 자기가 올린 것만 — 남의 경비 사진을 볼 이유가 없다
     const mineOnly = !APPROVER_ROLES.includes(me.role);
-    const q = [
-      'select=*',
-      status === 'all' ? '' : `status=eq.${encodeURIComponent(status)}`,
-      mineOnly ? `created_by=eq.${encodeURIComponent(me.id)}` : '',
-      'order=created_at.desc',
-      'limit=200',
-    ].filter(Boolean).join('&');
-    const r = await restAsServer(`capture_inbox?${q}`);
-    if (!r.ok) { res.status(502).json({ error: 'db', detail: await r.text() }); return; }
-    res.json({ items: await r.json(), canApprove: !mineOnly });
+    const offset = Number(req.query.offset || 0);
+    if (!Number.isSafeInteger(offset) || offset < 0) { res.status(400).json({ error: '페이지 번호 오류' }); return; }
+    const [r, ids] = await Promise.all([
+      restAsServer(`capture_inbox?${captureQuery(me, status)}&limit=200&offset=${offset}`),
+      allRows(`capture_inbox?${captureQuery(me, status, 'id')}`),
+    ]);
+    if (!r.ok) throw new Error('접수 조회 실패');
+    res.json({ items: await r.json(), total: ids.length, canApprove: !mineOnly });
   } catch (e) {
     console.error('GET /api/captures 실패:', e);
     res.status(500).json({ error: 'internal' });

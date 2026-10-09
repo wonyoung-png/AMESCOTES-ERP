@@ -54,9 +54,8 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/', label: '대시보드', icon: <BarChart3 size={17} />, table: '생산 현황' },
       { path: '/quick', label: '빠른 등록', icon: <Zap size={17} />, table: '발주·입고·불량·현장 접수' },
-      { path: '/work', label: '업무 피드', icon: <MessageSquare size={17} />, table: '업무 비서에서 올린 것이 팀별로' },
+      { path: '/work', label: '업무함', icon: <MessageSquare size={17} />, table: '업무 피드와 증빙 접수를 한곳에서' },
       { path: '/my-calendar', label: '내 캘린더', icon: <CalendarDays size={17} />, table: '구글 캘린더 + ATLM 업무' },
-      { path: '/inbox', label: '접수함', icon: <Inbox size={17} />, table: '승인하면 전표가 생긴다' },
     ],
   },
   {
