@@ -11,7 +11,7 @@ import { members, esc, kstToday, CLASSIFY_MODEL, type Member } from './work.js';
 import { ORG, orgTeam, orgTeamOfName, DEFAULT_RULES } from './org.js';
 import { gatherWatch, type Watch } from './watch.js';
 import { runSubscriptionUsageChecks } from './subscriptions.js';
-import { reportingCards, prioritizeCards, dayStartUtc } from './work-records.js';
+import { allRows, reportingCards, prioritizeCards, dayStartUtc } from './work-records.js';
 
 export type AgentStatus = 'work' | 'idle' | 'warn' | 'report';
 export type AgentRun = {
@@ -44,8 +44,8 @@ export function judge(team: string, cards: any[], bossIds: Set<string>, today: s
     overdue: open.filter(c => c.kind === 'todo' && c.parsed?.dueDate && c.parsed.dueDate < today).length,
     orders: open.filter(c => c._dir).length, // 대표 지시 중 아직 안 끝난 것
     toCeo: open.filter(c => c.kind === 'request_check' && bossIds.has(c.assignee_id)).length,
-    newToday: mine.filter(c => Date.parse(c.created_at) > dayAgo).length,
-    doneToday: mine.filter(c => c.done_at && Date.parse(c.done_at) > dayAgo).length,
+    newToday: mine.filter(c => Date.parse(c.created_at) >= dayAgo).length,
+    doneToday: mine.filter(c => c.status === 'done' && c.done_at && Date.parse(c.done_at) >= dayAgo).length,
     total30: mine.filter(c => Date.parse(c.created_at) >= Date.now() - 30 * 864e5).length,
     alerts: watch?.alerts || 0, // ERP·PMS 데이터 경고 (watch.ts 규칙)
   };
@@ -60,7 +60,9 @@ async function write(team: string, cards: any[], all: Member[], stats: Record<st
     const noAccount = org && !org.members.some(p => all.some(x => x.name === p.name));
     return { headline: noAccount ? '팀원 ERP 계정 등록 전 — 아직 볼 기록이 없어요' : '최근 30일 올라온 업무가 없어요', summary: null, needs: [] as AgentRun['needs'] };
   }
-  if (!key) return { headline: `진행 중 ${stats.open}건`, summary: null, needs: [] };
+  const fallback = { headline: `진행 ${stats.open}건 · 마감 지남 ${stats.overdue}건 · 운영 확인 ${stats.alerts}개`,
+    summary: 'AI 보고 작성 불가 — 규칙 집계와 원본 근거를 확인해 주세요.', needs: [] };
+  if (!key) return fallback;
 
   // 팀원별: 조직도 이름 기준 — 계정 여부·최근 7일 올린 수·하는 일(프로필). 조용한 사람도 보이게
   const weekAgo = Date.now() - 7 * 864e5;
@@ -106,7 +108,7 @@ needs 는 정말 대표가 볼 것만, 없으면 []. 적혀 있지 않은 건 �
   } catch (e) {
     // 보고 문장을 못 써도 상태·숫자는 남긴다
     console.warn(`[agents] ${team} 보고 작성 실패:`, String(e).split('\n')[0]);
-    return { headline: `진행 중 ${stats.open}건 · 마감 지남 ${stats.overdue}건`, summary: null, needs: [] };
+    return fallback;
   }
 }
 
@@ -169,10 +171,9 @@ export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: strin
 /** 팀별 가장 최근 점검 */
 export async function latestRuns(): Promise<AgentRun[]> {
   const since = new Date(Date.now() - 14 * 864e5).toISOString();
-  const r = await restAsServer(`team_agent_runs?created_at=gte.${since}&select=*&order=created_at.desc&limit=300`);
-  if (!r.ok) return [];
+  const runs = await allRows(`team_agent_runs?created_at=gte.${since}&select=*&order=created_at.desc,id.desc`);
   const seen = new Set<string>();
-  return (await r.json()).filter((x: AgentRun) => !seen.has(x.team) && seen.add(x.team));
+  return runs.filter((x: AgentRun) => !seen.has(x.team) && seen.add(x.team));
 }
 
 let running = false;

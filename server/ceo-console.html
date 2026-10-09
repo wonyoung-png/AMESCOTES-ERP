@@ -361,11 +361,11 @@ function home() {
   const k = D.kpi && D.kpi.ok ? D.kpi : null;
   const dateLabel = new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'long',day:'numeric',weekday:'long'});
   const decideTop = [...D.decide.map(c => itemHtml(c, false)), ...D.captures.map(c => captureHtml(c, false))].slice(0, 5);
-  const teamCards = D.teams.sort((a,b) => (b.open + b.newToday) - (a.open + a.newToday)).map(t => {
-    const dot = t.overdue ? 'warn' : (t.open || t.newToday) ? '' : 'idle';
+  const teamCards = [...D.teams].sort((a,b) => (b.open + b.newToday) - (a.open + a.newToday)).map(t => {
+    const dot = t.overdue || (D.watch || []).find(w => w.team === t.team)?.alerts ? 'warn' : (t.open || t.newToday) ? '' : 'idle';
     return `<div class="team"><h3><i class="${dot}"></i>${esc(t.team)}</h3>
       <dl><div><dt>진행 중</dt><dd>${t.open}</dd></div><div><dt>오늘 완료</dt><dd>${t.doneToday}</dd></div><div><dt>마감 지남</dt><dd${t.overdue ? ' class="up"' : ''}>${t.overdue}</dd></div></dl>
-      <p>${(() => { const ag = (D.agents || []).find(x => x.team === t.team); return ag ? esc(ag.headline) : t.latest ? esc(t.latest) : '아직 올라온 업무가 없어요'; })()}</p></div>`;
+      <p>${(() => { const ag = (D.agents || []).find(x => x.team === t.team); return ag ? (ag.stale ? '[오늘 이전 보고] ' : '') + esc(ag.headline) : t.latest ? esc(t.latest) : '아직 올라온 업무가 없어요'; })()}</p></div>`;
   }).join('');
   const cal = D.campaigns.map(c => {
     const d = new Date(c.start_date + 'T00:00:00+09:00');
@@ -391,7 +391,10 @@ function home() {
     </div>
     <section class="sec"><div class="sec-h"><h2>결정할 것</h2><span>먼저 올라온 순</span><a href="#inbox">모두 처리하기 →</a></div>
       <div class="list">${decideTop.join('') || '<p class="empty">지금 결정할 것이 없어요</p>'}</div></section>
-    <section class="sec"><div class="sec-h"><h2>팀</h2><span>최근 30일 업무 카드 기준</span></div>
+    <section class="sec"><div class="sec-h"><h2>현재 운영 점검</h2><span>조회 ${esc(new Date(D.checkedAt).toLocaleTimeString('ko-KR', {timeZone:'Asia/Seoul'}))} · 경고는 조건 수이며 중복 업무를 포함할 수 있습니다</span></div>
+      <div class="list">${(D.watch || []).map(w => `<details class="item"><summary>${esc(w.team)} · ${w.alerts ? '확인 조건 ' + w.alerts + '개' : '설정된 기준에서 경고 없음'}</summary><div>${w.facts.map(f => `<p>${esc(f)}</p>`).join('')}</div></details>`).join('') || '<p class="empty">운영 점검 자료가 없습니다 — 판단 보류</p>'}</div>
+      <div class="acts"><a class="btn" href="${esc(D.erpUrl)}/deadlines" target="_blank" rel="noopener">납기·입고 원본 ↗</a><a class="btn" href="${esc(D.erpUrl)}/cash-plan" target="_blank" rel="noopener">자금계획 원본 ↗</a><a class="btn" href="${esc(D.erpUrl)}/calendar" target="_blank" rel="noopener">운영캘린더 원본 ↗</a><a class="btn" href="${esc(D.erpUrl)}/work?view=captures" target="_blank" rel="noopener">접수 승인 원본 ↗</a></div></section>
+    <section class="sec"><div class="sec-h"><h2>팀</h2><span>최근 30일 + 오래된 미결·오늘 처리한 업무 기준</span></div>
       <div class="teams">${teamCards || '<p class="empty">팀이 지정된 직원이 아직 없어요 — ERP 사용자관리에서 팀을 정해주세요</p>'}</div></section>
     <section class="sec cal"><div class="sec-h"><h2>다가오는 일정</h2><span>운영캘린더 · 30일</span></div>
       <div class="list">${cal || '<p class="empty">30일 안에 잡힌 기획전이 없어요</p>'}</div></section>
@@ -429,7 +432,11 @@ function agentList() {
   return keys.map(k => {
     const t = D.teams.find(x => x.team === k) || { open: 0, overdue: 0, doneToday: 0, newToday: 0 };
     const org = D.org.teams.find(x => x.key === k);
-    return { division: org ? org.division : '대표 직속', ...(by.get(k) || { team: k, status: t.open ? 'work' : 'idle', headline: '아직 점검 전이에요', summary: null, needs: [], stats: { open: t.open, overdue: t.overdue, doneToday: t.doneToday, newToday: t.newToday }, created_at: null }) };
+    const a = by.get(k) || { team: k, status: t.open ? 'work' : 'idle', headline: '아직 점검 전이에요', summary: null, needs: [], stats: {}, created_at: null };
+    const w = (D.watch || []).find(x => x.team === k);
+    return { ...a, division: org ? org.division : '대표 직속', status: t.overdue || w?.alerts ? 'warn' : a.stale ? (t.open ? 'work' : 'idle') : a.status,
+      headline: (a.stale ? '[오늘 이전 보고] ' : '') + a.headline,
+      stats: { ...a.stats, open: t.open, overdue: t.overdue, doneToday: t.doneToday, newToday: t.newToday, alerts: w?.alerts || 0, facts: w?.facts || a.stats?.facts || [] } };
   });
 }
 function mapView() {

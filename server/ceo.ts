@@ -20,6 +20,7 @@ import { latestRuns, runAgentsOnce, orgOf, isDirective, CEO_DESK, loadRules } fr
 import { ORG, DIVISIONS, DIVISION_HEADS, DEFAULT_RULES, orgTeam } from './org.js';
 import { syncSoon } from './gcal.js';
 import { allRows, reportingCards, prioritizeCards, searchCards, dayStartUtc } from './work-records.js';
+import { gatherWatch } from './watch.js';
 
 const router = Router();
 
@@ -204,7 +205,7 @@ async function gather(me: SessionUser) {
   const today = kstToday();
   const in30 = new Date(Date.now() + 9 * 3600e3 + 30 * 864e5).toISOString().slice(0, 10);
   const ago3 = new Date(Date.now() + 9 * 3600e3 - 3 * 864e5).toISOString().slice(0, 10);
-  const [cr, pr, kr, all, kpi, agents] = await Promise.all([
+  const [cr, pr, kr, all, kpi, agents, watch] = await Promise.all([
     // 대표는 전부 본다 — 질문(개인 대화)만 뺀다
     reportingCards('*', since),
     // 사진은 빼고 — 콘솔이 /api/ceo/capture-photo/:id 로 따로 받는다 (요약에 넣으면 응답이 수십 MB 가 될 수 있다, 코덱스 지적)
@@ -214,6 +215,7 @@ async function gather(me: SessionUser) {
     members(),
     salesKpi(),
     latestRuns(),
+    gatherWatch(),
   ]);
   const cards: any[] = cr;
   const bossIds = new Set(all.filter(m => CEO_EMAILS.includes(m.email.toLowerCase())).map(m => m.id));
@@ -237,18 +239,21 @@ async function gather(me: SessionUser) {
   const teams = new Map<string, TeamDay>();
   for (const t of ORG) teams.set(t.key, { team: t.key, open: 0, doneToday: 0, newToday: 0, overdue: 0 });
   for (const c of cards) {
+    if (c.status === 'cancelled') continue;
     const t: string = c._org;
     if (t === CEO_DESK) continue; // 대표 본인 업무는 '결정할 것'에서 본다
     const s: TeamDay = teams.get(t) || { team: t, open: 0, doneToday: 0, newToday: 0, overdue: 0 };
     if (c.status === 'open') s.open++;
-    if (c.done_at && Date.parse(c.done_at) > dayAgo) s.doneToday++;
-    if (Date.parse(c.created_at) > dayAgo) s.newToday++;
+    if (c.status === 'done' && c.done_at && Date.parse(c.done_at) >= dayAgo) s.doneToday++;
+    if (Date.parse(c.created_at) >= dayAgo) s.newToday++;
     if (c.kind === 'todo' && c.status === 'open' && c.parsed?.dueDate && c.parsed.dueDate < today) s.overdue++;
     if (!s.latest) s.latest = c.raw_text;
     teams.set(t, s);
   }
 
-  return { me, today, cards, open, decide, captures, campaigns, teams: Array.from(teams.values()), members: all, kpi, agents,
+  return { me, today, cards, open, decide, captures, campaigns, teams: Array.from(teams.values()), members: all, kpi,
+    agents: agents.map(a => ({ ...a, stale: a.created_at < dayStartUtc() })),
+    watch: Array.from(watch, ([team, w]) => ({ team, ...w })), checkedAt: new Date().toISOString(),
     buyers: captures.length ? await buyerOptions() : [] };
 }
 
@@ -280,6 +285,8 @@ router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response
       recent: g.cards.slice(0, 20),
       kpi: g.kpi,
       agents: g.agents,
+      watch: g.watch,
+      checkedAt: g.checkedAt,
       // 조직도 + 팀원 ERP 계정 여부, 팀별 대표 지시 (지도·지시 화면용)
       org: {
         divisions: DIVISIONS, heads: DIVISION_HEADS,
@@ -328,7 +335,8 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
       '', '[승인 대기 현장 접수]', ...g.captures.map(c => `- ${c.created_at.slice(0, 10)} ${c.created_by_name} [${c.kind}] ${c.raw_text}`),
       '', `[업무 전수 집계 — 최근 30일 + 오래된 미결/최근 처리] ${g.cards.length}건, 미결 ${g.open.length}건`,
       '', `[질문 관련 근거 — 과거 검색 포함, 선택 ${evidence.length}건]`, ...evidence.map(fmtCard),
-      '', '[팀 에이전트 최근 점검]', ...g.agents.map(a => `- ${a.team} (${a.created_at.slice(0, 16)}) [${a.status}] ${a.headline}${a.summary ? ' / ' + a.summary.replace(/\s+/g, ' ') : ''}`),
+      '', `[현재 운영 점검 — 조회 ${g.checkedAt}]`, ...g.watch.flatMap(w => [`[${w.team}] 경고 조건 ${w.alerts}개`, ...w.facts]),
+      '', '[팀 에이전트 최근 점검 — 과거 보고는 현재 점검과 구분]', ...g.agents.map(a => `- ${a.team} (${a.created_at}) [${a.status}${a.stale ? ', 오늘 이전 보고' : ''}] ${a.headline}${a.summary ? ' / ' + a.summary.replace(/\s+/g, ' ') : ''}`),
       '', '[브랜드 매출 요약 (PMS)]', g.kpi ? JSON.stringify(g.kpi).slice(0, 6000) : '(지금은 불러오지 못함)',
     ].join('\n');
 
@@ -338,6 +346,7 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
 - 결론부터, 짧게. 숫자와 근거(날짜·누가)를 붙인다. 기록에 없으면 없다고 하고 누구에게 물으면 될지 말한다.
 - 대표가 결정할 일이 보이면 "결정 필요:"로 따로 짚는다.
 - 대표께 존댓말로 답한다. 근거 표본을 전수 검토한 것처럼 표현하지 않는다.
+- 조회 실패는 정상이나 0건으로 답하지 않는다. 과거 팀 보고보다 현재 운영 점검을 우선하며, 자금계획 차액을 은행 잔고나 자금 부족으로 단정하지 않는다.
 - 채팅창은 글자 그대로 보인다. 마크다운 기호(**, #)는 쓰지 말고 줄바꿈과 "·"로 정리한다.`;
 
     // 앞 대화는 화면이 보내온 것이라 믿을 수 없다. 대화 턴으로 끼우지 않고

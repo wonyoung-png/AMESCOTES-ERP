@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { judge, missingScheduleTeams } from './agents';
+import { dayStartUtc } from './work-records';
+
+test('한국 자정 완료를 포함하고 취소·재개 업무를 완료로 세지 않는다', () => {
+  const midnight = dayStartUtc();
+  const cards = ['done', 'cancelled', 'open'].map(status => ({ _org: '국내 MD', kind: 'todo', status,
+    created_at: midnight, done_at: midnight, parsed: {} }));
+  const result = judge('국내 MD', cards, new Set(), '2026-10-09');
+  assert.equal(result.stats.doneToday, 1);
+  assert.equal(result.stats.newToday, 2);
+});
 
 test('팀 에이전트는 하루 1,000건을 잘림 없이 집계한다', () => {
   const now = new Date().toISOString();
