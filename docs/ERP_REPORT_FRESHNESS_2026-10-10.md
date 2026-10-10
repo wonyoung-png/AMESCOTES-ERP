@@ -45,7 +45,13 @@
 
 ## 배포
 
-- 독립 Codex 최종 검토·푸시·앱 단독 배포 후 실제 결과를 이 절에 추가한다.
+- 기능 커밋 `c0de1444ce5e4f795d4c2c8642699a7f5b5f6b09`, 원격 aws-migration 푸시 및 앱 단독 배포 완료.
+- 배포 SSM `a1673f97-f30b-4fcb-a35a-5f21d76b9552` Success. 전역 배포 잠금 아래 검토된 커밋을 fast-forward한 뒤 앱 이미지 한 번 빌드·교체했다. DB/PMS/프록시 설정·컨테이너는 변경하지 않았다.
+- 실제 코드·private mode·health 읽기 검증 SSM `42ceb23b-37c5-4900-a15a-7412bc9187d7` Success.
+- 실제 이미지 `sha256:69f37dadf64a07e10942bcb35de1319a29055926549c6ceb5a6e715827f41034`, Docker healthy, ERP_PRIVATE_MODE=true 확인.
+- 공개 healthz 200, 미로그인 업무·campaigns·outbox·중국재고·비서실 overview API는 각각 401.
+- 복구 이미지 `amescotes-erp:before-report-freshness-20261010`은 이전 이미지 `sha256:589b49f9dabf93732d23c53b7b0d40de193a067b82bc21d25d988a1b47058126`을 보존한다. 실제 rollback은 필요하지 않았다.
+- 기능 적용 이후 실사용 보고는 대표 점검/기존 스케줄로 생성한다. 배포 확인을 위해 회사 DB에 시험 보고를 생성하지 않았다.
 
 ## 다음 점검
 
