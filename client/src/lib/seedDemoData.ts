@@ -544,12 +544,10 @@ export async function seedDemoIntegrationData(): Promise<SeedResult> {
 
   // ── 12. 미수금 정산 ──
   const settlements: Settlement[] = [
-    { id: DEMO.settlement, buyerName: 'LLL International', buyerId: DEMO.vendorBuyer, channel: 'B2B직납', invoiceNo: 'INV-DEMO-001', invoiceDate: '2026-08-05', dueDate: '2026-09-15', billedAmountKrw: 13350000, collectedAmountKrw: 5000000, status: '주의', projectNo: DEMO.projectOem, workspace: 'OEM', createdAt: ts },
-    { id: DEMO.settlement2, buyerName: 'LLL International', buyerId: DEMO.vendorBuyer, channel: 'B2B직납', invoiceNo: 'INV-DEMO-SAMPLE', invoiceDate: '2026-06-20', dueDate: '2026-07-20', billedAmountKrw: 34000, collectedAmountKrw: 34000, status: '정상', projectNo: DEMO.projectLumen, workspace: 'OEM', createdAt: ts },
+    { id: DEMO.settlement, buyerName: 'LLL International', buyerId: DEMO.vendorBuyer, channel: 'B2B직납', invoiceNo: 'INV-DEMO-001', invoiceDate: '2026-08-05', dueDate: '2026-09-15', billedAmountKrw: 13350000, collectedAmountKrw: 5000000, collectedDate: '2026-08-20', status: '주의', projectNo: DEMO.projectOem, workspace: 'OEM', createdAt: ts },
+    { id: DEMO.settlement2, buyerName: 'LLL International', buyerId: DEMO.vendorBuyer, channel: 'B2B직납', invoiceNo: 'INV-DEMO-SAMPLE', invoiceDate: '2026-06-20', dueDate: '2026-07-20', billedAmountKrw: 34000, collectedAmountKrw: 34000, collectedDate: '2026-07-01', status: '정상', projectNo: DEMO.projectLumen, workspace: 'OEM', createdAt: ts },
   ];
-  let stList = store.getSettlements();
-  settlements.forEach(s => { stList = upsertById(stList, s); });
-  store.setSettlements(stList);
+  await store.setSettlements(settlements);
   summary.push(`미수금 ${settlements.length}건`);
 
   // ── 13. 미지급 · 불량차감 ──

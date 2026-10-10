@@ -40,7 +40,7 @@ test('조회 실패는 정상 상태로 표시하지 않고 입고 실패 때 �
 test('미수금은 부분수금 차감, 자금계획은 확정입고 비용 중복 차감, 은행잔고 단정 금지', async () => {
   const today = kstToday();
   const w = await gatherWatch(reader({
-    settlements: [{ billed_amount_krw: 100000, collected_amount_krw: 40000, status: '부분수금', due_date: today }],
+    settlements: [{ billed_amount_krw: 100000, collected_amount_krw: 40000, status: '완납', due_date: today }],
     payables: [
       { source_type: 'processing', order_id: 'o', amount_krw: 100000, paid_amount_krw: 0, due_date: today },
       { source_type: 'order_receipt', order_id: 'o', amount_krw: 60000, paid_amount_krw: 20000, due_date: today },

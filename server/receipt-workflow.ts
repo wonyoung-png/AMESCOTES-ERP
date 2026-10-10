@@ -56,6 +56,13 @@ export function validStatementBilling(v: any) {
       && ['과세', '면세'].includes(l.taxType) && Number.isFinite(l.taxRate) && l.taxRate >= 0 && l.taxRate <= 1);
 }
 const workflowMessages: Record<string, string> = {
+  invalid_settlement: '청구금액·수금액·날짜를 확인해주세요',
+  stale_settlement: '다른 작업에서 미수금이 변경되었습니다 — 최신 내용을 다시 열어주세요',
+  settlement_number_changed: '기존 명세서번호 변경은 별도 정정이 필요합니다',
+  collection_reversal_required: '수금액을 줄이는 처리는 별도 입금 정정이 필요합니다',
+  settlement_not_found: '미수금 원본을 찾을 수 없습니다',
+  statement_not_billed: '청구 완료된 명세표만 수금을 연결할 수 있습니다',
+  linked_bill_locked: '연결 명세표의 바이어·청구금액·사업 구분은 명세표에서 수정해주세요',
   order_not_found: '생산 발주를 찾을 수 없습니다', invalid_order_status: '확정된 생산 발주만 출고할 수 있습니다',
   over_shipment: '서버의 최신 출고 잔량을 초과합니다', invalid_shipment: '출고 수량·날짜·판매처를 확인해주세요',
   receipt_conflict: '같은 출고 요청의 내용이 바뀌었습니다 — 출고 이력을 확인해주세요',
@@ -92,5 +99,20 @@ router.post('/api/orders/:id/ship', requireUser(), async (req, res) => {
 router.post('/api/statements/save-billing', requireUser(), async (req, res) => {
   if (!validStatementBilling(req.body)) { res.status(400).json({ message: '명세표 품목·수량·단가·날짜를 확인해주세요' }); return; }
   await saveWorkflow(res, 'save_statement_billing', req.body);
+});
+export function validSettlement(v: any) {
+  const s = v?.settlement;
+  return !!s && typeof s.id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(s.id)
+    && typeof s.buyerName === 'string' && !!s.buyerName.trim()
+    && ['W Concept','29CM','자사몰','해외T/T','B2B직납','기타'].includes(s.channel)
+    && Number.isFinite(s.billedAmountKrw) && s.billedAmountKrw > 0 && s.billedAmountKrw <= Number.MAX_SAFE_INTEGER
+    && Number.isFinite(s.collectedAmountKrw) && s.collectedAmountKrw >= 0 && s.collectedAmountKrw <= s.billedAmountKrw
+    && validDate(s.invoiceDate) && validDate(s.dueDate)
+    && (!s.collectedAmountKrw || validDate(s.collectedDate))
+    && (v.expected == null || (typeof v.expected === 'object' && !Array.isArray(v.expected) && v.expected.id === s.id));
+}
+router.post('/api/settlements/save', requireUser(), async (req, res) => {
+  if (!validSettlement(req.body)) { res.status(400).json({ message: '청구금액·수금액·날짜를 확인해주세요' }); return; }
+  await saveWorkflow(res, 'save_settlement', req.body);
 });
 export default router;

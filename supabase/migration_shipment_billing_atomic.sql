@@ -100,6 +100,7 @@ begin
     update public.trade_statements set vendor_id=v.id,vendor_name=v.name,vendor_code=v.code,
       project_no=nullif(s->>'projectNo',''),workspace=nullif(s->>'workspace',''),issue_date=dt,lines=s->'lines',
       status=s->>'status',tax_invoice=tax,tax_invoice_no=nullif(s->>'taxInvoiceNo',''),memo=nullif(s->>'memo',''),
+      collected_date=case when s->>'status'='수금완료' then stl.collected_date else null end,
       updated_at=clock_timestamp() where id=sid returning * into saved;
   end if;
   if billed then
@@ -109,8 +110,11 @@ begin
         values('stl_'||sid,v.id,v.name,saved.project_no,saved.workspace,'B2B직납',number,invoice_dt,
           invoice_dt+30,amount,0,'정상') returning * into stl;
     else
-      -- 수금액·수금일·기한·상태는 이 함수의 수정 대상이 아니다.
+      -- 수금액·수금일·기한은 보존하고 잔액이 생기면 완납 상태를 해제한다.
       update public.settlements set buyer_name=v.name,billed_amount_krw=amount,
+        status=case when coalesce(stl.collected_amount_krw,0)=amount then '완납'
+          when stl.due_date<(now() at time zone 'Asia/Seoul')::date then '위험'
+          when stl.due_date<=(now() at time zone 'Asia/Seoul')::date+14 then '주의' else '정상' end,
         project_no=saved.project_no,workspace=saved.workspace where id=stl.id returning * into stl;
     end if;
   end if;

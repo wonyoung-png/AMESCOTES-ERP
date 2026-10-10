@@ -833,10 +833,16 @@ async function saveTradeStatement(statement: TradeStatement) {
   return result.statement;
 }
 
-/** 정산·미수금 저장 — 로컬 표시와 서버 공유를 함께 유지한다. */
-function saveSettlements(list: Settlement[]) {
-  setAll(KEYS.settlements, list);
-  import('./settlementQueries').then(m => m.pushSettlements(list)).catch(() => {});
+/** 미수금·명세표는 서버 단건 검증 성공 결과만 캐시에 반영한다. */
+async function saveSettlement(statement: Settlement, expected: Settlement | null) {
+  const result = await (await import('./settlementQueries')).saveSettlement(statement, expected);
+  const list = getAll<Settlement>(KEYS.settlements);
+  setAll(KEYS.settlements, [...list.filter(s => s.id !== statement.id), result.settlement]);
+  if (result.statement) {
+    const statements = getAll<TradeStatement>(KEYS.tradeStatements);
+    setAll(KEYS.tradeStatements, [...statements.filter(s => s.id !== result.statement!.id), result.statement]);
+  }
+  return result.settlement;
 }
 
 // ─── 매출 (간단 버전) ───
@@ -1551,13 +1557,20 @@ export const store = {
 
   // Settlements
   getSettlements: () => getAll<Settlement>(KEYS.settlements),
-  setSettlements: (v: Settlement[]) => saveSettlements(v),
+  setSettlements: async (v: Settlement[]) => {
+    // 백업·데모 가져오기는 기존 서버 금액을 덮지 않는다. 변경된 기존 건은 정정 화면에서 처리한다.
+    for (const s of v) await saveSettlement(s, null);
+  },
   hydrateSettlements: (v: Settlement[]) => setAll(KEYS.settlements, v),
-  addSettlement: (v: Settlement) => { const a = getAll<Settlement>(KEYS.settlements); a.push(v); saveSettlements(a); },
-  updateSettlement: (id: string, u: Partial<Settlement>) => { const a = getAll<Settlement>(KEYS.settlements); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; saveSettlements(a); } },
-  deleteSettlement: (id: string) => {
+  addSettlement: (v: Settlement) => saveSettlement(v, null),
+  updateSettlement: (id: string, u: Partial<Settlement>, expected?: Settlement) => {
+    const original = expected || getAll<Settlement>(KEYS.settlements).find(s => s.id === id);
+    if (!original || original.id !== id) return Promise.reject(new Error('미수금을 찾을 수 없습니다'));
+    return saveSettlement({ ...original, ...u }, original);
+  },
+  deleteSettlement: async (id: string) => {
+    await (await import('./settlementQueries')).deleteSettlementSB(id);
     setAll(KEYS.settlements, getAll<Settlement>(KEYS.settlements).filter(x => x.id !== id));
-    import('./settlementQueries').then(m => m.deleteSettlementSB(id)).catch(() => {});
   },
 
   // Expenses

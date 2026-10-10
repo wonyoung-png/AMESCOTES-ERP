@@ -1,5 +1,6 @@
 // AMESCOTES ERP — 정산 / 미수금 관리
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { fetchSettlements } from '@/lib/settlementQueries';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import {
   store, genId, formatKRW, formatNumber,
@@ -26,14 +27,20 @@ const STATUS_COLOR: Record<SettlementStatus, string> = {
 
 function calcStatus(dueDate: string, collected: number, billed: number): SettlementStatus {
   if (collected >= billed) return '완납';
-  const dday = Math.ceil((new Date(dueDate).getTime() - Date.now()) / 86400000);
+  const dday = -calcElapsedDays(dueDate);
   if (dday < 0) return '위험';
   if (dday <= 14) return '주의';
   return '정상';
 }
 
+function calcElapsedDays(dueDate: string) {
+  return Math.round((new Date(todayKst()).getTime() - new Date(dueDate).getTime()) / 86400000);
+}
+const todayKst = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(new Date());
+const displaySettlements = (rows: Settlement[]) => rows.map(s => ({ ...s, status: calcStatus(s.dueDate, s.collectedAmountKrw, s.billedAmountKrw) }));
+
 export default function SettlementManagement() {
-  const [settlements, setSettlements] = useState<Settlement[]>(() => store.getSettlements());
+  const [settlements, setSettlements] = useState<Settlement[]>(() => displaySettlements(store.getSettlements()));
   const [buyers] = useState<Vendor[]>(() => store.getVendors().filter(v => v.type === '바이어'));
   const [search, setSearch] = usePersistedState('settlement.search', '');
   const [filterStatus, setFilterStatus] = usePersistedState('settlement.filterStatus', 'all');
@@ -41,8 +48,21 @@ export default function SettlementManagement() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<Partial<Settlement>>({});
   const [editId, setEditId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const lock = useRef(false);
+  const original = useRef<Settlement | null>(null);
+  const collectRequest = useRef<{ settlement: Settlement; date: string } | null>(null);
 
-  const refresh = () => setSettlements(store.getSettlements());
+  const refresh = () => setSettlements(displaySettlements(store.getSettlements()));
+  useEffect(() => {
+    let active = true;
+    fetchSettlements().then(rows => {
+      if (!active) return;
+      store.hydrateSettlements(rows); setSettlements(displaySettlements(rows)); setLoaded(true);
+    }).catch(error => { if (active) toast.error(`미수금 조회 실패: ${error.message} — 새로고침 후 확인해주세요`); });
+    return () => { active = false; };
+  }, []);
 
   const filtered = useMemo(() => {
     let list = settlements;
@@ -83,8 +103,7 @@ export default function SettlementManagement() {
     const overdue = settlements.filter(s => s.status === '위험');
     const over90 = settlements.filter(s => {
       if (s.status === '완납') return false;
-      const dday = Math.ceil((new Date(s.dueDate).getTime() - Date.now()) / 86400000);
-      return dday < -90;
+      return calcElapsedDays(s.dueDate) > 90;
     });
     return {
       totalReceivable: totalBilled - totalCollected,
@@ -96,13 +115,13 @@ export default function SettlementManagement() {
 
   const agingData = useMemo(() => {
     const buckets = [
-      { name: '30일 이내', min: 0, max: 30, total: 0 },
+      { name: '기한 내·30일 이내', min: 0, max: 30, total: 0 },
       { name: '31-60일', min: 31, max: 60, total: 0 },
       { name: '61-90일', min: 61, max: 90, total: 0 },
       { name: '90일 초과', min: 91, max: 9999, total: 0 },
     ];
     settlements.filter(s => s.status !== '완납').forEach(s => {
-      const days = Math.abs(Math.ceil((Date.now() - new Date(s.dueDate).getTime()) / 86400000));
+      const days = Math.max(0, calcElapsedDays(s.dueDate));
       const bucket = buckets.find(b => days >= b.min && days <= b.max);
       if (bucket) bucket.total += s.billedAmountKrw - s.collectedAmountKrw;
     });
@@ -112,11 +131,6 @@ export default function SettlementManagement() {
   const AGING_COLORS = ['var(--chart-4)', 'var(--chart-3)', 'var(--chart-2)', 'var(--system-red)'];
 
   // 경과일 계산 (만기일 기준, 음수면 경과)
-  const calcElapsedDays = (dueDate: string) => {
-    const ms = Date.now() - new Date(dueDate).getTime();
-    return Math.floor(ms / 86400000);  // 양수 = 경과일
-  };
-
   // 경과된 미수금 목록
   const overdueList = useMemo(
     () => settlements.filter(s => s.status !== '완납' && calcElapsedDays(s.dueDate) > 0),
@@ -124,27 +138,33 @@ export default function SettlementManagement() {
   );
 
   const openNew = () => {
-    setForm({ channel: 'W Concept', billedAmountKrw: 0, collectedAmountKrw: 0, status: '정상', invoiceDate: new Date().toISOString().split('T')[0] });
+    original.current = null;
+    setForm({ id: genId(), createdAt: new Date().toISOString(), channel: 'W Concept', billedAmountKrw: 0, collectedAmountKrw: 0, status: '정상', invoiceDate: todayKst() });
     setEditId(null);
     setShowModal(true);
   };
 
   const openEdit = (s: Settlement) => {
+    original.current = s;
     setForm({ ...s });
     setEditId(s.id);
     setShowModal(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (lock.current || !loaded) return;
     if (!form.buyerName) { toast.error('바이어명을 입력하세요'); return; }
     if (!form.invoiceDate || !form.dueDate) { toast.error('날짜를 입력하세요'); return; }
     const status = calcStatus(form.dueDate!, form.collectedAmountKrw || 0, form.billedAmountKrw || 0);
+    lock.current = true; setSaving(true);
+    try {
     if (editId) {
-      store.updateSettlement(editId, { ...form, status } as Partial<Settlement>);
+      await store.updateSettlement(editId, { ...form, status } as Partial<Settlement>, original.current || undefined);
       toast.success('수정되었습니다');
     } else {
       const s: Settlement = {
-        id: genId(),
+        id: form.id!,
+        buyerId: form.buyerId,
         buyerName: form.buyerName!,
         channel: form.channel || '기타',
         invoiceNo: form.invoiceNo,
@@ -155,39 +175,38 @@ export default function SettlementManagement() {
         collectedDate: form.collectedDate,
         status,
         memo: form.memo,
-        createdAt: new Date().toISOString(),
+        createdAt: form.createdAt!,
       };
-      store.addSettlement(s);
+      await store.addSettlement(s);
       toast.success('정산 내역이 등록되었습니다');
     }
     refresh();
     setShowModal(false);
+    } catch (error) { toast.error((error as Error).message); }
+    finally { lock.current = false; setSaving(false); }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    if (lock.current || !loaded) return;
     if (!confirm('삭제하시겠습니까?')) return;
-    store.deleteSettlement(id);
-    refresh();
-    toast.success('삭제되었습니다');
+    lock.current = true; setSaving(true);
+    try { await store.deleteSettlement(id); refresh(); toast.success('삭제되었습니다'); }
+    catch (error) { toast.error((error as Error).message); }
+    finally { lock.current = false; setSaving(false); }
   };
 
-  const handleCollect = (s: Settlement) => {
-    const today = new Date().toISOString().split('T')[0];
-    store.updateSettlement(s.id, {
-      collectedAmountKrw: s.billedAmountKrw,
-      collectedDate: today,
-      status: '완납',
-    });
-    // 연결된 거래명세표의 상태를 "수금완료"로 자동 변경
-    if (s.invoiceNo) {
-      const tradeStatements = store.getTradeStatements();
-      const linked = tradeStatements.find(ts => ts.statementNo === s.invoiceNo);
-      if (linked && linked.status !== '수금완료') {
-        void store.updateTradeStatement(linked.id, { status: '수금완료' }).catch((error: Error) => toast.error(`명세표 상태 확인 필요: ${error.message}`));
-      }
-    }
-    refresh();
-    toast.success('수금 완료 처리되었습니다. 거래명세표 상태가 자동 업데이트됩니다.');
+  const handleCollect = async (s: Settlement) => {
+    if (lock.current || !loaded) return;
+    if (!collectRequest.current || collectRequest.current.settlement.id !== s.id) collectRequest.current = { settlement: s, date: todayKst() };
+    const request = collectRequest.current;
+    lock.current = true; setSaving(true);
+    try {
+      await store.updateSettlement(s.id, { collectedAmountKrw: request.settlement.billedAmountKrw,
+        collectedDate: request.date, status: '완납' }, request.settlement);
+      collectRequest.current = null;
+      refresh(); toast.success('수금 내역과 연결 명세표 상태가 저장되었습니다');
+    } catch (error) { toast.error((error as Error).message); }
+    finally { lock.current = false; setSaving(false); }
   };
 
   return (
@@ -197,7 +216,7 @@ export default function SettlementManagement() {
           <h1 className="text-xl md:text-2xl font-bold text-foreground">매출·미수</h1>
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">명세표 발행 후 입금 현황 관리 · 기한 초과 자동 알림</p>
         </div>
-        <Button onClick={openNew} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
+        <Button onClick={openNew} disabled={saving || !loaded} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
           <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />정산 등록
         </Button>
       </div>
@@ -390,12 +409,12 @@ export default function SettlementManagement() {
                   <td className="ctr">
                     <div className="flex items-center justify-center gap-1">
                       {s.status !== '완납' && (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-[var(--system-green)] px-2" onClick={() => handleCollect(s)}>
+                        <Button disabled={saving || !loaded} variant="ghost" size="sm" className="h-7 text-xs text-[var(--system-green)] px-2" onClick={() => handleCollect(s)}>
                           수금완료
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(s)}>수정</Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
+                      <Button disabled={saving || !loaded} variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(s)}>수정</Button>
+                      <Button disabled={saving || !loaded || s.collectedAmountKrw > 0 || store.getTradeStatements().some(t => t.statementNo === s.invoiceNo)} variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -438,12 +457,12 @@ export default function SettlementManagement() {
                 </div>
                 <div className="flex items-center justify-end gap-1 mt-2">
                   {s.status !== '완납' && (
-                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-[var(--system-green)]" onClick={() => handleCollect(s)}>
+                    <Button disabled={saving || !loaded} variant="ghost" size="sm" className="h-8 px-2 text-xs text-[var(--system-green)]" onClick={() => handleCollect(s)}>
                       수금완료
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openEdit(s)}>수정</Button>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
+                  <Button disabled={saving || !loaded} variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openEdit(s)}>수정</Button>
+                  <Button disabled={saving || !loaded || s.collectedAmountKrw > 0 || store.getTradeStatements().some(t => t.statementNo === s.invoiceNo)} variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -453,10 +472,10 @@ export default function SettlementManagement() {
         </div>
       </div>
 
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={v => { if (!saving) setShowModal(v); }}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editId ? '정산 수정' : '정산 등록'}</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
+          <fieldset disabled={saving} className="space-y-4 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5 col-span-1 sm:col-span-2">
                 <Label>바이어 *</Label>
@@ -492,7 +511,7 @@ export default function SettlementManagement() {
               </div>
               <div className="space-y-1.5">
                 <Label>명세서번호</Label>
-                <Input value={form.invoiceNo || ''} onChange={e => setForm(f => ({ ...f, invoiceNo: e.target.value }))} placeholder="INV-2026-001" />
+                <Input disabled={!!editId} value={form.invoiceNo || ''} onChange={e => setForm(f => ({ ...f, invoiceNo: e.target.value }))} placeholder="INV-2026-001" />
               </div>
               <div className="space-y-1.5">
                 <Label>발행일 *</Label>
@@ -519,10 +538,10 @@ export default function SettlementManagement() {
                 <Input value={form.memo || ''} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="비고" />
               </div>
             </div>
-          </div>
+          </fieldset>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
-            <Button onClick={handleSave}>{editId ? '수정' : '등록'}</Button>
+            <Button disabled={saving} variant="outline" onClick={() => setShowModal(false)}>취소</Button>
+            <Button disabled={saving || !loaded} onClick={handleSave}>{saving ? '저장 중…' : editId ? '수정' : '등록'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

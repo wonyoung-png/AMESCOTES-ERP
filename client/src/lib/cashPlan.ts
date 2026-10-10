@@ -50,7 +50,7 @@ export function buildMonthlyCashPlan(settlements: Settlement[], payables: Payabl
     const date = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const confirmedIncoming = settlements
-      .filter(s => s.dueDate?.startsWith(key) && s.status !== '완납')
+      .filter(s => s.dueDate?.startsWith(key) && s.billedAmountKrw > s.collectedAmountKrw)
       .reduce((sum, s) => sum + Math.max(0, s.billedAmountKrw - s.collectedAmountKrw), 0);
     const expectedIncoming = statements
       .filter(s => s.status === '미청구' && addDays(s.issueDate, 30).startsWith(key))

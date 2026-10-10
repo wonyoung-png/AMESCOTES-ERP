@@ -1,4 +1,6 @@
 import { db } from './db';
+import { fromRow } from './tradeStatementQueries';
+import type { Settlement } from './store';
 
 export const settlementRow = (s: any) => ({
   id: s.id,
@@ -36,18 +38,32 @@ export const settlementFromRow = (r: any) => ({
   createdAt: r.created_at || '',
 });
 
-let chain: Promise<unknown> = Promise.resolve();
-const queue = (fn: () => PromiseLike<unknown>) => { chain = chain.then(fn, fn); };
-
-export function pushSettlements(list: any[]): void {
-  if (!list?.length) return;
-  queue(() => db.from('settlements').upsert(list.map(settlementRow)).then(({ error }) => {
-    if (error) console.warn('[settlements] 서버 저장 실패:', error.message);
-  }));
+export async function fetchSettlements(): Promise<Settlement[]> {
+  const rows: Settlement[] = [];
+  for (let start = 0; ; start += 1000) {
+    const { data, error } = await db.from('settlements').select('*').order('id').range(start, start + 999);
+    if (error) throw error;
+    rows.push(...(data || []).map(settlementFromRow));
+    if ((data || []).length < 1000) return rows;
+  }
 }
 
-export function deleteSettlementSB(id: string): void {
-  queue(() => db.from('settlements').delete().eq('id', id).then(({ error }) => {
-    if (error) console.warn('[settlements] 서버 삭제 실패:', error.message);
-  }));
+export async function saveSettlement(s: Settlement, expected: Settlement | null, send: typeof fetch = fetch) {
+  const response = await send('/api/settlements/save', {
+    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settlement: s, expected: expected ? settlementRow(expected) : null }),
+  });
+  let body;
+  try { body = await response.json(); }
+  catch { throw new Error('수금 저장 결과 확인이 필요합니다 — 같은 내용으로 재시도해주세요'); }
+  if (!response.ok) throw new Error(body.message || '미수금 저장에 실패했습니다');
+  if (body.result?.settlement?.id !== s.id) throw new Error('미수금 저장 결과 확인이 필요합니다');
+  return { settlement: settlementFromRow(body.result.settlement),
+    statement: body.result.statement ? fromRow(body.result.statement) : null };
+}
+
+export async function deleteSettlementSB(id: string): Promise<void> {
+  const { error } = await db.from('settlements').delete().eq('id', id);
+  if (error) throw new Error(String(error.message).includes('protected_settlement')
+    ? '수금 또는 명세표 연결이 있는 미수금은 삭제할 수 없습니다 — 정정 절차가 필요합니다' : error.message);
 }

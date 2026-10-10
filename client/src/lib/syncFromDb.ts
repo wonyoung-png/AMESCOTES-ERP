@@ -332,10 +332,10 @@ export async function syncFromDb(): Promise<void> {
     // 거래명세표 — tax_invoice / lines 가 jsonb 라 자동 변환으로는 모양이 안 맞는다
     const ts = await import('./tradeStatementQueries');
     await mergeTable('trade_statements', 'ames_trade_statements', '거래명세표',
-      ts.tradeStatementRow, ts.fromRow);
+      ts.tradeStatementRow, ts.fromRow, true);
     const settlements = await import('./settlementQueries');
     await mergeTable('settlements', 'ames_settlements', '정산·미수금',
-      settlements.settlementRow, settlements.settlementFromRow);
+      settlements.settlementRow, settlements.settlementFromRow, true);
     console.log('[syncFromDb] Phase1 테이블 동기화 완료');
   } catch (e) {
     console.warn('[syncFromDb] Phase1 동기화 스킵 (테이블 미생성 시 migration 실행):', e);
@@ -354,10 +354,22 @@ async function mergeTable(
   toRow: (row: Record<string, any>) => Record<string, any>
     = row => filterForTable(table, toSnakeCase(row)),
   fromRow: (row: Record<string, any>) => Record<string, any> = toCamelCase,
+  serverOnly = false,
 ): Promise<void> {
   try {
-    const { data, error } = await db.from(table).select('*');
-    if (error) { console.warn(`[syncFromDb] ${table} 조회 실패:`, error.message); return; }
+    let data: any[] = [];
+    if (serverOnly) {
+      for (let start = 0; ; start += 1000) {
+        const page = await db.from(table).select('*').order('id').range(start, start + 999);
+        if (page.error) throw page.error;
+        data.push(...(page.data || []));
+        if ((page.data || []).length < 1000) break;
+      }
+    } else {
+      const result = await db.from(table).select('*');
+      if (result.error) throw result.error;
+      data = result.data || [];
+    }
 
     const localRaw = localStorage.getItem(KEY);
     const local: Array<Record<string, any>> = localRaw ? JSON.parse(localRaw) : [];
@@ -366,6 +378,16 @@ async function mergeTable(
     const byId = new Map<string, Record<string, any>>();
     local.forEach(r => { if (r?.id) byId.set(r.id, r); });
     const localOnly = local.filter(r => r?.id && !(data || []).some((d: any) => d.id === r.id));
+    if (serverOnly) {
+      // 로컬 미확인 원본은 복구용으로 보관하되 금융 장부에 임의로 다시 올리지 않는다.
+      if (localOnly.length) {
+        const archived = JSON.parse(localStorage.getItem(KEY + '_unsynced') || '[]');
+        const recovery = new Map([...archived, ...localOnly].map((r: any) => [r.id, r]));
+        localStorage.setItem(KEY + '_unsynced', JSON.stringify([...recovery.values()]));
+      }
+      localStorage.setItem(KEY, JSON.stringify(remote));
+      return;
+    }
     remote.forEach(r => { if (r?.id) byId.set(r.id, r); });   // 같은 id 는 서버본이 기준
 
     localStorage.setItem(KEY, JSON.stringify([...byId.values()]));

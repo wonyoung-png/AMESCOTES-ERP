@@ -99,6 +99,10 @@ export default function ExchangeSettings() {
       postCosts: store.getPostCosts(),
       vendors: store.getVendors(),
       settlements: store.getSettlements(),
+      financialRecovery: {
+        statements: JSON.parse(localStorage.getItem('ames_trade_statements_unsynced') || '[]'),
+        settlements: JSON.parse(localStorage.getItem('ames_settlements_unsynced') || '[]'),
+      },
       expenses: store.getExpenses(),
       salesRecords: store.getSalesRecords(),
       settings: store.getSettings(),
@@ -126,14 +130,14 @@ export default function ExchangeSettings() {
       if (data.purchaseItems) store.setPurchaseItems(data.purchaseItems);
       if (data.postCosts) store.setPostCosts(data.postCosts);
       if (data.vendors) store.setVendors(data.vendors);
-      if (data.settlements) store.setSettlements(data.settlements);
+      if (data.settlements) await store.setSettlements(data.settlements);
       if (data.expenses) store.setExpenses(data.expenses);
       if (data.salesRecords) store.setSalesRecords(data.salesRecords);
       if (data.settings) store.setSettings(data.settings);
       toast.success('데이터가 복원되었습니다. 새로고침합니다.');
       setTimeout(() => window.location.reload(), 1000);
-    } catch {
-      toast.error('파일 파싱 실패');
+    } catch (error) {
+      toast.error(`복원 중단: ${(error as Error).message} — 일부 항목은 이미 반영됐을 수 있습니다`);
     }
   };
 

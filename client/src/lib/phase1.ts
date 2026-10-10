@@ -1820,42 +1820,10 @@ export async function migrateLocalToDb() {
   const tradeStatements = JSON.parse(localStorage.getItem('ames_trade_statements') || '[]');
   const settlements = JSON.parse(localStorage.getItem('ames_settlements') || '[]');
   const purchases = JSON.parse(localStorage.getItem('ames_purchases') || '[]');
-  for (const s of tradeStatements) {
-    await db.from('trade_statements').upsert({
-      id: s.id,
-      statement_no: s.statementNo,
-      vendor_id: s.vendorId,
-      vendor_name: s.vendorName,
-      vendor_code: s.vendorCode,
-      project_no: s.projectNo,
-      workspace: s.workspace,
-      issue_date: s.issueDate,
-      lines: s.lines,
-      status: s.status,
-      tax_invoice: s.taxInvoice,
-      memo: s.memo,
-      created_at: s.createdAt,
-    });
-  }
-  for (const s of settlements) {
-    await db.from('settlements').upsert({
-      id: s.id,
-      buyer_id: s.buyerId,
-      buyer_name: s.buyerName,
-      project_no: s.projectNo,
-      workspace: s.workspace,
-      channel: s.channel,
-      invoice_no: s.invoiceNo,
-      invoice_date: s.invoiceDate,
-      due_date: s.dueDate,
-      billed_amount_krw: s.billedAmountKrw,
-      collected_amount_krw: s.collectedAmountKrw,
-      collected_date: s.collectedDate,
-      status: s.status,
-      memo: s.memo,
-      created_at: s.createdAt,
-    });
-  }
+  const { saveStatementBilling } = await import('./statement-workflow');
+  const { saveSettlement } = await import('./settlementQueries');
+  for (const s of tradeStatements) await saveStatementBilling(s, s.issueDate);
+  for (const s of settlements) await saveSettlement(s, null);
   for (const p of purchases) {
     await db.from('purchase_items').upsert({
       id: p.id,

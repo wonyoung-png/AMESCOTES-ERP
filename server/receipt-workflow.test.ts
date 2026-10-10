@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import router, { validReceipt, validShipment, validStatementBilling } from './receipt-workflow.js';
+import router, { validReceipt, validShipment, validStatementBilling, validSettlement } from './receipt-workflow.js';
 
 test('receipt input rejects malformed quantity, date and disposition', () => {
   const v = { id: 'rcp_test', orderId: 'test', qty: 10, defectQty: 2, receivedDate: '2026-10-09', createPayable: true, disposition: 'deduct' };
@@ -42,10 +42,21 @@ test('shipment and billing APIs reject anonymous requests before writing', async
   await new Promise<void>(resolve => server.once('listening', resolve));
   const address = server.address() as { port: number };
   try {
-    for (const path of ['/api/orders/test_order/ship', '/api/statements/save-billing']) {
+    for (const path of ['/api/orders/test_order/ship', '/api/statements/save-billing', '/api/settlements/save']) {
       const response = await fetch(`http://127.0.0.1:${address.port}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       assert.equal(response.status, 401);
       await response.arrayBuffer();
     }
   } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
+});
+test('settlement boundary rejects negative, excessive, missing date and malformed snapshots', () => {
+  const settlement = { id: 'synthetic_settlement', buyerName: 'test', channel: '기타', invoiceDate: '2026-10-10',
+    dueDate: '2026-11-10', billedAmountKrw: 1000, collectedAmountKrw: 0 };
+  assert.equal(validSettlement({settlement, expected:null}), true);
+  for (const patch of [{billedAmountKrw:0},{collectedAmountKrw:-1},{collectedAmountKrw:1001},
+    {collectedAmountKrw:300},{billedAmountKrw:Infinity},{dueDate:'2026-02-30'},{buyerName:' '},{channel:'unknown'}]) {
+    assert.equal(validSettlement({settlement:{...settlement,...patch}}), false);
+  }
+  assert.equal(validSettlement({settlement,expected:[]}),false);
+  assert.equal(validSettlement({settlement,expected:{id:'wrong'}}),false);
 });

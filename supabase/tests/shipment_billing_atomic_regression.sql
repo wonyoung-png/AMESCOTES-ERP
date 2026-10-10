@@ -76,7 +76,7 @@ begin
   r:=public.save_statement_billing(payload);
   assert (r->'settlement'->>'billed_amount_krw')::numeric=2200 and (r->'settlement'->>'collected_amount_krw')::numeric=300
     and r->'settlement'->>'collected_date'='2026-10-09' and r->'settlement'->>'due_date'='2026-12-01'
-    and r->'settlement'->>'invoice_date'='2026-10-10' and r->'settlement'->>'status'='일부수금','payment metadata overwritten'; checks:=checks+1;
+    and r->'settlement'->>'invoice_date'='2026-10-10' and r->'settlement'->>'status'<>'완납','payment metadata overwritten'; checks:=checks+1;
   begin perform public.save_statement_billing(jsonb_build_object('statement',s,'invoiceDate','2026-10-10','expectedUpdatedAt',first_result->'statement'->>'updated_at')); raise exception 'assert_stale';
   exception when others then if sqlerrm<>'stale_statement' then raise; end if; end; checks:=checks+1;
   payload:=payload||jsonb_build_object('expectedUpdatedAt',r->'statement'->>'updated_at');

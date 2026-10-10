@@ -129,7 +129,7 @@ export async function gatherWatch(read = restAsServer, readPms = pms): Promise<M
   }
   if (settlements instanceof Error) failed('경영지원', '미수금', settlements);
   else {
-    const recv = settlements.filter(s => s.status !== '완납' && Number(s.billed_amount_krw) > Number(s.collected_amount_krw));
+    const recv = settlements.filter(s => Number(s.billed_amount_krw) > Number(s.collected_amount_krw));
     const late = recv.filter(s => s.due_date && s.due_date < today);
     add('경영지원', [`미수금 ${recv.length}건 ${won(recv.reduce((n, s) => n + Number(s.billed_amount_krw) - Number(s.collected_amount_krw), 0))} — 수금 예정일 지남 ${late.length}건 (부분 수금 차감)`], late.length);
   }
