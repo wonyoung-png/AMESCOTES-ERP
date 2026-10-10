@@ -44,6 +44,8 @@ function ChinaWarehouseContent({userId}: {userId: string}) {
   const [requestId, setRequestId] = useState('');
   const [transferMode, setTransferMode] = useState(false);
   const [arrival, setArrival] = useState<ChinaTransfer | null>(null);
+  const [arrivalQty, setArrivalQty] = useState(0);
+  const [arrivalId, setArrivalId] = useState('');
   const [confirmationRef, setConfirmationRef] = useState('');
   const [arrivalDate, setArrivalDate] = useState(new Date().toISOString().slice(0,10));
   const [importOpen, setImportOpen] = useState(false);
@@ -75,6 +77,8 @@ function ChinaWarehouseContent({userId}: {userId: string}) {
 
   const totalOnHand = balances.reduce((s, b) => s + b.onHand, 0);
   const skuCount = balances.filter(b => b.onHand > 0).length;
+  const currentArrival = snapshot?.transfers.find(t=>t.id===arrival?.id) || arrival;
+  const arrivalRemaining = currentArrival ? currentArrival.qty - currentArrival.received_qty : 0;
 
   const saveAttempt = async (candidate: ChinaRequest) => {
     if (saving || attempt.current.busy) return;
@@ -85,7 +89,7 @@ function ChinaWarehouseContent({userId}: {userId: string}) {
       setSnapshot(result); // Use only the returned server stock, never subtract locally.
       attempt.current.clear(); setAttemptedKind(null); setStorageError('');
       const qty = Number(request.input.qty);
-      toast.success(request.kind === 'receive' ? '전량 도착 확인 저장 · EZ 가용 별도 확인'
+      toast.success(request.kind === 'receive' ? `한국 도착 ${request.input.receivedQty ?? '기존 전량 요청'} 확인 저장 · EZ 수량 변경 없음`
         : request.kind === 'transfer' ? `한국 이동 ${qty}개 · 운송중 반영`
         : request.kind === 'adjust' ? `재고 조정 ${qty > 0 ? '+' : ''}${qty} 서버 저장`
         : `중국창고 출고 ${qty}개 서버 저장`);
@@ -208,7 +212,7 @@ function ChinaWarehouseContent({userId}: {userId: string}) {
       <Button variant="outline" size="sm" disabled={saving} onClick={refresh}>서버 새로 조회</Button>
       {(attemptedKind || storageError) && <div role="alert" className="border rounded-lg p-4 text-sm space-y-2">
         <p>{storageError || (saving ? '원래 요청 전송 중' : '탭 세션 보존·복원 요청 · 처리 여부 미확인')} · 요청 ID: {String(attempt.current.request?.input.id ?? requestId)}</p>
-        {attempt.current.request && <p>원래 종류: {attempt.current.request.kind} · 수량: {String(attempt.current.request.input.qty ?? '전량 도착')} · 품목: {String(attempt.current.request.input.styleNo ?? '')}</p>}
+        {attempt.current.request && <p>원래 종류: {attempt.current.request.kind} · 수량: {String(attempt.current.request.input.receivedQty ?? attempt.current.request.input.qty ?? '기존 전량 도착 요청')} · 품목: {String(attempt.current.request.input.styleNo ?? '')}{attempt.current.request.input.arrivalId ? ` · 도착 요청 ID: ${String(attempt.current.request.input.arrivalId)}` : ''}</p>}
         <p>처리 종류·수량·일자·본문은 첫 전송으로 고정됩니다. 창 닫기는 취소가 아닙니다. 같은 요청 재시도는 추가 차감하지 않으며, 새 요청은 중복 차감될 수 있습니다.</p>
         <p>같은 탭·계정·브랜드에서는 페이지 이동·새로고침 후 원래 요청을 복원합니다. 탭 종료·저장 자료 삭제·다른 탭/기기에는 보장되지 않습니다. 근거 확인 전 새 등록하지 마세요.</p>
         {userId === 'unknown-user' && <p>계정 식별 정보가 없어 이 탭의 미식별 계정 영역을 사용합니다. 계정 변경 전 기존 이력을 확인하세요.</p>}
@@ -330,10 +334,14 @@ function ChinaWarehouseContent({userId}: {userId: string}) {
       {/* 출고 */}
       <div className="border rounded-lg bg-card p-4 space-y-3">
         <h2 className="text-sm font-semibold">중국 → 한국 이동</h2>
-        <p className="text-xs text-muted-foreground">출고확정 시 중국 보유 감소·운송중 증가. 한국 도착 확인은 운송중만 종료하며, EZ 재고를 추가 생성하지 않습니다. 전량 도착만 처리합니다.</p>
-        {(snapshot?.workspace === ws ? snapshot.transfers : []).map(t=><div key={t.id} className="flex flex-wrap gap-2 items-center justify-between text-sm border-t pt-2">
-          <span>{t.style_no} · {t.color} · {formatNumber(t.qty)}개 · {t.sent_date} · {t.status==='in_transit'?'운송중':`도착 확인 ${t.received_date} · ${t.confirmation_ref}`}</span>
-          {t.status==='in_transit' && <Button size="sm" variant="outline" disabled={locked} onClick={()=>{setArrival(t);setConfirmationRef('');setArrivalDate(new Date().toISOString().slice(0,10));}}>한국 전량 도착 확인</Button>}
+        <p className="text-xs text-muted-foreground">출고확정 시 중국 보유 감소·운송중 증가. 실제 3PL 입고를 근거로 도착한 수량만 기록하고 운송중 잔량을 줄입니다. EZ 재고는 변경하지 않습니다.</p>
+        {(snapshot?.workspace === ws ? snapshot.transfers : []).map(t=><div key={t.id} className="text-sm border-t pt-2 space-y-2">
+          <div className="flex flex-wrap gap-2 items-center justify-between">
+            <span>{t.style_no} · {t.color} · 출고 {formatNumber(t.qty)}개 · 누적 도착 {formatNumber(t.received_qty)}개 · 남은 운송중 {formatNumber(t.qty-t.received_qty)}개 · {t.sent_date} · {t.status==='in_transit'?'운송중':'도착 완료'}</span>
+            {t.status==='in_transit' && t.qty>t.received_qty && <Button size="sm" variant="outline" disabled={locked} onClick={()=>{setArrival(t);setArrivalQty(t.qty-t.received_qty);setArrivalId(crypto.randomUUID());setConfirmationRef('');setArrivalDate(new Date().toISOString().slice(0,10));}}>한국 도착 기록</Button>}
+          </div>
+          {t.arrivals.length ? <ul className="text-xs text-muted-foreground space-y-1">{t.arrivals.map(a=><li key={a.id}>{a.received_date} · 도착 {formatNumber(a.qty)}개 · 근거 {a.confirmation_ref} · 기록자 {a.created_by} · {a.created_at}</li>)}</ul>
+            : (t.received_date || t.confirmation_ref) && <p className="text-xs text-muted-foreground">기존 도착 기록: {t.received_date} · {t.confirmation_ref}</p>}
         </div>)}
         {snapshot && !snapshot.transfers.length && <p className="text-sm text-muted-foreground">등록된 이동 없음</p>}
       </div>
@@ -424,15 +432,19 @@ function ChinaWarehouseContent({userId}: {userId: string}) {
         </DialogContent>
       </Dialog>
       <Dialog open={!!arrival} onOpenChange={v=>{if(!saving && !v) {closeWarning();setArrival(null);}}}><DialogContent>
-        <DialogHeader><DialogTitle>한국 전량 도착 확인</DialogTitle></DialogHeader>
-        <p className="text-sm">{arrival?.style_no} · {arrival?.color} · {arrival?.qty}개. 실제 3PL 입고를 확인한 뒤 근거를 기록하세요. 국내 EZ 수량은 변경하지 않습니다.</p>
-        {attemptedKind && <p role="alert" className="text-sm">처리 여부 미확인 · 첫 도착일과 입고 근거로만 재시도합니다. 새 등록 전 이력을 확인하세요.</p>}
+        <DialogHeader><DialogTitle>한국 도착 수량 기록</DialogTitle></DialogHeader>
+        <p className="text-sm">{currentArrival?.style_no} · {currentArrival?.color} · 출고 {currentArrival?.qty}개 / 누적 도착 {currentArrival?.received_qty}개 / 남은 운송중 {arrivalRemaining}개. 실제 3PL 입고 수량을 확인한 뒤 근거를 기록하세요. 국내 EZ 수량은 변경하지 않습니다.</p>
+        {attemptedKind && <p role="alert" className="text-sm">처리 여부 미확인 · 첫 수량·도착 요청 ID·날짜·입고 근거로만 재시도합니다. 새 등록 전 이력을 확인하세요.</p>}
+        <Label htmlFor="cn-arrival-qty">이번 도착 수량</Label><Input disabled={locked} id="cn-arrival-qty" type="number" min="1" max={arrivalRemaining} step="1" value={arrivalQty || ''} onChange={e=>setArrivalQty(Number(e.target.value))} />
         <Label htmlFor="cn-arrival-date">도착일</Label><Input disabled={locked} id="cn-arrival-date" type="date" value={arrivalDate} onChange={e=>setArrivalDate(e.target.value)} />
         <Label htmlFor="cn-arrival-ref">3PL 입고증·이지 입고이력 번호</Label><Input disabled={locked} id="cn-arrival-ref" value={confirmationRef} onChange={e=>setConfirmationRef(e.target.value)} />
-        <DialogFooter><Button disabled={saving || !confirmationRef.trim()} onClick={async()=>{
+        <DialogFooter><Button disabled={saving || !confirmationRef.trim() || (!snapshot && !attempt.current.request)} onClick={async()=>{
           if(!arrival || saving) return;
-          await saveAttempt({kind:'receive',workspace:ws,action:'transfer',input:{id:arrival.id,action:'receive',receivedDate:arrivalDate,confirmationRef}});
-        }}>{saving?'저장 중…':attemptedKind?'원래 요청 그대로 재시도':'전량 도착 확인 저장'}</Button></DialogFooter>
+          if(attempt.current.request) {retryPending();return;}
+          if(!Number.isSafeInteger(arrivalQty) || arrivalQty<=0 || arrivalQty>arrivalRemaining) {toast.error('남은 운송중 수량 이내의 양의 정수를 입력하세요');return;}
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(arrivalDate) || !Number.isFinite(Date.parse(arrivalDate)) || new Date(arrivalDate).toISOString().slice(0,10)!==arrivalDate) {toast.error('올바른 도착일을 입력하세요');return;}
+          await saveAttempt({kind:'receive',workspace:ws,action:'transfer',input:{id:arrival.id,action:'receive',receivedQty:arrivalQty,arrivalId,receivedDate:arrivalDate,confirmationRef}});
+        }}>{saving?'저장 중…':attemptedKind?'원래 요청 그대로 재시도':'도착 수량 저장'}</Button></DialogFooter>
       </DialogContent></Dialog>
       <Dialog open={importOpen} onOpenChange={v=>{if(!saving) setImportOpen(v);}}><DialogContent>
         <DialogHeader><DialogTitle>기존 브라우저 이력 가져오기</DialogTitle></DialogHeader>

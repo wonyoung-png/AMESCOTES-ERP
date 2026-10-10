@@ -26,8 +26,15 @@ function validRequest(value: unknown, workspace: string): value is ChinaRequest 
     || (b.workspace !== undefined && b.workspace !== workspace)) return false;
   const date = (d: unknown) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)
     && Number.isFinite(Date.parse(d)) && new Date(d).toISOString().slice(0,10) === d;
-  if (v.kind === 'receive') return v.action === 'transfer' && b.action === 'receive'
-    && date(b.receivedDate) && typeof b.confirmationRef === 'string' && !!b.confirmationRef.trim();
+  if (v.kind === 'receive') {
+    const hasQty = Object.hasOwn(b, 'receivedQty'), hasArrivalId = Object.hasOwn(b, 'arrivalId');
+    return v.action === 'transfer' && b.action === 'receive'
+      && date(b.receivedDate) && typeof b.confirmationRef === 'string' && !!b.confirmationRef.trim()
+      // Existing frozen full-arrival requests have neither field. Never upgrade their body.
+      && ((!hasQty && !hasArrivalId) || (hasQty && hasArrivalId
+        && Number.isSafeInteger(b.receivedQty) && Number(b.receivedQty) > 0 && Number(b.receivedQty) <= 2147483647
+        && typeof b.arrivalId === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(b.arrivalId)));
+  }
   if (!['outbound','transfer','adjust'].includes(v.kind) || typeof b.styleNo !== 'string' || !b.styleNo.trim()
     || typeof b.color !== 'string' || !b.color.trim() || !Number.isSafeInteger(b.qty)
     || Number(b.qty) === 0 || Math.abs(Number(b.qty)) > 2147483647 || !date(b.moveDate)

@@ -143,6 +143,47 @@ test('adjustment and arrival restore their original quantity/date/evidence', asy
   }
 });
 
+test('receive shape: legacy neither-field requests replay unchanged; new pair is required and validated', async()=>{
+  const legacy:ChinaRequest={kind:'receive',workspace:'LUMEN',action:'transfer',input:{id:'transfer-id',action:'receive',receivedDate:'2026-10-10',confirmationRef:'old-receipt'}};
+  for(const extra of [{},{receivedQty:3,arrivalId:'arrival-fixed'}]) {
+    const f=sessionFixture(), request={...legacy,input:{...legacy.input,...extra}};
+    f.values.set(f.key,JSON.stringify(request));
+    const restored=createChinaStockAttempt(f.session);
+    assert.equal(restored.storageError,'');assert.deepEqual(restored.request,request);
+    await restored.run(outbound(),async(_ws,_action,input)=>{assert.deepEqual(input,request.input);return 1;});
+  }
+  for(const extra of [{receivedQty:3},{arrivalId:'arrival-fixed'},{receivedQty:0,arrivalId:'a'},{receivedQty:-1,arrivalId:'a'},
+    {receivedQty:1.5,arrivalId:'a'},{receivedQty:2147483648,arrivalId:'a'},{receivedQty:'3',arrivalId:'a'},
+    {receivedQty:3,arrivalId:''},{receivedQty:3,arrivalId:null},{receivedQty:3,arrivalId:'bad/id'},{receivedQty:null,arrivalId:'a'}]) {
+    const f=sessionFixture(),request={...legacy,input:{...legacy.input,...extra}};
+    f.values.set(f.key,JSON.stringify(request));
+    const restored=createChinaStockAttempt(f.session);assert.ok(restored.storageError);
+    let calls=0;await assert.rejects(restored.run(request,async()=>++calls));assert.equal(calls,0);
+    const fresh=sessionFixture();
+    await assert.rejects(createChinaStockAttempt(fresh.session).run(request,async()=>++calls));assert.equal(calls,0);
+  }
+});
+
+test('partial receive response loss freezes arrivalId/quantity/proof across workspace/user remount', async()=>{
+  const f=sessionFixture();
+  const request:ChinaRequest={kind:'receive',workspace:'LUMEN',action:'transfer',input:{id:'transfer-id',action:'receive',receivedQty:3,arrivalId:'arrival-fixed',receivedDate:'2026-10-10',confirmationRef:'receipt-3'}};
+  let received=0;const arrivals=new Map<string,object>();let calls=0;
+  const send=async(_ws:string,_action:string,input:object)=>{
+    calls++;const body=input as Record<string,unknown>;
+    if(!arrivals.has(String(body.arrivalId))){arrivals.set(String(body.arrivalId),structuredClone(input));received+=Number(body.receivedQty);throw new Error('committed response lost');}
+    assert.deepEqual(input,arrivals.get(String(body.arrivalId)));
+    return {received,remaining:4-received};
+  };
+  await assert.rejects(createChinaStockAttempt(f.session).run(request,send));assert.equal(received,3);
+  assert.equal(createChinaStockAttempt({...f.session,workspace:'AETALOOF'}).request,null);
+  assert.equal(createChinaStockAttempt({...f.session,userId:'other-user'}).request,null);
+  const restored=createChinaStockAttempt(f.session);
+  request.input={...request.input,receivedQty:1,arrivalId:'changed',confirmationRef:'changed-proof',receivedDate:'2026-10-11'};
+  const saved=await restored.run(request,send);
+  assert.equal(calls,2);assert.equal(arrivals.size,1);assert.deepEqual(saved.result,{received:3,remaining:1});
+  assert.equal(saved.request.input.arrivalId,'arrival-fixed');assert.equal(saved.request.input.receivedQty,3);
+});
+
 for (const transferMode of [false,true]) test(`real ChinaWarehouse UI (${transferMode?'transfer':'outbound'}): lost response locks fields, closing cannot start a new debit, original retry succeeds`, async () => {
   const { build } = await import('esbuild');
   const { default: puppeteer } = await import('puppeteer');
@@ -186,16 +227,33 @@ for (const transferMode of [false,true]) test(`real ChinaWarehouse UI (${transfe
     page.on('request',request=>{if(request.url().startsWith(origin+'/') || request.url().startsWith('data:'))void request.continue();else{external.push(request.url());void request.abort();}});
     const calls:{workspace:string;action:string;input:Record<string,unknown>}[]=[];
     const rows=new Map<string,Record<string,unknown>>();
+    const arrivals=new Map<string,Record<string,unknown>>();
     await page.exposeFunction('fixtureSend',async(workspace:string,action?:string,input?:Record<string,unknown>)=>{
       if(action && input){
         calls.push({workspace,action,input:structuredClone(input)});
-        const id=(action==='transfer'?'transfer_':'')+input.id;
-        if(!rows.has(workspace+id)){rows.set(workspace+id,{...input,workspace,id});throw new Error('응답 유실');}
+        if(action==='transfer' && input.action==='receive') {
+          const transfer=rows.get(workspace+'transfer_'+input.id);assert.ok(transfer);
+          const arrivalKey=String(input.arrivalId);
+          if(!arrivals.has(arrivalKey)) {
+            const received=[...arrivals.values()].filter(a=>a.transfer_id===input.id).reduce((sum,a)=>sum+Number(a.qty),0);
+            assert.ok(Number(input.receivedQty)>0 && Number(input.receivedQty)<=Number(transfer.qty)-received);
+            arrivals.set(arrivalKey,{id:input.arrivalId,transfer_id:input.id,qty:input.receivedQty,received_date:input.receivedDate,confirmation_ref:input.confirmationRef,created_by:'user-1',created_at:'2026-10-10T00:00:00Z'});
+            throw new Error('도착 처리 후 응답 유실');
+          }
+          const existing=arrivals.get(arrivalKey)!;assert.equal(existing.qty,input.receivedQty);assert.equal(existing.confirmation_ref,input.confirmationRef);assert.equal(existing.received_date,input.receivedDate);
+        } else {
+          const id=(action==='transfer'?'transfer_':'')+input.id;
+          if(!rows.has(workspace+id)){rows.set(workspace+id,{...input,workspace,id});throw new Error('응답 유실');}
+        }
       }
       const moves=[...rows.values()].filter(row=>row.workspace===workspace);
       const outboundQty=moves.reduce((total,row)=>total+Number(row.qty),0);
       return {workspace,balances:[{workspace,styleNo:'SKU1',styleName:'품목',color:'BLACK',onHand:10-outboundQty,inboundQty:10,outboundQty}],moves,
-        transfers:moves.filter(row=>String(row.id).startsWith('transfer_')).map(row=>({id:String(row.id).slice(9),workspace,style_no:row.styleNo,color:row.color,qty:row.qty,sent_date:row.moveDate,status:'in_transit'}))};
+        transfers:moves.filter(row=>String(row.id).startsWith('transfer_')).map(row=>{
+          const id=String(row.id).slice(9),history=[...arrivals.values()].filter(a=>a.transfer_id===id);
+          const received_qty=history.reduce((sum,a)=>sum+Number(a.qty),0);
+          return {id,workspace,style_no:row.styleNo,color:row.color,qty:row.qty,sent_date:row.moveDate,received_qty,arrivals:history,status:received_qty===Number(row.qty)?'received':'in_transit'};
+        })};
     });
     await page.goto(origin+'/');
     const clickText=async(text:string)=>{await page.evaluate(text=>{
@@ -237,11 +295,46 @@ for (const transferMode of [false,true]) test(`real ChinaWarehouse UI (${transfe
     assert.deepEqual(errors,[]);
     assert.deepEqual(external,[]);
     assert.equal(await page.evaluate(key=>sessionStorage.getItem(key),chinaStockSessionKey('LUMEN','user-1')),null);
+    if(transferMode) {
+      await clickText('한국 도착 기록');await page.waitForSelector('#cn-arrival-qty');
+      assert.equal(await page.$eval('#cn-arrival-qty',el=>(el as HTMLInputElement).value),'4');
+      await page.focus('#cn-arrival-qty');await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.press('Backspace');await page.type('#cn-arrival-qty','5');
+      await page.type('#cn-arrival-ref','3PL-proof-partial');
+      await clickText('도착 수량 저장');assert.equal(calls.length,2,'Over-remaining quantity must not send');
+      await page.focus('#cn-arrival-qty');await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.press('Backspace');await page.type('#cn-arrival-qty','3');
+      assert.equal(await page.$eval('#cn-arrival-qty',el=>(el as HTMLInputElement).value),'3');
+      await clickText('도착 수량 저장');
+      await page.waitForFunction(()=>document.querySelector('#cn-arrival-qty')?.hasAttribute('disabled'));
+      await page.waitForFunction(()=>[...document.querySelectorAll<HTMLButtonElement>('button')].some(b=>b.textContent?.trim()==='원래 요청 그대로 재시도' && !b.disabled));
+      const frozenReceive=calls[2];assert.equal(frozenReceive.input.receivedQty,3);
+      assert.match(String(frozenReceive.input.arrivalId),/^[0-9a-f-]{36}$/);
+      const receivePending=await page.evaluate(key=>sessionStorage.getItem(key),chinaStockSessionKey('LUMEN','user-1'));
+      await page.reload();await page.waitForSelector('[role="alert"]');
+      assert.equal(await page.evaluate(key=>sessionStorage.getItem(key),chinaStockSessionKey('LUMEN','user-1')),receivePending);
+      await page.waitForFunction(()=>document.body.textContent?.includes('누적 도착 3개 · 남은 운송중 1개'));
+      await clickText('원래 요청 그대로 재시도');await page.waitForFunction(()=>!document.querySelector('[role="alert"]'));
+      assert.deepEqual(calls[3],frozenReceive);assert.equal(arrivals.size,1);
+      assert.ok((await page.$eval('body',el=>el.textContent))?.includes('3PL-proof-partial'));
+      assert.equal(await page.$eval('tbody tr td:nth-child(6)',el=>el.textContent?.trim()),'6','Receiving must not debit China stock again');
+      await clickText('한국 도착 기록');await page.waitForSelector('#cn-arrival-qty');
+      assert.equal(await page.$eval('#cn-arrival-qty',el=>(el as HTMLInputElement).value),'1');
+      await page.type('#cn-arrival-ref','3PL-proof-final');await clickText('도착 수량 저장');
+      await page.waitForFunction(()=>document.querySelector('#cn-arrival-qty')?.hasAttribute('disabled'));
+      await page.waitForFunction(()=>[...document.querySelectorAll<HTMLButtonElement>('button')].some(b=>b.textContent?.trim()==='원래 요청 그대로 재시도' && !b.disabled));
+      await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('[role="dialog"]'));
+      await clickText('원래 요청 그대로 재시도');await page.waitForFunction(()=>!document.querySelector('[role="alert"]'));
+      assert.deepEqual(calls[5],calls[4]);assert.notEqual(calls[4].input.arrivalId,frozenReceive.input.arrivalId);
+      assert.equal(arrivals.size,2);assert.ok((await page.$eval('body',el=>el.textContent))?.includes('누적 도착 4개 · 남은 운송중 0개'));
+      assert.ok((await page.$eval('body',el=>el.textContent))?.includes('도착 완료'));
+      assert.equal(await page.evaluate(()=>[...document.querySelectorAll('button')].some(b=>b.textContent?.trim()==='한국 도착 기록')),false);
+      assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
+    }
+    const completedCalls=calls.length;
     // Real UI storage quota failure: persistence fails before the mocked server is called.
     await clickText('출고');await page.waitForSelector('[role="dialog"]');
     await page.evaluate("Storage.prototype.setItem=function(){throw new DOMException('fixture quota','QuotaExceededError');};");
     await clickText('출고 확정');
     await page.waitForFunction(()=>document.body.textContent?.includes('탭 세션 요청 저장 실패'));
-    assert.equal(calls.length,2);
+    assert.equal(calls.length,completedCalls);
   } finally { await browser?.close();await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve())); }
 });

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import router, {validChinaMove} from './inventory';
+import router, {validChinaMove, validChinaArrival} from './inventory';
 import { inventoryFromSheet, inventoryQuantity, inventorySubtotal } from '../shared/inventory';
 
 const sheet = { headers: ['SKU', '상품명', '총잔여', 'EZ가용', '출고대기', 'EZ해외', '쇼피파이', '카페24', '신세계센텀', '한남쇼룸'],
@@ -57,4 +57,15 @@ test('중국 장부 입력 경계에서 브랜드·정수·날짜·조정 사유
   assert.ok(validChinaMove(v));
   for(const patch of [{workspace:'OEM'},{qty:NaN},{qty:1.2},{qty:-1},{qty:0},{moveDate:'2026-02-30'},{color:''},{id:{}},{moveType:'adjust'}]) assert.equal(validChinaMove({...v,...patch}),false);
   assert.ok(validChinaMove({...v,qty:-1,moveType:'adjust',memo:'실사'}));
+});
+test('부분 도착은 수량과 고정 요청 ID를 함께 요구하며 구형 전량 요청은 보존한다', () => {
+  const legacy={receivedDate:'2026-10-10',confirmationRef:'3PL-001'};
+  assert.ok(validChinaArrival(legacy));
+  const partial={...legacy,receivedQty:3,arrivalId:'arrival-001'};
+  assert.ok(validChinaArrival(partial));
+  for (const patch of [{receivedQty:0},{receivedQty:-1},{receivedQty:1.5},{receivedQty:NaN},
+    {receivedQty:2147483648},{receivedQty:null},{arrivalId:undefined},{arrivalId:''},{arrivalId:{}},
+    {confirmationRef:' '},{receivedDate:'2026-02-30'}]) assert.equal(validChinaArrival({...partial,...patch}),false);
+  assert.equal(validChinaArrival({...legacy,arrivalId:'only-id'}),false);
+  assert.equal(validChinaArrival({...legacy,receivedQty:3}),false);
 });

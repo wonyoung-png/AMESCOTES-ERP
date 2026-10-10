@@ -61,7 +61,7 @@ export default function InventoryOverview() {
       location: 'china', quantity: b.onHand, pending: null, basis: 'on-hand', source: 'ERP 중국 서버 장부',
     }));
     const transit: InventoryRow[] = (chinaSnapshot?.workspace===workspace ? chinaSnapshot.transfers : []).filter(t=>t.status==='in_transit').map(t=>({
-      id:`transfer:${t.id}`,sku:t.style_no,name:t.style_no,color:t.color,location:'in-transit',quantity:Number(t.qty),pending:null,basis:'on-hand',source:`ERP 이동 ${t.id}` }));
+      id:`transfer:${t.id}`,sku:t.style_no,name:t.style_no,color:t.color,location:'in-transit',quantity:t.qty-t.received_qty,pending:null,basis:'on-hand',source:`ERP 이동 ${t.id} · 발송 ${t.qty} / 도착 ${t.received_qty}` }));
     return [...(snapshot?.workspace === workspace ? snapshot.rows : []), ...china,...transit];
   }, [workspace, snapshot, chinaSnapshot]);
   const filtered = rows.filter(row => (location === 'all' || row.location === location)

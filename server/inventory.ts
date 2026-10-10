@@ -12,6 +12,13 @@ export function validChinaMove(v: any) {
     && ['inbound','outbound','adjust'].includes(v.moveType) && (v.moveType === 'adjust' || v.qty > 0)
     && validDate(v.moveDate) && (v.moveType !== 'adjust' || typeof v.memo === 'string' && !!v.memo.trim());
 }
+export function validChinaArrival(v: any) {
+  if (!v || !validDate(v.receivedDate) || typeof v.confirmationRef !== 'string' || !v.confirmationRef.trim()) return false;
+  // Older pending requests contain neither field; keep their full-arrival retry contract.
+  if (v.receivedQty === undefined && v.arrivalId === undefined) return true;
+  return Number.isSafeInteger(v.receivedQty) && v.receivedQty > 0 && v.receivedQty <= 2147483647
+    && typeof v.arrivalId === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(v.arrivalId);
+}
 async function chinaRpc(name: string, body: object) {
   const result = await restAsServer(`rpc/${name}`, { method: 'POST', body: JSON.stringify(body) });
   if (!result.ok) {
@@ -19,7 +26,9 @@ async function chinaRpc(name: string, body: object) {
     const messages: Record<string,string> = { insufficient_china_stock: '최신 중국 재고보다 많은 수량입니다',
       stock_conflict: '같은 요청의 내용이 변경됐습니다. 이력을 확인하세요', invalid_stock_receipt: '서버 입고 원본과 브랜드·품번·컬러·정상 수량이 다릅니다',
       receipt_required: '입고는 생산 의뢰의 중국입고에서 등록하세요', invalid_stock_move: '수량·날짜·조정 사유를 확인하세요',
-      transfer_not_found: '이 브랜드의 이동 기록이 없습니다', invalid_transfer: '이동 날짜·수량·입고 확인 근거를 확인하세요' };
+      transfer_not_found: '이 브랜드의 이동 기록이 없습니다', invalid_transfer: '이동 날짜·수량·입고 확인 근거를 확인하세요',
+      arrival_exceeds_remaining: '운송 중 잔여 수량보다 많은 도착 수량입니다. 최신 이력을 조회하세요',
+      partial_arrival_requires_quantity: '이미 일부 도착한 이동입니다. 최신 이력을 조회하고 도착 수량을 지정하세요' };
     throw new Error(Object.entries(messages).find(([key]) => detail.includes(key))?.[1] || '중국 재고 저장 결과를 확인하지 못했습니다. 새로 조회 후 같은 요청으로 재시도하세요');
   }
   return result.json();
@@ -44,8 +53,7 @@ router.post('/api/inventory/china/import', requireUser(), async(req,res) => {
 router.post('/api/inventory/china/transfer', requireUser(), async(req,res) => {
   const v=req.body;
   if (!v || typeof v.id!=='string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(v.id) || !['LUMEN','AETALOOF'].includes(v.workspace)
-    || !(v.action==='send' && validChinaMove({...v,moveType:'outbound'}) || v.action==='receive' && validDate(v.receivedDate)
-      && typeof v.confirmationRef==='string' && !!v.confirmationRef.trim())) { res.status(400).json({error:'이동 수량·날짜·입고 근거를 확인하세요'}); return; }
+    || !(v.action==='send' && validChinaMove({...v,moveType:'outbound'}) || v.action==='receive' && validChinaArrival(v))) { res.status(400).json({error:'이동 수량·날짜·입고 근거를 확인하세요'}); return; }
   try { res.json(await chinaRpc('save_china_transfer',{p_input:v,p_actor:userOf(req).id})); }
   catch(e) { res.status(409).json({error:(e as Error).message}); }
 });
