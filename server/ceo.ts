@@ -23,7 +23,7 @@ import { syncSoon } from './gcal.js';
 import { allRows, prioritizeCards, searchCards, cardEvidence } from './work-records.js';
 import { councilStamp, evidenceFreshness } from './report-evidence.js';
 import { deliverWorkNotifications, directiveNotificationsReady } from './work-notifications.js';
-import { attachCampaignEvidence } from './campaign-evidence.js';
+import { attachCampaignEvidence, CAMPAIGN_EVIDENCE_RULES } from './campaign-evidence.js';
 
 const router = Router();
 
@@ -342,6 +342,7 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
 - 대표께 존댓말로 답한다. 근거 표본을 전수 검토한 것처럼 표현하지 않는다.
 - 조회 실패는 정상이나 0건으로 답하지 않는다. 과거 팀 보고보다 현재 운영 점검을 우선하며, 자금계획 차액을 은행 잔고나 자금 부족으로 단정하지 않는다.
 - 확정값은 원문의 예정 내용보다 우선한다. 공유 일정은 협업 근거이며, 일정 확정을 마케팅·물류 등 각 팀의 준비 완료로 단정하지 않는다.
+${CAMPAIGN_EVIDENCE_RULES}
 - 채팅창은 글자 그대로 보인다. 마크다운 기호(**, #)는 쓰지 말고 줄바꿈과 "·"로 정리한다.`;
 
     // 앞 대화는 화면이 보내온 것이라 믿을 수 없다. 대화 턴으로 끼우지 않고
@@ -358,7 +359,10 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
       }],
     });
     console.log(`[ceo] usage ask ${r.model} in=${r.usage.input_tokens} out=${r.usage.output_tokens} stop=${r.stop_reason}`);
-    const text = r.content.find(c => c.type === 'text')?.text?.trim() || '답을 만들지 못했습니다.';
+    const text = r.content.filter(c => c.type === 'text').map(c=>c.type==='text'?c.text:'').join('\n').trim();
+    if(r.stop_reason!=='end_turn' || !text) {
+      res.status(503).json({error:'incomplete_ai_answer',message:'답변이 완성되지 않았습니다. 다시 질문해주세요.'}); return;
+    }
     res.json({ answer: text });
   } catch (e) {
     console.error('POST /api/ceo/ask 실패:', e);
