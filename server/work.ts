@@ -55,9 +55,9 @@ const logUsage = (step: string, r: Anthropic.Message) =>
   console.log(`[work] usage ${step} ${r.model} in=${r.usage.input_tokens} out=${r.usage.output_tokens} stop=${r.stop_reason}`);
 
 /** 세션 사용자에 팀·직책을 붙여 읽는다 (auth.ts 의 SessionUser 에는 없다) */
-export async function members(): Promise<Member[]> {
+export async function members(strict = false): Promise<Member[]> {
   const r = await restAsServer('app_users?is_active=eq.true&select=id,name,team,position,role,email,work_profile');
-  if (!r.ok) return [];
+  if (!r.ok) { if (strict) throw new Error('members_unavailable'); return []; }
   return (await r.json()).map((u: any) => ({
     id: String(u.id), name: String(u.name || u.email), team: String(u.team || ''),
     position: String(u.position || ''), role: String(u.role || ''), email: String(u.email || ''),

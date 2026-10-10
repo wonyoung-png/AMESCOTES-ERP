@@ -14,6 +14,7 @@ import { runSubscriptionUsageChecks } from './subscriptions.js';
 import { allRows, reportingCards, currentCampaignCards, prioritizeCards, dayStartUtc, cardEvidence } from './work-records.js';
 import { findCouncilCandidates, openCouncil } from './council.js';
 import { attachCampaignEvidence, CAMPAIGN_EVIDENCE_RULES } from './campaign-evidence.js';
+import { reportStamp } from './report-evidence.js';
 
 export type AgentStatus = 'work' | 'idle' | 'warn' | 'report';
 export type AgentRun = {
@@ -121,12 +122,12 @@ needs 는 정말 대표가 볼 것만, 없으면 []. 적혀 있지 않은 건 �
 export { write as writeTeamReport };
 
 /** 팀별 감시 기준 — 대표가 고친 것(team_watch) 우선, 없으면 기본값 */
-export async function loadRules(): Promise<Map<string, string>> {
+export async function loadRules(strict = false): Promise<Map<string, string>> {
   const m = new Map(Object.entries(DEFAULT_RULES));
   const r = await restAsServer('team_watch?select=team,rules');
   if (r.ok) {
     for (const x of await r.json()) if (x.rules?.trim()) m.set(x.team, x.rules); // 빈 값 = 기본값
-  } else console.warn('[agents] team_watch 조회 실패', r.status); // 기본값으로 계속
+  } else { if (strict) throw new Error('rules_unavailable'); console.warn('[agents] team_watch 조회 실패', r.status); }
   return m;
 }
 
@@ -136,30 +137,52 @@ async function recentCards(since: string): Promise<any[]> {
   return Array.from(new Map([...recent, ...current].map(c => [c.id, c])).values());
 }
 
+/** Both generation and freshness checks use the same untruncated source scope. */
+export async function loadReportContext(allowUnavailable = false) {
+  const since = new Date(Date.now() - 30 * 864e5).toISOString();
+  const sourceErrors:string[]=[];
+  const read = async<T>(label:string,promise:Promise<T>,fallback:T):Promise<T> => {
+    try { return await promise; } catch(e) {
+      if(!allowUnavailable) throw e;
+      sourceErrors.push(label);return fallback;
+    }
+  };
+  const [cards, all, watch, rules] = await Promise.all([
+    read('업무 자료',recentCards(since).then(cards => attachCampaignEvidence(cards)),[]),
+    read('직원 업무 범위',members(true),[]),gatherWatch(),read('팀 감시 기준',loadRules(true),new Map<string,string>()),
+  ]);
+  const bossIds = new Set(all.filter(m => CEO_EMAILS.includes(m.email.toLowerCase())).map(m => m.id));
+  for (const c of cards) { c._dir=isDirective(c,bossIds); c._org=orgOf(c,bossIds); }
+  return {cards,all,watch,rules,bossIds,today:kstToday(),sourceErrors};
+}
+export function teamEvidence(team: string, ctx: Awaited<ReturnType<typeof loadReportContext>>) {
+  const wt=ctx.watch.get(team);
+  const judged=judge(team,ctx.cards,ctx.bossIds,ctx.today,wt);
+  const org=orgTeam(team);
+  const people=ctx.all.filter(m => org ? org.members.some(p=>p.name===m.name) : m.team===team)
+    .map(m=>({id:m.id,name:m.name,team:m.team,position:m.position,role:m.role,profile:m.profile})).sort((a,b)=>a.id.localeCompare(b.id));
+  const evidence=reportStamp(team,judged.mine,judged.shared,people,judged.stats,judged.status,wt?.facts||[],ctx.rules.get(team)||'',ctx.today);
+  if(ctx.sourceErrors.length) evidence.complete=false;
+  return evidence;
+}
+
 /** 팀 목록 = 조직도 14팀 (+ 어느 팀에도 못 붙인 카드가 있으면 '팀 미지정') */
 export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: string): Promise<AgentRun[]> {
   await runSubscriptionUsageChecks().catch(e => console.warn('[agents] 구독 사용 확인 실패:', String(e).split('\n')[0]));
-  const since = new Date(Date.now() - 30 * 864e5).toISOString();
-  const [cards, all] = await Promise.all([
-    recentCards(since).then(cards => attachCampaignEvidence(cards)),
-    members(),
-  ]);
-  const bossIds = new Set(all.filter(m => CEO_EMAILS.includes(m.email.toLowerCase())).map(m => m.id));
+  const ctx=await loadReportContext();
+  const {cards,all,bossIds,today,watch,rules}=ctx;
   const teams = new Set<string>(ORG.map(t => t.key));
-  for (const c of cards) { c._dir = isDirective(c, bossIds); c._org = orgOf(c, bossIds); } // 카드마다 한 번만 판정
   cards.forEach(c => c.kind !== 'question' && c._org !== CEO_DESK && teams.add(c._org));
-  const today = kstToday();
-
-  const [watch, rules] = await Promise.all([gatherWatch(), loadRules()]);
 
   // 4팀씩 동시에 — 순서대로면 [전체 지금 점검]이 1분 넘고, 한꺼번에 14개면 AI 요청 한도에 걸린다 (코덱스 지적)
   const targets = Array.from(teams).filter(t => !onlyTeam || t === onlyTeam);
   const one = async (team: string): Promise<AgentRun | null> => {
     const wt = watch.get(team);
     const { mine, shared, stats, status } = judge(team, cards, bossIds, today, wt);
+    const evidence=teamEvidence(team,ctx);
     const w = await write(team, mine, all, stats, status, wt?.facts || [], rules.get(team) || '', shared);
     const row = { id: genId(), team, status, headline: w.headline, summary: w.summary, needs: w.needs,
-      stats: { ...stats, facts: (wt?.facts || []).slice(0, 40) }, model: CLASSIFY_MODEL, trigger };
+      stats: { ...stats, facts: (wt?.facts || []).slice(0, 40), evidence }, model: CLASSIFY_MODEL, trigger };
     const r = await restAsServer('team_agent_runs', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
     if (r.ok) return (await r.json())[0] as AgentRun;
     console.error(`[agents] ${team} 저장 실패:`, (await r.text()).slice(0, 200));

@@ -11,6 +11,9 @@ import { rest, restAsServer, requireUser } from '../server/auth';
 import { verifyFinanceHttp } from './e2e-finance-http';
 import { verifyWorkHttp, workHttpLlmCases, ceoLoopbackRequest } from './e2e-work-http';
 import { deliverWorkNotifications } from '../server/work-notifications';
+import { loadReportContext } from '../server/agents';
+import { findCouncilCandidates, openCouncil } from '../server/council';
+import { orgTeam } from '../server/org';
 
 const REST = 'http://erp-e2e-api-20261010:3000';
 assert.equal(process.env.ERP_E2E_ISOLATED, '20261010');
@@ -26,6 +29,9 @@ let changedCampaignCard: string | null = null;
 let changedCampaignPrompts = 0;
 let changedCampaignSource: { id: string; updatedAt: string } | null = null;
 let deliveryFailure: 'before' | 'after' | null = null;
+let rulesUnavailable=false;
+let directiveResponseLost=false;
+let directedRecordFailure=false;
 function assertChangedCampaignLine(message: string) {
   assert.ok(changedCampaignCard && changedCampaignSource);
   const line = message.split('\n').find(line => line.startsWith('- id=' + changedCampaignCard + ' '));
@@ -71,6 +77,17 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     forbidden.push(url.origin);
     throw new Error('Isolated harness blocks external network');
   }
+  if(url.origin===REST && url.pathname==='/team_watch' && rulesUnavailable) return new Response('',{status:503});
+  if(url.origin===REST && url.pathname==='/work_cards' && init?.method==='POST' && directiveResponseLost
+    && JSON.parse(String(init.body)).parsed?.directive?.councilId) {
+    directiveResponseLost=false;
+    const committed=await originalFetch(input,{...init,redirect:'error'});assert.ok(committed.ok);await committed.text();
+    throw new Error('Synthetic council directive committed response lost');
+  }
+  if(url.origin===REST && url.pathname==='/agent_councils' && init?.method==='PATCH' && directedRecordFailure
+    && JSON.parse(String(init.body)).directed_cards) {
+    directedRecordFailure=false;return new Response('',{status:503});
+  }
   if (url.origin === REST && url.pathname === '/rpc/deliver_work_notifications' && deliveryFailure) {
     const failure = deliveryFailure; deliveryFailure = null;
     if (failure === 'after') {
@@ -97,7 +114,7 @@ function simpleHash(value: string) { let h = 0; for (let i = 0; i < value.length
 const fixtures = {
   bossEmail: 'wonyoung@atlm.kr', staffEmail: 'e2e-staff@test.invalid', leaderEmail: 'e2e-leader@test.invalid', password,
   read: async (path: string) => {
-    assert.ok(/^(work_cards|notifications|campaigns|team_agent_runs|production_orders|trade_statements|settlements|payables)\?/.test(path), 'fixture read table not allowed');
+    assert.ok(/^(work_cards|notifications|campaigns|team_agent_runs|agent_councils|agent_council_messages|production_orders|trade_statements|settlements|payables)\?/.test(path), 'fixture read table not allowed');
     const r = await restAsServer(path);
     assert.ok(r.ok, `fixture read ${path}: ${r.status}`);
     return r.json();
@@ -197,9 +214,52 @@ async function main() {
         console.log(JSON.stringify({actualWorkMutationCase:s.route,nextKind:s.next,status:'PASS'}));
       }
       console.log(JSON.stringify({actualWorkMutationRaces:'PASS',cases:6,staleWrites:0,staleNotifications:0}));
+      const ceoHeaders={'Content-Type':'application/json',Cookie:cookie+'; '+fixtures.ceoCookie,Host:'ceo.fixture.invalid',Origin:'https://ceo.fixture.invalid'};
+      const overview=async()=>{
+        const response=await ceoLoopbackRequest(new URL(base+'/api/ceo/overview'),ceoHeaders);
+        assert.equal(response.status,200);return response.json();
+      };
+      const oldReport=(await fixtures.read('team_agent_runs?id=eq.'+work.ids.agentRuns[0]+'&select=*'))[0];
+      assert.equal(oldReport.team,'마케팅');
+      const before=await overview();
+      assert.equal(before.agents.find((a:any)=>a.id===oldReport.id).freshness,'current');
+      rulesUnavailable=true;
+      const unknown=await overview();assert.ok(unknown.sourceErrors.includes('팀 감시 기준'));
+      assert.equal(unknown.agents.find((a:any)=>a.id===oldReport.id).freshness,'unknown');
+      const failedReport=await ceoLoopbackRequest(new URL(base+'/api/ceo/agents/run'),ceoHeaders,{team:'마케팅'});
+      assert.equal(failedReport.status,500);
+      assert.equal((await fixtures.read('team_agent_runs?select=id')).length,2,'Source failure must not generate a report');
+      rulesUnavailable=false;
+      const context=await loadReportContext();
+      const candidate=findCouncilCandidates(context.cards,context.watch).find(c=>c.triggerKey.startsWith('card:'));
+      assert.ok(candidate,'Confirmed shared schedule must be a council candidate');
+      const conduct=async(_c:any,id?:string)=>{
+        const saved=await restAsServer('agent_councils?id=eq.'+id,{method:'PATCH',body:JSON.stringify({status:'concluded',
+          conclusion:{conclusion:'격리된 근거 점검',open_disagreements:[],ceo_decisions:[],actions_by_team:[{team:'마케팅',action:'준비 확인'},{team:'마케팅',action:'소재 확인'}]}})});
+        assert.ok(saved.ok);return {conclusion:'격리된 근거 점검',open_disagreements:[],ceo_decisions:[],actions_by_team:[]};
+      };
+      await Promise.all([openCouncil(candidate,{rest:restAsServer,conduct}),openCouncil(candidate,{rest:restAsServer,conduct})]);
+      const oldCouncils=await fixtures.read('agent_councils?select=*');
+      assert.equal(oldCouncils.length,1);const oldCouncil=oldCouncils[0];
+      assert.equal((await overview()).councils.find((c:any)=>c.id===oldCouncil.id).freshness,'current');
+      const wrongHash=await ceoLoopbackRequest(new URL(base+'/api/ceo/councils/'+oldCouncil.id+'/direct'),ceoHeaders,{evidenceHash:'wrong'});
+      assert.equal(wrongHash.status,409);
       const campaignId = work.ids.campaign!;
       const update = await restAsServer('campaigns?id=eq.'+campaignId,{method:'PATCH',body:JSON.stringify({title:'CURRENT_CAMPAIGN_FIXTURE',discount_rate:15,start_date:'2026-11-20',end_date:'2026-11-21',updated_at:new Date().toISOString()})});
       assert.ok(update.ok);
+      const after=await overview();
+      assert.equal(after.agents.find((a:any)=>a.id===oldReport.id).freshness,'changed');
+      assert.equal(after.councils.find((c:any)=>c.id===oldCouncil.id).freshness,'changed');
+      const workCount=(await fixtures.read('work_cards?select=id')).length;
+      const staleDirect=await ceoLoopbackRequest(new URL(base+'/api/ceo/councils/'+oldCouncil.id+'/direct'),ceoHeaders,{evidenceHash:oldCouncil.cost.evidence.hash});
+      assert.equal(staleDirect.status,409);assert.equal((await staleDirect.json()).error,'stale_council_evidence');
+      assert.equal((await fixtures.read('work_cards?select=id')).length,workCount,'Stale council must not create instructions');
+      const newContext=await loadReportContext();
+      const updatedCandidate=findCouncilCandidates(newContext.cards,newContext.watch).find(c=>c.triggerKey===candidate.triggerKey)!;
+      assert.ok(updatedCandidate);await openCouncil(updatedCandidate,{rest:restAsServer,conduct});
+      const newCouncils=await fixtures.read('agent_councils?select=*');assert.equal(newCouncils.length,2);
+      const currentCouncil=newCouncils.find((c:any)=>c.id!==oldCouncil.id)!;
+      assert.deepEqual((await fixtures.read('agent_councils?id=eq.'+oldCouncil.id+'&select=*'))[0],oldCouncil,'Old council history must not be overwritten');
       const changedSource=(await fixtures.read('campaigns?id=eq.'+campaignId+'&select=id,updated_at'))[0];
       changedCampaignSource={id:changedSource.id,updatedAt:changedSource.updated_at};
       changedCampaignCard='wc_'+crypto.randomUUID().replaceAll('-','');
@@ -214,6 +274,29 @@ async function main() {
       assert.equal((await fixtures.read('team_agent_runs?id=eq.'+run.id+'&select=headline'))[0].headline,run.headline);
       assert.equal((await fixtures.read('work_cards?id=eq.'+changedCampaignCard+'&select=confirmed_payload'))[0].confirmed_payload.discountRate,20);
       assert.equal(changedCampaignPrompts,2);
+      assert.equal((await overview()).agents.find((a:any)=>a.id===run.id).freshness,'current');
+      assert.deepEqual((await fixtures.read('team_agent_runs?id=eq.'+oldReport.id+'&select=*'))[0],oldReport,'Old report must not be rewritten');
+      const member=await restAsServer('app_users?id=eq.e2e_marketing',{method:'PATCH',body:JSON.stringify({name:orgTeam('마케팅')!.members[0].name})});assert.ok(member.ok);
+      const currentUrl=new URL(base+'/api/ceo/councils/'+currentCouncil.id+'/direct'),currentBody={evidenceHash:currentCouncil.cost.evidence.hash};
+      directiveResponseLost=true;
+      const lost=await ceoLoopbackRequest(currentUrl,ceoHeaders,currentBody);assert.equal(lost.status,207);
+      directedRecordFailure=true;
+      const markerFailure=await ceoLoopbackRequest(currentUrl,ceoHeaders,currentBody);assert.equal(markerFailure.status,207);
+      const duplicates=await Promise.all([ceoLoopbackRequest(currentUrl,ceoHeaders,currentBody),ceoLoopbackRequest(currentUrl,ceoHeaders,currentBody)]);
+      assert.ok(duplicates.every(r=>r.status===200));
+      const directives=await fixtures.read('work_cards?kind=eq.todo&select=id,parsed');
+      const councilDirectives=directives.filter((c:any)=>c.parsed?.directive?.councilId===currentCouncil.id);
+      assert.match(councilDirectives[0]?.parsed?.directive?.text,/준비 확인.*소재 확인/s);
+      assert.equal(councilDirectives.length,1);const councilNotices=await noticeRows(councilDirectives[0].id);assert.equal(councilNotices.length,1);
+      const markRead=await restAsServer('notifications?id=eq.'+councilNotices[0].id,{method:'PATCH',body:JSON.stringify({read_at:'2026-10-10T00:00:00Z'})});assert.ok(markRead.ok);
+      assert.equal((await ceoLoopbackRequest(currentUrl,ceoHeaders,currentBody)).status,200);
+      assert.equal((await noticeRows(councilDirectives[0].id))[0].read_at,'2026-10-10T00:00:00+00:00');
+      const unavailable=await restAsServer('campaigns?id=eq.'+campaignId,{method:'PATCH',body:JSON.stringify({status:'closed'})});assert.ok(unavailable.ok);
+      const closed=await ceoLoopbackRequest(currentUrl,ceoHeaders,currentBody);
+      assert.equal(closed.status,409);assert.equal((await fixtures.read('work_cards?select=id')).length,workCount+3);
+      console.log(JSON.stringify({actualReportFreshness:'PASS',sameDayChanged:true,refreshedCurrent:true,oldReportsPreserved:true,
+        actualCouncilFreshness:'PASS',concurrentDedup:true,changedEvidenceNewHistory:true,staleAndClosedDirectBlocked:true,
+        ruleFailureUnknownWithoutNewReports:true,directiveLostResponseAndParallelRetrySingleCardAndNotice:true,noticeReadPreserved:true}));
       console.log(JSON.stringify({actualChangedCampaignEvidence:'PASS',historicalDiscount:20,currentDiscount:15,pastDecisionRescheduled:true,questionAndReportStored:true,promptChecks:2}));
       for(const table of ['production_orders','trade_statements','settlements','payables']) assert.equal((await fixtures.read(table+'?select=id')).length,0,'Work-only run wrote financial/business transactions');
     }

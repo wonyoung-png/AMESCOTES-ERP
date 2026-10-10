@@ -272,7 +272,7 @@ async function load() {
   catch (e) { document.getElementById('view').innerHTML = `<p class="empty">불러오지 못했습니다 (${esc(e.message)}). 새로고침해 보세요.</p>`; return; }
   document.getElementById('who').textContent = D.me.name + ' · ' + D.me.email;
   document.getElementById('erpLink').href = D.erpUrl;
-  const n = D.decide.length + D.captures.length + (D.councils || []).filter(c => c.status === 'concluded').length;
+  const n = D.decide.length + D.captures.length + (D.councils || []).filter(c => c.status === 'concluded' && c.freshness === 'current').length;
   const nav = document.getElementById('navN'); nav.hidden = !n; nav.textContent = n;
   render();
 }
@@ -362,13 +362,13 @@ function home() {
   const openN = D.teams.reduce((s, t) => s + t.open, 0);
   const k = D.kpi && D.kpi.ok ? D.kpi : null;
   const dateLabel = new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'long',day:'numeric',weekday:'long'});
-  const councilItems = (D.councils || []).filter(c => c.status === 'concluded').map(c => `<div class="item"><span class="k">협의</span><div class="t"><p>${esc(c.conclusion?.ceo_decisions?.[0]?.question || '결론 확인')}</p><small>${esc(c.topic)} · 협의에 포함</small></div></div>`);
+  const councilItems = (D.councils || []).filter(c => c.status === 'concluded' && c.freshness === 'current').map(c => `<div class="item"><span class="k">협의</span><div class="t"><p>${esc(c.conclusion?.ceo_decisions?.[0]?.question || '결론 확인')}</p><small>${esc(c.topic)} · 협의에 포함</small></div></div>`);
   const decideTop = [...councilItems, ...D.decide.map(c => itemHtml(c, false)), ...D.captures.map(c => captureHtml(c, false))].slice(0, 5);
   const teamCards = [...D.teams].sort((a,b) => (b.open + b.newToday) - (a.open + a.newToday)).map(t => {
     const dot = t.overdue || (D.watch || []).find(w => w.team === t.team)?.alerts ? 'warn' : (t.open || t.newToday) ? '' : 'idle';
     return `<div class="team"><h3><i class="${dot}"></i>${esc(t.team)}</h3>
       <dl><div><dt>진행 중</dt><dd>${t.open}</dd></div><div><dt>오늘 완료</dt><dd>${t.doneToday}</dd></div><div><dt>마감 지남</dt><dd${t.overdue ? ' class="up"' : ''}>${t.overdue}</dd></div></dl>
-      <p>${(() => { const ag = (D.agents || []).find(x => x.team === t.team); return ag ? '[보고 ' + esc(new Date(ag.created_at).toLocaleString('ko-KR', {timeZone:'Asia/Seoul'})) + (ag.stale ? ' · 오늘 이전' : '') + '] ' + esc(ag.headline) : t.latest ? esc(t.latest) : '아직 올라온 업무가 없어요'; })()}</p></div>`;
+      <p>${(() => { const ag = (D.agents || []).find(x => x.team === t.team); return ag ? '[보고 ' + esc(new Date(ag.created_at).toLocaleString('ko-KR', {timeZone:'Asia/Seoul'})) + ' · ' + freshnessLabel(ag) + '] ' + esc(ag.headline) : t.latest ? esc(t.latest) : '아직 올라온 업무가 없어요'; })()}</p></div>`;
   }).join('');
   const cal = D.campaigns.map(c => {
     const d = new Date(c.start_date + 'T00:00:00+09:00');
@@ -405,7 +405,7 @@ function home() {
 }
 
 function inbox() {
-  const councilDecisions = (D.councils || []).filter(c => c.status === 'concluded');
+  const councilDecisions = (D.councils || []).filter(c => c.status === 'concluded' && c.freshness === 'current');
   const groups = [
     ['확인 요청', D.decide.filter(c => c.kind === 'request_check')],
     ['내 할 일', D.decide.filter(c => c.kind === 'todo')],
@@ -422,16 +422,17 @@ function councilSay(m) {
   if (m.round === 1) return esc(x.position || '') + ((x.evidence || []).length ? ` <small>근거 ${x.evidence.length}건</small>` : '') + ((x.ask_others || []).length ? `<br><small>다른 팀에 질문 · ${esc(x.ask_others.join(' / '))}</small>` : '');
   return esc(x.revised_position || '') + ((x.agree || []).length ? `<br><small>동의 · ${esc(x.agree.join(' / '))}</small>` : '') + ((x.disagree || []).length ? `<br><small>이견 · ${esc(x.disagree.map(d => `${d.point}: ${d.why}`).join(' / '))}</small>` : '');
 }
+const freshnessLabel = a => a.freshness === 'current' ? '저장 근거와 일치' : a.freshness === 'changed' ? '근거 변경 · 다시 점검 필요' : '최신 근거 확인 불가';
 function councils() {
   const rows = (D.councils || []).map(c => {
     const x = c.conclusion || {}, messages = c.messages || [];
     return `<details class="item"><summary><span class="k ${c.status === 'failed' ? 'req' : ''}">${esc(c.status === 'concluded' ? '결론' : c.status === 'open' ? '진행 중' : '실패')}</span> ${esc(c.topic)} <small> · ${esc((c.teams || []).join(' · '))} · 결정 ${x.ceo_decisions?.length || 0}건</small></summary>
-      <div class="t" style="padding:14px 0"><p>${esc(x.conclusion || '아직 결론이 없습니다')}</p>
+      <div class="t" style="padding:14px 0"><p><span class="k">${freshnessLabel(c)}</span> · ${kst(c.created_at)} 당시 협의</p><p>${esc(x.conclusion || '아직 결론이 없습니다')}</p>
       ${messages.map(m => `<p><small>라운드 ${m.round} · ${esc(m.team)}</small><br>${councilSay(m)}</p>`).join('')}
       ${(x.open_disagreements || []).map(v => `<p>이견 · ${esc(v)}</p>`).join('')}
       ${(x.ceo_decisions || []).map(v => `<p>결정 질문 · ${esc(v.question)} (${esc((v.options || []).join(' / '))})</p>`).join('')}
       ${(x.actions_by_team || []).map(v => `<p>${esc(v.team)} 제안 · ${esc(v.action)}</p>`).join('')}
-      ${x.actions_by_team?.length ? `<button class="btn pri" data-council-direct="${esc(c.id)}">이 안으로 지시</button>` : ''}</div></details>`;
+      ${x.actions_by_team?.length && c.status === 'concluded' && c.freshness === 'current' ? `<button class="btn pri" data-council-direct="${esc(c.id)}">이 안으로 지시</button>` : x.actions_by_team?.length ? '<p>최신 근거로 지금 협의한 뒤 지시해주세요.</p>' : ''}</div></details>`;
   }).join('');
   return `<section class="sec"><div class="sec-h"><h2>협의</h2><span>2라운드 · 결론은 제안만</span><button class="btn" data-council-run>지금 협의</button></div><div class="list">${rows || '<p class="empty">협의 기록이 없어요</p>'}</div></section>`;
 }
@@ -440,7 +441,7 @@ function render() {
   const v = (location.hash || '#home').slice(1);
   document.querySelectorAll('.nav a[data-v]').forEach(a => a.classList.toggle('on', a.dataset.v === v));
   document.getElementById('crumb').textContent = v === 'inbox' ? '결정할 것' : v === 'councils' ? '협의' : v === 'map' ? '회사 지도' : '홈';
-  document.getElementById('view').innerHTML = `<div class="inner" style="padding:0">${v === 'inbox' ? inbox() : v === 'councils' ? councils() : v === 'map' ? mapView() : home()}</div>`;
+  document.getElementById('view').innerHTML = `<div class="inner" style="padding:0">${D.sourceErrors?.length ? `<p class="hint warn">현재 조회 미확인: ${D.sourceErrors.map(esc).join(' · ')}. 저장된 보고는 과거 기록이며 최신 판단 근거로 사용하지 마세요.</p>` : ''}${v === 'inbox' ? inbox() : v === 'councils' ? councils() : v === 'map' ? mapView() : home()}</div>`;
 }
 
 // ───────── 회사 지도
@@ -459,7 +460,7 @@ function agentList() {
     const w = (D.watch || []).find(x => x.team === k);
     return { ...a, division: org ? org.division : '대표 직속', status: t.overdue || w?.alerts ? 'warn'
       : D.decide.some(c => c.kind === 'request_check' && c._org === k) ? 'report' : t.open || t.newToday || t.sharedToday ? 'work' : 'idle',
-      headline: (a.stale ? '[오늘 이전 보고] ' : '') + a.headline,
+      headline: (a.freshness !== 'current' && a.created_at ? '[' + freshnessLabel(a) + '] ' : '') + a.headline,
       stats: { ...a.stats, open: t.open, overdue: t.overdue, doneToday: t.doneToday, newToday: t.newToday, shared: t.shared || 0, sharedToday: t.sharedToday || 0,
         toCeo: D.decide.filter(c => c.kind === 'request_check' && c._org === k).length,
         alerts: w?.alerts || 0, facts: w?.facts || a.stats?.facts || [] }, liveFacts: !!w };
@@ -499,9 +500,11 @@ function mapView() {
         <small>${a.created_at ? 'AI 보고 ' + kst(a.created_at) : 'AI 보고 전'} · 현재 조회 ${kst(D.checkedAt)}</small>
         <button class="btn" type="button" data-run="${esc(a.team)}">이 팀 지금 점검</button></div>
       <p class="head">${esc(a.headline)}</p>
+      <p><span class="k">${freshnessLabel(a)}</span> · 보고 당시 근거와 현재 조회를 비교한 상태입니다.</p>
       ${a.summary ? `<p class="sum">${esc(a.summary)}</p>` : ''}
       <div class="nums"><span><b>${num(a.stats?.open) ?? 0}</b>진행 중</span><span><b>${num(a.stats?.overdue) ?? 0}</b>마감 지남</span><span><b>${num(a.stats?.toCeo) ?? 0}</b>대표 확인 요청</span><span><b>${(D.orders || []).filter(o => o.team === a.team && o.status === 'open').length}</b>내 지시 진행</span><span><b>${num(a.stats?.doneToday) ?? 0}</b>오늘 완료</span><span><b>${num(a.stats?.shared) ?? 0}</b>공유받은 근거</span></div>
-      ${a.councilIncluded ? '<p><span class="k">협의에 포함</span></p>' : a.needs?.length ? `<div><div class="sec-h"><h2>보고 당시 확인 제안</h2><span>${kst(a.created_at)} 기준 · 현재 근거 확인 후 결정</span></div><ul>${a.needs.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul></div>` : ''}
+      ${a.councilIncluded ? '<p><span class="k">최신 근거의 협의 기록 있음</span></p>' : ''}
+      ${a.needs?.length ? `<div><div class="sec-h"><h2>보고 당시 확인 제안</h2><span>${kst(a.created_at)} 기준 · 현재 근거 확인 후 결정</span></div><ul>${a.needs.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul></div>` : ''}
       ${facts(a)}
       ${people(a.team)}
       ${ordersOf(a.team)}
@@ -593,7 +596,7 @@ document.getElementById('view').addEventListener('click', async e => {
   const c = (D.councils || []).find(x => x.id === b.dataset.councilDirect); if (!c) return;
   if (!confirm('팀별 제안을 대표 지시 카드로 만들까요?')) return;
   b.disabled = true;
-  try { await api(`/api/ceo/councils/${encodeURIComponent(c.id)}/direct`, {}); await load(); }
+  try { await api(`/api/ceo/councils/${encodeURIComponent(c.id)}/direct`, {evidenceHash:c.cost?.evidence?.hash}); await load(); }
   catch (err) { alertInline(b, err.message); b.disabled = false; }
 });
 document.getElementById('view').addEventListener('keydown', e => {

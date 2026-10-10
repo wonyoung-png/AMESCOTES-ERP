@@ -16,12 +16,13 @@ import { currentUser, restAsServer, CEO_EMAILS, type SessionUser } from './auth.
 import { gcalConfigured, tokenFrom, verifiedEmail, GOOGLE_CLIENT_ID } from './gcal.js';
 import { members, esc, kstToday, ANSWER_MODEL, notify, genId } from './work.js';
 import { dailyFetch } from './daily-bridge.js';
-import { latestRuns, runAgentsOnce, orgOf, isDirective, CEO_DESK, loadRules, judge } from './agents.js';
+import { latestRuns, runAgentsOnce, CEO_DESK, judge, loadReportContext, teamEvidence } from './agents.js';
 import { emptyOnFailure, findCouncilCandidates, openCouncil, pendingCouncilActions } from './council.js';
 import { ORG, DIVISIONS, DIVISION_HEADS, DEFAULT_RULES, orgTeam } from './org.js';
 import { syncSoon } from './gcal.js';
-import { allRows, reportingCards, prioritizeCards, searchCards, dayStartUtc, cardEvidence } from './work-records.js';
-import { gatherWatch } from './watch.js';
+import { allRows, prioritizeCards, searchCards, cardEvidence } from './work-records.js';
+import { councilStamp, evidenceFreshness } from './report-evidence.js';
+import { attachCampaignEvidence } from './campaign-evidence.js';
 
 const router = Router();
 
@@ -202,26 +203,25 @@ async function salesKpi(): Promise<any | null> {
 }
 
 async function gather(me: SessionUser) {
-  const since = new Date(Date.now() - 30 * 864e5).toISOString();
   const today = kstToday();
   const in30 = new Date(Date.now() + 9 * 3600e3 + 30 * 864e5).toISOString().slice(0, 10);
-  const [cr, pr, kr, all, kpi, agents, watch, councils, councilMessages] = await Promise.all([
+  const [context, pr, kr, kpi, agents, councilRows, councilMessages] = await Promise.all([
     // 대표는 전부 본다 — 질문(개인 대화)만 뺀다
-    reportingCards('*', since),
+    loadReportContext(true),
     // 사진은 빼고 — 콘솔이 /api/ceo/capture-photo/:id 로 따로 받는다 (요약에 넣으면 응답이 수십 MB 가 될 수 있다, 코덱스 지적)
     allRows(`capture_inbox?status=eq.pending&select=id,created_at,created_by_name,raw_text,kind,parsed,confidence&order=created_at.desc,id.desc`),
     allRows(`campaigns?select=id,title,channel,start_date,end_date,status,discount_rate,workspace` +
       `&status=neq.closed&end_date=gte.${today}&start_date=lte.${in30}&order=start_date.asc,id.asc`),
-    members(),
     salesKpi(),
     latestRuns(),
-    gatherWatch(),
     allRows('agent_councils?select=*&order=created_at.desc,id.desc&limit=50').catch(emptyOnFailure('협의')),
     allRows('agent_council_messages?select=*&order=round.asc,created_at.asc,id.asc&limit=500').catch(emptyOnFailure('협의 메시지')),
   ]);
-  const cards: any[] = cr;
-  const bossIds = new Set(all.filter(m => CEO_EMAILS.includes(m.email.toLowerCase())).map(m => m.id));
-  for (const c of cards) { c._dir = isDirective(c, bossIds); c._org = orgOf(c, bossIds); }
+  const {cards,all,bossIds,watch,rules}=context;
+  const candidates=findCouncilCandidates(cards,watch);
+  const candidateStamps=new Map(candidates.map(c=>[c.triggerKey,councilStamp(c)]));
+  const councils=councilRows.map((c:any)=>({...c,freshness:evidenceFreshness(c.cost?.evidence,
+    context.sourceErrors.length ? undefined : candidateStamps.get(c.cost?.evidence?.scope))}));
   const captures: any[] = pr;
   if (captures.length) {
     const ph = await allRows('capture_inbox?status=eq.pending&photo=not.is.null&select=id&order=id.asc');
@@ -229,7 +229,7 @@ async function gather(me: SessionUser) {
     for (const c of captures) c.has_photo = withPhoto.has(c.id);
   }
   const campaigns: any[] = kr;
-  const councilTeams = new Set<string>(councils.filter((c: any) => c.status === 'concluded' && c.trigger_day === today).flatMap((c: any) => c.teams || []));
+  const councilTeams = new Set<string>(councils.filter((c: any) => c.status === 'concluded' && c.freshness === 'current' && c.trigger_day === today).flatMap((c: any) => c.teams || []));
 
   const open = cards.filter(c => c.status === 'open');
   // 대표가 결정·처리할 것: 나한테 온 확인 요청·내 할 일 + 아직 캘린더에 안 올린 일정 + 승인 대기 현장 접수
@@ -239,13 +239,14 @@ async function gather(me: SessionUser) {
   ];
   const teamKeys = new Set([...ORG.map(t => t.key), ...cards.filter(c => c.status !== 'cancelled' && c._org !== CEO_DESK).map(c => c._org)]);
   const teams = Array.from(teamKeys, team => {
-    const { mine, stats } = judge(team, cards, bossIds, today);
+    const { mine, stats } = judge(team, cards, bossIds, today,watch.get(team));
     return { team, ...stats, latest: mine[0]?.raw_text };
   });
 
-  return { me, today, cards, open, decide, captures, campaigns, teams, members: all, kpi, councils, councilMessages,
-    agents: agents.map(a => ({ ...a, stale: a.created_at < dayStartUtc(), ...(councilTeams.has(a.team) ? { needs: [], councilIncluded: true } : {}) })),
-    watch: Array.from(watch, ([team, w]) => ({ team, ...w })), checkedAt: new Date().toISOString(),
+  return { me, today, cards, open, decide, captures, campaigns, teams, members: all, kpi, councils, councilMessages,rules,
+    agents: agents.map(a => { const freshness=evidenceFreshness(a.stats?.evidence,teamEvidence(a.team,context));
+      return {...a,freshness,stale:freshness!=='current',councilIncluded:councilTeams.has(a.team)}; }),
+    watch: Array.from(watch, ([team, w]) => ({ team, ...w })), checkedAt: new Date().toISOString(),sourceErrors:context.sourceErrors,
     buyers: captures.length ? await buyerOptions() : [] };
 }
 
@@ -264,7 +265,8 @@ async function buyerOptions() {
 
 router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response) => {
   try {
-    const [g, rules] = await Promise.all([gather((req as any).user), loadRules()]);
+    const g=await gather((req as any).user);
+    const rules=g.rules;
     res.set('Cache-Control', 'no-store'); // 없으면 브라우저가 옛 요약을 다시 보여준다 (지시 직후 안 보임)
     res.json({
       me: { name: g.me.name, email: g.me.email },
@@ -280,6 +282,7 @@ router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response
       councils: g.councils.map((c: any) => ({ ...c, messages: g.councilMessages.filter((m: any) => m.council_id === c.id) })),
       watch: g.watch,
       checkedAt: g.checkedAt,
+      sourceErrors:g.sourceErrors,
       // 조직도 + 팀원 ERP 계정 여부, 팀별 대표 지시 (지도·지시 화면용)
       org: {
         divisions: DIVISIONS, heads: DIVISION_HEADS,
@@ -317,15 +320,16 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
 
     const g = await gather((req as any).user);
     const matched = await searchCards(question);
-    const evidence = prioritizeCards(Array.from(new Map([...g.cards, ...matched].map(c => [c.id, c])).values()), question, 200);
+    const evidence = await attachCampaignEvidence(prioritizeCards(Array.from(new Map([...matched, ...g.cards].map(c => [c.id, c])).values()), question, 200));
     const records = [
+      ...g.sourceErrors.map(s=>`[현재 조회 실패 — 판단 보류] ${s}`),
       '[직원]', ...g.members.map(m => `- ${m.name}(${m.team || '-'}${m.position ? '·' + m.position : ''})${m.profile ? ': ' + m.profile.replace(/\s+/g, ' ').slice(0, 300) : ''}`),
       '', '[운영캘린더 — 현재 진행 및 앞으로 30일, 종료 확인 누락은 현재 운영 점검에 별도 포함]', ...g.campaigns.map(c => `- ${c.start_date}~${c.end_date} ${c.channel || ''} ${c.title} (${c.status === 'draft' ? '예정' : c.status}${c.discount_rate != null ? ', ' + c.discount_rate + '%' : ''})`),
       '', '[승인 대기 현장 접수]', ...g.captures.map(c => `- ${c.created_at.slice(0, 10)} ${c.created_by_name} [${c.kind}] ${c.raw_text}`),
       '', `[업무 전수 집계 — 최근 30일 + 오래된 미결/최근 처리] ${g.cards.length}건, 미결 ${g.open.length}건`,
       '', `[질문 관련 근거 — 과거 검색 포함, 선택 ${evidence.length}건]`, ...evidence.map(cardEvidence),
       '', `[현재 운영 점검 — 조회 ${g.checkedAt}]`, ...g.watch.flatMap(w => [`[${w.team}] 경고 조건 ${w.alerts}개`, ...w.facts]),
-      '', '[팀 에이전트 최근 점검 — 과거 보고는 현재 점검과 구분]', ...g.agents.map(a => `- ${a.team} (${a.created_at}) [${a.status}${a.stale ? ', 오늘 이전 보고' : ''}] ${a.headline}${a.summary ? ' / ' + a.summary.replace(/\s+/g, ' ') : ''}`),
+      '', '[팀 에이전트 최근 점검 — 근거 변경·미확인 보고는 현재 근거로 사용하지 않는다]', ...g.agents.map(a => `- ${a.team} (${a.created_at}) [${a.status}, 근거 ${a.freshness}] ${a.headline}${a.summary ? ' / ' + a.summary.replace(/\s+/g, ' ') : ''}`),
       '', '[브랜드 매출 요약 (PMS)]', g.kpi ? JSON.stringify(g.kpi).slice(0, 6000) : '(지금은 불러오지 못함)',
     ].join('\n');
 
@@ -368,9 +372,9 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
 // (계정이 생기면 그 팀 피드에 보인다). 끝났는지는 팀 에이전트가 다음 점검에서 따라간다.
 
 type DirectiveInput = { team: unknown; text: unknown; dueDate?: unknown };
-async function createDirective(me: SessionUser, input: DirectiveInput) {
+async function createDirective(me: SessionUser, input: DirectiveInput, councilId?:string) {
     const team = orgTeam(String(input.team || ''));
-    const text = String(input.text || '').trim().slice(0, 1000);
+    const text = String(input.text || '').trim().slice(0, councilId?6000:1000);
     const due = String(input.dueDate || '');
     if (!team || !text) throw Object.assign(new Error('팀과 지시 내용을 적어주세요'), { status: 400, code: 'bad_request' });
     // 2026-99-99 같은 값은 정규식만으론 통과한다 — 날짜로 바꿨다 되돌려 같은지 본다 (코덱스 지적)
@@ -378,20 +382,41 @@ async function createDirective(me: SessionUser, input: DirectiveInput) {
     const okDate = /^\d{4}-\d{2}-\d{2}$/.test(due) && !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === due;
     if (due && !okDate) throw Object.assign(new Error('마감일이 날짜가 아니에요'), { status: 400, code: 'bad_date' });
 
-    const all = await members();
+    const all = await members(true);
     const to = team.members.map(p => all.find(x => x.name === p.name)).find(Boolean);
     const card = {
-      id: genId('wc'),
+      id: councilId ? 'wc_'+crypto.createHash('sha256').update(JSON.stringify([councilId,team.key])).digest('hex').slice(0,32) : genId('wc'),
       created_by: me.id, created_by_name: me.name,
       team: to?.team || team.key,
       raw_text: `[대표 지시] ${text}`, kind: 'todo', status: 'open',
-      parsed: { summary: text, title: text.slice(0, 60), ...(due ? { dueDate: due } : {}), directive: { team: team.key, text } },
+      parsed: { summary: text, title: text.slice(0, 60), ...(due ? { dueDate: due } : {}), directive: { team: team.key, text, ...(councilId?{councilId}:{}) } },
       assignee_id: to?.id || null, assignee_name: to?.name || null,
     };
     const r = await restAsServer('work_cards', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(card) });
-    if (!r.ok) throw Object.assign(new Error('save_failed'), { status: 502, code: 'save_failed' });
-    if (to) { await notify([{ user_id: to.id, card_id: card.id, title: `${me.name} 대표 — 지시`, body: text }]); syncSoon(); }
-    return { cardId: card.id, delivered: to ? to.name : null };
+    let saved=card;
+    if (!r.ok) {
+      if(!councilId || r.status!==409) throw Object.assign(new Error('save_failed'), { status: 502, code: 'save_failed' });
+      const existing=await restAsServer('work_cards?id=eq.'+card.id+'&select=*&limit=1');
+      const row=existing.ok ? (await existing.json())[0] : null;
+      if(!row || row.parsed?.directive?.councilId!==councilId || row.parsed?.directive?.team!==team.key || row.parsed?.directive?.text!==text)
+        throw new Error('directive_conflict');
+      saved=row;
+    }
+    if(saved.assignee_id) {
+      if(councilId) {
+        // Fixed DB IDs make both a lost response and parallel retries safe; no existing read state is updated.
+        const notice={id:'ntf_'+card.id.slice(3),user_id:saved.assignee_id,card_id:card.id,link:'/work',title:`${me.name} 대표 — 지시`,body:text};
+        const sent=await restAsServer('notifications',{method:'POST',body:JSON.stringify(notice)});
+        if(!sent.ok) {
+          if(sent.status!==409) throw new Error('directive_notification_failed');
+          const old=await restAsServer('notifications?id=eq.'+notice.id+'&select=user_id,card_id&limit=1');
+          const row=old.ok ? (await old.json())[0] : null;
+          if(row?.user_id!==notice.user_id || row?.card_id!==notice.card_id) throw new Error('directive_notification_conflict');
+        }
+      } else await notify([{ user_id: saved.assignee_id, card_id: card.id, title: `${me.name} 대표 — 지시`, body: text }]);
+      syncSoon();
+    }
+    return { cardId: card.id, delivered: saved.assignee_name || null };
 }
 
 router.post('/api/ceo/directive', requireCeo(), async (req: Request, res: Response) => {
@@ -408,14 +433,20 @@ router.post('/api/ceo/directive', requireCeo(), async (req: Request, res: Respon
 router.post('/api/ceo/councils/:id/direct', requireCeo(), async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    const found = await restAsServer(`agent_councils?id=eq.${encodeURIComponent(id)}&select=id,status,conclusion,directed_cards&limit=1`);
+    const found = await restAsServer(`agent_councils?id=eq.${encodeURIComponent(id)}&select=id,status,trigger_day,conclusion,directed_cards,cost&limit=1`);
     const council = found.ok ? (await found.json())[0] : null;
     if (!council || council.status !== 'concluded') { res.status(404).json({ error: 'not_found' }); return; }
+    const context=await loadReportContext();
+    const candidate=findCouncilCandidates(context.cards,context.watch).find(c=>c.triggerKey===council.cost?.evidence?.scope);
+    const freshness=evidenceFreshness(council.cost?.evidence,candidate?councilStamp(candidate):undefined);
+    if(council.trigger_day!==kstToday() || freshness!=='current' || req.body?.evidenceHash!==council.cost?.evidence?.hash) {
+      res.status(409).json({error:'stale_council_evidence',message:'협의 근거가 변경됐거나 확인되지 않았습니다. 지금 협의로 다시 점검한 뒤 지시해주세요.'}); return;
+    }
     const directed = council.directed_cards && typeof council.directed_cards === 'object' ? council.directed_cards : {};
     const failed: Array<{ team: string; error: string }> = [];
     for (const action of pendingCouncilActions(council.conclusion?.actions_by_team || [], directed)) {
       try {
-        const made = await createDirective((req as any).user, { team: action.team, text: action.action });
+        const made = await createDirective((req as any).user, { team: action.team, text: action.action },id);
         directed[action.team] = made;
         const saved = await restAsServer(`agent_councils?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ directed_cards: directed, directed_at: new Date().toISOString() }) });
         if (!saved.ok) throw new Error(`directed_save_${saved.status}`);
@@ -482,6 +513,7 @@ router.post('/api/ceo/agents/run', requireCeo(), async (req: Request, res: Respo
 router.post('/api/ceo/councils/run', requireCeo(), async (_req: Request, res: Response) => {
   try {
     const g = await gather((_req as any).user);
+    if(g.sourceErrors.length) { res.status(503).json({error:'evidence_unavailable',message:'현재 근거를 읽지 못해 협의를 시작하지 않았습니다.'});return; }
     const candidates = findCouncilCandidates(g.cards, new Map(g.watch.map((w: any) => [w.team, { facts: w.facts, alerts: w.alerts }])));
     const results = await Promise.all(candidates.map(c => openCouncil(c)));
     res.json({ opened: results.filter(Boolean).length });
