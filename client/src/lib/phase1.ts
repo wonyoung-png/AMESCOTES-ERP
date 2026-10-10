@@ -682,6 +682,19 @@ export const phase1 = {
   },
 
   getPayables: () => getAll<Payable>(KEYS.payables),
+  savePlannedPayables: async (id: string, rows: Omit<Payable, 'id' | 'createdAt' | 'paidAmountKrw' | 'status'>[]) => {
+    const r=await fetch('/api/payables/planned',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,rows})});
+    const j=await r.json(); if(!r.ok) throw new Error(j.message || '계획지출 저장 결과 확인 필요');
+    const saved=j.items.map(rowToPayable) as Payable[];
+    const cache=new Map(getAll<Payable>(KEYS.payables).map(p=>[p.id,p])); saved.forEach(p=>cache.set(p.id,p));
+    setAll(KEYS.payables,[...cache.values()]); return saved;
+  },
+  generateReceiptPayables: async (orderId: string) => {
+    const r=await fetch(`/api/orders/${encodeURIComponent(orderId)}/receipt-payables`,{method:'POST',credentials:'include'});
+    const j=await r.json(); if(!r.ok) throw new Error(j.message || '미지급 저장 결과 확인 필요');
+    const cache=new Map(getAll<Payable>(KEYS.payables).map(p=>[p.id,p])); j.items.map(rowToPayable).forEach((p:Payable)=>cache.set(p.id,p));
+    setAll(KEYS.payables,[...cache.values()]); return j as {created:number};
+  },
   addPayable: (v: Omit<Payable, 'id' | 'createdAt' | 'paidAmountKrw' | 'status'>) => {
     const row: Payable = {
       ...v,

@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { store, formatNumber, genId, type OrderStatus, type ProductionOrder } from '@/lib/store';
 import {
-  phase1, pullBrandOrders, CHINA_CORP_VENDOR_CODE, CHINA_CORP_VENDOR_NAME,
+  phase1, pullBrandOrders,
   type BrandOrderBatch, type OrderDisplayStatus, type ReceiptDestination, type ReorderOrderRow,
 } from '@/lib/phase1';
 import { fetchOrders } from '@/lib/dbQueries';
@@ -35,27 +35,6 @@ const STATUS_CLASS: Record<OrderDisplayStatus, string> = {
   진행중: 'bg-[var(--fill-quaternary)] text-muted-foreground border-border',
   발주: 'bg-card text-muted-foreground border-border',
 };
-
-function ensureChinaCorpVendor(): { id: string; name: string } {
-  const vendors = store.getVendors();
-  const found = vendors.find(v =>
-    v.code === CHINA_CORP_VENDOR_CODE || v.name.includes('중국법인') || v.name === CHINA_CORP_VENDOR_NAME,
-  );
-  if (found) return { id: found.id, name: found.name };
-  const id = `vendor-${CHINA_CORP_VENDOR_CODE}`;
-  store.addVendor({
-    id,
-    name: CHINA_CORP_VENDOR_NAME,
-    code: CHINA_CORP_VENDOR_CODE,
-    type: '기타',
-    customType: '중국법인',
-    country: '중국',
-    currency: 'CNY',
-    contactHistory: [],
-    createdAt: new Date().toISOString(),
-  });
-  return { id, name: CHINA_CORP_VENDOR_NAME };
-}
 
 export default function BrandOrders() {
   const { workspace } = useWorkspace();
@@ -349,19 +328,13 @@ export default function BrandOrders() {
     }
   };
 
-  const createPayables = (row: ReorderOrderRow) => {
-    const order = orders.find(o => o.id === row.orderId);
-    const cn = ensureChinaCorpVendor();
-    const created = phase1.createPayablesForOrderReceipts(row.orderId, {
-      unitPriceKrw: row.factoryUnitPriceKrw || order?.factoryUnitPriceKrw || 0,
-      factoryVendorId: row.vendorId || order?.vendorId,
-      factoryVendorName: row.vendorName || order?.vendorName,
-      chinaCorpVendorId: cn.id,
-      chinaCorpVendorName: cn.name,
-    });
-    if (created.length) toast.success(`미지급 ${created.length}건 확인/등록`);
-    else toast.warning('등록 가능한 입고 미지급이 없습니다 — 입고 기록과 공장 단가를 확인해주세요');
-    refresh();
+  const createPayables = async (row: ReorderOrderRow) => {
+    if(receiptBusy) return; setReceiptBusy(true);
+    try {
+      const result=await phase1.generateReceiptPayables(row.orderId);
+      toast.success(result.created ? `미지급 ${result.created}건 서버 등록` : '신규 미지급 없음 · 기존 기록 유지');
+      queryClient.invalidateQueries({queryKey:['payables']}); refresh();
+    } catch(e) {toast.error((e as Error).message);} finally {setReceiptBusy(false);}
   };
 
   const detailLogs = detailRow ? phase1.getReceiptLogsByOrder(detailRow.orderId).filter(l => l.logType === 'inbound') : [];
@@ -724,7 +697,7 @@ export default function BrandOrders() {
                   <Button size="sm" variant="outline" onClick={() => markProduced(detailRow)}>생산완료</Button>
                 )}
                 {detailLogs.length > 0 && (
-                  <Button size="sm" variant="outline" onClick={() => createPayables(detailRow)}>미지급 등록</Button>
+                  <Button size="sm" variant="outline" disabled={receiptBusy} onClick={() => createPayables(detailRow)}>{receiptBusy ? '서버 확인 중…' : '미지급 등록'}</Button>
                 )}
                 <Link href="/payables">
                   <Button size="sm" variant="ghost">미지급 탭 →</Button>

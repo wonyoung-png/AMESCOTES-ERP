@@ -72,6 +72,20 @@ assert.equal(phase1.getDefectCarryovers().filter(r => r.id === 'def_test_atomic'
 assert.equal(t.writes.length, writesBefore, 'server receipt result triggered duplicate browser DB writes');
 console.log('atomic receipt cache checks=5 PASS');
 
+const payableBefore=JSON.stringify(phase1.getPayables());
+globalThis.fetch=async()=>({ok:false,json:async()=>({message:'rollback'})});
+await assert.rejects(phase1.savePlannedPayables('test_plan',[input,input]),/rollback/);
+await assert.rejects(phase1.generateReceiptPayables('test_atomic_order'),/rollback/);
+assert.equal(JSON.stringify(phase1.getPayables()),payableBefore,'failed batch changed cache');
+const savedPlan={id:'plan_test_plan_1',vendor_name:'test',source_type:'manual',source_id:'test_plan',amount_krw:1000,paid_amount_krw:300,status:'partial'};
+globalThis.fetch=async()=>({ok:true,json:async()=>({items:[savedPlan],created:0})});
+await phase1.savePlannedPayables('test_plan',[input]);await phase1.savePlannedPayables('test_plan',[input]);
+assert.equal(phase1.getPayables().filter(p=>p.id===savedPlan.id).length,1);
+assert.equal(phase1.getPayables().find(p=>p.id===savedPlan.id).paidAmountKrw,300);
+await phase1.generateReceiptPayables('test_atomic_order');
+assert.equal(phase1.getPayables().filter(p=>p.id===savedPlan.id).length,1);
+console.log('payable generation cache checks=5 PASS');
+
 const chinaMove = { workspace: 'LUMEN', styleNo: 'TEST_CN', color: 'BLACK', qty: 5, moveType: 'inbound', moveDate: '2026-10-09' };
 phase1.addChinaStockMove(chinaMove);
 assert.equal(phase1.getChinaStockBalances('LUMEN')[0].onHand, 5);
