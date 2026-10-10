@@ -23,7 +23,7 @@ export function findCouncilCandidates(cards: any[], watch: Map<string, Watch>): 
     const teams = uniqueTeams([team, ...related]); if (teams.length < 2) continue;
     const key = `watch:${kind}:${fact.replace(/\d[\d,.]*/g, '#').slice(0, 80)}`;
     if (!found.has(key)) found.set(key, { topic: fact.slice(0, 160), triggerKey: key, teams, evidence: Object.fromEntries(teams.map(t => [t,
-      (watch.get(t)?.facts || []).map((own, n) => `watch:${t}:${n} ${own}`)])) });
+      (watch.get(t)?.facts || []).map((own, n) => `watch:${t.replace(/\s+/g, "_")}:${n} ${own}`)])) });
   }
   for (const c of cards) {
     const shared = Array.isArray(c.shared_teams) ? c.shared_teams : [];

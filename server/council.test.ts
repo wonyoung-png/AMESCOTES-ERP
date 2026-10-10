@@ -50,3 +50,12 @@ test('이미 지시한 팀은 재시도 대상에서 제외한다', () => {
   const actions = [{ team: '마케팅', action: 'A' }, { team: '물류·CS', action: 'B' }];
   assert.deepEqual(pendingCouncilActions(actions, { 마케팅: { cardId: 'wc_1' } }), [actions[1]]);
 });
+
+test('공백 있는 팀명(국내 MD)도 근거 id 가 한 단어라 걸러지지 않는다', () => {
+  const watch = new Map([['생산관리', { facts: ['발주 납기 지연 2건'], alerts: 1 }], ['국내 MD', { facts: ['리오더 승인 대기 8건'], alerts: 1 }]]) as any;
+  const [c] = findCouncilCandidates([], watch);
+  const md = c.evidence['국내 MD'];
+  const allowed = new Set(md.map((x: string) => x.split(' ')[0]));
+  assert.ok(allowed.has('watch:국내_MD:0'));
+  assert.equal(sanitizeEvidence({ position: 'p', evidence: ['watch:국내_MD:0'] }, allowed).position, 'p');
+});
