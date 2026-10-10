@@ -15,6 +15,7 @@ import { CheckCircle2, Package, Plane, Ship, Truck, Warehouse } from 'lucide-rea
 import { getCurrentUser } from '@/lib/auth';
 import { confirmShippingPlan, fetchShippingPlans, upsertShippingPlan, type ShippingMethod } from '@/lib/shippingPlans';
 import { validDate } from '../../../shared/schedule';
+import { statementUnitPrice } from '@/lib/statement-workflow';
 
 const LOG_LABELS: Record<ReceiptLogType, string> = {
   inbound: '입고',
@@ -151,7 +152,7 @@ export default function ReceivingShipping() {
             id: genId(),
             description: `[${o.styleNo}] ${o.styleName}`,
             qty: newShipped,
-            unitPrice: item?.salePriceKrw ?? 0,
+            unitPrice: statementUnitPrice(item),
             taxType: '과세',
             taxRate: 0.1,
           }],

@@ -5,7 +5,7 @@ import { useLocation } from 'wouter';
 import {
   store, genId, formatKRW, formatNumber,
   type TradeStatement, type TradeStatementLine, type TradeStatementStatus, type TaxType,
-  type TaxInvoiceData, type Settlement, type ProductionOrder,
+  type TaxInvoiceData, type ProductionOrder,
 } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { StatementDoc } from '@/components/StatementDoc';
 import { printDoc, copyDocAsImage, saveDocAsImage } from '@/lib/docExport';
 import { toast } from 'sonner';
+import { saveStatementBilling, statementUnitPrice } from '@/lib/statement-workflow';
 import { Plus, Search, Pencil, Trash2, FileText, X, Receipt, Printer, Download, Eye, CheckCircle } from 'lucide-react';
 
 // 공급자 고정값 (우리 회사)
@@ -53,25 +54,10 @@ function calcStatement(lines: TradeStatementLine[] | undefined) {
   return { taxableSupply, taxableVat, exemptAmount, grandTotal: taxableSupply + taxableVat + exemptAmount };
 }
 
-function ensureReceivable(statement: TradeStatement, invoiceDate: string) {
-  const existing = store.getSettlements().find(s => s.invoiceNo === statement.statementNo);
-  if (existing) {
-    store.updateSettlement(existing.id, {
-      buyerId: statement.vendorId, buyerName: statement.vendorName,
-      billedAmountKrw: calcStatement(statement.lines).grandTotal,
-      projectNo: statement.projectNo, workspace: statement.workspace,
-    });
-    return;
-  }
-  const due = new Date(`${invoiceDate}T00:00:00`);
-  due.setDate(due.getDate() + 30);
-  const settlement: Settlement = {
-    id: genId(), buyerId: statement.vendorId, buyerName: statement.vendorName, channel: 'B2B직납',
-    invoiceNo: statement.statementNo, invoiceDate, dueDate: localDate(due),
-    billedAmountKrw: calcStatement(statement.lines).grandTotal, collectedAmountKrw: 0, status: '정상',
-    projectNo: statement.projectNo, workspace: statement.workspace, createdAt: new Date().toISOString(),
-  };
-  store.addSettlement(settlement);
+async function persistStatement(statement: TradeStatement, invoiceDate: string) {
+  const result = await saveStatementBilling(statement, invoiceDate);
+  store.hydrateTradeStatements([...store.getTradeStatements().filter(s => s.id !== result.statement.id), result.statement]);
+  if (result.settlement) store.hydrateSettlements([...store.getSettlements().filter(s => s.id !== result.settlement!.id), result.settlement]);
 }
 
 const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -88,6 +74,7 @@ export default function TradeStatement() {
   const [isEdit, setIsEdit] = useState(false);
   const [form, setForm] = useState<Partial<TradeStatement>>({});
   const [lines, setLines] = useState<TradeStatementLine[]>([newLine()]);
+  const [saving, setSaving] = useState(false);
 
   // 상세보기 모달
   const [detailStatement, setDetailStatement] = useState<TradeStatement | null>(null);
@@ -141,7 +128,7 @@ export default function TradeStatement() {
 
   const openNew = () => {
     setIsEdit(false);
-    setForm({ issueDate: new Date().toISOString().split('T')[0], status: '미청구', vendorId: '', vendorName: '', vendorCode: '' });
+    setForm({ id: genId(), createdAt: new Date().toISOString(), issueDate: localDate(), status: '미청구', vendorId: '', vendorName: '', vendorCode: '' });
     setLines([newLine()]);
     setShowModal(true);
   };
@@ -152,8 +139,8 @@ export default function TradeStatement() {
     const item = items.find(i => i.id === order.styleId);
 
     // 바이어 자동 선택
-    if (item?.buyerId) {
-      const buyer = vendors.find(v => v.id === item.buyerId);
+    if (order.buyerId || item?.buyerId) {
+      const buyer = vendors.find(v => v.id === (order.buyerId || item?.buyerId));
       if (buyer) {
         setForm(f => ({
           ...f,
@@ -163,6 +150,7 @@ export default function TradeStatement() {
         }));
       }
     }
+    setForm(f => ({ ...f, projectNo: order.projectNo, workspace: order.workspace || 'OEM' }));
 
     // lines 구성
     const colorQtyList = order.colorQtys && order.colorQtys.length > 0
@@ -172,7 +160,7 @@ export default function TradeStatement() {
       id: genId(),
       description: `[${order.styleNo}] ${order.styleName}${cq.color !== '기본' ? ` (${cq.color})` : ''}`,
       qty: cq.qty,
-      unitPrice: item?.salePriceKrw ?? 0,
+      unitPrice: statementUnitPrice(item),
       taxType: '과세' as const,
       taxRate: 0.1,
     }));
@@ -199,37 +187,24 @@ export default function TradeStatement() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return;
     if (!form.vendorId)  { toast.error('거래처를 선택해주세요'); return; }
     if (!form.issueDate) { toast.error('발행일을 입력해주세요'); return; }
     if (lines.some(l => !l.description)) { toast.error('품목/내역을 모두 입력해주세요'); return; }
 
     const vendorCode = form.vendorCode || 'XXX';
 
-    if (isEdit && form.id) {
-      const updated = { ...form, lines, vendorCode } as TradeStatement;
-      store.updateTradeStatement(form.id, updated);
-      if (updated.status === '청구완료' || updated.taxInvoice?.issued) ensureReceivable(updated, updated.issueDate);
-      toast.success('거래명세표가 수정되었습니다');
-    } else {
-      const statementNo = store.getNextStatementNo(vendorCode);
-      store.addTradeStatement({
-        id: genId(),
-        statementNo,
-        vendorId: form.vendorId!,
-        vendorName: form.vendorName!,
-        vendorCode,
-        issueDate: form.issueDate!,
-        lines,
-        status: form.status || '미청구',
-        taxInvoiceNo: form.taxInvoiceNo,
-        memo: form.memo,
-        createdAt: new Date().toISOString(),
-      });
-      toast.success(`거래명세표 ${statementNo} 발행 완료`);
-    }
-    refresh();
-    setShowModal(false);
+    const statement = { ...form, id: form.id || genId(), statementNo: form.statementNo || store.getNextStatementNo(vendorCode),
+      lines, vendorCode, createdAt: form.createdAt || new Date().toISOString() } as TradeStatement;
+    setForm(statement); // 후속 실패에도 같은 ID·번호로 재시도한다.
+    setSaving(true);
+    try {
+      await persistStatement(statement, statement.issueDate);
+      toast.success(isEdit ? '거래명세표가 수정되었습니다' : `거래명세표 ${statement.statementNo} 저장 완료`);
+      refresh(); setShowModal(false);
+    } catch (error) { toast.error((error as Error).message); }
+    finally { setSaving(false); }
   };
 
   const handleDelete = (id: string) => {
@@ -243,8 +218,8 @@ export default function TradeStatement() {
   const openTaxModal = (s: TradeStatement) => {
     const calc = calcStatement(s.lines);
     const grandTotal = calc.grandTotal;
-    const supplyAmount = Math.round(grandTotal / 1.1);
-    const taxAmount = grandTotal - supplyAmount;
+    const supplyAmount = calc.taxableSupply + calc.exemptAmount;
+    const taxAmount = calc.taxableVat;
 
     const vendor = vendors.find(v => v.id === s.vendorId);
     setTaxTargetId(s.id);
@@ -263,7 +238,8 @@ export default function TradeStatement() {
   };
 
   // 계산서 발행 완료
-  const handleTaxIssue = () => {
+  const handleTaxIssue = async () => {
+    if (saving) return;
     if (!taxForm.buyerCompanyName) { toast.error('공급받는자 상호를 입력해주세요'); return; }
     if (!taxForm.buyerBizRegNo) { toast.error('사업자등록번호를 입력해주세요'); return; }
     if (taxForm.totalAmount <= 0) { toast.error('합계금액을 입력해주세요'); return; }
@@ -274,11 +250,13 @@ export default function TradeStatement() {
       issuedAt: new Date().toISOString(),
     };
     const target = statements.find(s => s.id === taxTargetId);
-    store.updateTradeStatement(taxTargetId, { taxInvoice: invoiceData, status: '청구완료' });
-    if (target) ensureReceivable(target, localDate());
-    refresh();
-    setShowTaxModal(false);
-    toast.success('세금계산서가 발행되었습니다');
+    if (!target) { toast.error('명세표를 찾을 수 없습니다'); return; }
+    setSaving(true);
+    try {
+      await persistStatement({ ...target, taxInvoice: invoiceData, status: '청구완료' }, localDate());
+      refresh(); setShowTaxModal(false); toast.success('계산서 발행 정보와 미수금이 저장되었습니다');
+    } catch (error) { toast.error((error as Error).message); }
+    finally { setSaving(false); }
   };
 
   // 계산서 미리보기 열기
@@ -501,28 +479,12 @@ export default function TradeStatement() {
                   <td className="nw num font-mono text-xs text-muted-foreground">{formatKRW(calc.taxableVat)}</td>
                   <td className="nw num font-mono text-xs font-bold text-foreground">{formatKRW(calc.grandTotal)}</td>
                   <td>
-                    <Select value={s.status} onValueChange={v => {
+                    <Select disabled={saving} value={s.status} onValueChange={async v => {
                       const newStatus = v as TradeStatementStatus;
-                      const linked = store.getSettlements().find(st => st.invoiceNo === s.statementNo);
-                      if (newStatus === '미청구' && linked?.collectedAmountKrw) {
-                        toast.error('이미 입금된 명세표는 미청구로 되돌릴 수 없습니다');
-                        return;
-                      }
-                      store.updateTradeStatement(s.id, { status: newStatus });
-                      if (newStatus === '청구완료') ensureReceivable(s, localDate());
-                      if (newStatus === '미청구' && linked) store.deleteSettlement(linked.id);
-                      if (newStatus === '수금완료') {
-                        // 연결된 정산 레코드의 collectedAmountKrw = billedAmountKrw 자동 업데이트
-                        const settlements = store.getSettlements();
-                        const linked = settlements.find(st => st.invoiceNo === s.statementNo);
-                        if (linked) {
-                          store.updateSettlement(linked.id, {
-                            collectedAmountKrw: linked.billedAmountKrw,
-                            status: '완납',
-                          });
-                        }
-                      }
-                      refresh();
+                      setSaving(true);
+                      try { await persistStatement({ ...s, status: newStatus }, localDate()); refresh(); }
+                      catch (error) { toast.error((error as Error).message); }
+                      finally { setSaving(false); }
                     }}>
                       <SelectTrigger className={`h-7 text-xs w-28 border ${STATUS_COLOR[s.status]}`}>
                         <SelectValue />
@@ -628,7 +590,7 @@ export default function TradeStatement() {
       </div>
 
       {/* 세금계산서 발행 모달 */}
-      <Dialog open={showTaxModal} onOpenChange={setShowTaxModal}>
+      <Dialog open={showTaxModal} onOpenChange={open => { if (!saving) setShowTaxModal(open); }}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="w-[95vw] max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -636,7 +598,7 @@ export default function TradeStatement() {
               세금계산서 발행
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <fieldset disabled={saving} className="space-y-4 py-2">
             {/* 공급자 (고정) */}
             <div className="rounded-md border border-border bg-muted p-3 space-y-1.5">
               <p className="text-xs font-semibold text-muted-foreground uppercase">공급자</p>
@@ -748,10 +710,10 @@ export default function TradeStatement() {
                 className="h-8 text-sm"
               />
             </div>
-          </div>
+          </fieldset>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTaxModal(false)}>취소</Button>
-            <Button onClick={handleTaxIssue} className="gap-2">
+            <Button disabled={saving} variant="outline" onClick={() => setShowTaxModal(false)}>취소</Button>
+            <Button disabled={saving} onClick={handleTaxIssue} className="gap-2">
               <Receipt className="w-4 h-4" />발행 완료
             </Button>
           </DialogFooter>
@@ -927,12 +889,12 @@ export default function TradeStatement() {
       </Dialog>
 
       {/* 발행/수정 모달 */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={open => { if (!saving) setShowModal(open); }}>
         <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-3xl sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEdit ? '거래명세표 수정' : '거래명세표 발행'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-5 py-2">
+          <fieldset disabled={saving} className="space-y-5 py-2">
             {!isEdit && (
               <div className="flex justify-end">
                 <Button
@@ -1078,10 +1040,10 @@ export default function TradeStatement() {
               <Label>메모</Label>
               <Input value={form.memo || ''} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="비고" />
             </div>
-          </div>
+          </fieldset>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
-            <Button onClick={handleSave}>{isEdit ? '수정' : '발행'}</Button>
+            <Button disabled={saving} variant="outline" onClick={() => setShowModal(false)}>취소</Button>
+            <Button disabled={saving} onClick={handleSave}>{saving ? '저장 중…' : isEdit ? '수정' : '저장'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1120,6 +1082,7 @@ function TradeStatementDetailModal({
   const [isEditing, setIsEditing] = useState(false);
   const docRef = useRef<HTMLDivElement>(null);
   const [editLines, setEditLines] = useState<TradeStatementLine[]>(() => [...statement.lines]);
+  const [saving, setSaving] = useState(false);
 
   const updateItemPrice = (id: string, field: 'unitPrice' | 'qty', val: number) => {
     setEditLines(prev => prev.map(l => l.id === id ? { ...l, [field]: val } : l));
@@ -1138,11 +1101,13 @@ function TradeStatementDetailModal({
     setEditLines(prev => prev.map(l => l.id === id ? { ...l, description: val } : l));
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
+    if (saving) return;
     if (editLines.some(l => !l.description)) { toast.error('품목명을 모두 입력해주세요'); return; }
-    store.updateTradeStatement(statement.id, { lines: editLines });
-    toast.success('거래명세표가 수정되었습니다');
-    onSaved();
+    setSaving(true);
+    try { await persistStatement({ ...statement, lines: editLines }, statement.issueDate); toast.success('거래명세표와 연결 금액이 저장되었습니다'); onSaved(); }
+    catch (error) { toast.error((error as Error).message); }
+    finally { setSaving(false); }
   };
 
   const displayLines = isEditing ? editLines : statement.lines;
@@ -1150,7 +1115,7 @@ function TradeStatementDetailModal({
   const vendor = vendors.find(v => v.id === statement.vendorId);
 
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open onOpenChange={() => { if (!saving) onClose(); }}>
       <DialogContent onInteractOutside={e => e.preventDefault()} className="w-[96vw] sm:max-w-4xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -1166,7 +1131,7 @@ function TradeStatementDetailModal({
           </div>
         )}
 
-        <div className={`space-y-3 py-2 ${!isEditing ? 'hidden' : ''}`}>
+        <fieldset disabled={saving} className={`space-y-3 py-2 ${!isEditing ? 'hidden' : ''}`}>
           {/* 헤더 정보 */}
           <div className="grid grid-cols-2 gap-3 text-sm bg-muted rounded-md p-3">
             <div>
@@ -1307,10 +1272,10 @@ function TradeStatementDetailModal({
               <span className="font-mono text-foreground">{formatKRW(calc.grandTotal)}</span>
             </div>
           </div>
-        </div>
+        </fieldset>
 
         <DialogFooter className="gap-2 flex-wrap">
-          <Button variant="outline" onClick={onClose}>닫기</Button>
+          <Button disabled={saving} variant="outline" onClick={onClose}>닫기</Button>
           {!isEditing && (
             <>
               <Button variant="outline" className="gap-1" onClick={async () => {
@@ -1330,11 +1295,11 @@ function TradeStatementDetailModal({
           )}
           {isEditing ? (
             <>
-              <Button variant="outline" onClick={() => { setIsEditing(false); setEditLines([...statement.lines]); }}>
+              <Button disabled={saving} variant="outline" onClick={() => { setIsEditing(false); setEditLines([...statement.lines]); }}>
                 취소
               </Button>
-              <Button onClick={handleSaveEdit}>
-                수정 저장
+              <Button disabled={saving} onClick={handleSaveEdit}>
+                {saving ? '저장 중…' : '수정 저장'}
               </Button>
             </>
           ) : (
