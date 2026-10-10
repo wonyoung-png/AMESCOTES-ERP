@@ -91,6 +91,10 @@ for (const scenario of cases) for (const path of ['answer', 'team_report'] as co
       assert.equal(linkedReads, scenario.state === 'unlinked' ? 0 : 1);
       assert.equal(prompts.length, 1, 'Must reach real model prompt construction, not a fallback');
       const { system, messages } = prompts[0];
+      if (path === 'answer') {
+        assert.ok(system.includes('[팀명] 준비 미확인 — 준비 진행 기록이 없습니다'));
+        assert.match(system,/기록이 없다는 이유로 미준비·미이행을 단정하지 마라/);
+      }
       assert.match(system, /확정값은 당시 결정 기록/);
       assert.match(system, /연결된 현재 캘린더 값이 우선/);
       assert.match(system, /과거 확정값을 현재 값처럼 말하지 마라/);

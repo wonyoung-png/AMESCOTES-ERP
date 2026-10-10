@@ -85,9 +85,29 @@ export function workHttpLlmCases(startDate: string) {
   };
 }
 
-type Fixtures = { bossEmail: string; staffEmail: string; leaderEmail: string; password: string;
+type Fixtures = { bossEmail: string; staffEmail: string; leaderEmail: string; password: string; liveModel?: boolean;
   read?: (path: string) => Promise<any[]>; ceoCookie?: string; marketingId?: string; logisticsId?: string };
 type Row = Record<string, any>;
+export function assertPreparationUnknown(text: string, teams = ['마케팅', '물류']) {
+  const clauses = text.split(/[\n,;。]|(?<=[.!?])\s+/);
+  const unknown = /미확인|미검증|불명|unknown|확인되지|확인\s*필요|(?:기록|근거)(?:에|가|는|이|은|을)?\s*(?:없|부족|찾지\s*못)|확인할\s*수\s*없/;
+  const affirmative = /준비(?:가|는)?\s*완료(?!\s*(?:여부|근거|기록|확인|미확인|아님|아니|(?:도|가|는)\s*아(?:니|님|닙)|와는?\s*다|를\s*(?:뜻하지|의미하지)|되지|되었는지|됐는지|했는지|로\s*보지|라고\s*볼\s*수\s*없))/;
+  assert.ok(clauses.every(clause => !affirmative.test(clause)), 'Preparation falsely completed anywhere in answer');
+  for (const team of teams) {
+    const evidence = clauses.filter((clause, index) => clause.includes(team)
+      || (/(?:두|각)\s*팀/.test(clause) && index > 0 && ['마케팅', '물류'].every(name => clauses[index - 1].includes(name))));
+    assert.ok(evidence.some(clause => unknown.test(clause)), team + ' preparation uncertainty missing');
+    assert.ok(evidence.every(clause => !affirmative.test(clause)), team + ' preparation falsely completed');
+  }
+}
+export function assertFinalDiscount(text: string) {
+  const clauses = text.split(/[\n;。]|(?<=[.!?])\s+/);
+  assert.ok(clauses.some(clause => /20\s*%/.test(clause) && /확정|최종|현재|할인율|진행/.test(clause)), 'Confirmed 20% claim missing');
+  for (const clause of clauses.filter(clause => /30\s*%/.test(clause))) {
+    assert.doesNotMatch(clause.replace(/확정\s*전/g, '결정 전'), /(?:확정|최종|현재)[^%.!?\n]{0,25}30\s*%/, 'Draft 30% falsely asserted as final');
+    assert.match(clause, /제안|초안|검토|원문|이전|당초|기존|처음|요청 글|결정 전|확정 전|변경 전|30\s*%[^%]{0,12}아니/, 'Draft 30% lacks historical qualifier');
+  }
+}
 type Check = { name: string; status: 'passed' | 'failed' | 'blocked'; detail?: string };
 export interface WorkHttpResult {
   status: 'passed' | 'failed' | 'partial';
@@ -100,8 +120,14 @@ export interface WorkHttpResult {
 export async function verifyWorkHttp(base: string, fixtures: Fixtures): Promise<WorkHttpResult> {
   const startDate = '2026-10-20'; // Agreed deterministic classifier/harness date.
   const cases = workHttpLlmCases(startDate);
+  if (fixtures.liveModel) {
+    cases.request.text = 'W컨셉 기획전 연락이 왔는데 아직 참여를 결정하지 못했습니다. 30% 제안이라 팀장님 확인이 필요합니다.';
+    cases.schedule.text = 'LUMEN 2026년 10월 20일 W컨셉 기획전 파니에 토트 30% 할인 예정입니다. 마케팅과 물류·CS팀에 공유해주세요.';
+    cases.boss.text = '제가 대표입니다. 내일까지 W컨셉 기획전 참여 여부를 제가 결정해야 합니다.';
+    cases.question.text = 'W컨셉 기획전의 최종 확정 할인율과 마케팅·물류 준비 상태를 업무 기록에 근거해서 알려주세요.';
+  }
   const result: WorkHttpResult = { status: 'failed', checks: [], ids: { agentRuns: [] }, llmInputs: cases,
-    limitations: ['LLM responses are deterministic harness fixtures; actual AI quality is not tested.',
+    limitations: [fixtures.liveModel ? 'Actual model used for classification, evidence answer and reports; bounded sample, not general quality proof.' : 'LLM responses are deterministic harness fixtures; actual AI quality is not tested.',
       'No cleanup/DELETE/DROP; all created evidence remains in the disposable harness.',
       'Marketing/logistics cookie logins, shared feeds and notification badges are tested; browser UI rendering is not tested.',
       'CEO second-factor cookie is signed by the isolated harness; no live Google verification is claimed.'] };
@@ -291,7 +317,8 @@ export async function verifyWorkHttp(base: string, fixtures: Fixtures): Promise<
     const question = ok(await http('/api/work', staff.cookie, { text: cases.question.text, requestId: requestId() }));
     assert.equal(question.card.kind, 'question'); assert.equal(question.card.status, 'done');
     const answer = String(question.card.parsed.answer || '');
-    assert.match(answer, /20\s*%/); assert.match(answer, /미확인|미검증|불명|unknown|확인되지|준비.*확인\s*필요|준비.*근거.*(?:아닙|없)/);
+    if (fixtures.liveModel) console.log(JSON.stringify({ liveAnswer: answer, kind: question.card.kind, status: question.card.status }));
+    assertFinalDiscount(answer); assertPreparationUnknown(answer);
     assert.doesNotMatch(answer, /준비(?:가|는)?\s*완료(?:됐|되었습니다|했습니다)/);
     const storedQuestion = await oneCard(question.card.id);
     assert.equal(storedQuestion.parsed.answer, answer);
@@ -317,13 +344,19 @@ export async function verifyWorkHttp(base: string, fixtures: Fixtures): Promise<
     for (const team of ['마케팅', '물류·CS']) {
       const run = ok(await http('/api/ceo/agents/run', ceoCookie, { team }, true));
       assert.equal(run.runs.length, 1); const report = run.runs[0];
+      assert.equal(run.saved, 1); assert.deepEqual(run.reportFailures, []); assert.deepEqual(run.saveFailures, []);
+      assert.equal(report.stats.reportAvailable, true, 'Fallback must not count as a live report');
       assert.equal(report.team, team); assert.equal(report.trigger, 'manual');
       assert.ok(Number(report.stats.shared) >= 1, 'Confirmed schedule must be counted as shared evidence');
       assert.equal(Number(report.stats.open), 0, 'Shared schedule is not an own-team open task');
       assert.equal(Number(report.stats.doneToday), 0, 'Shared schedule is not team preparation completion');
       assert.ok(typeof report.headline === 'string' && report.headline.trim());
       assert.match(String(report.summary), /20\s*%/);
-      assert.match(String(report.summary), /미확인|미검증|불명|unknown|확인되지|준비.*확인\s*필요|준비.*근거.*(?:아닙|없)/);
+      assertFinalDiscount(String(report.summary));
+      if (fixtures.liveModel) console.log(JSON.stringify({ liveReport: report.summary, team }));
+      if (fixtures.liveModel) assert.doesNotMatch(String(report.summary), /미준비로\s*보|준비하지\s*않았|미이행으로\s*보/, 'Missing preparation evidence is not evidence of failure');
+      // A team's own report need not discuss the other team's readiness.
+      assertPreparationUnknown(String(report.summary), [team.includes('물류') ? '물류' : '마케팅']);
       assert.doesNotMatch(String(report.summary), /AI 보고 작성 불가|준비(?:가|는)?\s*완료(?:됐|되었습니다|했습니다)/);
       const saved = await rows('team_agent_runs', `id=eq.${encodeURIComponent(report.id)}&select=*`);
       assert.equal(saved.length, 1); assert.equal(saved[0].team, team);

@@ -31,6 +31,9 @@ for (const scenario of ['valid','split','truncated','empty','missing_summary','w
         calls++;assert.equal(new Headers(init?.headers||req?.headers).get('x-api-key'),'synthetic-team-report-key');
         const body=JSON.parse(String(init?.body??await req?.clone().text()));
         assert.match(body.messages[0].content,/직원이 입력한 샘플 검수 진행/);
+        assert.ok(body.system.includes(member.team + ' 준비 미확인 — 준비 진행 기록이 없습니다'));
+        assert.match(body.system,/업무 카드가 없다는 이유로.*미준비.*추정하지 마라/);
+        assert.match(body.system,/업무 카드의 확정값과 운영캘린더의 draft 상태는 별개/);
         const text=scenario==='empty'?'':scenario==='missing_summary'?'{"headline":"제목","needs":[]}':
           scenario==='wrong_needs'?'{"headline":"제목","summary":"보고","needs":[{"text":3}]}':scenario==='malformed'?'not JSON':valid;
         const content=scenario==='split'?[{type:'text',text:text.slice(0,20)},{type:'text',text:text.slice(20)}]:[{type:'text',text}];
