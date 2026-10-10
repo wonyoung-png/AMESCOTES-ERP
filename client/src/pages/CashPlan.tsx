@@ -30,7 +30,7 @@ export default function CashPlan() {
   const [minimumBalance, setMinimumBalance] = useState('0');
   const current = months.find(m => m.key === selected) ?? months[0];
   const incomingRows = [
-    ...settlements.filter(s => s.dueDate?.startsWith(selected) && s.status !== '완납').map(s => ({ id: s.id, name: s.buyerName, date: s.dueDate, amount: Math.max(0, s.billedAmountKrw - s.collectedAmountKrw), note: `확정 · ${s.invoiceNo || ''}` })),
+    ...settlements.filter(s => s.dueDate?.startsWith(selected) && s.billedAmountKrw > s.collectedAmountKrw).map(s => ({ id: s.id, name: s.buyerName, date: s.dueDate, amount: Math.max(0, s.billedAmountKrw - s.collectedAmountKrw), note: `확정 · ${s.invoiceNo || ''}` })),
     ...statements.filter(s => s.status === '미청구' && expectedStatementDate(s).startsWith(selected)).map(s => ({ id: s.id, name: s.vendorName, date: expectedStatementDate(s), amount: statementTotal(s), note: `예상 · ${s.statementNo}` })),
   ];
   const outgoingRows = payables.filter(p => p.dueDate?.startsWith(selected) && p.status !== 'paid').map(p => {

@@ -1,5 +1,5 @@
 // 중국창고 — 이지어드민/3PL과 분리된 ERP 장부 (품목·컬러)
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { store, formatNumber } from '@/lib/store';
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner';
 import { PackageMinus, PackagePlus, Warehouse } from 'lucide-react';
 import { chinaStockRequest, type ChinaSnapshot, type ChinaTransfer } from '@/lib/chinaStock';
+import { createChinaStockAttempt, type ChinaRequest, type ChinaRequestKind } from '@/lib/chinaStockAttempt';
 
 const MOVE_LABEL: Record<ChinaStockMoveType, string> = {
   inbound: '입고',
@@ -21,10 +22,12 @@ const MOVE_LABEL: Record<ChinaStockMoveType, string> = {
 
 export default function ChinaWarehouse() {
   const { workspace } = useWorkspace();
-  return <ChinaWarehouseContent key={workspace} />;
+  const user = store.getCurrentUser();
+  const userId = user?.id || user?.email || 'unknown-user';
+  return <ChinaWarehouseContent key={`${workspace}:${userId}`} userId={userId} />;
 }
 
-function ChinaWarehouseContent() {
+function ChinaWarehouseContent({userId}: {userId: string}) {
   const { workspace } = useWorkspace();
   const ws = workspace === 'AETALOOF' ? 'AETALOOF' : 'LUMEN';
   const [revision, tick] = useState(0);
@@ -32,6 +35,12 @@ function ChinaWarehouseContent() {
   const [snapshot, setSnapshot] = useState<ChinaSnapshot | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const attemptRef = useRef<ReturnType<typeof createChinaStockAttempt> | null>(null);
+  if (!attemptRef.current) attemptRef.current = createChinaStockAttempt({workspace:ws,userId,storage:()=>window.sessionStorage});
+  const attempt = {current:attemptRef.current};
+  const [attemptedKind, setAttemptedKind] = useState<ChinaRequestKind | null>(()=>attempt.current.request?.kind ?? null);
+  const [storageError, setStorageError] = useState(attempt.current.storageError);
+  const locked = saving || attemptedKind !== null || !!storageError;
   const [requestId, setRequestId] = useState('');
   const [transferMode, setTransferMode] = useState(false);
   const [arrival, setArrival] = useState<ChinaTransfer | null>(null);
@@ -40,7 +49,6 @@ function ChinaWarehouseContent() {
   const [importOpen, setImportOpen] = useState(false);
   useEffect(() => {
     let active=true; setSnapshot(null); setError('');
-    setOutOpen(false); setAdjOpen(false); setArrival(null); setImportOpen(false);
     if (workspace !== 'OEM') chinaStockRequest(ws).then(v=>{if(active) setSnapshot(v);}).catch(e=>{if(active) setError(e.message);});
     return ()=>{active=false;};
   }, [workspace,revision]);
@@ -68,7 +76,38 @@ function ChinaWarehouseContent() {
   const totalOnHand = balances.reduce((s, b) => s + b.onHand, 0);
   const skuCount = balances.filter(b => b.onHand > 0).length;
 
+  const saveAttempt = async (candidate: ChinaRequest) => {
+    if (saving || attempt.current.busy) return;
+    setAttemptedKind(attempt.current.request?.kind ?? candidate.kind);
+    setSaving(true);
+    try {
+      const { result, request } = await attempt.current.run(candidate, chinaStockRequest);
+      setSnapshot(result); // Use only the returned server stock, never subtract locally.
+      attempt.current.clear(); setAttemptedKind(null); setStorageError('');
+      const qty = Number(request.input.qty);
+      toast.success(request.kind === 'receive' ? '전량 도착 확인 저장 · EZ 가용 별도 확인'
+        : request.kind === 'transfer' ? `한국 이동 ${qty}개 · 운송중 반영`
+        : request.kind === 'adjust' ? `재고 조정 ${qty > 0 ? '+' : ''}${qty} 서버 저장`
+        : `중국창고 출고 ${qty}개 서버 저장`);
+      setOutOpen(false); setAdjOpen(false); setArrival(null);
+    } catch(e) {
+      setStorageError(attempt.current.storageError);
+      toast.error(`${(e as Error).message} · 처리 여부 미확인: 원래 요청만 재시도하세요. 새 등록은 중복 차감될 수 있습니다.`);
+    } finally { setSaving(false); }
+  };
+
+  const retryPending = () => {
+    const request = attempt.current.request;
+    if (request) void saveAttempt(request);
+  };
+
+  const closeWarning = () => {
+    if (attempt.current.request) toast.warning('창을 닫아도 처리 취소가 아닙니다. 원래 요청을 재시도하거나 서버 이력·운송 근거를 먼저 확인하세요.');
+  };
+
   const openOutbound = (styleNo?: string, color?: string, styleName?: string) => {
+    if (storageError) { toast.error(storageError); return; }
+    if (attempt.current.request) { closeWarning(); return; }
     setRequestId(crypto.randomUUID()); setTransferMode(false);
     setForm({
       styleNo: styleNo || '',
@@ -82,6 +121,8 @@ function ChinaWarehouseContent() {
   };
 
   const openAdjust = () => {
+    if (storageError) { toast.error(storageError); return; }
+    if (attempt.current.request) { closeWarning(); return; }
     setRequestId(crypto.randomUUID());
     setForm({
       styleNo: '', styleName: '', color: '', qty: 0,
@@ -92,14 +133,14 @@ function ChinaWarehouseContent() {
 
   const submitOutbound = async () => {
     if (saving || !snapshot) return;
+    if (attempt.current.request) { retryPending(); return; }
     if (!form.styleNo.trim() || !form.color.trim()) {
       toast.error('품목·컬러를 입력하세요');
       return;
     }
     if (!Number.isSafeInteger(form.qty) || form.qty <= 0) { toast.error('양의 정수 수량을 입력하세요'); return; }
     const item = items.find(i => i.styleNo === form.styleNo.trim());
-    setSaving(true);
-    try { const saved = await chinaStockRequest(ws, transferMode ? 'transfer' : 'move', {
+    await saveAttempt({kind: transferMode ? 'transfer' : 'outbound', workspace: ws, action: transferMode ? 'transfer' : 'move', input: {
       id: requestId, ...(transferMode ? {action:'send'} : {}),
       workspace: ws,
       styleNo: form.styleNo.trim(),
@@ -109,16 +150,12 @@ function ChinaWarehouseContent() {
       moveType: 'outbound',
       moveDate: form.moveDate,
       memo: form.memo || '홀세일/직납 출고',
-    });
-    setSnapshot(saved);
-    toast.success(transferMode ? `한국 이동 ${form.qty}개 · 운송중 반영` : `중국창고 출고 ${form.qty}개 서버 저장`);
-    setOutOpen(false);
-    } catch(e) { toast.error((e as Error).message); }
-    finally { setSaving(false); }
+    }});
   };
 
   const submitAdjust = async () => {
     if (saving || !snapshot) return;
+    if (attempt.current.request) { retryPending(); return; }
     if (!form.styleNo.trim() || !form.color.trim()) {
       toast.error('품목·컬러를 입력하세요');
       return;
@@ -126,8 +163,7 @@ function ChinaWarehouseContent() {
     if (!Number.isSafeInteger(form.qty) || !form.qty) { toast.error('조정 수량(+/-)을 정수로 입력하세요'); return; }
     const item = items.find(i => i.styleNo === form.styleNo.trim());
     if (!form.memo.trim()) { toast.error('조정 사유를 입력하세요'); return; }
-    setSaving(true);
-    try { const saved = await chinaStockRequest(ws, 'move', {
+    await saveAttempt({kind:'adjust', workspace:ws, action:'move', input:{
       id: requestId,
       workspace: ws,
       styleNo: form.styleNo.trim(),
@@ -137,12 +173,7 @@ function ChinaWarehouseContent() {
       moveType: 'adjust',
       moveDate: form.moveDate,
       memo: form.memo || '수기 조정',
-    });
-    setSnapshot(saved);
-    toast.success(`재고 조정 ${form.qty > 0 ? '+' : ''}${form.qty} 서버 저장`);
-    setAdjOpen(false);
-    } catch(e) { toast.error((e as Error).message); }
-    finally { setSaving(false); }
+    }});
   };
 
   if (workspace === 'OEM') return <div className="p-6 text-sm text-muted-foreground">브랜드를 선택한 후 중국창고를 관리하세요.</div>;
@@ -175,9 +206,24 @@ function ChinaWarehouseContent() {
 
       <div role="status" className="text-sm text-muted-foreground">{error || (!snapshot ? '서버 재고 조회 중…' : '서버 조회 완료 · 브라우저 자료는 확인 전 합산하지 않음')}</div>
       <Button variant="outline" size="sm" disabled={saving} onClick={refresh}>서버 새로 조회</Button>
+      {(attemptedKind || storageError) && <div role="alert" className="border rounded-lg p-4 text-sm space-y-2">
+        <p>{storageError || (saving ? '원래 요청 전송 중' : '탭 세션 보존·복원 요청 · 처리 여부 미확인')} · 요청 ID: {String(attempt.current.request?.input.id ?? requestId)}</p>
+        {attempt.current.request && <p>원래 종류: {attempt.current.request.kind} · 수량: {String(attempt.current.request.input.qty ?? '전량 도착')} · 품목: {String(attempt.current.request.input.styleNo ?? '')}</p>}
+        <p>처리 종류·수량·일자·본문은 첫 전송으로 고정됩니다. 창 닫기는 취소가 아닙니다. 같은 요청 재시도는 추가 차감하지 않으며, 새 요청은 중복 차감될 수 있습니다.</p>
+        <p>같은 탭·계정·브랜드에서는 페이지 이동·새로고침 후 원래 요청을 복원합니다. 탭 종료·저장 자료 삭제·다른 탭/기기에는 보장되지 않습니다. 근거 확인 전 새 등록하지 마세요.</p>
+        {userId === 'unknown-user' && <p>계정 식별 정보가 없어 이 탭의 미식별 계정 영역을 사용합니다. 계정 변경 전 기존 이력을 확인하세요.</p>}
+        <Button disabled={saving || !!storageError || !attempt.current.request} onClick={retryPending}>원래 요청 그대로 재시도</Button>
+        <Button variant="outline" disabled={saving} onClick={()=>{
+          if (attempt.current.busy) return;
+          if (!window.confirm('서버 이력과 운송/입고 근거로 기존 요청 처리 여부를 확인하셨습니까? 처리된 건을 새로 등록하면 중복 차감됩니다. 기존 요청 재시도 ID를 해제합니다.')) return;
+          try {
+            attempt.current.clear(); setAttemptedKind(null); setStorageError(''); setOutOpen(false); setAdjOpen(false); setArrival(null);
+          } catch(e) { setStorageError(attempt.current.storageError); toast.error((e as Error).message); }
+        }}>근거 확인 후 새 등록 허용</Button>
+      </div>}
       {pendingLegacy.length>0 && <div className="border rounded-lg p-4 bg-card text-sm">
         브라우저 이력 {pendingLegacy.length}건이 서버에 없습니다. 다른 PC 이력과 중복 여부를 확인 후 가져오세요.
-        <Button className="ml-2" variant="outline" size="sm" disabled={!snapshot || saving} onClick={()=>setImportOpen(true)}>기존 이력 검토·가져오기</Button>
+        <Button className="ml-2" variant="outline" size="sm" disabled={!snapshot || locked} onClick={()=>setImportOpen(true)}>기존 이력 검토·가져오기</Button>
       </div>}
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -287,15 +333,16 @@ function ChinaWarehouseContent() {
         <p className="text-xs text-muted-foreground">출고확정 시 중국 보유 감소·운송중 증가. 한국 도착 확인은 운송중만 종료하며, EZ 재고를 추가 생성하지 않습니다. 전량 도착만 처리합니다.</p>
         {(snapshot?.workspace === ws ? snapshot.transfers : []).map(t=><div key={t.id} className="flex flex-wrap gap-2 items-center justify-between text-sm border-t pt-2">
           <span>{t.style_no} · {t.color} · {formatNumber(t.qty)}개 · {t.sent_date} · {t.status==='in_transit'?'운송중':`도착 확인 ${t.received_date} · ${t.confirmation_ref}`}</span>
-          {t.status==='in_transit' && <Button size="sm" variant="outline" disabled={saving} onClick={()=>{setArrival(t);setConfirmationRef('');setArrivalDate(new Date().toISOString().slice(0,10));}}>한국 전량 도착 확인</Button>}
+          {t.status==='in_transit' && <Button size="sm" variant="outline" disabled={locked} onClick={()=>{setArrival(t);setConfirmationRef('');setArrivalDate(new Date().toISOString().slice(0,10));}}>한국 전량 도착 확인</Button>}
         </div>)}
         {snapshot && !snapshot.transfers.length && <p className="text-sm text-muted-foreground">등록된 이동 없음</p>}
       </div>
-      <Dialog open={outOpen} onOpenChange={v=>{if(!saving) setOutOpen(v);}}>
+      <Dialog open={outOpen} onOpenChange={v=>{if(!saving) {if(!v) closeWarning(); setOutOpen(v);}}}>
         <DialogContent>
           <DialogHeader><DialogTitle>중국창고 출고</DialogTitle></DialogHeader>
-          <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={transferMode} disabled={saving} onChange={e=>setTransferMode(e.target.checked)} />한국 3PL로 창고 이동 (신규 매입 아님)</label>
-          <div className="space-y-3">
+          <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={transferMode} disabled={locked} onChange={e=>setTransferMode(e.target.checked)} />한국 3PL로 창고 이동 (신규 매입 아님)</label>
+          {attemptedKind && <p role="alert" className="text-sm">처리 여부 미확인 · 변경 불가. 같은 본문으로 재시도하세요. 닫은 뒤 새 등록은 중복 차감 위험이 있습니다.</p>}
+          <fieldset disabled={locked} className="space-y-3">
             <div>
               <Label>스타일번호</Label>
               <select
@@ -331,20 +378,21 @@ function ChinaWarehouseContent() {
               <Label>메모</Label>
               <Input value={form.memo} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} placeholder="홀세일 / 직납 등" />
             </div>
-          </div>
+          </fieldset>
           <DialogFooter>
-            <Button variant="outline" disabled={saving} onClick={() => setOutOpen(false)}>취소</Button>
-            <Button disabled={saving} onClick={submitOutbound}>{saving ? '서버 저장 중…' : transferMode ? '한국 이동 확정' : '출고 확정'}</Button>
+            <Button variant="outline" disabled={saving} onClick={() => {closeWarning();setOutOpen(false);}}>{attemptedKind ? '닫기 (취소 아님)' : '취소'}</Button>
+            <Button disabled={saving} onClick={submitOutbound}>{saving ? '서버 저장 중…' : attemptedKind ? '원래 요청 그대로 재시도' : transferMode ? '한국 이동 확정' : '출고 확정'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* 수기 조정 */}
-      <Dialog open={adjOpen} onOpenChange={v=>{if(!saving) setAdjOpen(v);}}>
+      <Dialog open={adjOpen} onOpenChange={v=>{if(!saving) {if(!v) closeWarning();setAdjOpen(v);}}}>
         <DialogContent>
           <DialogHeader><DialogTitle>수기 재고 조정</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground -mt-2">증가는 +, 감소는 − 수량으로 입력</p>
-          <div className="space-y-3">
+          {attemptedKind && <p role="alert" className="text-sm">처리 여부 미확인 · 변경 불가. 원래 요청만 재시도하세요. 새 등록은 중복 조정 위험이 있습니다.</p>}
+          <fieldset disabled={locked} className="space-y-3">
             <div>
               <Label>스타일번호</Label>
               <Input value={form.styleNo} onChange={e => setForm(f => ({ ...f, styleNo: e.target.value }))} list="cn-styles" />
@@ -368,30 +416,30 @@ function ChinaWarehouseContent() {
               <Label>사유</Label>
               <Input value={form.memo} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} />
             </div>
-          </div>
+          </fieldset>
           <DialogFooter>
-            <Button variant="outline" disabled={saving} onClick={() => setAdjOpen(false)}>취소</Button>
-            <Button disabled={saving} onClick={submitAdjust}>{saving ? '서버 저장 중…' : '조정 반영'}</Button>
+            <Button variant="outline" disabled={saving} onClick={() => {closeWarning();setAdjOpen(false);}}>{attemptedKind ? '닫기 (취소 아님)' : '취소'}</Button>
+            <Button disabled={saving} onClick={submitAdjust}>{saving ? '서버 저장 중…' : attemptedKind ? '원래 요청 그대로 재시도' : '조정 반영'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog open={!!arrival} onOpenChange={v=>{if(!saving && !v) setArrival(null);}}><DialogContent>
+      <Dialog open={!!arrival} onOpenChange={v=>{if(!saving && !v) {closeWarning();setArrival(null);}}}><DialogContent>
         <DialogHeader><DialogTitle>한국 전량 도착 확인</DialogTitle></DialogHeader>
         <p className="text-sm">{arrival?.style_no} · {arrival?.color} · {arrival?.qty}개. 실제 3PL 입고를 확인한 뒤 근거를 기록하세요. 국내 EZ 수량은 변경하지 않습니다.</p>
-        <Label htmlFor="cn-arrival-date">도착일</Label><Input id="cn-arrival-date" type="date" value={arrivalDate} onChange={e=>setArrivalDate(e.target.value)} />
-        <Label htmlFor="cn-arrival-ref">3PL 입고증·이지 입고이력 번호</Label><Input id="cn-arrival-ref" value={confirmationRef} onChange={e=>setConfirmationRef(e.target.value)} />
+        {attemptedKind && <p role="alert" className="text-sm">처리 여부 미확인 · 첫 도착일과 입고 근거로만 재시도합니다. 새 등록 전 이력을 확인하세요.</p>}
+        <Label htmlFor="cn-arrival-date">도착일</Label><Input disabled={locked} id="cn-arrival-date" type="date" value={arrivalDate} onChange={e=>setArrivalDate(e.target.value)} />
+        <Label htmlFor="cn-arrival-ref">3PL 입고증·이지 입고이력 번호</Label><Input disabled={locked} id="cn-arrival-ref" value={confirmationRef} onChange={e=>setConfirmationRef(e.target.value)} />
         <DialogFooter><Button disabled={saving || !confirmationRef.trim()} onClick={async()=>{
-          if(!arrival || saving) return; setSaving(true);
-          try {setSnapshot(await chinaStockRequest(ws,'transfer',{id:arrival.id,action:'receive',receivedDate:arrivalDate,confirmationRef}));setArrival(null);toast.success('전량 도착 확인 저장 · EZ 가용 별도 확인');}
-          catch(e){toast.error((e as Error).message);} finally{setSaving(false);}
-        }}>{saving?'저장 중…':'전량 도착 확인 저장'}</Button></DialogFooter>
+          if(!arrival || saving) return;
+          await saveAttempt({kind:'receive',workspace:ws,action:'transfer',input:{id:arrival.id,action:'receive',receivedDate:arrivalDate,confirmationRef}});
+        }}>{saving?'저장 중…':attemptedKind?'원래 요청 그대로 재시도':'전량 도착 확인 저장'}</Button></DialogFooter>
       </DialogContent></Dialog>
       <Dialog open={importOpen} onOpenChange={v=>{if(!saving) setImportOpen(v);}}><DialogContent>
         <DialogHeader><DialogTitle>기존 브라우저 이력 가져오기</DialogTitle></DialogHeader>
         <p className="text-sm">{ws} 기존 이력을 서버 원본과 대조합니다. 같은 입고 ID는 중복 생성하지 않습니다. 다른 PC의 수기 이력과 같은 재고인지 먼저 확인해주세요. 원본 브라우저 자료는 삭제하지 않습니다.</p>
         <div className="max-h-60 overflow-auto text-xs space-y-1">{pendingLegacy.map(m=><p key={m.id}>{m.moveDate} · {m.styleNo} · {m.color} · {MOVE_LABEL[m.moveType]} {m.qty} · {m.memo}</p>)}</div>
         <DialogFooter><Button disabled={saving} onClick={async()=>{
-          if(saving) return;setSaving(true);
+          if(saving || attempt.current.request) return;setSaving(true);
           try{setSnapshot(await chinaStockRequest(ws,'import',{moves:legacy,confirmed:true}));setImportOpen(false);toast.success('기존 이력 서버 저장 · 원본 보존');}
           catch(e){toast.error((e as Error).message);}finally{setSaving(false);}
         }}>{saving?'대조·저장 중…':'이력 확인 후 가져오기'}</Button></DialogFooter>

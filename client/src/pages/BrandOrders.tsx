@@ -136,12 +136,11 @@ export default function BrandOrders() {
     const logs = phase1.getReceiptLogs();
     return board.map(group => {
       const ids = new Set(group.rows.map(r => r.orderId)); const styleLogs = logs.filter(l => ids.has(l.orderId));
-      const inbound = styleLogs.filter(l => l.logType === 'inbound').reduce((n,l) => n + l.qty, 0);
-      const outbound = styleLogs.filter(l => l.logType !== 'inbound'); const shipped = outbound.reduce((n,l) => n + l.qty, 0);
+      const outbound = styleLogs.filter(l => l.logType !== 'inbound');
       const incoming = group.rows.reduce((n,r) => n + r.remaining, 0);
       const demand = { domestic: outbound.filter(l => l.deliveryMarket === 'domestic').reduce((n,l) => n+l.qty,0), b2b: outbound.filter(l => !l.deliveryMarket || l.deliveryMarket === 'b2b').reduce((n,l) => n+l.qty,0), overseas: outbound.filter(l => l.deliveryMarket === 'overseas').reduce((n,l) => n+l.qty,0) };
-      const currentStock = Math.max(0, inbound - shipped); const totalDemand = demand.domestic + demand.b2b + demand.overseas;
-      return { ...group, currentStock, incoming, available: currentStock + incoming, demand, reorderQty: Math.max(0, totalDemand-currentStock-incoming) };
+      // 입출고 이력만으로 위치별 실재고·현재 주문 수요를 확정할 수 없다.
+      return { ...group, incoming, demand };
     });
   }, [board, tickN]);
   const categories = useMemo(() => {
@@ -359,7 +358,7 @@ export default function BrandOrders() {
 
         {/* ── 오더관리 ── */}
         <TabsContent value="mgmt" className="mt-4 space-y-4">
-          <div className="bg-card rounded-lg border overflow-x-auto"><div className="px-4 py-3 border-b"><p className="font-semibold text-sm">리오더 수량 판단</p><p className="text-xs text-muted-foreground">OEM·LUMEN 공통 상품코드 · 현재고 + 입고예정과 배송처별 주문 비교</p></div><table className="data-table w-full text-sm min-w-[760px]"><thead><tr><th>상품</th><th className="num">현재고</th><th className="num">입고예정</th><th className="num">가용합계</th><th className="num">국내</th><th className="num">B2B</th><th className="num">해외</th><th className="num">리오더 권장</th></tr></thead><tbody>{reorderSummary.map(r => <tr key={r.styleNo}><td><b>{r.styleName}</b><span className="ml-2 font-mono text-xs text-primary">{r.styleNo}</span></td><td className="num">{formatNumber(r.currentStock)}</td><td className="num">{formatNumber(r.incoming)}</td><td className="num font-semibold">{formatNumber(r.available)}</td><td className="num">{formatNumber(r.demand.domestic)}</td><td className="num">{formatNumber(r.demand.b2b)}</td><td className="num">{formatNumber(r.demand.overseas)}</td><td className={`num font-bold ${r.reorderQty ? 'text-[var(--system-red)]' : 'text-[var(--system-green)]'}`}>{formatNumber(r.reorderQty)}</td></tr>)}</tbody></table></div>
+          <div className="bg-card rounded-lg border overflow-x-auto"><div className="px-4 py-3 border-b"><p className="font-semibold text-sm">리오더 수량 판단</p><p className="text-xs text-muted-foreground">위치별 실재고·불량·현재 주문 수요 대조 전 권장 수량은 미확인입니다. 배송처별 숫자는 과거 출고 이력입니다.</p></div><table className="data-table w-full text-sm min-w-[760px]"><thead><tr><th>상품</th><th className="num">현재고</th><th className="num">입고예정</th><th className="num">가용합계</th><th className="num">국내 출고</th><th className="num">B2B 출고</th><th className="num">해외 출고</th><th className="num">리오더 권장</th></tr></thead><tbody>{reorderSummary.map(r => <tr key={r.styleNo}><td><b>{r.styleName}</b><span className="ml-2 font-mono text-xs text-primary">{r.styleNo}</span></td><td className="num">미확인</td><td className="num">{formatNumber(r.incoming)}</td><td className="num font-semibold">미확인</td><td className="num">{formatNumber(r.demand.domestic)}</td><td className="num">{formatNumber(r.demand.b2b)}</td><td className="num">{formatNumber(r.demand.overseas)}</td><td className="num"><Link href="/inventory" className="text-primary underline">재고 대조 필요</Link></td></tr>)}</tbody></table></div>
           <div className="flex flex-wrap gap-2 items-center">
             {([
               ['active', '진행중'],

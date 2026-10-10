@@ -114,6 +114,9 @@ needs 는 정말 대표가 볼 것만, 없으면 []. 적혀 있지 않은 건 �
   }
 }
 
+// Pure report generation export for isolated model checks; does not store runs or notify.
+export { write as writeTeamReport };
+
 /** 팀별 감시 기준 — 대표가 고친 것(team_watch) 우선, 없으면 기본값 */
 export async function loadRules(): Promise<Map<string, string>> {
   const m = new Map(Object.entries(DEFAULT_RULES));

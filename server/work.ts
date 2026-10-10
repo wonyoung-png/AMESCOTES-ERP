@@ -92,7 +92,7 @@ export async function notify(rows: Array<{ user_id: string; card_id: string; tit
 
 // ───────────────────────── AI 판정
 
-async function classify(opts: {
+export async function classify(opts: {
   text: string; me: Member; open: Array<{ id: string; raw_text: string; kind: string }>;
 }): Promise<{ kind: Kind; parsed: Record<string, any>; relatedId: string | null }> {
   const key = process.env.ANTHROPIC_API_KEY;
