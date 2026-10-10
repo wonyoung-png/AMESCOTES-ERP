@@ -154,7 +154,8 @@ JSON 하나만 출력한다. 설명 금지.
     logUsage('classify', r);
     const raw = r.content.find(c => c.type === 'text')?.text || '';
     const j = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
-    const kind: Kind = KINDS.includes(j.kind) ? j.kind : 'share';
+    if (!KINDS.includes(j.kind) || !j.parsed || typeof j.parsed !== 'object' || Array.isArray(j.parsed)) throw new Error('invalid_classification');
+    const kind: Kind = j.kind;
     const relatedId = opts.open.some(c => c.id === j.relatedId) ? j.relatedId : null;
     return { kind, parsed: j.parsed && typeof j.parsed === 'object' ? j.parsed : {}, relatedId };
   } catch (e) {
@@ -390,6 +391,13 @@ async function loadForActor(req: Request, res: Response) {
   return { all, me, card, leader };
 }
 
+/** A newer routing/decision must win even if both snapshots are still open. */
+function mutationQuery(card: any, status: string) {
+  if (typeof card.updated_at !== 'string' || !card.updated_at) throw new Error('missing_work_version');
+  return `work_cards?id=eq.${encodeURIComponent(card.id)}&status=eq.${encodeURIComponent(status)}`
+    + `&kind=eq.${encodeURIComponent(card.kind)}&updated_at=eq.${encodeURIComponent(card.updated_at)}`;
+}
+
 // ───────────────────────── 확인 요청에 답하기
 
 router.post('/api/work/:id/reply', requireUser(), async (req: Request, res: Response) => {
@@ -406,7 +414,7 @@ router.post('/api/work/:id/reply', requireUser(), async (req: Request, res: Resp
     const text = String((req.body ?? {}).text || '').trim();
     if (!text) { res.status(400).json({ error: 'reply_required' }); return; }
 
-    const r = await restAsServer(`work_cards?id=eq.${encodeURIComponent(card.id)}&status=eq.open`, {
+    const r = await restAsServer(mutationQuery(card, 'open'), {
       method: 'PATCH', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
         status: 'done', reply_text: text, replied_by_name: me.name, replied_at: new Date().toISOString(),
@@ -479,7 +487,7 @@ router.post('/api/work/:id/kind', requireUser(), async (req: Request, res: Respo
     if (routed.kind === 'question' && !parsed.answer) parsed.answer = await answer(author, card.raw_text, all);
 
     const now = new Date().toISOString();
-    const r = await restAsServer(`work_cards?id=eq.${encodeURIComponent(card.id)}&status=eq.${encodeURIComponent(card.status)}`, {
+    const r = await restAsServer(mutationQuery(card, card.status), {
       method: 'PATCH', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
         kind: routed.kind, parsed,
@@ -510,7 +518,7 @@ router.post('/api/work/:id/cancel', requireUser(), async (req: Request, res: Res
     if (!canManage(card, me, leader)) { res.status(403).json({ error: 'forbidden' }); return; }
     // 끝난 카드(캘린더에 이미 올라간 일정 등)는 여기서 못 되돌린다
     const now = new Date().toISOString();
-    const r = await restAsServer(`work_cards?id=eq.${encodeURIComponent(card.id)}&status=eq.open`, {
+    const r = await restAsServer(mutationQuery(card, 'open'), {
       method: 'PATCH', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ status: 'cancelled', done_by_name: me.name, done_at: now, updated_at: now }),
     });
@@ -537,7 +545,7 @@ router.post('/api/work/:id/done', requireUser(), async (req: Request, res: Respo
     }
     const note = String((req.body ?? {}).note || '').trim().slice(0, 500);
     const now = new Date().toISOString();
-    const r = await restAsServer(`work_cards?id=eq.${encodeURIComponent(card.id)}&status=eq.open`, {
+    const r = await restAsServer(mutationQuery(card, 'open'), {
       method: 'PATCH', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
         status: 'done', done_by_name: me.name, done_at: now, updated_at: now,
@@ -564,6 +572,9 @@ router.post('/api/work/:id/confirm', requireUser(), async (req: Request, res: Re
     const { all, me, card, leader } = ctx;
     if (!(card.created_by === me.id || leader || isBoss(me))) { res.status(403).json({ error: 'forbidden' }); return; }
 
+    if (typeof card.updated_at !== 'string' || !card.updated_at) {
+      res.status(409).json({ error: 'stale_work_version', message: '업무를 새로고침한 뒤 다시 확정해주세요' }); return;
+    }
     let payload;
     try { payload = schedulePayload({ ...(card.parsed || {}), ...((req.body ?? {}).payload || {}) }); }
     catch (e) { res.status(400).json({ error: 'invalid_schedule', message: (e as Error).message }); return; }
@@ -575,10 +586,13 @@ router.post('/api/work/:id/confirm', requireUser(), async (req: Request, res: Re
 
     const r = await restAsServer('rpc/confirm_schedule_card', {
       method: 'POST',
-      body: JSON.stringify({ p_id: card.id, p_payload: payload, p_actor_name: me.name, p_shared: shared }),
+      body: JSON.stringify({ p_id: card.id, p_payload: payload, p_actor_name: me.name, p_shared: shared, p_expected_updated_at: card.updated_at }),
     });
     if (!r.ok) {
       const detail = await r.text();
+      if (detail.includes('stale_work_version')) {
+        res.status(409).json({ error: 'stale_work_version', message: '업무가 변경되었습니다. 새로고침한 뒤 다시 확정해주세요' }); return;
+      }
       const msg =
         detail.includes('already:')        ? '이미 처리된 카드입니다'
         : detail.includes('title_required') ? '기획전 이름을 넣어주세요'

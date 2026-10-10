@@ -388,8 +388,10 @@ export function resolveDiscount(
  * localStorage에만 두면 만든 사람 브라우저에서만 보인다.
  */
 function saveCampaigns(list: Campaign[]) {
+  const previous = getAll<Campaign>(KEYS.campaigns);
   setAll(KEYS.campaigns, list);
-  import('./campaignQueries').then(m => m.pushCampaigns(list)).catch(() => {});
+  window.dispatchEvent(new Event('campaigns:changed'));
+  import('./campaignQueries').then(m => m.pushCampaigns(list, previous)).catch(reportSyncFail('기획전'));
 }
 
 export const CAMPAIGN_CHANNELS = ['자사몰', '센텀', '29CM', 'W컨셉', '쇼룸', '해외'] as const;
@@ -449,26 +451,6 @@ function buildCampaignProjectTasks(_startDate: string, existing?: CampaignTask[]
 function migrateCampaignTasks(c: Campaign): Campaign {
   const tasks = buildCampaignProjectTasks(c.startDate, c.tasks);
   return { ...c, tasks };
-}
-
-function seedCampaignsIfEmpty() {
-  const existing = getAll<Campaign>(KEYS.campaigns);
-  if (existing.length > 0) return;
-  const samples: Omit<Campaign, 'id' | 'createdAt' | 'updatedAt' | 'tasks'>[] = [
-    { workspace: 'LUMEN', title: '센텀 오픈100일 · 시즌오프', channel: '센텀', startDate: '2026-07-10', endDate: '2026-07-20', status: 'active', discountRate: 20, pushSkus: ['LLL6F92SB'], owner: 'MD' },
-    { workspace: 'LUMEN', title: '여름 시즌오프', channel: '자사몰', startDate: '2026-07-06', endDate: '2026-07-12', status: 'active', discountRate: 15 },
-    { workspace: 'LUMEN', title: 'Lumen with SUMMER', channel: '자사몰', startDate: '2026-07-01', endDate: '2026-07-13', status: 'active', discountRate: 10 },
-    { workspace: 'LUMEN', title: 'W ONLY · 72H 특가', channel: 'W컨셉', startDate: '2026-07-06', endDate: '2026-07-12', status: 'onboarded' },
-    { workspace: 'LUMEN', title: '가을 대형 (안)', channel: '자사몰', startDate: '2026-09-01', endDate: '2026-09-14', status: 'draft' },
-  ];
-  const now = new Date().toISOString();
-  saveCampaigns( samples.map(s => ({
-    ...s,
-    id: uid(),
-    tasks: [] as CampaignTask[],
-    createdAt: now,
-    updatedAt: now,
-  })));
 }
 
 function getAll<T>(key: string): T[] {
@@ -1315,10 +1297,8 @@ export const phase1 = {
   },
 
   getCampaigns: (workspace?: 'LUMEN' | 'AETALOOF') => {
-    seedCampaignsIfEmpty();
-    let all = getAll<Campaign>(KEYS.campaigns).map(migrateCampaignTasks);
-    const migrated = all.some((c, i) => c !== getAll<Campaign>(KEYS.campaigns)[i]);
-    if (migrated) saveCampaigns( all);
+    // Viewing a calendar must not create sample campaigns or write to the server.
+    const all = getAll<Campaign>(KEYS.campaigns).map(migrateCampaignTasks);
     return workspace ? all.filter(c => c.workspace === workspace) : all;
   },
 

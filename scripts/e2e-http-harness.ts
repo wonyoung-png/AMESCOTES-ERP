@@ -20,6 +20,7 @@ const originalFetch = globalThis.fetch;
 const forbidden: string[] = [];
 let modelCalls = 0;
 let evidenceChecks = 0;
+let mutationRace: { id: string; kind: string } | null = null;
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
   if (url.origin === 'https://api.anthropic.com') {
@@ -49,7 +50,17 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     forbidden.push(url.origin);
     throw new Error('Isolated harness blocks external network');
   }
-  return originalFetch(input, { ...init, redirect: 'error' });
+  if (url.origin===REST && url.pathname==='/work_cards' && (!init?.method || init.method==='GET')
+    && mutationRace && url.searchParams.get('id')==='eq.'+mutationRace.id && url.searchParams.get('select')==='*') {
+    const race=mutationRace; mutationRace=null;
+    const snapshot=await originalFetch(input,{...init,redirect:'error'});
+    assert.ok(snapshot.ok);
+    const changed=await originalFetch(REST+'/work_cards?id=eq.'+race.id,{method:'PATCH',headers:init?.headers,
+      body:JSON.stringify({kind:race.kind,assignee_id:'e2e_leader',updated_at:'2099-01-01T00:00:00.000001Z'}),redirect:'error'});
+    assert.ok(changed.ok,'Synthetic concurrent DB update failed');
+    return snapshot;
+  }
+  return originalFetch(input, { ...init, redirect: 'error', signal: init?.signal ?? AbortSignal.timeout(15000) });
 }) as typeof fetch;
 
 const password = 'E2E-only-20261010!';
@@ -67,6 +78,7 @@ const fixtures = {
 
 async function main() {
   const resumeWork = process.env.ERP_E2E_RESUME_WORK === '1';
+  const workOnly = process.env.ERP_E2E_WORK_ONLY === '1';
   const empty = await restAsServer('app_users?select=id');
   assert.ok(empty.ok, 'isolated REST not ready');
   const existing = await empty.json();
@@ -106,15 +118,39 @@ async function main() {
   assert.ok(address && typeof address !== 'string');
   const base = `http://127.0.0.1:${address.port}`;
   try {
-    if (!resumeWork) console.log(JSON.stringify({ finance: await verifyFinanceHttp(base, fixtures) }));
+    if (!resumeWork && !workOnly) console.log(JSON.stringify({ finance: await verifyFinanceHttp(base, fixtures) }));
     const work = await verifyWorkHttp(base, fixtures);
     console.log(JSON.stringify({ work }));
     assert.equal(work.status, 'passed', 'Work HTTP chain not fully passed');
     assert.equal(evidenceChecks, 3, 'Question answer and both team reports must use confirmed records');
+    if(workOnly) {
+      const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:fixtures.bossEmail,password})});
+      assert.equal(login.status,200); const cookie=login.headers.get('set-cookie')!.split(';')[0];
+      for(const s of [
+        {route:'reply',kind:'request_check',next:'schedule',body:{text:'stale reply'}},
+        {route:'done',kind:'todo',next:'schedule',body:{note:'stale done'}},
+        {route:'kind',kind:'todo',next:'request_check',body:{kind:'share'}},
+        {route:'cancel',kind:'todo',next:'request_check',body:{}},
+        {route:'done',kind:'todo',next:'todo',body:{note:'stale owner'}},
+        {route:'confirm',kind:'schedule',next:'schedule',body:{payload:{title:'stale confirmation',workspace:'LUMEN',channel:'W컨셉',startDate:'2026-10-20',discountRate:20},shareTeams:[]}},
+      ]) {
+        const id='wc_'+crypto.randomUUID().replaceAll('-','');
+        const seed=await restAsServer('work_cards',{method:'POST',body:JSON.stringify({id,kind:s.kind,status:'open',created_by:'e2e_staff',created_by_name:'테스트 직원',team:'국내 MD',raw_text:'isolated mutation race',parsed:{}})});
+        assert.ok(seed.ok,'Synthetic work seed'); mutationRace={id,kind:s.next};
+        const r=await fetch(base+`/api/work/${id}/${s.route}`,{method:'POST',headers:{'Content-Type':'application/json',Cookie:cookie},body:JSON.stringify(s.body)});
+        assert.equal(r.status,409,JSON.stringify(await r.json())); assert.equal(mutationRace,null,'Race injection did not execute');
+        const saved=await fixtures.read('work_cards?id=eq.'+id+'&select=*');
+        assert.equal(saved[0].status,'open');assert.equal(saved[0].kind,s.next);assert.equal(saved[0].assignee_id,'e2e_leader');
+        assert.equal((await fixtures.read('notifications?card_id=eq.'+id+'&select=id')).length,0);
+        console.log(JSON.stringify({actualWorkMutationCase:s.route,nextKind:s.next,status:'PASS'}));
+      }
+      console.log(JSON.stringify({actualWorkMutationRaces:'PASS',cases:6,staleWrites:0,staleNotifications:0}));
+      for(const table of ['production_orders','trade_statements','settlements','payables']) assert.equal((await fixtures.read(table+'?select=id')).length,0,'Work-only run wrote financial/business transactions');
+    }
     // PMS is an external, unavailable dependency in this isolated stack; blocked
     // reads may produce honest warnings, but no other destination is acceptable.
     assert.ok(forbidden.every(origin => origin === 'http://e2e-unavailable:8000'), 'unexpected network destination');
-    console.log(JSON.stringify({ isolatedHttpDatabase: resumeWork ? 'WORK_DEBUG_PASS_NOT_FULL_RUN' : 'PASS', model: 'deterministic fixture, not live', google: 'synthetic signed proof, not OAuth', pms: 'unavailable fixture', modelCalls, prohibitedExternalWrites: 0 }));
-  } finally { server.close(); globalThis.fetch = originalFetch; }
+    console.log(JSON.stringify({ isolatedHttpDatabase: resumeWork ? 'WORK_DEBUG_PASS_NOT_FULL_RUN' : workOnly ? 'WORK_ONLY_PASS_NO_FINANCE_RUN' : 'PASS', model: 'deterministic fixture, not live', google: 'synthetic signed proof, not OAuth', pms: 'unavailable fixture', modelCalls, prohibitedExternalWrites: 0 }));
+  } finally { server.closeAllConnections(); server.close(); globalThis.fetch = originalFetch; }
 }
 main().catch(error => { console.error(String(error).split('\n')[0]); process.exitCode = 1; });

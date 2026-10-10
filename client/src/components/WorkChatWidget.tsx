@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 import { Link } from 'wouter';
 import { toast } from 'sonner';
+import { createWorkSubmitAttempt } from '@/lib/workSubmitAttempt';
 import {
   type Card, type Me, type WorkCounts, CardActions, isTodo, isUnread, fetchWork, postWork, announceWorkChanged, fmtTime,
   PROFILE_PLACEHOLDER, PROFILE_MAX,
@@ -121,7 +122,13 @@ export default function WorkChatWidget() {
   const [pending, setPending] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const sending = useRef(false);
-  const retryRequest = useRef<{ text: string; id: string } | null>(null);
+  const attempt = useMemo(() => {
+    if (!me?.id) return null;
+    try { return createWorkSubmitAttempt(me.id, window.sessionStorage); }
+    catch { return null; }
+  }, [me?.id]);
+  const [, refreshAttempt] = useState(0);
+  const frozen = attempt?.request;
 
   const load = useCallback(async () => {
     const j = await fetchWork();
@@ -161,15 +168,20 @@ export default function WorkChatWidget() {
   const send = async (t = text) => {
     const msg = t.trim();
     if (!msg || sending.current) return;
+    if (!attempt) { toast.error('로그인·요청 보존 공간을 확인하지 못했습니다. 전송하지 않았습니다.'); return; }
     sending.current = true;
-    if (retryRequest.current?.text !== msg) retryRequest.current = { text: msg, id: `wc_${crypto.randomUUID().replace(/-/g, '')}` };
-    setText(''); setPending(msg);
-    const card = await postWork(msg, retryRequest.current.id);
-    setPending(null);
-    sending.current = false;
-    if (!card) { setText(msg); return; }
-    retryRequest.current = null;
-    announceWorkChanged();
+    setPending(msg);
+    try {
+      await attempt.run(msg, request => postWork(request.text, request.requestId));
+      setText(current => current.trim() === msg ? '' : current);
+      announceWorkChanged();
+    } catch (error) {
+      toast.error((error as Error).message || '저장 결과를 확인하지 못했습니다. 원문으로 재시도해주세요.');
+    } finally {
+      setPending(null);
+      sending.current = false;
+      refreshAttempt(n => n + 1);
+    }
   };
 
   return (
@@ -257,10 +269,17 @@ export default function WorkChatWidget() {
             <div ref={endRef} />
           </div>
 
+          {((frozen && !pending) || attempt?.blocked || (me && !attempt)) && <div role="alert" className="px-3 py-2 text-xs border-t border-border space-y-1">
+            <p>{attempt?.blocked || (!attempt ? '요청 보존 공간을 사용할 수 없어 전송을 중단했습니다. 브라우저 저장 공간을 확인해주세요.' : '이전 요청의 저장 결과가 미확인입니다. 복원된 원문·동일 요청 ID로 재시도하세요.')}</p>
+            {frozen && <><p className="whitespace-pre-wrap break-words">{frozen.text}</p>
+              <button type="button" disabled={!!pending || !!attempt?.blocked} onClick={() => send(frozen.text)} className="underline disabled:opacity-40">동일 요청 다시 확인</button></>}
+            <p>이 탭에서만 요청이 보존됩니다. 다른 탭·기기에서 새로 등록하기 전 업무함에서 저장 여부를 확인하세요.</p>
+          </div>}
           <div className="shrink-0 border-t border-border p-2 flex items-end gap-2">
             <textarea
               value={text}
               onChange={e => setText(e.target.value)}
+              disabled={!!pending || !!frozen || !!attempt?.blocked || !attempt}
               onKeyDown={e => {
                 // 한글 조합 중 Enter 는 글자 확정이다. 그때 보내면 마지막 글자가 두 번 들어간다
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
@@ -269,7 +288,7 @@ export default function WorkChatWidget() {
               placeholder="업무를 한 줄로 쓰거나 물어보세요"
               className="flex-1 max-h-32 min-h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none outline-none focus:border-primary/50"
             />
-            <button type="button" onClick={() => send()} disabled={!text.trim() || !!pending} aria-label="보내기"
+            <button type="button" onClick={() => send()} disabled={!text.trim() || !!pending || !!frozen || !!attempt?.blocked || !attempt} aria-label="보내기"
               className="h-10 w-10 shrink-0 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40">
               <Send className="w-4 h-4" />
             </button>

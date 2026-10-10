@@ -53,10 +53,27 @@ export default function OperationalCalendar() {
   const [viewMode, setViewMode] = useState<CalendarViewMode>('month');
   const [anchor, setAnchor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [statusFilter, setStatusFilter] = useState<CampaignStatus | 'all'>('all');
-  const [, tick] = useState(0);
-  const refresh = useCallback(() => tick(n => n + 1), []);
+  const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision(n => n + 1), []);
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea === window.localStorage && (event.key === 'ames_campaigns' || event.key === null)) refresh();
+    };
+    window.addEventListener('work:changed', refresh);
+    window.addEventListener('campaigns:changed', refresh);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('work:changed', refresh);
+      window.removeEventListener('campaigns:changed', refresh);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [refresh]);
 
   const [selected, setSelected] = useState<Campaign | null>(null);
+  const selectedId = selected?.id;
+  useEffect(() => {
+    if (selectedId) setSelected(phase1.getCampaign(selectedId) || null);
+  }, [revision, selectedId]);
   const [showNew, setShowNew] = useState(false);
   // 대형 프로젝트는 여기서 만들고 프로젝트 탭에서 상세를 관리한다
   const [projects, setProjects] = useState<Project[]>([]);
@@ -95,7 +112,7 @@ export default function OperationalCalendar() {
       if (statusFilter !== 'all' && c.status !== statusFilter) return false;
       return true;
     });
-  }, [ws, statusFilter, tick]);
+  }, [ws, statusFilter, revision]);
 
   const bands = useMemo(() => getBands(viewMode, anchor), [viewMode, anchor]);
   const period = periodLabel(viewMode, anchor);

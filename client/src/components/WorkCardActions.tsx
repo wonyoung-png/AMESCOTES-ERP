@@ -156,6 +156,7 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
         const local = JSON.parse(localStorage.getItem('ames_campaigns') || '[]');
         const ids = new Set(local.map((x: any) => x.id));
         localStorage.setItem('ames_campaigns', JSON.stringify([...local, ...remote.filter(x => !ids.has(x.id))]));
+        window.dispatchEvent(new Event('campaigns:changed'));
       } catch { /* 다음 동기화 때 들어온다 */ }
     }
   };

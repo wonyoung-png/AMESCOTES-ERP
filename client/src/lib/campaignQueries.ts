@@ -1,9 +1,10 @@
 // 기획전 서버 저장.
 //
-// 지금까지 localStorage에만 있어서 대표가 만든 기획전을 직원이 못 봤다.
-// phase1의 쓰기가 전부 setAll(KEYS.campaigns, ...) 한 곳을 지나므로 거기서 서버에도 올린다.
+// Local cache is optimistic; changed rows require their acknowledged server version.
 import { db } from './db';
 import { filterForTable } from './tableColumns';
+import { createCampaignSync, sameCampaign } from './campaignSync';
+import { toast } from 'sonner';
 
 const toRow = (c: any) => filterForTable('campaigns', {
   id: c.id,
@@ -21,7 +22,7 @@ const toRow = (c: any) => filterForTable('campaigns', {
   tasks: c.tasks || [],
   product_discounts: c.productDiscounts || [],
   category_discounts: c.categoryDiscounts || [],
-  updated_at: new Date().toISOString(),
+  updated_at: c.updatedAt,
 });
 
 const fromRow = (r: any) => ({
@@ -42,13 +43,37 @@ export async function fetchCampaignsSB(): Promise<any[]> {
   return (data || []).map(fromRow);
 }
 
-/** 화면을 막지 않는다 — 저장 실패는 콘솔로만 알리고 로컬 값은 그대로 둔다 */
-export function pushCampaigns(list: any[]): void {
-  if (!list?.length) return;
-  db.from('campaigns').upsert(list.map(toRow)).then(({ error }) => {
-    if (error) console.warn('[campaigns] 서버 저장 실패:', error.message);
-  });
+function replaceIfCurrent(submitted: any, replacement?: any) {
+  const current = JSON.parse(localStorage.getItem('ames_campaigns') || '[]') as any[];
+  if (!sameCampaign(current.find(c => c.id === submitted.id), submitted)) return;
+  const next = current.filter(c => c.id !== submitted.id);
+  if (replacement) next.push(replacement);
+  localStorage.setItem('ames_campaigns', JSON.stringify(next));
+  window.dispatchEvent(new Event('campaigns:changed'));
 }
+
+export const pushCampaigns = createCampaignSync(async (next, previous) => {
+  if (previous && !previous.updatedAt) throw new Error('기획전을 새로 불러온 후 다시 수정해주세요');
+  const version = new Date(Math.max(Date.now(), (Date.parse(previous?.updatedAt || '') || 0) + 1)).toISOString();
+  const row = toRow({ ...next, updatedAt: version });
+  const query = previous
+    ? db.from('campaigns').update(row).eq('id', next.id).eq('updated_at', previous.updatedAt)
+    : db.from('campaigns').insert(row);
+  const { data, error } = await query.select('*');
+  if (error) throw error;
+  if (data?.length !== 1) throw new Error('다른 담당자가 먼저 변경했습니다. 최신 내용을 확인하고 다시 수정해주세요');
+  return fromRow(data[0]);
+}, replaceIfCurrent, async (submitted, baseline, error) => {
+  // Unknown outcomes are reconciled, never retried as a blind upsert.
+  let authoritative = baseline;
+  try {
+    const { data, error: readError } = await db.from('campaigns').select('*').eq('id', submitted.id);
+    if (readError) throw readError;
+    authoritative = data?.[0] ? fromRow(data[0]) : undefined;
+  } catch { /* Offline: revert to the last acknowledged baseline. */ }
+  replaceIfCurrent(submitted, authoritative);
+  toast.error(`기획전 저장을 확인하지 못했습니다 — ${(error as Error)?.message || '연결 상태를 확인해주세요'}`);
+});
 
 export function deleteCampaignSB(id: string): void {
   db.from('campaigns').delete().eq('id', id).then(({ error }) => {
