@@ -4,7 +4,6 @@
 // "어제 얼마 팔았고, 오늘 무엇을 손대야 하는가"를 본다. 숫자는 PMS가 모아 둔 것을
 // /api/dashboard/brand 한 번으로 받고, 체크아웃 퍼널만 ERP 자체(/api/pixel/funnel)에서 읽는다.
 import { useEffect, useMemo, useState } from 'react';
-import { PMS_API } from '@/lib/hosts';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle, ArrowRight, BarChart3, Boxes, CalendarDays, Clock, PackageSearch, Percent, ShoppingCart, TrendingUp, Truck, Activity,
@@ -13,6 +12,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatKRW, formatNumber } from '@/lib/store';
+import { toast } from 'sonner';
 
 
 
@@ -21,16 +21,13 @@ import { formatKRW, formatNumber } from '@/lib/store';
 const pmsUrl = (tab: string) => `/pms?tab=${encodeURIComponent(tab)}`;
 
 async function pms<T>(path: string, brand: string, init: RequestInit = {}): Promise<T> {
-  const base = PMS_API();
-  // 주소를 못 만들면(로컬·IP 접속) 빈 문자열이 온다. 그대로 fetch 하면 지금 서버를
-  // 부르게 되어 엉뚱한 404 를 PMS 장애처럼 보여 준다 (코덱스 지적)
-  if (!base) throw new Error('브랜드 운영 주소를 알 수 없습니다 (정식 주소로 접속해 주세요)');
-  const r = await fetch(base + path, {
+  const route = path === '/api/dashboard/brand' ? 'brand' : path === '/api/dashboard/goals' ? 'goals' : '';
+  if (!route) throw new Error('지원하지 않는 브랜드 운영 요청입니다');
+  const r = await fetch(`/api/bridge/daily/${route}?brand=${encodeURIComponent(brand.toLowerCase())}`, {
     ...init,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      'X-Erp-Token': localStorage.getItem('erp_token') || '',
-      'X-Brand': brand.toLowerCase(),
       ...(init.headers as Record<string, string> || {}),
     },
   });
@@ -121,14 +118,24 @@ export default function BrandDashboard({ brand }: { brand: string }) {
   });
   const [goalOpen, setGoalOpen] = useState(false);
   const [goalInput, setGoalInput] = useState('');
+  const [goalSaving, setGoalSaving] = useState(false);
   // 한국은 UTC+9 — 새벽엔 toISOString()이 전월을 준다. 로컬 달력으로 만든다
   const _d = new Date();
   const month = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}`;
   useEffect(() => { if (data?.sales.mtd.goal) setGoalInput(String(data.sales.mtd.goal)); }, [data]);
 
   async function saveGoal() {
-    await pms('/api/dashboard/goals', brand, { method: 'POST', body: JSON.stringify({ month, amount: Number(goalInput.replace(/,/g, '')) || 0 }) });
-    setGoalOpen(false); refetch();
+    if (goalSaving) return;
+    const amount = Number(goalInput.replace(/,/g, ''));
+    if (!goalInput.trim() || !Number.isFinite(amount) || amount < 0 || amount > Number.MAX_SAFE_INTEGER) {
+      toast.error('목표 금액을 확인해주세요'); return;
+    }
+    setGoalSaving(true);
+    try {
+      await pms('/api/dashboard/goals', brand, { method: 'POST', body: JSON.stringify({ month, amount }) });
+      setGoalOpen(false); refetch(); toast.success('목표를 저장했습니다');
+    } catch (error) { toast.error(error instanceof Error ? error.message : '목표 저장 결과를 확인해주세요'); }
+    finally { setGoalSaving(false); }
   }
 
   const chart = useMemo(() => (data?.sales.daily30 || []).map(d => ({ ...d, day: d.date.slice(5) })), [data]);
@@ -194,8 +201,8 @@ export default function BrandDashboard({ brand }: { brand: string }) {
       {goalOpen && (
         <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3 text-sm">
           <span>{month} 매출 목표 (원)</span>
-          <input className="border border-border rounded px-2 py-1 bg-background w-44" value={goalInput} onChange={e => setGoalInput(e.target.value)} placeholder="1000000000" />
-          <Button size="sm" onClick={saveGoal}>저장</Button><Button size="sm" variant="ghost" onClick={() => setGoalOpen(false)}>닫기</Button>
+          <input disabled={goalSaving} className="border border-border rounded px-2 py-1 bg-background w-44" value={goalInput} onChange={e => setGoalInput(e.target.value)} placeholder="1000000000" />
+          <Button size="sm" disabled={goalSaving} onClick={saveGoal}>{goalSaving ? '저장 중…' : '저장'}</Button><Button size="sm" disabled={goalSaving} variant="ghost" onClick={() => setGoalOpen(false)}>닫기</Button>
         </div>
       )}
 
