@@ -27,4 +27,15 @@
 - 운영에는 테스트 지시/보고/알림을 생성하지 않는다. 테스트 환경은 검증 후 정확한 이름과 라벨 확인 후 폐기한다.
 - 알림 SQL 회귀 및 전송 중 취소 잠금 검증 통과: SSM `0781611d-429c-48a8-b233-1fb8ef918d22`, Success. 기존 생성 알림 중복 방지, 미배정/취소 지시 제외, 완료 결과/기존 읽음 보존 확인.
 - 브라우저 저장 장애가 재시도 중 발생해도 이전 요청 ID를 버리지 않는 회귀 검증 통과.
-- JavaScript 테스트 9개 파일 통과(브라우저 2개 포함). 독립 최종 검토/운영 반영 결과는 확인 후 추가한다.
+- JavaScript 테스트 9개 파일 통과(브라우저 2개 포함).
+
+## 최종 검토 및 운영 반영
+- 독립 Codex 읽기 전용 검토: 19개 파일 전체 diff 검토 후 P1/P2 차단 없음, READY. 초기 지적 사항을 수정하고 회귀 검증 후 승인받았다.
+- 기능 커밋: `9fa8a7475afcc5c0cf737c9da63d18f2568ecb64` (aws-migration에 push 후 배포).
+- 배포 SSM: `bdc264a9-8966-4c0c-bc10-2ccb15925dfa`, Success. 자동 배포와 같은 전역 잠금 안에서 SQL 선적용 후 앱을 한 번 빌드/교체했다.
+- SQL 설치 전후 기존 업무 카드 수 동일. 새 readiness 함수 실제 PostgREST 호출 통과. 기존 앱 이미지 보존: `amescotes-erp:before-ceo-directive-20261010`.
+- 운영 readback SSM: `993b1260-2b8c-4b8e-ae73-3b7cfa945ed7`, Success. app healthy, ERP_PRIVATE_MODE=true, 런타임 지시 보호 및 readiness 차단 확인.
+- 운영 이미지: `sha256:a413a9f9a75750172b96124d5f1205a7c04a5f0e68d9824bf398ca3a692f58ec`.
+- 공개 health 200. 비로그인 업무 API/알림 outbox/중국재고/대표실 overview 각각 401.
+- 운영의 CEO_DIRECTIVE_FIXTURE 업무 0건. 테스트 컨테이너/내부 네트워크 폐기 완료(합성 자료는 복구 불가, 실제 회사 자료 삭제 없음).
+- 이 결과 기록은 문서만 추가 동기화하며 앱은 다시 빌드하지 않는다.
