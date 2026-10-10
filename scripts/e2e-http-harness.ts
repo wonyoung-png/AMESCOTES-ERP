@@ -9,7 +9,7 @@ import receiptRouter from '../server/receipt-workflow';
 import payableRouter from '../server/payable-payment';
 import { rest, restAsServer, requireUser } from '../server/auth';
 import { verifyFinanceHttp } from './e2e-finance-http';
-import { verifyWorkHttp, workHttpLlmCases } from './e2e-work-http';
+import { verifyWorkHttp, workHttpLlmCases, ceoLoopbackRequest } from './e2e-work-http';
 
 const REST = 'http://erp-e2e-api-20261010:3000';
 assert.equal(process.env.ERP_E2E_ISOLATED, '20261010');
@@ -21,6 +21,19 @@ const forbidden: string[] = [];
 let modelCalls = 0;
 let evidenceChecks = 0;
 let mutationRace: { id: string; kind: string } | null = null;
+let changedCampaignCard: string | null = null;
+let changedCampaignPrompts = 0;
+let changedCampaignSource: { id: string; updatedAt: string } | null = null;
+function assertChangedCampaignLine(message: string) {
+  assert.ok(changedCampaignCard && changedCampaignSource);
+  const line = message.split('\n').find(line => line.startsWith('- id=' + changedCampaignCard + ' '));
+  assert.ok(line, 'The historical card itself must be present');
+  assert.match(line, /당시 확정.*"discountRate":20/);
+  const current = line.split('연결된 현재 운영캘린더')[1];
+  assert.ok(current, 'The same historical card must carry linked current evidence');
+  for (const field of [`"id":"${changedCampaignSource.id}"`, '"discountRate":15', '"startDate":"2026-11-20"',
+    `"updatedAt":${JSON.stringify(changedCampaignSource.updatedAt)}`]) assert.ok(current.includes(field), 'Missing same-card current field: ' + field);
+}
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
   if (url.origin === 'https://api.anthropic.com') {
@@ -30,18 +43,24 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const message = String(request.messages?.[0]?.content || '');
     let output: string;
     if (String(request.system).includes('업무 카드로 바꾼다')) {
-      const example = Object.values(workHttpLlmCases('2026-10-20')).find(c => c.text === message);
+      const example = changedCampaignCard && message === 'CURRENT_CAMPAIGN_FIXTURE 현재 일정 할인 알려줘'
+        ? { response: { kind: 'question', relatedId: null, parsed: { answer: '' } } }
+        : Object.values(workHttpLlmCases('2026-10-20')).find(c => c.text === message);
       assert.ok(example, 'Unknown model fixture input');
       output = JSON.stringify(example.response);
     } else if (String(request.system).includes('팀 감독 에이전트')) {
       assert.match(message, /확정.*discountRate[^\d]*20/s, 'Final confirmed payload missing from team report prompt');
       assert.match(message, /다른 팀에서 공유받은 근거/);
-      evidenceChecks++;
-      output = JSON.stringify({ headline: '10/20 확정 20% · 준비 확인 필요', summary: '· 공유된 일정은 10/20 확정 20%입니다.\n· 공유는 팀 준비 완료 근거가 아닙니다.', needs: [] });
+      if (changedCampaignCard) {
+        assertChangedCampaignLine(message); changedCampaignPrompts++;
+      } else evidenceChecks++;
+      output = JSON.stringify({ headline: changedCampaignCard ? '현재 11/20 15% · 당시 결정 20%' : '10/20 확정 20% · 준비 확인 필요', summary: changedCampaignCard ? '· 현재 11/20 15%, 당시 결정 20%입니다.' : '· 공유된 일정은 10/20 확정 20%입니다.\n· 공유는 팀 준비 완료 근거가 아닙니다.', needs: [] });
     } else {
       assert.match(message, /확정.*discountRate[^\d]*20/s, 'Final confirmed payload missing from answer prompt');
-      evidenceChecks++;
-      output = '업무 기록과 확정 일정에 따르면 2026-10-20 W컨셉 파니에 토트 20%입니다. 준비 완료 근거는 아직 확인되지 않았습니다.';
+      if (changedCampaignCard) {
+        assertChangedCampaignLine(message); changedCampaignPrompts++;
+      } else evidenceChecks++;
+      output = changedCampaignCard ? '현재 일정은 2026-11-20 15%, 당시 확정 결정은 20%입니다.' : '업무 기록과 확정 일정에 따르면 2026-10-20 W컨셉 파니에 토트 20%입니다. 준비 완료 근거는 아직 확인되지 않았습니다.';
     }
     return new Response(JSON.stringify({ id: 'fixture-' + modelCalls, type: 'message', role: 'assistant', model: request.model, content: [{ type: 'text', text: output }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 0, output_tokens: 0 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
@@ -145,6 +164,24 @@ async function main() {
         console.log(JSON.stringify({actualWorkMutationCase:s.route,nextKind:s.next,status:'PASS'}));
       }
       console.log(JSON.stringify({actualWorkMutationRaces:'PASS',cases:6,staleWrites:0,staleNotifications:0}));
+      const campaignId = work.ids.campaign!;
+      const update = await restAsServer('campaigns?id=eq.'+campaignId,{method:'PATCH',body:JSON.stringify({title:'CURRENT_CAMPAIGN_FIXTURE',discount_rate:15,start_date:'2026-11-20',end_date:'2026-11-21',updated_at:new Date().toISOString()})});
+      assert.ok(update.ok);
+      const changedSource=(await fixtures.read('campaigns?id=eq.'+campaignId+'&select=id,updated_at'))[0];
+      changedCampaignSource={id:changedSource.id,updatedAt:changedSource.updated_at};
+      changedCampaignCard='wc_'+crypto.randomUUID().replaceAll('-','');
+      const historical=await restAsServer('work_cards',{method:'POST',body:JSON.stringify({id:changedCampaignCard,kind:'schedule',status:'done',team:'국내 MD',created_by:'e2e_staff',created_by_name:'테스트 직원',created_at:'2026-01-01T00:00:00Z',done_at:'2026-01-01T00:00:00Z',raw_text:'past decision',confirmed_payload:{title:'past decision',startDate:'2026-01-01',endDate:'2026-01-02',discountRate:20},result_ref:{table:'campaigns',id:campaignId},shared_teams:['마케팅']})});
+      assert.ok(historical.ok);
+      const question=await fetch(base+'/api/work',{method:'POST',headers:{'Content-Type':'application/json',Cookie:cookie},body:JSON.stringify({text:'CURRENT_CAMPAIGN_FIXTURE 현재 일정 할인 알려줘',requestId:'wc_'+crypto.randomUUID().replaceAll('-','')})});
+      assert.equal(question.status,200); const questionCard=(await question.json()).card;
+      assert.match(questionCard.parsed.answer,/현재.*15%/);
+      const report=await ceoLoopbackRequest(new URL(base+'/api/ceo/agents/run'),{'Content-Type':'application/json',Cookie:cookie+'; '+fixtures.ceoCookie,Host:'ceo.fixture.invalid',Origin:'https://ceo.fixture.invalid'},{team:'마케팅'});
+      assert.equal(report.status,200); const run=(await report.json()).runs[0];
+      assert.match(run.headline,/현재.*15%/);
+      assert.equal((await fixtures.read('team_agent_runs?id=eq.'+run.id+'&select=headline'))[0].headline,run.headline);
+      assert.equal((await fixtures.read('work_cards?id=eq.'+changedCampaignCard+'&select=confirmed_payload'))[0].confirmed_payload.discountRate,20);
+      assert.equal(changedCampaignPrompts,2);
+      console.log(JSON.stringify({actualChangedCampaignEvidence:'PASS',historicalDiscount:20,currentDiscount:15,pastDecisionRescheduled:true,questionAndReportStored:true,promptChecks:2}));
       for(const table of ['production_orders','trade_statements','settlements','payables']) assert.equal((await fixtures.read(table+'?select=id')).length,0,'Work-only run wrote financial/business transactions');
     }
     // PMS is an external, unavailable dependency in this isolated stack; blocked

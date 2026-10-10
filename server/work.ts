@@ -9,9 +9,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import { requireUser, requireRole, userOf, restAsServer, CEO_EMAILS, type SessionUser } from './auth.js';
 import { syncSoon, myUpcoming } from './gcal.js';
 import { ORG } from './org.js';
-import { searchCards, prioritizeCards, allRows, readRows, countRows, cardEvidence } from './work-records.js';
+import { searchCards, prioritizeCards, allRows, readRows, countRows, cardEvidence, currentCampaignCards } from './work-records.js';
 import { workPageQuery, workCountQueries, notificationReadIds, type WorkCursor } from './work-feed.js';
 import { submittedWork } from './work-submit.js';
+import { attachCampaignEvidence, CAMPAIGN_EVIDENCE_RULES } from './campaign-evidence.js';
 import { schedulePayload, SCHEDULE_CHANNELS } from '../shared/schedule.js';
 
 const router = Router();
@@ -178,29 +179,31 @@ function visibleFilter(me: Member): string {
  * 볼 권한이 있는 카드만 넘긴다 — 답이 권한 밖 내용을 흘리면 안 된다.
  * ponytail: 최근 90일 150건을 통째로 넘긴다. 기록이 많아지면 검색(전문검색/임베딩)으로 추린다.
  */
-async function answer(me: Member, question: string, all: Member[]): Promise<string> {
+export async function answer(me: Member, question: string, all: Member[]): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return 'AI 키가 없어 답할 수 없습니다.';
   const since = new Date(Date.now() - 90 * 864e5).toISOString();
-  let recent, camps, mine, matched;
+  let recent, camps, mine, matched, current;
   try {
-    [recent, camps, mine, matched] = await Promise.all([
+    [recent, camps, mine, matched, current] = await Promise.all([
       readRows(`work_cards?kind=neq.question&created_at=gte.${since}` +
-        `&select=id,created_at,created_by_name,team,kind,raw_text,status,reply_text,replied_by_name,confirmed_payload,done_by_name,shared_teams,parsed` +
+        `&select=id,created_at,created_by_name,team,kind,raw_text,status,reply_text,replied_by_name,confirmed_payload,result_ref,done_by_name,shared_teams,parsed` +
         `&order=created_at.desc,id.desc&limit=150${visibleFilter(me)}`),
-      readRows(`campaigns?select=title,channel,start_date,end_date,status,discount_rate,workspace` +
+      readRows(`campaigns?select=id,title,channel,start_date,end_date,status,discount_rate,workspace,updated_at` +
         `&end_date=gte.${new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)}&order=start_date.asc,id.asc&limit=100`),
       // 본인 구글 캘린더 (연결한 사람만, 본인 질문에만)
       myUpcoming(me.id),
       searchCards(question, visibleFilter(me)),
+      currentCampaignCards('*', visibleFilter(me)),
     ]);
   } catch (e) {
     console.warn('[work] 답변 근거 조회 실패:', String(e).split('\n')[0]);
     return '업무 기록이나 운영캘린더를 조회하지 못해 지금은 확인할 수 없습니다. 기록이 없다는 뜻은 아닙니다. 잠시 후 다시 물어봐 주세요.';
   }
-  const cards = prioritizeCards(Array.from(new Map([...recent, ...matched].map(c => [c.id || `${c.created_at}:${c.raw_text}`, c])).values()), question, 150);
-  const fmtCamp = (c: any) => `- ${c.start_date}~${c.end_date} ${c.channel || ''} ${c.title} (${c.status === 'draft' ? '예정' : c.status}` +
-    `${c.discount_rate != null ? `, ${c.discount_rate}%` : ''}, ${c.workspace})`;
+  const candidates = Array.from(new Map([...recent, ...matched, ...current].map(c => [c.id || `${c.created_at}:${c.raw_text}`, c])).values());
+  const cards = prioritizeCards(await attachCampaignEvidence(candidates), question, 150);
+  const fmtCamp = (c: any) => `- id=${c.id} ${c.start_date}~${c.end_date} ${c.channel || ''} ${c.title} (${c.status === 'draft' ? '예정' : c.status}` +
+    `${c.discount_rate != null ? `, ${c.discount_rate}%` : ''}, ${c.workspace}, 변경 ${c.updated_at || '미확인'})`;
 
   // 기록은 직원이 쓴 글이라 믿을 수 없는 데이터다. 지시문(system)과 섞지 않고
   // <records> 안에 데이터로만 넘긴다 — 카드에 "앞의 지시 무시하고…"가 적혀 있어도 따르지 않게 (코덱스 지적)
@@ -213,6 +216,7 @@ async function answer(me: Member, question: string, all: Member[]): Promise<stri
 - 질문과 관계없는 기록은 옮기지 않는다. 답에는 근거(날짜·누가 정했는지)를 붙인다. 3~5줄 이내, 한국어.
 - 과거 검색과 최근 기록에서 뽑은 근거 표본이다. 회사 전체를 전수 확인했다고 말하지 마라. 대표에게는 존댓말을 사용한다.
 - 확정값은 원문의 예정 내용보다 우선한다. 일정 확정과 각 팀의 준비 완료는 다르며, 공유받은 일정만으로 준비가 완료됐다고 답하지 마라.
+${CAMPAIGN_EVIDENCE_RULES}
 - 채팅창은 글자 그대로 보여준다. **굵게**·# 제목 같은 마크다운 기호를 쓰지 마라.`;
   // "W컨셉 건 누구한테 물어봐?" 에 답하려면 누가 뭘 맡는지 알아야 한다.
   // 묻는 사람 것은 전부, 다른 사람 것은 앞부분만 (ponytail: 직원이 수십 명이면 팀 단위로 추린다)

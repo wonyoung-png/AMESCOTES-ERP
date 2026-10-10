@@ -11,7 +11,7 @@ class WorkHttpStatusError extends Error {
 
 // Undici fetch can discard a custom Host. Use native HTTP ONLY for the already
 // validated loopback destination; the real ceo.* host gate must remain enabled.
-async function ceoLoopbackRequest(url: URL, headers: Record<string, string>, body?: object): Promise<Response> {
+export async function ceoLoopbackRequest(url: URL, headers: Record<string, string>, body?: object): Promise<Response> {
   assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname));
   const serialized = body === undefined ? undefined : JSON.stringify(body);
   return new Promise((resolve, reject) => {

@@ -1,4 +1,5 @@
 import { restAsServer } from './auth.js';
+import { campaignEvidence } from './campaign-evidence.js';
 
 type Reader = (path: string) => Promise<{ ok: boolean; status: number; headers?: Pick<Headers, 'get'>; json(): Promise<any> }>;
 
@@ -38,6 +39,19 @@ export async function reportingCards(select: string, since: string, read: Reader
   return allRows(`work_cards?kind=neq.question&${condition}&select=${select}&order=created_at.desc,id.desc`, read);
 }
 
+/** A past decision rescheduled into the future must not disappear from today's report. */
+export async function currentCampaignCards(select: string, visibility = '', read: Reader = restAsServer): Promise<any[]> {
+  const today = new Date(Date.parse(dayStartUtc()) + 9 * 3600e3).toISOString().slice(0, 10);
+  const campaigns = await allRows(`campaigns?status=neq.closed&end_date=gte.${today}&select=id&order=id.asc`, read);
+  if (campaigns.some(c => typeof c?.id !== 'string' || !/^[a-zA-Z0-9_-]{1,160}$/.test(c.id))) throw new Error('캘린더 연결 형식 오류');
+  const ids = [...new Set(campaigns.map(c => c.id as string))];
+  const cards: any[] = [];
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    cards.push(...await allRows(`work_cards?kind=eq.schedule&status=eq.done&result_ref->>table=eq.campaigns&result_ref->>id=in.(${ids.slice(offset, offset + 80).join(',')})&select=${select}&order=id.asc${visibility}`, read));
+  }
+  return cards;
+}
+
 export function prioritizeCards(cards: any[], question = '', limit = 120): any[] {
   const terms = question.match(/[\p{L}\p{N}]{2,}/gu) || [];
   const score = (c: any) => {
@@ -66,6 +80,7 @@ export function cardEvidence(c: any): string {
     (c._dir ? ` (대표 지시${c.assignee_name ? '→' + c.assignee_name : ', 받을 계정 없음'})` : '') +
     (c.parsed?.dueDate ? ` (마감 ${c.parsed.dueDate})` : '') +
     (c.reply_text ? ` → 답변 ${c.replied_by_name || c.done_by_name || '-'}: ${c.reply_text}` : '') +
-    (c.confirmed_payload ? ` → 확정(${c.done_by_name || '-'}): ${JSON.stringify(c.confirmed_payload)}` : '') +
+    (c.confirmed_payload ? ` → 당시 확정(${c.done_by_name || '-'}): ${JSON.stringify(c.confirmed_payload)}` : '') +
+    campaignEvidence(c) +
     (Array.isArray(c.shared_teams) && c.shared_teams.length ? ` → 공유 팀: ${c.shared_teams.join(', ')}` : '');
 }

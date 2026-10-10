@@ -11,8 +11,9 @@ import { members, esc, kstToday, CLASSIFY_MODEL, type Member } from './work.js';
 import { ORG, orgTeam, orgTeamOfName, DEFAULT_RULES } from './org.js';
 import { gatherWatch, type Watch } from './watch.js';
 import { runSubscriptionUsageChecks } from './subscriptions.js';
-import { allRows, reportingCards, prioritizeCards, dayStartUtc, cardEvidence } from './work-records.js';
+import { allRows, reportingCards, currentCampaignCards, prioritizeCards, dayStartUtc, cardEvidence } from './work-records.js';
 import { findCouncilCandidates, openCouncil } from './council.js';
+import { attachCampaignEvidence, CAMPAIGN_EVIDENCE_RULES } from './campaign-evidence.js';
 
 export type AgentStatus = 'work' | 'idle' | 'warn' | 'report';
 export type AgentRun = {
@@ -22,7 +23,7 @@ export type AgentRun = {
 
 const genId = () => `ag_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 const NO_TEAM = '팀 미지정';
-const CARD_SELECT = 'id,created_at,created_by,created_by_name,kind,status,team,assignee_id,assignee_name,parsed,raw_text,reply_text,replied_by_name,done_at,done_by_name,confirmed_payload,shared_teams';
+const CARD_SELECT = 'id,created_at,created_by,created_by_name,kind,status,team,assignee_id,assignee_name,parsed,raw_text,reply_text,replied_by_name,done_at,done_by_name,confirmed_payload,result_ref,shared_teams';
 
 /** 대표 지시 카드인가 — parsed 는 AI 가 채우는 칸이라 그것만 믿지 않는다. 대표가 쓴 것 + 조직도 팀일 때만 (코덱스 지적) */
 export const isDirective = (c: any, bossIds: Set<string>) =>
@@ -88,6 +89,7 @@ ${org ? `이 팀이 맡은 일: ${org.focus}.\n` : ''}대표에게 이 팀이 �
 이 기준에 비춰 [감시 데이터]와 [업무]를 읽고, 기준에 걸리는 것부터 보고한다. 데이터에 없는 숫자를 만들지 마라.
 전체 집계 ${cards.length}건 중 중요 근거 ${selected.length}건을 읽는다. 표본에 없는 세부 사항을 전수 확인했다고 말하지 마라. 대표께 존댓말로 보고한다.
 공유받은 업무 ${shared.length}건 중 ${received.length}건은 협업 근거다. 우리 팀의 진행·완료 건수에 더하거나 일정 확정을 우리 팀 준비 완료로 해석하지 마라. 확정 내용은 원문의 예정 내용보다 우선한다.
+${CAMPAIGN_EVIDENCE_RULES}
 상태는 이미 정해져 있다: ${status} (숫자 ${JSON.stringify(stats)}). 이 상태와 어긋나는 말을 하지 마라.
 JSON 하나만 출력한다.
 {"headline":"지도에 보일 한 줄, 30자 안, 지금 가장 중요한 일","summary":"3~5줄 보고, 마지막 줄은 팀원별 한 줄. 줄마다 '· '로 시작. 마크다운 금지","needs":[{"text":"대표가 결정·확인할 것 한 줄","cardId":"관련 카드 id 또는 생략"}]}
@@ -130,7 +132,8 @@ export async function loadRules(): Promise<Map<string, string>> {
 
 /** PostgREST 기본/임의 limit 때문에 일일 1,000건 이상에서도 보고 숫자가 잘리지 않게 전부 페이지 조회한다. */
 async function recentCards(since: string): Promise<any[]> {
-  return reportingCards(CARD_SELECT, since);
+  const [recent, current] = await Promise.all([reportingCards(CARD_SELECT, since), currentCampaignCards(CARD_SELECT)]);
+  return Array.from(new Map([...recent, ...current].map(c => [c.id, c])).values());
 }
 
 /** 팀 목록 = 조직도 14팀 (+ 어느 팀에도 못 붙인 카드가 있으면 '팀 미지정') */
@@ -138,7 +141,7 @@ export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: strin
   await runSubscriptionUsageChecks().catch(e => console.warn('[agents] 구독 사용 확인 실패:', String(e).split('\n')[0]));
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
   const [cards, all] = await Promise.all([
-    recentCards(since),
+    recentCards(since).then(cards => attachCampaignEvidence(cards)),
     members(),
   ]);
   const bossIds = new Set(all.filter(m => CEO_EMAILS.includes(m.email.toLowerCase())).map(m => m.id));
