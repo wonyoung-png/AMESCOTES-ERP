@@ -59,3 +59,25 @@ test('공백 있는 팀명(국내 MD)도 근거 id 가 한 단어라 걸러지�
   assert.ok(allowed.has('watch:국내_MD:0'));
   assert.equal(sanitizeEvidence({ position: 'p', evidence: ['watch:국내_MD:0'] }, allowed).position, 'p');
 });
+
+test('같은 발주 품번 카드와 무품번 요약 fact를 후보 1건으로 묶는다', () => {
+  const watch = new Map([['생산관리', { facts: ['납기·입고 점검: 확인 필요 3건'], alerts: 1 }]]) as any;
+  const cards = [
+    { id: 'wc_1', _org: '생산관리', shared_teams: ['국내 MD', '물류·CS'], raw_text: '발주 AB2609HB01-R1, K02609HB01-R1 납기 지연' },
+    { id: 'wc_2', _org: '생산관리', shared_teams: ['국내 MD', '물류·CS'], raw_text: 'K02609HB01-R1 입고 지연' },
+  ];
+  const got = findCouncilCandidates(cards, watch);
+  assert.equal(got.length, 1);
+  assert.match(got[0].topic, /^품번 2건:/);
+  assert.ok(Object.values(got[0].evidence).flat().some(x => x.includes('납기·입고 점검')));
+});
+
+test('서로 다른 품번 후보는 분리하고 입력 순서와 무관하게 triggerKey가 안정적이다', () => {
+  const card = (id: string, raw_text: string) => ({ id, _org: '생산관리', shared_teams: ['국내 MD', '물류·CS'], raw_text });
+  const a = card('wc_a', '발주 AB2609HB01-R1, K02609HB01-R1 납기 지연');
+  const b = card('wc_b', '발주 ZZ2609HB01-R1 생산 지연');
+  const first = findCouncilCandidates([a, b], new Map());
+  const reversed = findCouncilCandidates([b, a], new Map());
+  assert.equal(first.length, 2);
+  assert.deepEqual(first.map(x => x.triggerKey).sort(), reversed.map(x => x.triggerKey).sort());
+});

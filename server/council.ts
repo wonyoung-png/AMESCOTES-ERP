@@ -33,7 +33,46 @@ export function findCouncilCandidates(cards: any[], watch: Map<string, Watch>): 
     found.set(key, { topic: String(c.raw_text || c.parsed?.summary || '공동 업무').slice(0, 160), triggerKey: key, teams,
       evidence: Object.fromEntries(teams.map(t => [t, t === (c._org || c.team) || shared.includes(t) ? [`card:${c.id} ${cardEvidence(c).slice(0, 300)}`] : []])) });
   }
-  return Array.from(found.values()).slice(0, 3);
+  // 품번 예: AB2609HB01, K02609HB01(숫자 5자리), LLL2607HB13
+  const codePattern = /[A-Z]{1,4}\d{4,5}[A-Z]{2}\d{2}(?:-R\d+)?/g;
+  const rows = Array.from(found.values()).map(candidate => {
+    const text = [candidate.topic, ...Object.values(candidate.evidence).flat()].join(' ').toUpperCase();
+    return { candidate, kind: factKind(text), codes: new Set(text.match(codePattern) || []) };
+  });
+  const coded = rows.filter(x => x.kind && x.codes.size);
+  const groups: typeof coded[] = [];
+  for (const row of coded) {
+    const matches = groups.filter(group => group[0].kind === row.kind && group.some(other => [...row.codes].some(code => other.codes.has(code))));
+    if (!matches.length) { groups.push([row]); continue; }
+    matches[0].push(row);
+    for (const extra of matches.slice(1)) { matches[0].push(...extra); groups.splice(groups.indexOf(extra), 1); }
+  }
+  const mergeInto = (target: CouncilCandidate, source: CouncilCandidate) => {
+    target.teams = uniqueTeams([...target.teams, ...source.teams]);
+    for (const [team, evidence] of Object.entries(source.evidence))
+      target.evidence[team] = Array.from(new Set([...(target.evidence[team] || []), ...evidence]));
+  };
+  const hash = (value: string) => {
+    let n = 2166136261;
+    for (let i = 0; i < value.length; i++) { n ^= value.charCodeAt(i); n = Math.imul(n, 16777619); }
+    return (n >>> 0).toString(36);
+  };
+  const merged = groups.map(group => {
+    const candidate: CouncilCandidate = { ...group[0].candidate, teams: [...group[0].candidate.teams], evidence: Object.fromEntries(Object.entries(group[0].candidate.evidence).map(([team, evidence]) => [team, [...evidence]])) };
+    for (const row of group.slice(1)) mergeInto(candidate, row.candidate);
+    const codes = Array.from(new Set(group.flatMap(x => [...x.codes]))).sort();
+    candidate.topic = `품번 ${codes.length}건: ${group[0].candidate.topic}`.slice(0, 160);
+    candidate.triggerKey = `merged:${group[0].kind}:${hash(codes.join('|'))}`;
+    return { candidate, kind: group[0].kind };
+  });
+  const consumed = new Set(coded.map(x => x.candidate));
+  const plain: CouncilCandidate[] = [];
+  for (const row of rows.filter(x => !consumed.has(x.candidate))) {
+    const sameKind = row.kind && !row.codes.size ? merged.filter(x => x.kind === row.kind) : [];
+    if (sameKind.length) sameKind.forEach(x => mergeInto(x.candidate, row.candidate));
+    else plain.push(row.candidate);
+  }
+  return [...merged.map(x => x.candidate), ...plain].slice(0, 3);
 }
 
 export function sanitizeEvidence<T extends { position?: string; evidence?: unknown }>(value: T, allowed: Set<string>): T {
