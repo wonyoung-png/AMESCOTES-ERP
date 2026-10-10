@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { judge, missingScheduleTeams } from './agents';
+import { judge, missingScheduleTeams, completedScheduleTeams, reportTeams, fillScheduleTeams, type AgentRun } from './agents';
 import { dayStartUtc } from './work-records';
 
 test('한국 자정 완료를 포함하고 취소·재개 업무를 완료로 세지 않는다', () => {
@@ -29,4 +29,36 @@ test('일일 점검은 이미 완료된 팀을 제외하고 누락 팀만 찾는
   assert.equal(missing.includes('국내 MD'), false);
   assert.equal(missing.includes('생산관리'), false);
   assert.equal(missing.length, 12);
+});
+
+test('AI 보고 실패의 규칙 집계는 일일 보고 성공으로 세지 않으며 과거 기록은 호환된다', () => {
+  const completed = completedScheduleTeams([
+    { team: '국내 MD', stats: { reportAvailable: false } },
+    { team: '마케팅', stats: { reportAvailable: true } },
+    { team: '생산관리' },
+  ]);
+  assert.deepEqual(completed, ['마케팅', '생산관리']);
+  assert.ok(missingScheduleTeams(completed).includes('국내 MD'));
+  assert.ok(!missingScheduleTeams(completed).includes('마케팅'));
+});
+
+test('팀 미지정 업무도 생성·일일 보고의 동일 대상이며 대표실·질문·취소는 제외한다', () => {
+  const teams = reportTeams([
+    {_org:'팀 미지정',kind:'todo',status:'open'},
+    {_org:'대표실',kind:'todo',status:'open'},
+    {_org:'질문만',kind:'question',status:'done'},
+    {_org:'취소만',kind:'todo',status:'cancelled'},
+  ]);
+  assert.equal(teams.size,15);
+  assert.deepEqual(missingScheduleTeams([...teams].filter(t=>t!=='팀 미지정'),teams),['팀 미지정']);
+});
+
+test('첫 팀 저장 실패·두 번째 AI 실패 후에도 다음 팀 점검을 계속한다', async () => {
+  const called:string[]=[];
+  const saved=await fillScheduleTeams(['국내 MD','마케팅','생산관리'],async team=>{
+    called.push(team);
+    if(team==='국내 MD') throw Error('synthetic store failed');
+    return [{team,stats:{reportAvailable:team==='생산관리'}} as AgentRun];
+  });
+  assert.deepEqual(called,['국내 MD','마케팅','생산관리']);assert.equal(saved,1);
 });

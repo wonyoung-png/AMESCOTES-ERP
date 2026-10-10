@@ -64,10 +64,10 @@ async function write(team: string, cards: any[], all: Member[], stats: Record<st
   const org = orgTeam(team);
   if (!cards.length && !shared.length && !facts.length) {
     const noAccount = org && !org.members.some(p => all.some(x => x.name === p.name));
-    return { headline: noAccount ? '팀원 ERP 계정 등록 전 — 아직 볼 기록이 없어요' : '최근 30일 올라온 업무가 없어요', summary: null, needs: [] as AgentRun['needs'] };
+    return { headline: noAccount ? '팀원 ERP 계정 등록 전 — 아직 볼 기록이 없어요' : '최근 30일 올라온 업무가 없어요', summary: null, needs: [] as AgentRun['needs'], reportAvailable: true };
   }
   const fallback = { headline: `진행 ${stats.open}건 · 마감 지남 ${stats.overdue}건 · 운영 확인 ${stats.alerts}개`,
-    summary: 'AI 보고 작성 불가 — 규칙 집계와 원본 근거를 확인해 주세요.', needs: [] };
+    summary: 'AI 보고 작성 불가 — 규칙 집계와 원본 근거를 확인해 주세요.', needs: [], reportAvailable: false };
   if (!key) return fallback;
 
   // 팀원별: 조직도 이름 기준 — 계정 여부·최근 7일 올린 수·하는 일(프로필). 조용한 사람도 보이게
@@ -101,12 +101,16 @@ needs 는 정말 대표가 볼 것만, 없으면 []. 적혀 있지 않은 건 �
       messages: [{ role: 'user', content: `<records>\n[팀원]\n${esc(people) || '(없음)'}\n\n[감시 데이터 — ERP·PMS]\n${esc(facts.join('\n')) || '(없음)'}\n\n[팀 업무 — 최근 30일·미결·오늘 처리·앞으로의 확정 일정]\n${esc(lines) || '(없음)'}\n\n[다른 팀에서 공유받은 근거]\n${esc(received.map(cardEvidence).join('\n')) || '(없음)'}\n</records>` }],
     });
     console.log(`[agents] usage ${team} ${r.model} in=${r.usage.input_tokens} out=${r.usage.output_tokens}`);
-    const raw = r.content.find(c => c.type === 'text')?.text || '';
+    const raw = r.content.filter(c => c.type === 'text').map(c => c.text).join('').trim();
+    if (r.stop_reason !== 'end_turn' || !raw) throw new Error('incomplete_team_report');
     const j = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
-    const ids = new Set([...cards, ...shared].map(c => c.id));
+    if (!j || typeof j.headline !== 'string' || !j.headline.trim() || typeof j.summary !== 'string' || !j.summary.trim() ||
+      !Array.isArray(j.needs) || j.needs.some((n: any) => !n || typeof n.text !== 'string' || !n.text.trim())) throw new Error('invalid_team_report');
+    const ids = new Set([...selected, ...received].map(c => c.id));
     return {
-      headline: String(j.headline || '').slice(0, 60) || `진행 중 ${stats.open}건`,
-      summary: j.summary ? String(j.summary).slice(0, 1200) : null,
+      headline: j.headline.trim().slice(0, 60),
+      summary: j.summary.trim().slice(0, 1200),
+      reportAvailable: true,
       needs: (Array.isArray(j.needs) ? j.needs : []).slice(0, 5)
         .map((n: any) => ({ text: String(n?.text || '').slice(0, 200), ...(ids.has(n?.cardId) ? { cardId: n.cardId } : {}) }))
         .filter((n: any) => n.text),
@@ -171,8 +175,7 @@ export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: strin
   await runSubscriptionUsageChecks().catch(e => console.warn('[agents] 구독 사용 확인 실패:', String(e).split('\n')[0]));
   const ctx=await loadReportContext();
   const {cards,all,bossIds,today,watch,rules}=ctx;
-  const teams = new Set<string>(ORG.map(t => t.key));
-  cards.forEach(c => c.kind !== 'question' && c._org !== CEO_DESK && teams.add(c._org));
+  const teams = reportTeams(cards);
 
   // 4팀씩 동시에 — 순서대로면 [전체 지금 점검]이 1분 넘고, 한꺼번에 14개면 AI 요청 한도에 걸린다 (코덱스 지적)
   const targets = Array.from(teams).filter(t => !onlyTeam || t === onlyTeam);
@@ -181,8 +184,9 @@ export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: strin
     const { mine, shared, stats, status } = judge(team, cards, bossIds, today, wt);
     const evidence=teamEvidence(team,ctx);
     const w = await write(team, mine, all, stats, status, wt?.facts || [], rules.get(team) || '', shared);
+    if (!w.reportAvailable) evidence.complete = false;
     const row = { id: genId(), team, status, headline: w.headline, summary: w.summary, needs: w.needs,
-      stats: { ...stats, facts: (wt?.facts || []).slice(0, 40), evidence }, model: CLASSIFY_MODEL, trigger };
+      stats: { ...stats, facts: (wt?.facts || []).slice(0, 40), evidence, reportAvailable: w.reportAvailable }, model: CLASSIFY_MODEL, trigger };
     const r = await restAsServer('team_agent_runs', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
     if (r.ok) return (await r.json())[0] as AgentRun;
     console.error(`[agents] ${team} 저장 실패:`, (await r.text()).slice(0, 200));
@@ -222,10 +226,29 @@ export async function runAgentsOnce(trigger: 'schedule' | 'manual', onlyTeam?: s
   try { return await runAgents(trigger, onlyTeam); } finally { running = false; }
 }
 
-export const missingScheduleTeams = (done: Iterable<string>) => {
+export const reportTeams = (cards: any[]) => new Set<string>([
+  ...ORG.map(t => t.key),
+  ...cards.filter(c => c.kind !== 'question' && c.status !== 'cancelled' && c._org !== CEO_DESK && c._org).map(c => c._org as string),
+]);
+
+export const missingScheduleTeams = (done: Iterable<string>, targets: Iterable<string> = ORG.map(t => t.key)) => {
   const set = new Set(done);
-  return ORG.map(t => t.key).filter(team => !set.has(team));
+  return Array.from(targets).filter(team => !set.has(team));
 };
+
+/** Legacy reports remain compatible; new fallback-only runs do not finish the daily report. */
+export const completedScheduleTeams = (runs: Array<{team: string; stats?: {reportAvailable?: boolean}}>) =>
+  runs.filter(run => run.stats?.reportAvailable !== false).map(run => run.team);
+
+/** One failed team must not starve all teams after it. */
+export async function fillScheduleTeams(teams: string[], run = (team: string) => runAgentsOnce('schedule', team)) {
+  let saved = 0;
+  for (const team of teams) {
+    try { saved += completedScheduleTeams(await run(team) || []).length; }
+    catch (e) { console.warn(`[agents] ${team} 아침 점검 실패:`, String(e).split('\n')[0]); }
+  }
+  return saved;
+}
 
 /** KST 08:30 이후, 오늘 자동 점검이 아직 없으면 한 번 돈다. 10분마다 확인 */
 export function startAgentScheduler() {
@@ -234,16 +257,12 @@ export function startAgentScheduler() {
       const kst = new Date(Date.now() + 9 * 3600e3);
       if (kst.getUTCHours() * 60 + kst.getUTCMinutes() < 8 * 60 + 30) return;
       const dayStartUtc = new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()) - 9 * 3600e3).toISOString();
-      const r = await restAsServer(`team_agent_runs?trigger=eq.schedule&created_at=gte.${dayStartUtc}&select=team&limit=100`);
-      if (!r.ok) return;
-      const missing = missingScheduleTeams((await r.json()).map((x: any) => x.team));
+      const runs = await allRows(`team_agent_runs?trigger=eq.schedule&created_at=gte.${dayStartUtc}&select=team,stats&order=created_at.asc,id.asc`);
+      const ctx = await loadReportContext();
+      const missing = missingScheduleTeams(completedScheduleTeams(runs), reportTeams(ctx.cards));
       if (!missing.length) return;
-      let saved = 0;
       // 이미 성공한 팀은 다시 AI 호출하지 않고, 빠진 팀만 채운다.
-      for (const team of missing) {
-        const runs = await runAgentsOnce('schedule', team);
-        saved += runs?.length || 0;
-      }
+      const saved = await fillScheduleTeams(missing);
       console.log(`[agents] 아침 점검 보완 ${saved}/${missing.length}팀`);
     } catch (e) { console.warn('[agents] 스케줄 점검 실패:', String(e).split('\n')[0]); }
   };
