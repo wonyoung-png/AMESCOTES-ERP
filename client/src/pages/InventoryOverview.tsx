@@ -83,7 +83,7 @@ export default function InventoryOverview() {
       </div>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">국내 가용 · PMS 기록</p><p className="mt-1 text-2xl font-semibold">{number(inventorySubtotal(rows, 'domestic'))}</p></div>
+      <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">국내 가용 · 브랜드 운영 기록</p><p className="mt-1 text-2xl font-semibold">{number(inventorySubtotal(rows, 'domestic'))}</p></div>
       <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">중국 보유 · 서버 기록</p><p className="mt-1 text-2xl font-semibold">{number(chinaQty)}</p></div>
       <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">중국 → 한국 이동 중 · 서버 기록</p><p className="mt-1 text-2xl font-semibold">{number(transitQty)}</p></div>
     </div>

@@ -374,13 +374,13 @@ function home() {
       <div class="t"><p>${esc(c.title)}</p><small>${esc(c.channel || '')}${c.end_date && c.end_date !== c.start_date ? ' · ~' + esc(c.end_date.slice(5)) : ''}${c.discount_rate != null ? ' · ' + esc(c.discount_rate) + '%' : ''}</small></div>
       <span class="when">${c.status === 'draft' ? '예정' : esc(c.status)}</span></div>`;
   }).join('');
-  const money = k ? `<section class="sec"><div class="sec-h"><h2>LUMEN 매출</h2><span>기준 ${esc(k.as_of)} · PMS</span></div>
+  const money = k ? `<section class="sec"><div class="sec-h"><h2>LUMEN 매출</h2><span>기준 ${esc(k.as_of)} · 브랜드 운영</span></div>
       <div class="money">
         <div class="stat"><b>${won(num(k.period?.p7?.total_krw))}</b><span>최근 7일</span></div>
         <div class="stat"><b>${won(num(k.period?.p30?.total_krw))}</b><span>최근 30일</span></div>
         <div class="stat"><b class="${num(k.mom_pct) > 0 ? 'up' : num(k.mom_pct) < 0 ? 'down' : ''}">${num(k.mom_pct) == null ? '–' : (num(k.mom_pct) > 0 ? '+' : '') + num(k.mom_pct) + '%'}</b><span>직전 30일 대비</span></div>
         <div class="stat${num(k.inventory?.flag_exceed) ? ' warn' : ''}"><b>${num(k.inventory?.out_of_stock) ?? '–'}</b><span>품절 SKU (초과판매 위험 ${num(k.inventory?.flag_exceed) ?? 0})</span></div>
-      </div></section>` : `<section class="sec"><div class="sec-h"><h2>LUMEN 매출</h2><span>PMS 연결이 지금은 안 돼요</span></div></section>`;
+      </div></section>` : `<section class="sec"><div class="sec-h"><h2>LUMEN 매출</h2><span>브랜드 운영 데이터를 불러오지 못했습니다</span></div></section>`;
 
   return `<div class="cover" aria-hidden="true"></div>
     <div class="hello"><h1>${esc(greet())}</h1><p>${esc(dateLabel)} · 결정할 것 ${D.decide.length + D.captures.length}건이 기다리고 있어요</p></div>
@@ -508,7 +508,7 @@ function people(team) {
 function facts(a) {
   const f = Array.isArray(a.stats?.facts) ? a.stats.facts : [];
   if (!f.length) return '';
-  return `<details class="facts"><summary>${a.liveFacts ? '현재 운영 점검' : '보고 당시 근거'} (ERP·PMS) ${num(a.stats?.alerts) ? '· 확인 조건 ' + num(a.stats.alerts) + '개' : ''}</summary>
+  return `<details class="facts"><summary>${a.liveFacts ? '현재 운영 점검' : '보고 당시 근거'} (ERP 업무·브랜드 운영) ${num(a.stats?.alerts) ? '· 확인 조건 ' + num(a.stats.alerts) + '개' : ''}</summary>
     <pre>${esc(f.join('\n'))}</pre></details>`;
 }
 function watchForm(team) {

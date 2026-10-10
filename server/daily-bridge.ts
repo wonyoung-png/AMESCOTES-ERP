@@ -2,6 +2,7 @@
 // 같은 도커 네트워크의 daily(http://daily:8000)를 서비스 JWT로 호출 (읽기 전용 원칙).
 import { Router, type Request, type Response } from 'express';
 import crypto from 'crypto';
+import { requireUser } from './auth.js';
 
 const router = Router();
 const SECRET = process.env.PGRST_JWT_SECRET || '';
@@ -30,26 +31,9 @@ export async function dailyFetch(path: string, timeoutMs = 30000): Promise<unkno
   return r.json();
 }
 
-// 브리지 증명·요약 — 로그인 세션 보유자만 (미들웨어 없이 간단 검증)
-function hasValidSession(req: Request): boolean {
-  const bearer = req.headers.authorization || '';
-  const cookie = (req.headers.cookie || '').split(/;\s*/).find(c => c.startsWith('erp_token='));
-  const token = bearer.toLowerCase().startsWith('bearer ')
-    ? bearer.slice(7)
-    : cookie ? decodeURIComponent(cookie.slice('erp_token='.length)) : '';
-  if (!token || token.split('.').length !== 3) return false;
+// ERP 공통 인증으로 현재 계정 활성 상태·대표 전용 제한까지 확인한다.
+router.get('/api/bridge/daily/summary', requireUser(), async (_req: Request, res: Response) => {
   try {
-    const [h, b, s] = token.split('.');
-    const expected = b64url(crypto.createHmac('sha256', SECRET).update(`${h}.${b}`).digest());
-    if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(s))) return false;
-    const payload = JSON.parse(Buffer.from(b, 'base64url').toString()) as { exp?: number };
-    return Number(payload.exp || 0) * 1000 > Date.now();
-  } catch { return false; }
-}
-
-router.get('/api/bridge/daily/summary', async (req: Request, res: Response) => {
-  try {
-    if (!hasValidSession(req)) { res.status(401).json({ error: 'unauthorized' }); return; }
     const health = await dailyFetch('/api/health');
     res.json({ daily: health });
   } catch (e) {

@@ -24,7 +24,7 @@ async function pms<T>(path: string, brand: string, init: RequestInit = {}): Prom
   const base = PMS_API();
   // 주소를 못 만들면(로컬·IP 접속) 빈 문자열이 온다. 그대로 fetch 하면 지금 서버를
   // 부르게 되어 엉뚱한 404 를 PMS 장애처럼 보여 준다 (코덱스 지적)
-  if (!base) throw new Error('PMS 주소를 알 수 없습니다 (정식 주소로 접속해 주세요)');
+  if (!base) throw new Error('브랜드 운영 주소를 알 수 없습니다 (정식 주소로 접속해 주세요)');
   const r = await fetch(base + path, {
     ...init,
     headers: {
@@ -34,7 +34,7 @@ async function pms<T>(path: string, brand: string, init: RequestInit = {}): Prom
       ...(init.headers as Record<string, string> || {}),
     },
   });
-  if (!r.ok) throw new Error(`PMS ${r.status}`);
+  if (!r.ok) throw new Error(`브랜드 운영 조회 오류 (${r.status})`);
   return r.json();
 }
 
@@ -137,7 +137,7 @@ export default function BrandDashboard({ brand }: { brand: string }) {
   if (error || !data) {
     return (
       <div className="p-6 space-y-3">
-        <p className="text-sm text-foreground">PMS에서 데이터를 받지 못했습니다. ({String((error as Error)?.message || '')})</p>
+        <p className="text-sm text-foreground">브랜드 운영 데이터를 받지 못했습니다. ({String((error as Error)?.message || '')})</p>
         <Button size="sm" onClick={() => refetch()}>다시 시도</Button>
       </div>
     );
@@ -150,7 +150,7 @@ export default function BrandDashboard({ brand }: { brand: string }) {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground">{brand} 브랜드 운영</h1>
-          <p className="text-xs text-muted-foreground">기준 {data.asof} · PMS 집계 (10분 캐시) {ro.promo.days > 0 && `· 프로모션 가중 ×${ro.promo.factor}`}</p>
+          <p className="text-xs text-muted-foreground">기준 {data.asof} · 브랜드 운영 집계 (10분 캐시) {ro.promo.days > 0 && `· 프로모션 가중 ×${ro.promo.factor}`}</p>
         </div>
         <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>{isFetching ? '갱신 중…' : '↻ 새로고침'}</Button>
       </div>
@@ -173,7 +173,7 @@ export default function BrandDashboard({ brand }: { brand: string }) {
       </section>
 
       {/* 1단 · KPI */}
-      {!data.has_daily && <div className="rounded-lg border border-[var(--system-orange)]/40 bg-[var(--system-orange)]/5 p-3 text-xs">일일점검 데이터가 아직 없습니다. PMS 일일점검 수집이 돌아야 매출 카드가 채워집니다.</div>}
+      {!data.has_daily && <div className="rounded-lg border border-[var(--system-orange)]/40 bg-[var(--system-orange)]/5 p-3 text-xs">매출 수집 데이터가 아직 없습니다. 브랜드 운영의 수집·점검이 완료되면 매출 카드가 채워집니다.</div>}
       <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         <Kpi icon={<TrendingUp className="w-4 h-4 text-primary" />} bg="bg-primary/10" label={`어제 매출 (${yd.date.slice(5)})`} value={won(yd.total)}
           sub={<>전주 같은 요일 <Delta v={pct(yd.total, yd.last_week)} />{yd.shopify_usd ? ` · 해외 $${formatNumber(Math.round(yd.shopify_usd))}` : ''}</>} />

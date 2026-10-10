@@ -13,7 +13,7 @@ export default function PmsWorkspace() {
     return <div className="p-6 text-sm text-muted-foreground">브랜드 운영은 LUMEN 또는 AETALOOF를 선택한 후 이용하세요.</div>;
   }
   if (!base) {
-    return <div className="p-6 text-sm text-muted-foreground">PMS 주소를 확인할 수 없습니다.</div>;
+    return <div className="p-6 text-sm text-muted-foreground">브랜드 운영 주소를 확인할 수 없습니다.</div>;
   }
 
   const query = new URLSearchParams({ embedded: '1', brand: workspace.toLowerCase() });
