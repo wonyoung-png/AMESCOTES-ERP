@@ -17,6 +17,7 @@ import { gcalConfigured, tokenFrom, verifiedEmail, GOOGLE_CLIENT_ID } from './gc
 import { members, esc, kstToday, ANSWER_MODEL, notify, genId } from './work.js';
 import { dailyFetch } from './daily-bridge.js';
 import { latestRuns, runAgentsOnce, orgOf, isDirective, CEO_DESK, loadRules, judge } from './agents.js';
+import { emptyOnFailure, findCouncilCandidates, openCouncil, pendingCouncilActions } from './council.js';
 import { ORG, DIVISIONS, DIVISION_HEADS, DEFAULT_RULES, orgTeam } from './org.js';
 import { syncSoon } from './gcal.js';
 import { allRows, reportingCards, prioritizeCards, searchCards, dayStartUtc, cardEvidence } from './work-records.js';
@@ -204,7 +205,7 @@ async function gather(me: SessionUser) {
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
   const today = kstToday();
   const in30 = new Date(Date.now() + 9 * 3600e3 + 30 * 864e5).toISOString().slice(0, 10);
-  const [cr, pr, kr, all, kpi, agents, watch] = await Promise.all([
+  const [cr, pr, kr, all, kpi, agents, watch, councils, councilMessages] = await Promise.all([
     // 대표는 전부 본다 — 질문(개인 대화)만 뺀다
     reportingCards('*', since),
     // 사진은 빼고 — 콘솔이 /api/ceo/capture-photo/:id 로 따로 받는다 (요약에 넣으면 응답이 수십 MB 가 될 수 있다, 코덱스 지적)
@@ -215,6 +216,8 @@ async function gather(me: SessionUser) {
     salesKpi(),
     latestRuns(),
     gatherWatch(),
+    allRows('agent_councils?select=*&order=created_at.desc,id.desc&limit=50').catch(emptyOnFailure('협의')),
+    allRows('agent_council_messages?select=*&order=round.asc,created_at.asc,id.asc&limit=500').catch(emptyOnFailure('협의 메시지')),
   ]);
   const cards: any[] = cr;
   const bossIds = new Set(all.filter(m => CEO_EMAILS.includes(m.email.toLowerCase())).map(m => m.id));
@@ -226,6 +229,7 @@ async function gather(me: SessionUser) {
     for (const c of captures) c.has_photo = withPhoto.has(c.id);
   }
   const campaigns: any[] = kr;
+  const councilTeams = new Set<string>(councils.filter((c: any) => c.status === 'concluded' && c.trigger_day === today).flatMap((c: any) => c.teams || []));
 
   const open = cards.filter(c => c.status === 'open');
   // 대표가 결정·처리할 것: 나한테 온 확인 요청·내 할 일 + 아직 캘린더에 안 올린 일정 + 승인 대기 현장 접수
@@ -239,8 +243,8 @@ async function gather(me: SessionUser) {
     return { team, ...stats, latest: mine[0]?.raw_text };
   });
 
-  return { me, today, cards, open, decide, captures, campaigns, teams, members: all, kpi,
-    agents: agents.map(a => ({ ...a, stale: a.created_at < dayStartUtc() })),
+  return { me, today, cards, open, decide, captures, campaigns, teams, members: all, kpi, councils, councilMessages,
+    agents: agents.map(a => ({ ...a, stale: a.created_at < dayStartUtc(), ...(councilTeams.has(a.team) ? { needs: [], councilIncluded: true } : {}) })),
     watch: Array.from(watch, ([team, w]) => ({ team, ...w })), checkedAt: new Date().toISOString(),
     buyers: captures.length ? await buyerOptions() : [] };
 }
@@ -273,6 +277,7 @@ router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response
       recent: g.cards.slice(0, 20),
       kpi: g.kpi,
       agents: g.agents,
+      councils: g.councils.map((c: any) => ({ ...c, messages: g.councilMessages.filter((m: any) => m.council_id === c.id) })),
       watch: g.watch,
       checkedAt: g.checkedAt,
       // 조직도 + 팀원 ERP 계정 여부, 팀별 대표 지시 (지도·지시 화면용)
@@ -362,17 +367,16 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
 // 팀장 계정이 아직 없으면 팀원 중 계정 있는 첫 사람, 그것도 없으면 '전달 대기'로 남는다
 // (계정이 생기면 그 팀 피드에 보인다). 끝났는지는 팀 에이전트가 다음 점검에서 따라간다.
 
-router.post('/api/ceo/directive', requireCeo(), async (req: Request, res: Response) => {
-  try {
-    const me = (req as any).user as SessionUser;
-    const team = orgTeam(String(req.body?.team || ''));
-    const text = String(req.body?.text || '').trim().slice(0, 1000);
-    const due = String(req.body?.dueDate || '');
-    if (!team || !text) { res.status(400).json({ error: 'bad_request', message: '팀과 지시 내용을 적어주세요' }); return; }
+type DirectiveInput = { team: unknown; text: unknown; dueDate?: unknown };
+async function createDirective(me: SessionUser, input: DirectiveInput) {
+    const team = orgTeam(String(input.team || ''));
+    const text = String(input.text || '').trim().slice(0, 1000);
+    const due = String(input.dueDate || '');
+    if (!team || !text) throw Object.assign(new Error('팀과 지시 내용을 적어주세요'), { status: 400, code: 'bad_request' });
     // 2026-99-99 같은 값은 정규식만으론 통과한다 — 날짜로 바꿨다 되돌려 같은지 본다 (코덱스 지적)
     const t = Date.parse(due + 'T00:00:00Z');
     const okDate = /^\d{4}-\d{2}-\d{2}$/.test(due) && !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === due;
-    if (due && !okDate) { res.status(400).json({ error: 'bad_date', message: '마감일이 날짜가 아니에요' }); return; }
+    if (due && !okDate) throw Object.assign(new Error('마감일이 날짜가 아니에요'), { status: 400, code: 'bad_date' });
 
     const all = await members();
     const to = team.members.map(p => all.find(x => x.name === p.name)).find(Boolean);
@@ -385,11 +389,41 @@ router.post('/api/ceo/directive', requireCeo(), async (req: Request, res: Respon
       assignee_id: to?.id || null, assignee_name: to?.name || null,
     };
     const r = await restAsServer('work_cards', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(card) });
-    if (!r.ok) { res.status(502).json({ error: 'save_failed' }); return; }
+    if (!r.ok) throw Object.assign(new Error('save_failed'), { status: 502, code: 'save_failed' });
     if (to) { await notify([{ user_id: to.id, card_id: card.id, title: `${me.name} 대표 — 지시`, body: text }]); syncSoon(); }
-    res.json({ ok: true, delivered: to ? to.name : null });
+    return { cardId: card.id, delivered: to ? to.name : null };
+}
+
+router.post('/api/ceo/directive', requireCeo(), async (req: Request, res: Response) => {
+  try {
+    const made = await createDirective((req as any).user, req.body || {});
+    res.json({ ok: true, ...made });
   } catch (e) {
     console.error('POST /api/ceo/directive 실패:', e);
+    const x = e as any;
+    res.status(x.status || 500).json({ error: x.code || 'internal', message: x.status === 400 ? x.message : undefined });
+  }
+});
+
+router.post('/api/ceo/councils/:id/direct', requireCeo(), async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const found = await restAsServer(`agent_councils?id=eq.${encodeURIComponent(id)}&select=id,status,conclusion,directed_cards&limit=1`);
+    const council = found.ok ? (await found.json())[0] : null;
+    if (!council || council.status !== 'concluded') { res.status(404).json({ error: 'not_found' }); return; }
+    const directed = council.directed_cards && typeof council.directed_cards === 'object' ? council.directed_cards : {};
+    const failed: Array<{ team: string; error: string }> = [];
+    for (const action of pendingCouncilActions(council.conclusion?.actions_by_team || [], directed)) {
+      try {
+        const made = await createDirective((req as any).user, { team: action.team, text: action.action });
+        directed[action.team] = made;
+        const saved = await restAsServer(`agent_councils?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ directed_cards: directed, directed_at: new Date().toISOString() }) });
+        if (!saved.ok) throw new Error(`directed_save_${saved.status}`);
+      } catch (e) { failed.push({ team: String(action.team), error: String((e as Error).message) }); }
+    }
+    res.status(failed.length ? 207 : 200).json({ ok: !failed.length, directed: Object.keys(directed), failed });
+  } catch (e) {
+    console.error('POST /api/ceo/councils/:id/direct 실패:', e);
     res.status(500).json({ error: 'internal' });
   }
 });
@@ -440,6 +474,19 @@ router.post('/api/ceo/agents/run', requireCeo(), async (req: Request, res: Respo
     res.json({ runs });
   } catch (e) {
     console.error('POST /api/ceo/agents/run 실패:', e);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 현재 자료에서 규칙에 걸리는 사안을 즉시 협의한다. 결과는 제안으로만 저장한다.
+router.post('/api/ceo/councils/run', requireCeo(), async (_req: Request, res: Response) => {
+  try {
+    const g = await gather((_req as any).user);
+    const candidates = findCouncilCandidates(g.cards, new Map(g.watch.map((w: any) => [w.team, { facts: w.facts, alerts: w.alerts }])));
+    const results = await Promise.all(candidates.map(c => openCouncil(c)));
+    res.json({ opened: results.filter(Boolean).length });
+  } catch (e) {
+    console.error('POST /api/ceo/councils/run 실패:', e);
     res.status(500).json({ error: 'internal' });
   }
 });

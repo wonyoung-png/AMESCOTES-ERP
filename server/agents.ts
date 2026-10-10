@@ -12,6 +12,7 @@ import { ORG, orgTeam, orgTeamOfName, DEFAULT_RULES } from './org.js';
 import { gatherWatch, type Watch } from './watch.js';
 import { runSubscriptionUsageChecks } from './subscriptions.js';
 import { allRows, reportingCards, prioritizeCards, dayStartUtc, cardEvidence } from './work-records.js';
+import { findCouncilCandidates, openCouncil } from './council.js';
 
 export type AgentStatus = 'work' | 'idle' | 'warn' | 'report';
 export type AgentRun = {
@@ -171,6 +172,12 @@ export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: strin
   // 자동 점검은 오늘 기록이 없는 걸로 보고 10분 뒤 다시 시도한다
   const want = onlyTeam ? 1 : teams.size;
   if (out.length < want) throw new Error(`팀 점검 저장 ${out.length}/${want}`);
+  if (!onlyTeam) {
+    const candidates = findCouncilCandidates(cards, watch);
+    await Promise.all(candidates.map(c => openCouncil(c).catch(e => {
+      console.warn(`[agents] 협의 실패 ${c.triggerKey}:`, String(e).split('\n')[0]); return null;
+    })));
+  }
   return out;
 }
 

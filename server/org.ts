@@ -46,6 +46,15 @@ export const DEFAULT_RULES: Record<string, string> = {
 /** 본부장 (팀장과 별개) */
 export const DIVISION_HEADS: Record<string, string> = { '브랜드': '이원영', '머천다이징': '양리라', '생산': '이원영' };
 
+/** 운영 경보가 여러 팀의 공동 판단을 요구할 때 쓰는 고정 매핑. AI가 참가 팀을 넓히지 않는다. */
+export const RELATED_TEAMS: Record<string, string[]> = {
+  inventory: ['국내 MD', '글로벌 MD', '마케팅', '물류·CS'],
+  production: ['생산관리', '국내 MD'],
+  campaign: ['마케팅', '국내 MD', '물류·CS'],
+  sample: ['제품개발', '루멘 디자인', '에탈루프 디자인'],
+  finance: ['경영지원', '영업'],
+};
+
 const byName = new Map<string, string>();
 for (const t of ORG) for (const p of t.members) if (!byName.has(p.name)) byName.set(p.name, t.key); // 겸직은 첫 팀(=팀장 팀)
 /** 사람 이름 → 조직 팀 */
