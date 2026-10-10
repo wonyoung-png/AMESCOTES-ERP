@@ -17,14 +17,14 @@ export function workPageQuery(me: Actor, visibility: string, before?: WorkCursor
   return `work_cards?select=*&order=created_at.desc,id.desc&limit=200&${filter(conditions, visibility)}`;
 }
 
-export function workCountQueries(me: Actor, visibility: string) {
+export function workCountQueries(me: Actor, visibility: string, teamConditions?: {own:string;other:string}) {
   const id = JSON.stringify(me.id), team = JSON.stringify(me.team);
   const schedule = me.isBoss ? 'kind.eq.schedule' : `and(kind.eq.schedule,or(created_by.eq.${id}${me.isLeader && me.team ? `,team.eq.${team}` : ''}))`;
   const todo = `and(status.eq.open,or(assignee_id.eq.${id},${schedule}))`;
   const unread = `and(created_by.neq.${id},read_by.not.cs.{${id}})`;
   const query = (...conditions: string[]) => `work_cards?select=id&limit=0&${filter(['kind.neq.question', ...conditions], visibility)}`;
   return { attention: query(`or(${unread},${todo})`), todo: query(todo), unread: query(unread),
-    teamUnread: query(unread, `team.eq.${team}`), sharedUnread: query(unread, `team.neq.${team}`, `shared_teams.cs.{${team}}`) };
+    teamUnread: query(unread, teamConditions?.own || `team.eq.${team}`), sharedUnread: query(unread, teamConditions?.other || `team.neq.${team}`, `shared_teams.cs.{${team}}`) };
 }
 
 export function notificationReadIds(input: unknown): string[] {

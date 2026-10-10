@@ -14,6 +14,7 @@ import { deliverWorkNotifications } from '../server/work-notifications';
 import { loadReportContext } from '../server/agents';
 import { findCouncilCandidates, openCouncil } from '../server/council';
 import { orgTeam } from '../server/org';
+import {directiveFlowModel,verifyCeoDirectiveHttp} from './e2e-ceo-directive-http';
 
 const REST = 'http://erp-e2e-api-20261010:3000';
 assert.equal(process.env.ERP_E2E_ISOLATED, '20261010');
@@ -50,7 +51,9 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = JSON.parse(String(raw));
     const message = String(request.messages?.[0]?.content || '');
     let output: string;
-    if (String(request.system).includes('업무 카드로 바꾼다')) {
+    const directiveOutput=directiveFlowModel(request);
+    if(directiveOutput!==undefined) output=directiveOutput;
+    else if (String(request.system).includes('업무 카드로 바꾼다')) {
       const example = changedCampaignCard && message === 'CURRENT_CAMPAIGN_FIXTURE 현재 일정 할인 알려줘'
         ? { response: { kind: 'question', relatedId: null, parsed: { answer: '' } } }
         : Object.values(workHttpLlmCases('2026-10-20')).find(c => c.text === message);
@@ -79,7 +82,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   if(url.origin===REST && url.pathname==='/team_watch' && rulesUnavailable) return new Response('',{status:503});
   if(url.origin===REST && url.pathname==='/work_cards' && init?.method==='POST' && directiveResponseLost
-    && JSON.parse(String(init.body)).parsed?.directive?.councilId) {
+    && JSON.parse(String(init.body)).parsed?.directive) {
     directiveResponseLost=false;
     const committed=await originalFetch(input,{...init,redirect:'error'});assert.ok(committed.ok);await committed.text();
     throw new Error('Synthetic council directive committed response lost');
@@ -120,6 +123,16 @@ const fixtures = {
     return r.json();
   },
   ceoCookie: '',
+  failNextDelivery:()=>{deliveryFailure='before';},
+  loseNextDirectiveResponse:()=>{directiveResponseLost=true;},
+  flushNotifications:deliverWorkNotifications,
+  setMarketingTeam:async(team:string)=>{
+    const response=await restAsServer('app_users?id=eq.e2e_marketing',{method:'PATCH',body:JSON.stringify({team})});assert.ok(response.ok);
+  },
+  misrouteDirective:async(id:string)=>{
+    assert.match(id,/^wc_[a-z0-9]+$/);
+    const response=await restAsServer('work_cards?id=eq.'+id,{method:'PATCH',body:JSON.stringify({team:'국내 MD'})});assert.ok(response.ok);
+  },
 };
 
 async function main() {
@@ -298,6 +311,7 @@ async function main() {
         actualCouncilFreshness:'PASS',concurrentDedup:true,changedEvidenceNewHistory:true,staleAndClosedDirectBlocked:true,
         ruleFailureUnknownWithoutNewReports:true,directiveLostResponseAndParallelRetrySingleCardAndNotice:true,noticeReadPreserved:true}));
       console.log(JSON.stringify({actualChangedCampaignEvidence:'PASS',historicalDiscount:20,currentDiscount:15,pastDecisionRescheduled:true,questionAndReportStored:true,promptChecks:2}));
+      await verifyCeoDirectiveHttp(base,fixtures);
       for(const table of ['production_orders','trade_statements','settlements','payables']) assert.equal((await fixtures.read(table+'?select=id')).length,0,'Work-only run wrote financial/business transactions');
     }
     // PMS is an external, unavailable dependency in this isolated stack; blocked

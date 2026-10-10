@@ -4,9 +4,20 @@ import express from 'express';
 process.env.PGRST_JWT_SECRET = 'notification-retry-synthetic-secret';
 process.env.POSTGREST_URL = 'http://notification.fixture.invalid';
 process.env.ERP_PRIVATE_MODE = 'false';
-const { deliverWorkNotifications } = await import('./work-notifications');
+const { deliverWorkNotifications, directiveNotificationsReady } = await import('./work-notifications');
 const { default: router } = await import('./work');
 const { signJwt } = await import('./auth');
+
+test('directive readiness rejects missing or outdated DB triggers before mutations', async () => {
+  for (const r of [new Response('',{status:404}),new Response('0'),new Response('{}'),new Response('{')]) {
+    assert.equal(await directiveNotificationsReady(async()=>r),false);
+  }
+  assert.equal(await directiveNotificationsReady(async()=>{throw new Error('offline');}),false);
+  assert.equal(await directiveNotificationsReady(async(path,init)=>{
+    assert.equal(path,'rpc/directive_notification_version');assert.equal(init?.method,'POST');
+    return new Response('1');
+  }),true);
+});
 
 test('delivery only calls bounded RPC and handles failures/unknown result without success claims', async () => {
   for (const result of [new Response('',{status:503}),new Response('{}'),new Response('{'),new Response('{"delivered":0,"pending":true}')]) {

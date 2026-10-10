@@ -14,7 +14,7 @@ import CONSOLE_HTML from './ceo-console.html';
 import crypto from 'crypto';
 import { currentUser, restAsServer, CEO_EMAILS, type SessionUser } from './auth.js';
 import { gcalConfigured, tokenFrom, verifiedEmail, GOOGLE_CLIENT_ID } from './gcal.js';
-import { members, esc, kstToday, ANSWER_MODEL, notify, genId } from './work.js';
+import { members, esc, kstToday, ANSWER_MODEL, genId } from './work.js';
 import { dailyFetch } from './daily-bridge.js';
 import { latestRuns, runAgentsOnce, CEO_DESK, judge, loadReportContext, teamEvidence } from './agents.js';
 import { emptyOnFailure, findCouncilCandidates, openCouncil, pendingCouncilActions } from './council.js';
@@ -22,6 +22,7 @@ import { ORG, DIVISIONS, DIVISION_HEADS, DEFAULT_RULES, orgTeam } from './org.js
 import { syncSoon } from './gcal.js';
 import { allRows, prioritizeCards, searchCards, cardEvidence } from './work-records.js';
 import { councilStamp, evidenceFreshness } from './report-evidence.js';
+import { deliverWorkNotifications, directiveNotificationsReady } from './work-notifications.js';
 import { attachCampaignEvidence } from './campaign-evidence.js';
 
 const router = Router();
@@ -269,7 +270,7 @@ router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response
     const rules=g.rules;
     res.set('Cache-Control', 'no-store'); // 없으면 브라우저가 옛 요약을 다시 보여준다 (지시 직후 안 보임)
     res.json({
-      me: { name: g.me.name, email: g.me.email },
+      me: { id:g.me.id, name: g.me.name, email: g.me.email },
       today: g.today,
       decide: g.decide,
       captures: g.captures,
@@ -371,39 +372,43 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
 // 팀장 계정이 아직 없으면 팀원 중 계정 있는 첫 사람, 그것도 없으면 '전달 대기'로 남는다
 // (계정이 생기면 그 팀 피드에 보인다). 끝났는지는 팀 에이전트가 다음 점검에서 따라간다.
 
-type DirectiveInput = { team: unknown; text: unknown; dueDate?: unknown };
+type DirectiveInput = { team: unknown; text: unknown; dueDate?: unknown;requestId?:unknown };
 async function createDirective(me: SessionUser, input: DirectiveInput, councilId?:string) {
     const team = orgTeam(String(input.team || ''));
     const text = String(input.text || '').trim().slice(0, councilId?6000:1000);
     const due = String(input.dueDate || '');
     if (!team || !text) throw Object.assign(new Error('팀과 지시 내용을 적어주세요'), { status: 400, code: 'bad_request' });
+    if(input.requestId!==undefined && (typeof input.requestId!=='string' || !/^wc_[a-z0-9]{1,40}$/.test(input.requestId)))
+      throw Object.assign(new Error('잘못된 지시 요청 번호입니다'),{status:400,code:'bad_request_id'});
     // 2026-99-99 같은 값은 정규식만으론 통과한다 — 날짜로 바꿨다 되돌려 같은지 본다 (코덱스 지적)
     const t = Date.parse(due + 'T00:00:00Z');
     const okDate = /^\d{4}-\d{2}-\d{2}$/.test(due) && !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === due;
     if (due && !okDate) throw Object.assign(new Error('마감일이 날짜가 아니에요'), { status: 400, code: 'bad_date' });
 
+    if (!await directiveNotificationsReady()) throw Object.assign(new Error('지시 알림 설정 점검 중입니다. 잠시 후 다시 시도해주세요.'), { status:503,code:'directive_notifications_unavailable' });
     const all = await members(true);
-    const to = team.members.map(p => all.find(x => x.name === p.name)).find(Boolean);
+    const to = team.members.map(p => all.find(x => x.name === p.name && x.team === team.key)).find(Boolean);
     const card = {
-      id: councilId ? 'wc_'+crypto.createHash('sha256').update(JSON.stringify([councilId,team.key])).digest('hex').slice(0,32) : genId('wc'),
+      id: councilId ? 'wc_'+crypto.createHash('sha256').update(JSON.stringify([councilId,team.key])).digest('hex').slice(0,32) : (input.requestId as string || genId('wc')),
       created_by: me.id, created_by_name: me.name,
-      team: to?.team || team.key,
+      team: team.key,
       raw_text: `[대표 지시] ${text}`, kind: 'todo', status: 'open',
-      parsed: { summary: text, title: text.slice(0, 60), ...(due ? { dueDate: due } : {}), directive: { team: team.key, text, ...(councilId?{councilId}:{}) } },
+      parsed: { summary: text, title: text.slice(0, 60), ...(due ? { dueDate: due } : {}), directive: { team: team.key, text, notificationVersion:1, ...(councilId?{councilId}:{}) } },
       assignee_id: to?.id || null, assignee_name: to?.name || null,
     };
     const r = await restAsServer('work_cards', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(card) });
     let saved=card;
     if (!r.ok) {
-      if(!councilId || r.status!==409) throw Object.assign(new Error('save_failed'), { status: 502, code: 'save_failed' });
+      if((!councilId && !input.requestId) || r.status!==409) throw Object.assign(new Error('save_failed'), { status: 502, code: 'save_failed' });
       const existing=await restAsServer('work_cards?id=eq.'+card.id+'&select=*&limit=1');
       const row=existing.ok ? (await existing.json())[0] : null;
-      if(!row || row.parsed?.directive?.councilId!==councilId || row.parsed?.directive?.team!==team.key || row.parsed?.directive?.text!==text)
-        throw new Error('directive_conflict');
+      if(!row || row.created_by!==me.id || (row.parsed?.directive?.councilId||undefined)!==councilId || row.parsed?.directive?.team!==team.key
+        || row.parsed?.directive?.text!==text || (row.parsed?.dueDate||'')!==due)
+        throw Object.assign(new Error('같은 요청 번호의 지시 내용이 다릅니다'),{status:409,code:'directive_conflict'});
       saved=row;
     }
     if(saved.assignee_id) {
-      if(councilId) {
+      if(councilId && saved.parsed?.directive?.notificationVersion!==1) {
         // Fixed DB IDs make both a lost response and parallel retries safe; no existing read state is updated.
         const notice={id:'ntf_'+card.id.slice(3),user_id:saved.assignee_id,card_id:card.id,link:'/work',title:`${me.name} 대표 — 지시`,body:text};
         const sent=await restAsServer('notifications',{method:'POST',body:JSON.stringify(notice)});
@@ -413,10 +418,11 @@ async function createDirective(me: SessionUser, input: DirectiveInput, councilId
           const row=old.ok ? (await old.json())[0] : null;
           if(row?.user_id!==notice.user_id || row?.card_id!==notice.card_id) throw new Error('directive_notification_conflict');
         }
-      } else await notify([{ user_id: saved.assignee_id, card_id: card.id, title: `${me.name} 대표 — 지시`, body: text }]);
+      }
       syncSoon();
     }
-    return { cardId: card.id, delivered: saved.assignee_name || null };
+    const notified=await deliverWorkNotifications(card.id);
+    return { cardId: card.id, delivered: saved.assignee_name || null,notified };
 }
 
 router.post('/api/ceo/directive', requireCeo(), async (req: Request, res: Response) => {

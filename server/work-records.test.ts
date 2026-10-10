@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { allRows, reportingCards, prioritizeCards, searchCards, dayStartUtc } from './work-records';
+import { allRows, reportingCards, prioritizeCards, searchCards, dayStartUtc,cardEvidence } from './work-records';
+
+test('메모 없는 완료도 완료자와 완료 시각을 보고 근거에 보존한다',()=>{
+  const line=cardEvidence({id:'wc_done',kind:'todo',status:'done',done_by_name:'담당 직원',done_at:'2026-10-10T01:00:00Z'});
+  assert.match(line,/완료 기록: 담당 직원 \/ 2026-10-10T01:00:00Z/);
+});
 
 test('과거 검색은 검색 조건과 조회 권한 조건을 AND로 묶는다', async () => {
   let query = '';

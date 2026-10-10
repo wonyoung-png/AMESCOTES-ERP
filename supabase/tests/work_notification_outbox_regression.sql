@@ -1,5 +1,10 @@
 -- Isolated schema only; fixtures are never committed into the production DB.
 begin;
+do $$ begin
+ if current_database()<>'erp_e2e' then raise exception 'Disposable erp_e2e database only'; end if;
+end $$;
+-- Other HTTP fixtures may exist in the same disposable DB. Restore them at rollback.
+update app_users set is_active=false;
 insert into app_users(id,email,name,role,team,position,is_active,password_hash) values
  ('nt_author','nt-author@test.invalid','동명이인','사원','국내 MD','사원',true,'fixture'),
  ('nt_lead','nt-lead@test.invalid','동명이인','팀장','국내 MD','팀장',true,'fixture'),
@@ -68,6 +73,38 @@ do $$ begin
  if has_function_privilege('anon','public.deliver_work_notifications(text)','EXECUTE') then raise exception 'public delivery'; end if;
  if has_table_privilege('anon','public.work_notification_outbox','SELECT') then raise exception 'public outbox'; end if;
  if has_table_privilege('erp_server','public.work_notification_outbox','UPDATE') then raise exception 'server bypass'; end if;
+end $$;
+insert into app_users(id,email,name,role,team,is_active,password_hash)
+values('nt_boss','nt-boss@test.invalid','테스트 대표','대표','대표',true,'fixture');
+insert into work_cards(id,created_by,created_by_name,team,raw_text,kind,assignee_id,parsed) values
+ ('wc_ntdirective','nt_boss','테스트 대표','마케팅','대표 검수 지시','todo','nt_marketing','{"directive":{"team":"마케팅","notificationVersion":1}}'),
+ ('wc_ntlegacy','nt_boss','테스트 대표','마케팅','구버전 지시','todo','nt_marketing','{"directive":{"team":"마케팅"}}'),
+ ('wc_ntunassigned','nt_boss','테스트 대표','마케팅','미배정 지시','todo',null,'{"directive":{"team":"마케팅","notificationVersion":1}}');
+do $$ begin
+ if (select count(*) from work_notification_outbox where card_id='wc_ntdirective' and event_kind='directive')<>1 then raise exception 'directive intent missing'; end if;
+ if exists(select 1 from work_notification_outbox where card_id in ('wc_ntlegacy','wc_ntunassigned')) then raise exception 'legacy creation duplicate/unassigned intent'; end if;
+ if directive_notification_version()<>1 then raise exception 'readiness missing'; end if;
+ if has_function_privilege('anon','public.directive_notification_version()','EXECUTE') then raise exception 'public readiness'; end if;
+end $$;
+select deliver_work_notifications('wc_ntdirective');
+update notifications set read_at='2026-10-10T00:00:00Z' where card_id='wc_ntdirective';
+select set_config('request.headers','{"x-work-actor-id":"nt_marketing"}',true);
+update work_cards set status='done',done_by_name='마케팅',done_at=clock_timestamp(),reply_text='검수 완료',updated_at=clock_timestamp() where id in ('wc_ntdirective','wc_ntlegacy');
+select deliver_work_notifications('wc_ntdirective');
+select deliver_work_notifications('wc_ntdirective');
+select deliver_work_notifications('wc_ntlegacy');
+do $$ begin
+ if (select count(*) from notifications where card_id='wc_ntdirective')<>2 then raise exception 'directive delivery duplicated/lost'; end if;
+ if not exists(select 1 from notifications where card_id='wc_ntdirective' and user_id='nt_marketing' and read_at is not null) then raise exception 'read state lost'; end if;
+ if not exists(select 1 from notifications where card_id='wc_ntdirective' and user_id='nt_boss' and body='검수 완료') then raise exception 'completion result missing'; end if;
+ if (select count(*) from notifications where card_id='wc_ntlegacy' and user_id='nt_boss')<>1 then raise exception 'legacy completion missing'; end if;
+end $$;
+insert into work_cards(id,created_by,created_by_name,team,raw_text,kind,assignee_id,parsed) values
+ ('wc_ntcancelorder','nt_boss','테스트 대표','마케팅','취소 지시','todo','nt_marketing','{"directive":{"team":"마케팅","notificationVersion":1}}');
+update work_cards set status='cancelled',updated_at=clock_timestamp() where id='wc_ntcancelorder';
+select deliver_work_notifications('wc_ntcancelorder');
+do $$ begin
+ if exists(select 1 from notifications where card_id='wc_ntcancelorder') then raise exception 'cancelled directive sent'; end if;
 end $$;
 select 'WORK_NOTIFICATION_SQL_REGRESSION_PASS';
 rollback;

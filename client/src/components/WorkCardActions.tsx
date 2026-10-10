@@ -17,7 +17,7 @@ export type Card = {
   status: 'open' | 'done' | 'cancelled'; assignee_id?: string | null; assignee_name?: string | null;
   reply_text?: string | null; replied_by_name?: string | null; related_id?: string | null;
   shared_teams: string[]; result_ref?: { table: string; id: string } | null; done_by_name?: string | null;
-  read_by?: string[];
+  read_by?: string[]; _directive?: boolean;
 };
 
 /** 안 본 카드 = 남이 올렸고 내가 아직 확인 안 함. 내가 쓴 것·질문은 셀 필요 없다 */
@@ -269,7 +269,7 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
         <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
           <label className="flex items-center gap-1">
             종류
-            <select value={c.kind} disabled={busy}
+            <select value={c.kind} disabled={busy || c._directive} title={c._directive ? '대표 지시는 종류를 변경할 수 없습니다' : undefined}
               onChange={e => post('kind', { kind: e.target.value }, `'${KIND[e.target.value as Card['kind']].label}'(으)로 바꿨습니다`)}
               className="h-7 rounded-md border border-border bg-background px-1 text-xs">
               {(Object.keys(KIND) as Card['kind'][]).map(k => <option key={k} value={k}>{KIND[k].label}</option>)}

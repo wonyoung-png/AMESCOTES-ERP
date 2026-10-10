@@ -257,11 +257,32 @@ const won = n => n == null ? '–' : (Math.abs(n) >= 1e8 ? (n/1e8).toFixed(2).re
 const kst = iso => new Date(iso).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
 const KIND = { request_check:['확인 요청','req'], todo:['할 일','todo'], schedule:['일정','sch'], share:['공유',''], capture:['현장 접수','cap'] };
 let D = null;
+let pendingDirectives = {}, pendingOwner = null;
+const directiveBusy = new Set();
+function directiveCacheKey() { return 'ceo-directives:' + D.me.id; }
+function savePendingDirectives() {
+  try {
+    if(Object.keys(pendingDirectives).length) sessionStorage.setItem(directiveCacheKey(), JSON.stringify(pendingDirectives));
+    else sessionStorage.removeItem(directiveCacheKey());
+    return true;
+  } catch { return false; }
+}
+function restorePendingDirectives() {
+  if (pendingOwner === D.me.id) return;
+  pendingOwner = D.me.id; pendingDirectives = {};
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(directiveCacheKey()) || '{}');
+    for (const [team, p] of Object.entries(saved)) {
+      if (D.org.teams.some(t => t.key === team) && p?.team === team && typeof p.text === 'string'
+        && typeof p.dueDate === 'string' && /^wc_[a-z0-9]{1,40}$/.test(p.requestId)) pendingDirectives[team] = p;
+    }
+  } catch {}
+}
 
 async function api(path, body) {
   const r = await fetch(path, { method: body ? 'POST' : 'GET', credentials: 'include', cache: 'no-store',
     headers: body ? {'Content-Type':'application/json'} : undefined, body: body ? JSON.stringify(body) : undefined });
-  const j = await r.json().catch(() => ({}));
+  const j = await r.json().catch(() => { throw new Error('응답을 확인하지 못했습니다. 같은 요청으로 다시 시도해주세요.'); });
   if (!r.ok) throw Object.assign(new Error(j.message || j.error || 'HTTP ' + r.status), { status: r.status });
   if (j.notified === false) alert('저장은 완료됐습니다. 알림은 전달 대기 중이며 자동으로 재시도됩니다.');
   return j;
@@ -270,6 +291,7 @@ async function api(path, body) {
 async function load() {
   try { D = await api('/api/ceo/overview'); }
   catch (e) { document.getElementById('view').innerHTML = `<p class="empty">불러오지 못했습니다 (${esc(e.message)}). 새로고침해 보세요.</p>`; return; }
+  restorePendingDirectives();
   document.getElementById('who').textContent = D.me.name + ' · ' + D.me.email;
   document.getElementById('erpLink').href = D.erpUrl;
   const n = D.decide.length + D.captures.length + (D.councils || []).filter(c => c.status === 'concluded' && c.freshness === 'current').length;
@@ -442,6 +464,19 @@ function render() {
   document.querySelectorAll('.nav a[data-v]').forEach(a => a.classList.toggle('on', a.dataset.v === v));
   document.getElementById('crumb').textContent = v === 'inbox' ? '결정할 것' : v === 'councils' ? '협의' : v === 'map' ? '회사 지도' : '홈';
   document.getElementById('view').innerHTML = `<div class="inner" style="padding:0">${D.sourceErrors?.length ? `<p class="hint warn">현재 조회 미확인: ${D.sourceErrors.map(esc).join(' · ')}. 저장된 보고는 과거 기록이며 최신 판단 근거로 사용하지 마세요.</p>` : ''}${v === 'inbox' ? inbox() : v === 'councils' ? councils() : v === 'map' ? mapView() : home()}</div>`;
+  restoreDirectiveForms();
+}
+
+function restoreDirectiveForms() {
+  document.querySelectorAll('form.order:not(.watch)').forEach(f => {
+    const p = pendingDirectives[f.dataset.team], b = f.querySelector('button');
+    if (p) {
+      const t = f.querySelector('textarea'), d = f.querySelector('input[type=date]');
+      t.value = p.text; d.value = p.dueDate; t.disabled = true; d.disabled = true;
+      b.textContent = '같은 지시 다시 전달';
+    }
+    b.disabled = directiveBusy.has(f.dataset.team);
+  });
 }
 
 // ───────── 회사 지도
@@ -570,12 +605,27 @@ document.getElementById('view').addEventListener('submit', async e => {
   e.preventDefault();
   const t = f.querySelector('textarea'), d = f.querySelector('input[type=date]'), b = f.querySelector('button');
   if (!t.value.trim()) { t.focus(); return; }
-  b.disabled = true;
+  const team = f.dataset.team;
+  if (directiveBusy.has(team)) return;
+  directiveBusy.add(team); b.disabled = true;
   try {
-    const r = await api('/api/ceo/directive', { team: f.dataset.team, text: t.value.trim(), dueDate: d.value || '' });
+    const hadPending=!!pendingDirectives[team];
+    pendingDirectives[team] ||= {team,text:t.value.trim(),dueDate:d.value||'',requestId:'wc_'+crypto.randomUUID().replaceAll('-','')};
+    if(!savePendingDirectives()) {
+      if(!hadPending) delete pendingDirectives[team];
+      throw new Error('브라우저 임시 저장이 차단되어 지시를 보내지 않았습니다. 저장 허용 후 다시 시도해주세요.');
+    }
+    t.disabled=true;d.disabled=true;
+    const r = await api('/api/ceo/directive', pendingDirectives[team]);
+    if(r.ok!==true || r.cardId!==pendingDirectives[team].requestId) throw new Error('지시 저장 응답을 확인하지 못했습니다. 같은 지시로 다시 전달해주세요.');
+    delete pendingDirectives[team]; savePendingDirectives(); t.disabled=false;d.disabled=false;
     await load();
-    alertInline(document.querySelector('form.order button'), r.delivered ? `${r.delivered}님에게 보냈어요` : '팀원 계정이 아직 없어 전달 대기로 남겼어요');
-  } catch (err) { alertInline(b, err.message); b.disabled = false; }
+    alertInline(document.querySelector('form.order button'), r.notified===false ? '지시는 저장됐습니다. 알림 전달 대기 중이며 자동 재시도됩니다.' : r.delivered ? `${r.delivered}님에게 보냈어요` : '팀원 계정이 아직 없어 전달 대기로 남겼어요');
+  } catch (err) {
+    if(err.status===400) {delete pendingDirectives[team]; savePendingDirectives(); t.disabled=false;d.disabled=false;}
+    alertInline(b, err.message); b.disabled = false;
+    if(pendingDirectives[team]) b.textContent='같은 지시 다시 전달';
+  } finally { directiveBusy.delete(team); restoreDirectiveForms(); }
 });
 document.getElementById('view').addEventListener('click', async e => {
   const node = e.target.closest('.map-node');

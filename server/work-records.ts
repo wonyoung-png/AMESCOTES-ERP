@@ -79,6 +79,7 @@ export function cardEvidence(c: any): string {
   return `- id=${c.id || '-'} ${String(c.created_at || '').slice(0, 10)} ${c.created_by_name || '-'}(${c.team || '-'}) [${c.kind}/${c.status}] ${c.raw_text || ''}` +
     (c._dir ? ` (대표 지시${c.assignee_name ? '→' + c.assignee_name : ', 받을 계정 없음'})` : '') +
     (c.parsed?.dueDate ? ` (마감 ${c.parsed.dueDate})` : '') +
+    (c.status==='done' && c.done_at ? ` → 완료 기록: ${c.done_by_name || '완료자 미확인'} / ${c.done_at}` : '') +
     (c.reply_text ? ` → 답변 ${c.replied_by_name || c.done_by_name || '-'}: ${c.reply_text}` : '') +
     (c.confirmed_payload ? ` → 당시 확정(${c.done_by_name || '-'}): ${JSON.stringify(c.confirmed_payload)}` : '') +
     campaignEvidence(c) +

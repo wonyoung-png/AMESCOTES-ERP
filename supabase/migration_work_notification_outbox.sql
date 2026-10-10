@@ -30,6 +30,15 @@ begin
   -- Subscription checks have a separate existing lifecycle; do not double send.
   if coalesce((new.parsed->>'subscriptionCheck') = 'true', false) then return new; end if;
   v_actor := coalesce(nullif(current_setting('request.headers', true), ''), '{}')::jsonb->>'x-work-actor-id';
+  -- Only new application-issued directives opt into creation delivery; old app
+  -- versions can keep their direct notification path during rollout/rollback.
+  if tg_op='INSERT' and new.kind='todo' and new.status='open'
+    and new.parsed->'directive'->>'notificationVersion'='1'
+    and exists(select 1 from public.app_users where id=new.created_by and role='대표' and is_active=true) then
+    insert into public.work_notification_outbox(event_kind,card_id,user_id,title,body)
+    select 'directive',new.id,u.id,coalesce(new.created_by_name,'대표') || ' 대표 — 지시',new.raw_text
+    from public.app_users u where u.id=new.assignee_id and u.is_active=true;
+  end if;
   if new.kind = 'request_check' and new.status = 'open' and new.assignee_id is not null then
     if tg_op = 'INSERT' then v_event := 'request';
     elsif old.kind is distinct from new.kind or old.status is distinct from new.status
@@ -42,7 +51,13 @@ begin
     end if;
   end if;
   if tg_op <> 'UPDATE' or old.status <> 'open' or new.status <> 'done' then return new; end if;
-  if new.kind = 'request_check' and new.reply_text is not null then
+  if new.kind='todo' and jsonb_typeof(new.parsed->'directive')='object'
+    and exists(select 1 from public.app_users where id=new.created_by and role='대표' and is_active=true) then
+    insert into public.work_notification_outbox(event_kind,card_id,user_id,title,body)
+    select 'directive_done',new.id,u.id,coalesce(new.done_by_name,'담당자') || ' — 지시 완료',
+      coalesce(nullif(new.reply_text,''),new.raw_text)
+    from public.app_users u where u.id=new.created_by and u.is_active=true and u.id is distinct from v_actor;
+  elsif new.kind = 'request_check' and new.reply_text is not null then
     insert into public.work_notification_outbox (event_kind, card_id, user_id, title, body)
     select 'reply', new.id, u.id, coalesce(new.replied_by_name,'담당자') || ' — 답변', new.reply_text
     from public.app_users u where u.id = new.created_by and u.is_active = true
@@ -91,6 +106,8 @@ begin
     -- Requests superseded by cancellation/decision/reassignment must not arrive
     -- as a new outstanding request. Inactive recipients also remain unactionable.
     if not exists (select 1 from public.app_users where id=v_row.user_id and is_active=true)
+      or (v_row.event_kind='directive' and not exists(select 1 from public.work_cards where id=v_row.card_id
+        and kind='todo' and status='open' and assignee_id=v_row.user_id))
       or (v_row.event_kind='request' and (
         not exists (select 1 from public.work_cards where id=v_row.card_id
           and kind='request_check' and status='open' and assignee_id=v_row.user_id)
@@ -113,5 +130,10 @@ begin
 end $$;
 revoke all on function public.deliver_work_notifications(text) from public, anon;
 grant execute on function public.deliver_work_notifications(text) to erp_server;
+-- Installed atomically with the trigger; old databases fail closed in the app.
+create or replace function public.directive_notification_version() returns integer
+language sql stable set search_path = public as $$ select 1 $$;
+revoke all on function public.directive_notification_version() from public, anon;
+grant execute on function public.directive_notification_version() to erp_server;
 notify pgrst, 'reload schema';
 commit;

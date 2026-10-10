@@ -44,7 +44,7 @@ export function findCouncilCandidates(cards: any[], watch: Map<string, Watch>): 
       evidence: Object.fromEntries(teams.map(t => [t, t === (c._org || c.team) || shared.includes(t) ? [`card:${c.id} ${cardEvidence({ ...c, raw_text: String(c.raw_text || '').slice(0, 300), reply_text: String(c.reply_text || '').slice(0, 300) })}`] : []])) });
   }
   // 품번 예: AB2609HB01, K02609HB01(숫자 5자리), LLL2607HB13
-  const codePattern = /[A-Z]{1,4}\d{4,5}[A-Z]{2}\d{2}(?:-R\d+)?/g;
+  const codePattern = /\b[A-Z]{1,4}\d{4,5}[A-Z]{2}\d{2}(?:-R\d+)?\b/g;
   const rows = Array.from(found.values()).map(candidate => {
     const text = [candidate.topic, ...Object.values(candidate.evidence).flat()].join(' ').toUpperCase();
     return { candidate, kind: factKind(text), codes: new Set(text.match(codePattern) || []) };

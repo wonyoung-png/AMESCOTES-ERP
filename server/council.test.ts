@@ -12,6 +12,15 @@ test('연관 팀·카드 조건, 중복 키, 최대 3건', () => {
   assert.equal(new Set(got.map(x => x.triggerKey)).size, got.length);
 });
 
+test('업무 UUID 안의 문자·숫자를 품번으로 오인해 협의를 합치지 않는다', () => {
+  const card={id:'wc_695a52922ee454e9f97b6a86f6116fe78',kind:'schedule',status:'done',team:'국내 MD',
+    shared_teams:['마케팅','물류·CS'],raw_text:'기획전 준비'};
+  const got=findCouncilCandidates([card],new Map());
+  assert.equal(got[0].triggerKey,'card:'+card.id);
+  const real=findCouncilCandidates([{...card,raw_text:'품번 AB2609HB01 기획전 준비'}],new Map());
+  assert.match(real[0].triggerKey,/^merged:campaign:/);
+});
+
 test('허용되지 않은 evidence를 제거하고 주장도 제외 표시한다', () => {
   assert.deepEqual(sanitizeEvidence({ position: '재고 99개', evidence: ['bad'] }, new Set(['ok'])), { position: '[근거 확인 필요로 제외]', evidence: [] });
 });

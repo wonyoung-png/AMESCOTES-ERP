@@ -1,5 +1,13 @@
 import { restAsServer } from './auth.js';
 
+/** Fail closed before saving directives when the durable trigger is not deployed. */
+export async function directiveNotificationsReady(write = restAsServer): Promise<boolean> {
+  try {
+    const r = await write('rpc/directive_notification_version', { method: 'POST', body: '{}', signal: AbortSignal.timeout(10_000) });
+    return r.ok && await r.json() === 1;
+  } catch { return false; }
+}
+
 /** Failure leaves the DB-committed intent pending; retry never rewrites work. */
 export async function deliverWorkNotifications(cardId: string | null = null, write = restAsServer): Promise<boolean> {
   try {

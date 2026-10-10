@@ -11,9 +11,10 @@ import { syncSoon, myUpcoming } from './gcal.js';
 import { ORG } from './org.js';
 import { searchCards, prioritizeCards, allRows, readRows, countRows, cardEvidence, currentCampaignCards } from './work-records.js';
 import { workPageQuery, workCountQueries, notificationReadIds, type WorkCursor } from './work-feed.js';
+import { workVisibility, workTeamCondition, effectiveWorkTeam } from './work-visibility.js';
 import { submittedWork } from './work-submit.js';
 import { attachCampaignEvidence, CAMPAIGN_EVIDENCE_RULES } from './campaign-evidence.js';
-import { deliverWorkNotifications } from './work-notifications.js';
+import { deliverWorkNotifications, directiveNotificationsReady } from './work-notifications.js';
 import { schedulePayload, SCHEDULE_CHANNELS } from '../shared/schedule.js';
 
 const router = Router();
@@ -167,12 +168,8 @@ JSON 하나만 출력한다. 설명 금지.
 }
 
 /** 이 사람이 볼 수 있는 카드 — 대표는 전부, 나머지는 우리 팀·우리 팀 공유·내가 쓴 것·나한테 온 것 */
-function visibleFilter(me: Member): string {
-  if (isBoss(me)) return '';
-  const id = encodeURIComponent(me.id);
-  const t = encodeURIComponent(`"${me.team.replace(/"/g, '')}"`);
-  return `&or=(created_by.eq.${id},assignee_id.eq.${id}` +
-    (me.team ? `,team.eq.${encodeURIComponent(me.team)},shared_teams.cs.{${t}}` : '') + ')';
+function visibleFilter(me: Member, all: Member[]): string {
+  return workVisibility({...me,isBoss:isBoss(me)},all.filter(isBoss).map(m=>m.id));
 }
 
 /**
@@ -188,14 +185,14 @@ export async function answer(me: Member, question: string, all: Member[]): Promi
   try {
     [recent, camps, mine, matched, current] = await Promise.all([
       readRows(`work_cards?kind=neq.question&created_at=gte.${since}` +
-        `&select=id,created_at,created_by_name,team,kind,raw_text,status,reply_text,replied_by_name,confirmed_payload,result_ref,done_by_name,shared_teams,parsed` +
-        `&order=created_at.desc,id.desc&limit=150${visibleFilter(me)}`),
+        `&select=id,created_at,created_by_name,team,kind,raw_text,status,reply_text,replied_by_name,confirmed_payload,result_ref,done_at,done_by_name,shared_teams,parsed` +
+        `&order=created_at.desc,id.desc&limit=150${visibleFilter(me,all)}`),
       readRows(`campaigns?select=id,title,channel,start_date,end_date,status,discount_rate,workspace,updated_at` +
         `&end_date=gte.${new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)}&order=start_date.asc,id.asc&limit=100`),
       // 본인 구글 캘린더 (연결한 사람만, 본인 질문에만)
       myUpcoming(me.id),
-      searchCards(question, visibleFilter(me)),
-      currentCampaignCards('*', visibleFilter(me)),
+      searchCards(question, visibleFilter(me,all)),
+      currentCampaignCards('*', visibleFilter(me,all)),
     ]);
   } catch (e) {
     console.warn('[work] 답변 근거 조회 실패:', String(e).split('\n')[0]);
@@ -346,7 +343,7 @@ router.get('/api/work/today', requireUser(), async (req: Request, res: Response)
     const all = await members();
     const me = all.find(m => m.id === userOf(req).id);
     if (!me) { res.status(401).json({ error: 'no_session' }); return; }
-    const rows = await allRows(`work_cards?kind=neq.question&status=eq.open&select=id,raw_text,kind,assignee_id,assignee_name,created_by,created_by_name,parsed,created_at&order=created_at.desc,id.desc${visibleFilter(me)}`);
+    const rows = await allRows(`work_cards?kind=neq.question&status=eq.open&select=id,raw_text,kind,assignee_id,assignee_name,created_by,created_by_name,parsed,created_at&order=created_at.desc,id.desc${visibleFilter(me,all)}`);
     const today = kstToday();
     const mine = rows.filter(c => c.assignee_id === me.id || (!c.assignee_id && c.created_by === me.id));
     res.json({ me: { id: me.id, name: me.name }, items: prioritizeCards(mine, '', 100),
@@ -363,9 +360,12 @@ router.get('/api/work', requireUser(), async (req: Request, res: Response) => {
 
     const actor = { ...me, isBoss: isBoss(me), isLeader: isTeamLeader(me) };
     let query;
-    try { query = workPageQuery(actor, visibleFilter(me), req.query.before ? JSON.parse(String(req.query.before)) as WorkCursor : undefined); }
+    try { query = workPageQuery(actor, visibleFilter(me,all), req.query.before ? JSON.parse(String(req.query.before)) as WorkCursor : undefined); }
     catch { res.status(400).json({ error: 'invalid_cursor' }); return; }
-    const queries = workCountQueries(actor, visibleFilter(me));
+    const bossIds = all.filter(isBoss).map(m=>m.id);
+    const queries = workCountQueries(actor, visibleFilter(me,all), {
+      own:workTeamCondition(me.team,bossIds),other:workTeamCondition(me.team,bossIds,'neq'),
+    });
     const [items, counts] = await Promise.all([
       req.query.countsOnly === '1' ? Promise.resolve([]) : readRows(query),
       Promise.all(Object.entries(queries).map(async ([key, path]) => [key, await countRows(path)])).then(Object.fromEntries),
@@ -373,7 +373,7 @@ router.get('/api/work', requireUser(), async (req: Request, res: Response) => {
     const last = items.at(-1);
     res.json({
       // 질문은 개인 대화다. 남의 질문은 팀 피드에 내보내지 않는다
-      items, counts, nextCursor: items.length === 200 && last ? { created_at: last.created_at, id: last.id } : null,
+      items:items.map(c=>({...c,team:effectiveWorkTeam(c,bossIds),_directive:!!c.parsed?.directive && bossIds.includes(c.created_by) && ORG.some(t=>t.key===c.parsed.directive.team)})), counts, nextCursor: items.length === 200 && last ? { created_at: last.created_at, id: last.id } : null,
       me: { id: me.id, name: me.name, team: me.team, isLeader: isTeamLeader(me), isBoss: isBoss(me), profile: me.profile },
     });
   } catch (e) {
@@ -390,8 +390,10 @@ async function loadForActor(req: Request, res: Response) {
   const r = await restAsServer(`work_cards?id=eq.${encodeURIComponent(String(req.params.id))}&select=*`);
   const card = r.ok ? (await r.json())[0] : null;
   if (!card) { res.status(404).json({ error: 'not_found' }); return null; }
-  const leader = isTeamLeader(me) && me.team === card.team;
-  return { all, me, card, leader };
+  const directive=!!card.parsed?.directive && all.some(m=>m.id===card.created_by && isBoss(m))
+    && ORG.some(t=>t.key===card.parsed.directive.team);
+  const leader = isTeamLeader(me) && me.team === (directive ? card.parsed.directive.team : card.team);
+  return { all, me, card, leader,directive };
 }
 
 /** A newer routing/decision must win even if both snapshots are still open. */
@@ -448,7 +450,7 @@ router.post('/api/work/read', requireUser(), async (req: Request, res: Response)
     const ids = Array.from(new Set(raw.map(String)));
     // in.() 필터에 그대로 들어가므로 형식이 하나라도 틀리면 통째로 거절한다 (코덱스 지적)
     if (ids.some(s => !/^wc_[a-z0-9]{1,40}$/.test(s))) { res.status(400).json({ error: 'bad_ids' }); return; }
-    const vr = await restAsServer(`work_cards?select=id&id=in.(${ids.join(',')})${visibleFilter(me)}`);
+    const vr = await restAsServer(`work_cards?select=id&id=in.(${ids.join(',')})${visibleFilter(me,all)}`);
     if (!vr.ok) { res.status(502).json({ error: 'db' }); return; }
     const visible = (await vr.json()).map((c: any) => c.id);
     if (!visible.length) { res.json({ ok: true, marked: 0 }); return; }
@@ -474,6 +476,7 @@ router.post('/api/work/:id/kind', requireUser(), async (req: Request, res: Respo
     if (!ctx) return;
     const { all, me, card, leader } = ctx;
     if (!canManage(card, me, leader)) { res.status(403).json({ error: 'forbidden' }); return; }
+    if(ctx.directive) { res.status(400).json({error:'protected_directive',message:'대표 지시는 종류를 변경할 수 없습니다. 처리 결과를 남기거나 취소해주세요.'});return; }
     const want = String((req.body ?? {}).kind || '') as Kind;
     if (!KINDS.includes(want) || want === card.kind) { res.status(400).json({ error: 'bad_kind' }); return; }
     // 끝난 카드는 못 바꾼다 — 단 질문은 처음부터 '끝남'으로 저장되니 예외 (잘못 질문으로 간 공유·할 일 구제)
@@ -545,9 +548,12 @@ router.post('/api/work/:id/done', requireUser(), async (req: Request, res: Respo
       res.status(403).json({ error: 'forbidden' }); return;
     }
     const note = String((req.body ?? {}).note || '').trim().slice(0, 500);
+    if (ctx.directive && !await directiveNotificationsReady()) {
+      res.status(503).json({error:'directive_notifications_unavailable',message:'지시 알림 설정 점검 중입니다. 잠시 후 다시 시도해주세요.'}); return;
+    }
     const now = new Date().toISOString();
     const r = await restAsServer(mutationQuery(card, 'open'), {
-      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      method: 'PATCH', headers: { Prefer: 'return=representation', 'X-Work-Actor-Id':me.id },
       body: JSON.stringify({
         status: 'done', done_by_name: me.name, done_at: now, updated_at: now,
         // 어떻게 정했는지 한 줄 남기면 나중에 "W컨셉 참여했어?"에 답할 근거가 된다
@@ -556,8 +562,9 @@ router.post('/api/work/:id/done', requireUser(), async (req: Request, res: Respo
     });
     if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
     if (!(await r.json()).length) { res.status(409).json({ error: 'already' }); return; }
+    const notified=await deliverWorkNotifications(card.id);
     syncSoon();
-    res.json({ ok: true });
+    res.json({ ok: true,notified });
   } catch (e) {
     console.error('POST /api/work/:id/done 실패:', e);
     res.status(500).json({ error: 'internal' });
