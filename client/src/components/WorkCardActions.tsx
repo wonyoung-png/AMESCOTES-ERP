@@ -27,14 +27,19 @@ export const isUnread = (c: Card, me: Me | null) =>
 export async function markRead(ids: string[]): Promise<boolean> {
   if (!ids.length) return true;
   try {
-    const r = await fetch('/api/work/read', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
-    });
-    return r.ok;
+    for (let offset = 0; offset < ids.length; offset += 500) {
+      const r = await fetch('/api/work/read', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: ids.slice(offset, offset + 500) }),
+      });
+      if (!r.ok) return false;
+    }
+    return true;
   } catch { return false; }
 }
 export type Me = { id: string; name: string; team: string; isLeader: boolean; isBoss: boolean; profile?: string };
+export type WorkCounts = { attention: number; todo: number; unread: number; teamUnread: number; sharedUnread: number };
+export type WorkCursor = { created_at: string; id: string };
 
 /** 업무 프로필 작성 안내 — 위젯과 사용자관리가 같이 쓴다 */
 export const PROFILE_PLACEHOLDER = `담당 채널·브랜드: W컨셉, 29CM / LUMEN
@@ -60,26 +65,30 @@ export const isTodo = (c: Card, me: Me | null) => c.status === 'open' && !!me &&
   c.assignee_id === me.id || (c.kind === 'schedule' && (c.created_by === me.id || canActOn(c, me)))
 );
 
-export async function postWork(text: string): Promise<Card | null> {
+export async function postWork(text: string, requestId?: string): Promise<Card | null> {
   try {
     const r = await fetch('/api/work', {
       method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, requestId }),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) { toast.error(j.error === 'no_session' ? '로그인이 풀렸습니다' : '올리기 실패'); return null; }
+    if (!r.ok) { toast.error(j.error === 'no_session' ? '로그인이 풀렸습니다' : j.error === 'request_conflict' ? '이전 요청과 내용이 다릅니다. 내용을 확인해주세요' : '올리기 실패'); return null; }
     if (j.notified === false) toast.warning('업무는 저장됐지만 확인 요청 알림 전달에 실패했습니다 — 업무함에서 확인해주세요');
     return j.card as Card;
   } catch { toast.error('올리기 실패 — 통신 상태를 확인해주세요'); return null; }
 }
 
 /** 실패하면 null — 순간 장애에 대화·배지가 통째로 비면 안 되니 부르는 쪽이 이전 값을 유지한다 */
-export async function fetchWork(): Promise<{ items: Card[]; me: Me | null } | null> {
+export async function fetchWork(before?: WorkCursor | null, countsOnly = false): Promise<{ items: Card[]; me: Me | null; counts?: WorkCounts; nextCursor: WorkCursor | null } | null> {
   try {
-    const r = await fetch('/api/work', { credentials: 'include' });
+    const params = new URLSearchParams();
+    if (before) params.set('before', JSON.stringify(before));
+    if (countsOnly) params.set('countsOnly', '1');
+    const r = await fetch(`/api/work${params.size ? '?' + params : ''}`, { credentials: 'include' });
     if (!r.ok) return null;
     const j = await r.json();
-    return { items: j.items || [], me: j.me || null };
+    if (!Array.isArray(j.items)) return null;
+    return { items: j.items, me: j.me || null, counts: j.counts, nextCursor: j.nextCursor || null };
   } catch { return null; }
 }
 

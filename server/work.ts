@@ -9,7 +9,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { requireUser, requireRole, userOf, restAsServer, CEO_EMAILS, type SessionUser } from './auth.js';
 import { syncSoon, myUpcoming } from './gcal.js';
 import { ORG } from './org.js';
-import { searchCards, prioritizeCards, allRows, readRows, cardEvidence } from './work-records.js';
+import { searchCards, prioritizeCards, allRows, readRows, countRows, cardEvidence } from './work-records.js';
+import { workPageQuery, workCountQueries, notificationReadIds, type WorkCursor } from './work-feed.js';
+import { submittedWork } from './work-submit.js';
 import { schedulePayload, SCHEDULE_CHANNELS } from '../shared/schedule.js';
 
 const router = Router();
@@ -271,6 +273,12 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
     const text = String((req.body ?? {}).text || '').trim();
     if (!text) { res.status(400).json({ error: 'empty' }); return; }
     if (text.length > 2000) { res.status(400).json({ error: 'too_long' }); return; }
+    const requestId = (req.body ?? {}).requestId;
+    if (requestId !== undefined && (typeof requestId !== 'string' || !/^wc_[a-z0-9]{1,40}$/.test(requestId))) { res.status(400).json({ error: 'bad_request_id' }); return; }
+    if (requestId) {
+      const previous = await submittedWork(requestId, me.id, text);
+      if (previous) { res.json({ ok: true, card: previous, reused: true }); return; }
+    }
 
     const since = new Date(Date.now() - 30 * 864e5).toISOString();
     const or = await restAsServer(
@@ -297,7 +305,7 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
     const assignee = kind === 'request_check' ? owner : undefined;
 
     const card = {
-      id: genId('wc'),
+      id: requestId || genId('wc'),
       created_by: me.id, created_by_name: me.name, team: me.team,
       raw_text: text, kind, parsed,
       status: kind === 'question' ? 'done' : 'open',
@@ -307,13 +315,21 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
     const r = await restAsServer('work_cards', {
       method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(card),
     });
-    if (!r.ok) { res.status(502).json({ error: 'save_failed', detail: (await r.text()).slice(0, 300) }); return; }
+    if (!r.ok) {
+      // 동시에 재시도한 요청은 PK 충돌 후 원본을 확인한다. AI 결과로 기존 카드를 덮지 않는다.
+      if (requestId && r.status === 409) {
+        const previous = await submittedWork(requestId, me.id, text);
+        if (previous) { res.json({ ok: true, card: previous, reused: true }); return; }
+      }
+      res.status(r.status === 409 ? 409 : 502).json({ error: 'save_failed', detail: (await r.text()).slice(0, 300) }); return;
+    }
 
     const notified = assignee
       ? await notify([{ user_id: assignee.id, card_id: card.id, title: `${me.name} — 확인 요청`, body: text }]) : true;
     syncSoon(); // 마감 있는 할 일이면 구글 캘린더에도
     res.json({ ok: true, card: (await r.json())[0], notified });
   } catch (e) {
+    if ((e as Error).message === 'request_conflict') { res.status(409).json({ error: 'request_conflict' }); return; }
     console.error('POST /api/work 실패:', e);
     res.status(500).json({ error: 'internal' });
   }
@@ -341,11 +357,19 @@ router.get('/api/work', requireUser(), async (req: Request, res: Response) => {
     const me = all.find(m => m.id === userOf(req).id);
     if (!me) { res.status(401).json({ error: 'no_session' }); return; }
 
-    const r = await restAsServer(`work_cards?select=*&order=created_at.desc&limit=200${visibleFilter(me)}`);
-    if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
+    const actor = { ...me, isBoss: isBoss(me), isLeader: isTeamLeader(me) };
+    let query;
+    try { query = workPageQuery(actor, visibleFilter(me), req.query.before ? JSON.parse(String(req.query.before)) as WorkCursor : undefined); }
+    catch { res.status(400).json({ error: 'invalid_cursor' }); return; }
+    const queries = workCountQueries(actor, visibleFilter(me));
+    const [items, counts] = await Promise.all([
+      req.query.countsOnly === '1' ? Promise.resolve([]) : readRows(query),
+      Promise.all(Object.entries(queries).map(async ([key, path]) => [key, await countRows(path)])).then(Object.fromEntries),
+    ]);
+    const last = items.at(-1);
     res.json({
       // 질문은 개인 대화다. 남의 질문은 팀 피드에 내보내지 않는다
-      items: (await r.json()).filter((c: any) => c.kind !== 'question' || c.created_by === me.id),
+      items, counts, nextCursor: items.length === 200 && last ? { created_at: last.created_at, id: last.id } : null,
       me: { id: me.id, name: me.name, team: me.team, isLeader: isTeamLeader(me), isBoss: isBoss(me), profile: me.profile },
     });
   } catch (e) {
@@ -616,10 +640,11 @@ router.put('/api/work/profile/:userId', requireRole('대표'), async (req: Reque
 router.get('/api/notifications', requireUser(), async (req: Request, res: Response) => {
   try {
     const id = encodeURIComponent(userOf(req).id);
-    const r = await restAsServer(`notifications?user_id=eq.${id}&select=*&order=created_at.desc&limit=30`);
-    if (!r.ok) { res.status(502).json({ error: 'db' }); return; }
-    const items = await r.json();
-    res.json({ items, unread: items.filter((n: any) => !n.read_at).length });
+    const [items, unread] = await Promise.all([
+      readRows(`notifications?user_id=eq.${id}&select=*&order=read_at.desc.nullsfirst,created_at.desc,id.desc&limit=30`),
+      countRows(`notifications?user_id=eq.${id}&read_at=is.null&select=id&limit=0`),
+    ]);
+    res.json({ items, unread });
   } catch (e) {
     console.error('GET /api/notifications 실패:', e);
     res.status(500).json({ error: 'internal' });
@@ -629,7 +654,10 @@ router.get('/api/notifications', requireUser(), async (req: Request, res: Respon
 router.post('/api/notifications/read', requireUser(), async (req: Request, res: Response) => {
   try {
     const id = encodeURIComponent(userOf(req).id);
-    const r = await restAsServer(`notifications?user_id=eq.${id}&read_at=is.null`, {
+    let ids;
+    try { ids = notificationReadIds((req.body ?? {}).ids); }
+    catch { res.status(400).json({ error: 'bad_ids' }); return; }
+    const r = await restAsServer(`notifications?user_id=eq.${id}&read_at=is.null&id=in.(${ids.join(',')})`, {
       method: 'PATCH', body: JSON.stringify({ read_at: new Date().toISOString() }),
     });
     res.status(r.ok ? 200 : 502).json({ ok: r.ok });

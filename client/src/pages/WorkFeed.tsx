@@ -7,11 +7,11 @@
  *
  * 남이 올린 카드는 [확인]을 눌러 읽음 처리한다. 안 본 개수가 탭과 왼쪽 메뉴에 숫자로 뜬다.
  */
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Check, CheckCheck, Clock, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  type Card, type Me, KIND, CardActions, isTodo, isUnread, markRead, fetchWork, announceWorkChanged, fmtTime,
+  type Card, type Me, type WorkCounts, type WorkCursor, KIND, CardActions, isTodo, isUnread, markRead, fetchWork, announceWorkChanged, fmtTime,
 } from '@/components/WorkCardActions';
 
 type Tab = 'todo' | 'team' | 'shared' | 'all';
@@ -21,11 +21,17 @@ export default function WorkFeed() {
   const [me, setMe] = useState<Me | null>(null);
   const [tab, setTab] = useState<Tab>('todo');
   const [loadError, setLoadError] = useState(false);
+  const [counts, setCounts] = useState<WorkCounts | undefined>();
+  const [nextCursor, setNextCursor] = useState<WorkCursor | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const revision = useRef(0);
 
   const load = useCallback(async () => {
+    const current = ++revision.current;
     const j = await fetchWork();
+    if (current !== revision.current) return;
     setLoadError(!j);
-    if (j) { setItems(j.items); setMe(j.me); }
+    if (j) { setItems(j.items); setMe(j.me); setCounts(j.counts); setNextCursor(j.nextCursor); }
   }, []);
   useEffect(() => {
     load();
@@ -33,6 +39,18 @@ export default function WorkFeed() {
     window.addEventListener('work:changed', load);
     return () => window.removeEventListener('work:changed', load);
   }, [load]);
+
+  const loadMore = async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    const current = revision.current;
+    const j = await fetchWork(nextCursor);
+    if (j && current === revision.current) {
+      setItems(previous => [...new Map([...previous, ...j.items].map(c => [c.id, c])).values()]);
+      setCounts(j.counts); setNextCursor(j.nextCursor);
+    } else if (!j) toast.error('이전 업무 조회 실패 — 기존 목록은 유지됩니다');
+    setLoadingMore(false);
+  };
 
   const lists = useMemo(() => {
     const noQ = items.filter(c => c.kind !== 'question');
@@ -70,7 +88,7 @@ export default function WorkFeed() {
       <div className="flex items-end gap-1 border-b border-border">
         {tabs.map(([k, label]) => {
           // 내 할 일 = 처리할 개수, 나머지 탭 = 안 본 개수
-          const n = k === 'todo' ? lists.todo.length : unreadOf(k).length;
+          const n = k === 'todo' ? counts?.todo ?? lists.todo.length : k === 'team' ? counts?.teamUnread ?? unreadOf(k).length : k === 'shared' ? counts?.sharedUnread ?? unreadOf(k).length : counts?.unread ?? unreadOf(k).length;
           return (
             <button key={k} type="button" onClick={() => setTab(k)}
               className={`px-3 py-2 text-sm -mb-px border-b-2 flex items-center gap-1 ${tab === k ? 'border-primary text-foreground font-medium' : 'border-transparent text-muted-foreground'}`}>
@@ -84,7 +102,7 @@ export default function WorkFeed() {
         {unreadHere.length > 0 && (
           <button type="button" onClick={() => check(unreadHere.map(c => c.id))}
             className="ml-auto mb-1.5 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-            <CheckCheck className="w-3.5 h-3.5" />모두 확인
+            <CheckCheck className="w-3.5 h-3.5" />표시된 업무 확인
           </button>
         )}
       </div>
@@ -92,7 +110,7 @@ export default function WorkFeed() {
       <div className="space-y-2">
         {lists[tab].length === 0 && (
           <p className="text-sm text-muted-foreground py-6 text-center">
-            {tab === 'todo' ? '처리할 일이 없습니다' : '아직 올라온 카드가 없습니다'}
+            {nextCursor ? '현재 조회 범위에 없습니다. 이전 업무도 확인해 주세요.' : tab === 'todo' ? '처리할 일이 없습니다' : '아직 올라온 카드가 없습니다'}
           </p>
         )}
         {lists[tab].map(c => {
@@ -124,6 +142,7 @@ export default function WorkFeed() {
             </div>
           );
         })}
+        {nextCursor && <button type="button" disabled={loadingMore} onClick={loadMore} className="w-full h-9 rounded-md border border-border text-sm disabled:opacity-40">{loadingMore ? '조회 중…' : '이전 업무 더 보기'}</button>}
       </div>
     </div>
   );

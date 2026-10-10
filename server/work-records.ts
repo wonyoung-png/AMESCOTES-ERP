@@ -1,6 +1,6 @@
 import { restAsServer } from './auth.js';
 
-type Reader = (path: string) => Promise<{ ok: boolean; status: number; json(): Promise<any> }>;
+type Reader = (path: string) => Promise<{ ok: boolean; status: number; headers?: Pick<Headers, 'get'>; json(): Promise<any> }>;
 
 export const dayStartUtc = (now = new Date()) => new Date(new Date(now.getTime() + 9 * 3600e3).toISOString().slice(0, 10) + 'T00:00:00+09:00').toISOString();
 
@@ -10,6 +10,15 @@ export async function readRows(query: string, read: Reader = restAsServer): Prom
   const rows = await r.json();
   if (!Array.isArray(rows)) throw new Error('자료 형식 오류');
   return rows;
+}
+
+/** 목록 한도와 무관한 전체 건수. 자료 본문은 내려받지 않는다. */
+export async function countRows(query: string, read: Reader = path => restAsServer(path, { method: 'HEAD', headers: { Prefer: 'count=exact' } })): Promise<number> {
+  const r = await read(query);
+  if (!r.ok) throw new Error(`건수 조회 실패 (${r.status})`);
+  const total = r.headers?.get('content-range')?.split('/')[1];
+  if (!total || !/^\d+$/.test(total) || !Number.isSafeInteger(Number(total))) throw new Error('전체 건수 확인 불가');
+  return Number(total);
 }
 
 export async function allRows(query: string, read: Reader = restAsServer): Promise<any[]> {

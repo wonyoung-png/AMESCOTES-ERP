@@ -65,7 +65,7 @@ export async function rest(path: string, init: RequestInit & { role?: string } =
 /** 접수함 전용 — anon 으로는 막혀 있는 테이블·함수를 부른다 */
 export const restAsServer = (path: string, init: RequestInit = {}) =>
   rest(path, { ...init, role: 'erp_server' });
-type Response_ = { ok: boolean; status: number; json(): Promise<any>; text(): Promise<string> };
+type Response_ = { ok: boolean; status: number; headers?: Pick<Headers, 'get'>; json(): Promise<any>; text(): Promise<string> };
 
 export interface SessionUser {
   id: string;

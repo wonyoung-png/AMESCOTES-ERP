@@ -13,7 +13,7 @@ import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 import { Link } from 'wouter';
 import { toast } from 'sonner';
 import {
-  type Card, type Me, CardActions, isTodo, isUnread, fetchWork, postWork, announceWorkChanged, fmtTime,
+  type Card, type Me, type WorkCounts, CardActions, isTodo, isUnread, fetchWork, postWork, announceWorkChanged, fmtTime,
   PROFILE_PLACEHOLDER, PROFILE_MAX,
 } from '@/components/WorkCardActions';
 
@@ -116,13 +116,16 @@ export default function WorkChatWidget() {
   const [showProfile, setShowProfile] = useState(false);
   const [items, setItems] = useState<Card[]>([]);
   const [me, setMe] = useState<Me | null>(null);
+  const [counts, setCounts] = useState<WorkCounts | undefined>();
   const [text, setText] = useState('');
   const [pending, setPending] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const sending = useRef(false);
+  const retryRequest = useRef<{ text: string; id: string } | null>(null);
 
   const load = useCallback(async () => {
     const j = await fetchWork();
-    if (j) { setItems(j.items); setMe(j.me); }
+    if (j) { setItems(j.items); setMe(j.me); setCounts(j.counts); }
   }, []);
 
   // 닫혀 있어도 "내 할 일" 수는 보여야 한다 — 1분마다, 그리고 피드에서 처리했을 때
@@ -147,21 +150,25 @@ export default function WorkChatWidget() {
     .slice(0, 60)
     .sort((a, b) => a.created_at.localeCompare(b.created_at)), [items, me]);
   // 버튼 숫자 = 업무 피드 '내 할 일'과 같은 기준 (내 할 일·받은 확인 요청·등록 안 한 일정)
-  const todo = useMemo(() => items.filter(c => isTodo(c, me)).length, [items, me]);
+  const todo = counts?.todo ?? items.filter(c => isTodo(c, me)).length;
   // 왼쪽 메뉴 '업무 피드' 옆 숫자 = 볼 것 = 안 본 카드 + 내가 처리할 일 (겹치는 카드는 한 번만).
   // 내가 쓴 할 일만 있을 때도 숫자가 떠야 한다. 위젯이 이미 1분마다 읽고 있으니 그 값을 알린다
-  const attention = useMemo(() => items.filter(c => isUnread(c, me) || isTodo(c, me)).length, [items, me]);
+  const attention = counts?.attention ?? items.filter(c => isUnread(c, me) || isTodo(c, me)).length;
   useEffect(() => { window.dispatchEvent(new CustomEvent('work:unread', { detail: attention })); }, [attention]);
 
   useEffect(() => { if (open) endRef.current?.scrollIntoView({ block: 'end' }); }, [open, thread.length, pending]);
 
   const send = async (t = text) => {
     const msg = t.trim();
-    if (!msg || pending) return;
+    if (!msg || sending.current) return;
+    sending.current = true;
+    if (retryRequest.current?.text !== msg) retryRequest.current = { text: msg, id: `wc_${crypto.randomUUID().replace(/-/g, '')}` };
     setText(''); setPending(msg);
-    const card = await postWork(msg);
+    const card = await postWork(msg, retryRequest.current.id);
     setPending(null);
+    sending.current = false;
     if (!card) { setText(msg); return; }
+    retryRequest.current = null;
     announceWorkChanged();
   };
 

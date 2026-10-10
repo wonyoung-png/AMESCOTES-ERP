@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+
+const out = await build({ entryPoints: ['client/src/components/WorkCardActions.tsx'], bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent', plugins: [{ name: 'work-test', setup(b) {
+  b.onResolve({ filter: /^(sonner|@\/lib\/phase1|@\/lib\/campaignQueries)$/ }, a => ({ path: a.path, namespace: 'work-test' }));
+  b.onLoad({ filter: /.*/, namespace: 'work-test' }, () => ({ loader: 'js', contents: 'export const toast={error:()=>{},warning:()=>{}}; export const CAMPAIGN_TEAMS=[]; export const fetchCampaignsSB=async()=>[];' }));
+}}] });
+const { fetchWork, markRead, postWork } = await import('data:text/javascript;base64,' + Buffer.from(out.outputFiles[0].text).toString('base64'));
+const calls = [];
+globalThis.fetch = async (url, init) => { calls.push({ url, init }); return { ok: true, json: async () => ({ items: [], me: null, counts: { attention: 1251 }, nextCursor: { id: 'wc_next', created_at: '2026-10-10T01:00:00Z' } }) }; };
+assert.equal((await fetchWork()).counts.attention, 1251);
+await fetchWork({ id: 'wc_next', created_at: '2026-10-10T01:00:00Z' });
+assert.equal(JSON.parse(new URL('http://test' + calls.at(-1).url).searchParams.get('before')).id, 'wc_next');
+await fetchWork(null, true);
+assert.match(calls.at(-1).url, /countsOnly=1/);
+assert.equal(calls.at(-1).init.credentials, 'include');
+globalThis.fetch = async () => ({ ok: true, json: async () => ({ items: { bad: true } }) });
+assert.equal(await fetchWork(), null);
+globalThis.fetch = async () => ({ ok: false });
+assert.equal(await fetchWork(), null);
+const sizes = [];
+globalThis.fetch = async (_url, init) => { sizes.push(JSON.parse(init.body).ids.length); return { ok: true }; };
+assert.equal(await markRead(Array.from({ length: 1001 }, (_, i) => `wc_${i}`)), true);
+assert.deepEqual(sizes, [500, 500, 1]);
+let n = 0;
+globalThis.fetch = async () => ({ ok: ++n < 2 });
+assert.equal(await markRead(Array(1001).fill('wc_a')), false);
+assert.equal(n, 2);
+const payloads = [];
+globalThis.fetch = async (_url, init) => { payloads.push(JSON.parse(init.body)); return { ok: true, json: async () => ({ card: { id: 'wc_retry' } }) }; };
+await postWork('확인 필요', 'wc_retry');
+await postWork('확인 필요', 'wc_retry');
+assert.deepEqual(payloads[0], payloads[1]);
+console.log('work API checks=11 PASS');
