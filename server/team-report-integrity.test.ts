@@ -9,7 +9,7 @@ process.env.DAILY_URL = DAILY;
 process.env.PGRST_JWT_SECRET = 'synthetic-report-integrity-secret';
 process.env.GOOGLE_CLIENT_ID = '';
 process.env.GOOGLE_CLIENT_SECRET = '';
-const { writeTeamReport, runAgents, completedScheduleTeams } = await import('./agents');
+const { writeTeamReport, runAgents, completedScheduleTeams, AgentRunFailure, agentRunResult } = await import('./agents');
 const { evidenceFreshness } = await import('./report-evidence');
 const member = { id:'fixture_md', name:'Synthetic MD', team:'국내 MD', role:'직원', position:'대리', email:'md@fixture.invalid', profile:'' };
 const card = { id:'wc_integrity', created_at:new Date().toISOString(), created_by:member.id, created_by_name:member.name,
@@ -17,7 +17,7 @@ const card = { id:'wc_integrity', created_at:new Date().toISOString(), created_b
 const valid = JSON.stringify({headline:'검수 진행 중',summary:'· 샘플 검수를 진행 중입니다.',needs:[]});
 const json = (value:unknown) => new Response(JSON.stringify(value),{headers:{'Content-Type':'application/json'}});
 
-for (const scenario of ['valid','split','truncated','empty','missing_summary','wrong_needs','malformed','no_key'] as const) {
+for (const scenario of ['valid','split','truncated','empty','missing_summary','wrong_needs','malformed','no_key','store_failure'] as const) {
   test(`team report integrity: ${scenario}`, async () => {
     const previousFetch=globalThis.fetch,previousKey=process.env.ANTHROPIC_API_KEY;
     if(scenario==='no_key') delete process.env.ANTHROPIC_API_KEY;
@@ -44,16 +44,25 @@ for (const scenario of ['valid','split','truncated','empty','missing_summary','w
         }
       }
       if(url.origin===REST&&url.pathname==='/team_agent_runs'&&method==='POST') {
+        if(scenario==='store_failure') return new Response('{"error":"synthetic_store_failure"}',{status:503,headers:{'Content-Type':'application/json'}});
         const row=JSON.parse(String(init?.body));stored.push(row);return json([{...row,created_at:new Date().toISOString()}]);
       }
       if(url.origin===DAILY&&url.pathname==='/api/dashboard/brand'&&method==='GET') return json({});
       blocked.push(method+' '+url.origin+url.pathname);throw Error('Fixture blocks external requests');
     }) as typeof fetch;
     try {
-      const good=scenario==='valid'||scenario==='split';
+      const good=scenario==='valid'||scenario==='split'||scenario==='store_failure';
       const report=await writeTeamReport(member.team,[card],[member],{open:1,overdue:0,alerts:0},'work',[],'');
       assert.equal(report.reportAvailable,good);
       assert.equal(report.headline,good?'검수 진행 중':'진행 1건 · 마감 지남 0건 · 운영 확인 0개');
+      if(scenario==='store_failure') {
+        await assert.rejects(runAgents('manual',member.team),error=>{
+          assert.ok(error instanceof AgentRunFailure);
+          const result=agentRunResult(error.runs,error.failedTeams);
+          assert.equal(result.saved,0);assert.deepEqual(result.saveFailures,[member.team]);return true;
+        });
+        assert.equal(stored.length,0);assert.equal(calls,2);assert.deepEqual(blocked,[]);return;
+      }
       const runs=await runAgents('schedule',member.team);
       assert.equal(runs.length,1);assert.equal(stored.length,1);
       assert.equal(stored[0].stats.open,1,'Rule totals survive AI failure');

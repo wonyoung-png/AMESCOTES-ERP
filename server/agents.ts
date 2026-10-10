@@ -22,6 +22,18 @@ export type AgentRun = {
   needs: Array<{ text: string; cardId?: string }>; stats: Record<string, any>; trigger: string;
 };
 
+export class AgentRunFailure extends Error {
+  constructor(public runs: AgentRun[], public failedTeams: string[]) {
+    super(`팀 점검 저장 ${runs.length}/${runs.length + failedTeams.length}`);
+  }
+}
+
+export const agentRunResult = (runs: AgentRun[], saveFailures: string[] = []) => ({
+  runs, saved: runs.length,
+  reportFailures: runs.filter(r => r.stats?.reportAvailable === false).map(r => r.team),
+  saveFailures,
+});
+
 const genId = () => `ag_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 const NO_TEAM = '팀 미지정';
 const CARD_SELECT = 'id,created_at,created_by,created_by_name,kind,status,team,assignee_id,assignee_name,parsed,raw_text,reply_text,replied_by_name,done_at,done_by_name,confirmed_payload,result_ref,shared_teams';
@@ -201,7 +213,7 @@ export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: strin
   // 한 팀이라도 저장 못 했으면 성공처럼 끝내지 않는다 — 지도에 어제 보고가 오늘 것처럼 남는다 (코덱스 지적).
   // 자동 점검은 오늘 기록이 없는 걸로 보고 10분 뒤 다시 시도한다
   const want = onlyTeam ? 1 : teams.size;
-  if (out.length < want) throw new Error(`팀 점검 저장 ${out.length}/${want}`);
+  if (out.length < want) throw new AgentRunFailure(out, targets.filter(t => !out.some(r => r.team === t)).concat(targets.length ? [] : [onlyTeam!]).filter(Boolean));
   if (!onlyTeam) {
     const candidates = findCouncilCandidates(cards, watch);
     await Promise.all(candidates.map(c => openCouncil(c).catch(e => {

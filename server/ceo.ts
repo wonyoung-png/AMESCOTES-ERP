@@ -16,7 +16,7 @@ import { currentUser, restAsServer, CEO_EMAILS, type SessionUser } from './auth.
 import { gcalConfigured, tokenFrom, verifiedEmail, GOOGLE_CLIENT_ID } from './gcal.js';
 import { members, esc, kstToday, ANSWER_MODEL, genId } from './work.js';
 import { dailyFetch } from './daily-bridge.js';
-import { latestRuns, runAgentsOnce, CEO_DESK, judge, loadReportContext, teamEvidence } from './agents.js';
+import { latestRuns, runAgentsOnce, CEO_DESK, judge, loadReportContext, teamEvidence, AgentRunFailure, agentRunResult } from './agents.js';
 import { emptyOnFailure, findCouncilCandidates, openCouncil, pendingCouncilActions } from './council.js';
 import { ORG, DIVISIONS, DIVISION_HEADS, DEFAULT_RULES, orgTeam } from './org.js';
 import { syncSoon } from './gcal.js';
@@ -512,9 +512,12 @@ router.post('/api/ceo/agents/run', requireCeo(), async (req: Request, res: Respo
     const team = typeof req.body?.team === 'string' ? req.body.team.slice(0, 40) : undefined;
     const runs = await runAgentsOnce('manual', team);
     if (!runs) { res.status(409).json({ error: 'busy', message: '이미 점검 중이에요. 잠시 후 다시 눌러주세요' }); return; }
-    res.json({ runs });
+    res.json(agentRunResult(runs));
   } catch (e) {
     console.error('POST /api/ceo/agents/run 실패:', e);
+    if (e instanceof AgentRunFailure) {
+      res.status(503).json({ error:'partial_agent_run', message:'일부 팀의 점검 결과를 저장하지 못했습니다.', ...agentRunResult(e.runs,e.failedTeams) }); return;
+    }
     res.status(500).json({ error: 'internal' });
   }
 });

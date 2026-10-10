@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { judge, missingScheduleTeams, completedScheduleTeams, reportTeams, fillScheduleTeams, type AgentRun } from './agents';
+import { judge, missingScheduleTeams, completedScheduleTeams, reportTeams, fillScheduleTeams, AgentRunFailure, agentRunResult, type AgentRun } from './agents';
 import { dayStartUtc } from './work-records';
 
 test('한국 자정 완료를 포함하고 취소·재개 업무를 완료로 세지 않는다', () => {
@@ -61,4 +61,12 @@ test('첫 팀 저장 실패·두 번째 AI 실패 후에도 다음 팀 점검을
     return [{team,stats:{reportAvailable:team==='생산관리'}} as AgentRun];
   });
   assert.deepEqual(called,['국내 MD','마케팅','생산관리']);assert.equal(saved,1);
+});
+
+test('수동 점검 결과는 저장된 정상 보고·AI 실패·미저장 팀을 분리한다', () => {
+  const runs=[{team:'국내 MD',stats:{reportAvailable:true}},{team:'마케팅',stats:{reportAvailable:false}}] as AgentRun[];
+  const failure=new AgentRunFailure(runs,['생산관리']);
+  const result=agentRunResult(failure.runs,failure.failedTeams);
+  assert.equal(result.saved,2);assert.deepEqual(result.reportFailures,['마케팅']);assert.deepEqual(result.saveFailures,['생산관리']);
+  assert.equal(result.runs,runs);assert.match(failure.message,/2\/3/);
 });
