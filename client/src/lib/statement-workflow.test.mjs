@@ -6,6 +6,15 @@ const output = await build({ entryPoints: ['client/src/lib/statement-workflow.ts
   b.onLoad({ filter: /.*/, namespace: 'test-db' }, () => ({ contents: 'export const db={};', loader: 'js' }));
 }}] });
 const { statementAmount, statementUnitPrice, saveStatementBilling } = await import('data:text/javascript;base64,' + Buffer.from(output.outputFiles[0].text).toString('base64'));
+const queryBundle = await build({ entryPoints: ['client/src/lib/tradeStatementQueries.ts'], bundle: true, write: false, platform: 'node', format: 'esm', logLevel: 'silent', plugins: [{ name: 'legacy-db', setup(b) {
+  b.onResolve({ filter: /^\.\/db$/ }, a => ({ path: a.path, namespace: 'test-db' }));
+  b.onLoad({ filter: /.*/, namespace: 'test-db' }, () => ({ contents: 'export const db={};', loader: 'js' }));
+}}] });
+const { fromRow } = await import('data:text/javascript;base64,' + Buffer.from(queryBundle.outputFiles[0].text).toString('base64'));
+const legacyLine = { description: 'test', qty: 1, unitPrice: 100, taxType: '과세', taxRate: 10, memo: '현장 접수 납품 test' };
+assert.ok(Math.abs(statementAmount(fromRow({ lines: [legacyLine] })) - 110) < 0.000001);
+assert.equal(legacyLine.taxRate, 10, 'legacy source remains unchanged');
+assert.equal(fromRow({ lines: [{ ...legacyLine, memo: 'other source' }] }).lines[0].taxRate, 10, 'unknown rate is not guessed');
 const statement = { id: 'test_statement', statementNo: '', vendorId: 'test_buyer', vendorName: 'test', vendorCode: 'TEST', projectNo: 'test_project', workspace: 'OEM', issueDate: '2026-10-10', createdAt: '2026-10-10T00:00:00Z', status: '청구완료', lines: [{ id: 'test_line', description: 'test product', qty: 10, unitPrice: 100, taxType: '과세', taxRate: 0.1 }] };
 assert.equal(statementAmount(statement), 1100);
 assert.equal(statementAmount({ lines: [...statement.lines, { ...statement.lines[0], taxType: '면세' }] }), 2100);

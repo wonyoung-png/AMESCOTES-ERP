@@ -33,7 +33,9 @@ export const fromRow = (r: any) => ({
   projectNo: r.project_no || undefined,
   workspace: r.workspace || undefined,
   issueDate: r.issue_date || '',
-  lines: Array.isArray(r.lines) ? r.lines : [],
+  // 옛 현장 접수만 10(%)로 저장했다. DB 원본은 보존하고 화면에서는 비율로 읽는다.
+  lines: Array.isArray(r.lines) ? r.lines.map((line: any) => line?.taxRate === 10
+    && String(line.memo || '').startsWith('현장 접수') ? { ...line, taxRate: 0.1 } : line) : [],
   status: r.status,
   taxInvoice: r.tax_invoice || undefined,
   taxInvoiceNo: r.tax_invoice_no || undefined,
