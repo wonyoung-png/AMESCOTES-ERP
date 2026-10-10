@@ -41,6 +41,7 @@ for (const scenario of ['stale', 'missing_version', 'current', 'invalid'] as con
       }
       // Success may request the real syncSoon implementation's member list; no links exist.
       if (url.pathname === '/gcal_links') return new Response('[]');
+      if (url.pathname === '/rpc/deliver_work_notifications') return new Response(JSON.stringify({delivered:0,pending:false}));
       throw new Error('Unexpected fixture request ' + url.pathname);
     }) as typeof fetch;
     try {

@@ -15,6 +15,7 @@ import reorderBridgeRouter from "./reorder-bridge.js";
 import vendorOcrRouter from "./vendor-ocr.js";
 import captureRouter from "./capture.js";
 import workRouter from "./work.js";
+import { startWorkNotificationDelivery } from "./work-notifications.js";
 import usersRouter from "./users.js";
 import ceoRouter, { ceoHostGate, ceoHostLock } from "./ceo.js";
 import { startAgentScheduler } from "./agents.js";
@@ -145,6 +146,7 @@ async function startServer() {
     console.log(`[server] AMESCOTES ERP 서버 시작 — port ${port}`);
     startAgentScheduler(); // 팀 에이전트 아침 점검 (KST 08:30 이후 하루 한 번)
     startGcalSync(); // 직원 구글 캘린더 정기 동기화 (키 없으면 꺼짐)
+    startWorkNotificationDelivery(); // 저장된 알림 의도만 재전송 (업무 재작성 없음)
   });
 }
 

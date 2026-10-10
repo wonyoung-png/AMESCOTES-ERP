@@ -13,6 +13,7 @@ import { searchCards, prioritizeCards, allRows, readRows, countRows, cardEvidenc
 import { workPageQuery, workCountQueries, notificationReadIds, type WorkCursor } from './work-feed.js';
 import { submittedWork } from './work-submit.js';
 import { attachCampaignEvidence, CAMPAIGN_EVIDENCE_RULES } from './campaign-evidence.js';
+import { deliverWorkNotifications } from './work-notifications.js';
 import { schedulePayload, SCHEDULE_CHANNELS } from '../shared/schedule.js';
 
 const router = Router();
@@ -282,7 +283,7 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
     if (requestId !== undefined && (typeof requestId !== 'string' || !/^wc_[a-z0-9]{1,40}$/.test(requestId))) { res.status(400).json({ error: 'bad_request_id' }); return; }
     if (requestId) {
       const previous = await submittedWork(requestId, me.id, text);
-      if (previous) { res.json({ ok: true, card: previous, reused: true }); return; }
+      if (previous) { res.json({ ok: true, card: previous, reused: true, notified: await deliverWorkNotifications(previous.id) }); return; }
     }
 
     const since = new Date(Date.now() - 30 * 864e5).toISOString();
@@ -307,7 +308,6 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
     const routed = routeFor(kind, me, all);
     kind = routed.kind;
     const owner = routed.owner;
-    const assignee = kind === 'request_check' ? owner : undefined;
 
     const card = {
       id: requestId || genId('wc'),
@@ -318,19 +318,18 @@ router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
       related_id: relatedId,
     };
     const r = await restAsServer('work_cards', {
-      method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(card),
+      method: 'POST', headers: { Prefer: 'return=representation', 'X-Work-Actor-Id': me.id }, body: JSON.stringify(card),
     });
     if (!r.ok) {
       // 동시에 재시도한 요청은 PK 충돌 후 원본을 확인한다. AI 결과로 기존 카드를 덮지 않는다.
       if (requestId && r.status === 409) {
         const previous = await submittedWork(requestId, me.id, text);
-        if (previous) { res.json({ ok: true, card: previous, reused: true }); return; }
+        if (previous) { res.json({ ok: true, card: previous, reused: true, notified: await deliverWorkNotifications(previous.id) }); return; }
       }
       res.status(r.status === 409 ? 409 : 502).json({ error: 'save_failed', detail: (await r.text()).slice(0, 300) }); return;
     }
 
-    const notified = assignee
-      ? await notify([{ user_id: assignee.id, card_id: card.id, title: `${me.name} — 확인 요청`, body: text }]) : true;
+    const notified = await deliverWorkNotifications(card.id);
     syncSoon(); // 마감 있는 할 일이면 구글 캘린더에도
     res.json({ ok: true, card: (await r.json())[0], notified });
   } catch (e) {
@@ -419,7 +418,7 @@ router.post('/api/work/:id/reply', requireUser(), async (req: Request, res: Resp
     if (!text) { res.status(400).json({ error: 'reply_required' }); return; }
 
     const r = await restAsServer(mutationQuery(card, 'open'), {
-      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      method: 'PATCH', headers: { Prefer: 'return=representation', 'X-Work-Actor-Id': me.id },
       body: JSON.stringify({
         status: 'done', reply_text: text, replied_by_name: me.name, replied_at: new Date().toISOString(),
         done_by_name: me.name, done_at: new Date().toISOString(), updated_at: new Date().toISOString(),
@@ -428,8 +427,7 @@ router.post('/api/work/:id/reply', requireUser(), async (req: Request, res: Resp
     if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
     if (!(await r.json()).length) { res.status(409).json({ error: 'already' }); return; }
 
-    const notified = card.created_by && card.created_by !== me.id
-      ? await notify([{ user_id: card.created_by, card_id: card.id, title: `${me.name} — 답변`, body: text }]) : true;
+    const notified = await deliverWorkNotifications(card.id);
     res.json({ ok: true, notified });
   } catch (e) {
     console.error('POST /api/work/:id/reply 실패:', e);
@@ -503,8 +501,7 @@ router.post('/api/work/:id/kind', requireUser(), async (req: Request, res: Respo
     if (!r.ok) { res.status(502).json({ error: 'db', detail: (await r.text()).slice(0, 300) }); return; }
     if (!(await r.json()).length) { res.status(409).json({ error: 'already' }); return; }
 
-    const notified = routed.kind === 'request_check' && routed.owner
-      ? await notify([{ user_id: routed.owner.id, card_id: card.id, title: `${author.name} — 확인 요청`, body: card.raw_text }]) : true;
+    const notified = await deliverWorkNotifications(card.id);
     syncSoon();
     res.json({ ok: true, kind: routed.kind, notified });
   } catch (e) {
@@ -590,6 +587,7 @@ router.post('/api/work/:id/confirm', requireUser(), async (req: Request, res: Re
 
     const r = await restAsServer('rpc/confirm_schedule_card', {
       method: 'POST',
+      headers: { 'X-Work-Actor-Id': me.id },
       body: JSON.stringify({ p_id: card.id, p_payload: payload, p_actor_name: me.name, p_shared: shared, p_expected_updated_at: card.updated_at }),
     });
     if (!r.ok) {
@@ -609,16 +607,8 @@ router.post('/api/work/:id/confirm', requireUser(), async (req: Request, res: Re
     }
     const ref = await r.json();
 
-    // 공유받는 팀원 + 쓴 사람(남이 확정했을 때)에게 알림
-    const title = String(payload.title || card.raw_text);
-    const when = payload.startDate === payload.endDate || !payload.endDate
-      ? payload.startDate : `${payload.startDate}~${payload.endDate}`;
-    const notified = await notify([
-      ...all.filter(m => shared.includes(m.team) && m.id !== me.id)
-        .map(m => ({ user_id: m.id, card_id: card.id, title: `[${card.team || '팀'}] 일정 공유`, body: `${when} ${title}` })),
-      ...(card.created_by && card.created_by !== me.id
-        ? [{ user_id: card.created_by, card_id: card.id, title: `${me.name} — 캘린더 등록`, body: `${when} ${title}` }] : []),
-    ]);
+    // 수신자·확정 내용은 업무와 함께 저장됐다. 전달 실패 시 업무 재작성 없이 자동 재송신한다.
+    const notified = await deliverWorkNotifications(card.id);
     syncSoon(); // 공유받은 팀원들 구글 캘린더에 기획전
     res.json({ ok: true, ref, shared, notified: notified !== false });
   } catch (e) {

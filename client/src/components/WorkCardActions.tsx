@@ -73,7 +73,7 @@ export async function postWork(text: string, requestId?: string): Promise<Card |
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { toast.error(j.error === 'no_session' ? '로그인이 풀렸습니다' : j.error === 'request_conflict' ? '이전 요청과 내용이 다릅니다. 내용을 확인해주세요' : '올리기 실패'); return null; }
-    if (j.notified === false) toast.warning('업무는 저장됐지만 확인 요청 알림 전달에 실패했습니다 — 업무함에서 확인해주세요');
+    if (j.notified === false) toast.warning('업무는 저장됐습니다. 알림은 전달 대기 중이며 자동으로 재시도됩니다');
     return j.card as Card;
   } catch { toast.error('올리기 실패 — 통신 상태를 확인해주세요'); return null; }
 }
@@ -135,7 +135,7 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { toast.error(j.message || (j.error === 'already' ? '이미 처리됐습니다' : '처리 실패')); return false; }
-      if (j.notified === false) toast.warning('저장은 완료됐지만 알림 전달에 실패했습니다 — 업무함에서 확인해주세요');
+      if (j.notified === false) toast.warning('저장은 완료됐습니다. 알림은 전달 대기 중이며 자동으로 재시도됩니다');
       else toast.success(ok);
       onDone();
       return true;

@@ -10,6 +10,7 @@ import payableRouter from '../server/payable-payment';
 import { rest, restAsServer, requireUser } from '../server/auth';
 import { verifyFinanceHttp } from './e2e-finance-http';
 import { verifyWorkHttp, workHttpLlmCases, ceoLoopbackRequest } from './e2e-work-http';
+import { deliverWorkNotifications } from '../server/work-notifications';
 
 const REST = 'http://erp-e2e-api-20261010:3000';
 assert.equal(process.env.ERP_E2E_ISOLATED, '20261010');
@@ -24,6 +25,7 @@ let mutationRace: { id: string; kind: string } | null = null;
 let changedCampaignCard: string | null = null;
 let changedCampaignPrompts = 0;
 let changedCampaignSource: { id: string; updatedAt: string } | null = null;
+let deliveryFailure: 'before' | 'after' | null = null;
 function assertChangedCampaignLine(message: string) {
   assert.ok(changedCampaignCard && changedCampaignSource);
   const line = message.split('\n').find(line => line.startsWith('- id=' + changedCampaignCard + ' '));
@@ -68,6 +70,14 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.origin !== REST && url.hostname !== '127.0.0.1') {
     forbidden.push(url.origin);
     throw new Error('Isolated harness blocks external network');
+  }
+  if (url.origin === REST && url.pathname === '/rpc/deliver_work_notifications' && deliveryFailure) {
+    const failure = deliveryFailure; deliveryFailure = null;
+    if (failure === 'after') {
+      const committed = await originalFetch(input,{...init,redirect:'error'});
+      assert.ok(committed.ok); await committed.text();
+    }
+    throw new Error('Synthetic notification delivery response failure: '+failure);
   }
   if (url.origin===REST && url.pathname==='/work_cards' && (!init?.method || init.method==='GET')
     && mutationRace && url.searchParams.get('id')==='eq.'+mutationRace.id && url.searchParams.get('select')==='*') {
@@ -145,6 +155,29 @@ async function main() {
     if(workOnly) {
       const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:fixtures.bossEmail,password})});
       assert.equal(login.status,200); const cookie=login.headers.get('set-cookie')!.split(';')[0];
+      const staffLogin=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:fixtures.staffEmail,password})});
+      assert.equal(staffLogin.status,200); const staffCookie=staffLogin.headers.get('set-cookie')!.split(';')[0];
+      const noticeRows=async(id:string)=>fixtures.read('notifications?card_id=eq.'+id+'&select=*');
+      for (const failure of ['before','after','concurrent'] as const) {
+        const id='wc_'+crypto.randomUUID().replaceAll('-',''),text='isolated delivery '+failure;
+        const seed=await restAsServer('work_cards',{method:'POST',body:JSON.stringify({id,kind:'request_check',status:'open',created_by:'e2e_staff',created_by_name:'테스트 직원',team:'국내 MD',raw_text:text,assignee_id:'e2e_leader'})});
+        assert.ok(seed.ok,'Work + pending notification must commit without the application delivery step');
+        assert.equal((await noticeRows(id)).length,0);
+        if(failure==='concurrent') await Promise.all([deliverWorkNotifications(id),deliverWorkNotifications(id)]);
+        else {
+          deliveryFailure=failure;
+          assert.equal(await deliverWorkNotifications(id),false);
+          assert.equal((await noticeRows(id)).length,failure==='before'?0:1);
+        }
+        const replay=await fetch(base+'/api/work',{method:'POST',headers:{'Content-Type':'application/json',Cookie:staffCookie},body:JSON.stringify({text,requestId:id})});
+        assert.equal(replay.status,200);const replayBody=await replay.json();
+        assert.equal(replayBody.reused,true);assert.equal(replayBody.notified,true);
+        const notices=await noticeRows(id);assert.equal(notices.length,1);
+        const read=await restAsServer('notifications?id=eq.'+notices[0].id,{method:'PATCH',body:JSON.stringify({read_at:'2026-10-10T00:00:00Z'})});assert.ok(read.ok);
+        assert.equal(await deliverWorkNotifications(id),true);
+        assert.equal((await noticeRows(id))[0].read_at,'2026-10-10T00:00:00+00:00');
+        console.log(JSON.stringify({actualNotificationRecovery:failure,status:'PASS',notifications:1,readPreserved:true}));
+      }
       for(const s of [
         {route:'reply',kind:'request_check',next:'schedule',body:{text:'stale reply'}},
         {route:'done',kind:'todo',next:'schedule',body:{note:'stale done'}},
