@@ -31,4 +31,12 @@ globalThis.fetch = async (_url, init) => { payloads.push(JSON.parse(init.body));
 await postWork('확인 필요', 'wc_retry');
 await postWork('확인 필요', 'wc_retry');
 assert.deepEqual(payloads[0], payloads[1]);
-console.log('work API checks=11 PASS');
+await postWork('확인 필요','wc_retry','fixture_a');
+assert.equal(payloads.at(-1).expectedUserId,'fixture_a');
+for(const [status,error] of [[401,'no_session'],[409,'session_changed']]) {
+  globalThis.fetch=async()=>({status,ok:false,json:async()=>({error})});
+  await assert.rejects(postWork('확인 필요','wc_retry','fixture_a'),/로그인 계정이 변경되었거나 만료되었습니다/);
+}
+globalThis.fetch=async()=>({status:200,ok:true,json:async()=>({card:{id:'wc_retry',created_by:'fixture_b'}})});
+assert.equal(await postWork('확인 필요','wc_retry','fixture_a'),null);
+console.log('work API checks=15 PASS');

@@ -21,35 +21,80 @@ export default function WorkFeed() {
   const [me, setMe] = useState<Me | null>(null);
   const [tab, setTab] = useState<Tab>('todo');
   const [loadError, setLoadError] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [counts, setCounts] = useState<WorkCounts | undefined>();
   const [nextCursor, setNextCursor] = useState<WorkCursor | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const revision = useRef(0);
+  const rangeEnd = useRef<WorkCursor | null>(null);
+  const rangeOwner = useRef<string | null>(null);
+  const paging = useRef(false);
 
   const load = useCallback(async () => {
     const current = ++revision.current;
-    const j = await fetchWork();
+    const savedEnd = rangeEnd.current;
+    const savedOwner = rangeOwner.current;
+    let j = await fetchWork();
+    const end = j?.me?.id === savedOwner ? savedEnd : null;
+    const collected = j ? [...j.items] : [];
+    const actorId = j?.me?.id;
+    const cursors = new Set<string>();
+    while (j?.nextCursor && end && (j.nextCursor.created_at > end.created_at ||
+      (j.nextCursor.created_at === end.created_at && j.nextCursor.id > end.id))) {
+      if (current !== revision.current) return;
+      const key = JSON.stringify(j.nextCursor);
+      if (cursors.has(key) || cursors.size >= 100) { j = null; break; }
+      cursors.add(key);
+      j = await fetchWork(j.nextCursor);
+      if (j && j.me?.id !== actorId) { j = null; break; }
+      if (j) collected.push(...j.items);
+    }
     if (current !== revision.current) return;
     setLoadError(!j);
-    if (j) { setItems(j.items); setMe(j.me); setCounts(j.counts); setNextCursor(j.nextCursor); }
+    setInitialLoading(false);
+    if (j) {
+      if (rangeOwner.current !== j.me?.id) rangeEnd.current = null;
+      rangeOwner.current = j.me?.id ?? null;
+      const retained = end ? collected.filter(c => c.created_at > end.created_at ||
+        (c.created_at === end.created_at && c.id >= end.id)) : collected;
+      const last = retained.at(-1);
+      setItems([...new Map(retained.map(c => [c.id, c])).values()]); setMe(j.me); setCounts(j.counts);
+      setNextCursor(retained.length < collected.length ? last ? { created_at: last.created_at, id: last.id } : end : j.nextCursor);
+      if (j.counts) window.dispatchEvent(new CustomEvent('work:unread', { detail: j.counts.attention }));
+    }
   }, []);
   useEffect(() => {
     load();
+    const refreshVisible = () => { if (!document.hidden && !paging.current) load(); };
+    const timer = window.setInterval(refreshVisible, 60_000);
     // 위젯에서 올리면 여기도 갱신한다
     window.addEventListener('work:changed', load);
-    return () => window.removeEventListener('work:changed', load);
+    window.addEventListener('focus', refreshVisible);
+    document.addEventListener('visibilitychange', refreshVisible);
+    return () => {
+      ++revision.current;
+      window.clearInterval(timer);
+      window.removeEventListener('work:changed', load);
+      window.removeEventListener('focus', refreshVisible);
+      document.removeEventListener('visibilitychange', refreshVisible);
+    };
   }, [load]);
 
   const loadMore = async () => {
-    if (!nextCursor || loadingMore) return;
+    if (!nextCursor || paging.current) return;
     setLoadingMore(true);
-    const current = revision.current;
+    paging.current = true;
+    // A user-requested extra page supersedes any refresh already reading the old range.
+    const current = ++revision.current;
     const j = await fetchWork(nextCursor);
-    if (j && current === revision.current) {
+    if (j && current === revision.current && j.me?.id === me?.id) {
       setItems(previous => [...new Map([...previous, ...j.items].map(c => [c.id, c])).values()]);
+      const last = j.items.at(-1);
+      if (last) rangeEnd.current = { created_at: last.created_at, id: last.id };
       setCounts(j.counts); setNextCursor(j.nextCursor);
-    } else if (!j) toast.error('이전 업무 조회 실패 — 기존 목록은 유지됩니다');
+    } else if (!j || j.me?.id !== me?.id) toast.error('이전 업무 조회 실패 — 로그인 계정과 통신 상태를 확인해주세요. 기존 목록은 유지됩니다');
     setLoadingMore(false);
+    paging.current = false;
   };
 
   const lists = useMemo(() => {
@@ -108,7 +153,8 @@ export default function WorkFeed() {
       </div>
 
       <div className="space-y-2">
-        {lists[tab].length === 0 && (
+        {initialLoading && <p role="status" className="text-sm text-muted-foreground py-6 text-center">업무를 불러오는 중입니다…</p>}
+        {!initialLoading && !loadError && !!me && lists[tab].length === 0 && (
           <p className="text-sm text-muted-foreground py-6 text-center">
             {nextCursor ? '현재 조회 범위에 없습니다. 이전 업무도 확인해 주세요.' : tab === 'todo' ? '처리할 일이 없습니다' : '아직 올라온 카드가 없습니다'}
           </p>

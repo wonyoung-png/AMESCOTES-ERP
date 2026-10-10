@@ -120,8 +120,16 @@ export default function WorkChatWidget() {
   const [counts, setCounts] = useState<WorkCounts | undefined>();
   const [text, setText] = useState('');
   const [pending, setPending] = useState<string | null>(null);
+  const [sendBusy, setSendBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const sending = useRef(false);
+  const loadRevision = useRef(0);
+  const identity = useRef<string | null>(null);
+  useEffect(() => {
+    if (!me?.id) return;
+    if (identity.current && identity.current !== me.id) { setText(''); setPending(null); }
+    identity.current = me.id;
+  }, [me?.id]);
   const attempt = useMemo(() => {
     if (!me?.id) return null;
     try { return createWorkSubmitAttempt(me.id, window.sessionStorage); }
@@ -131,21 +139,29 @@ export default function WorkChatWidget() {
   const frozen = attempt?.request;
 
   const load = useCallback(async () => {
+    const revision = ++loadRevision.current;
     const j = await fetchWork();
+    if (revision !== loadRevision.current) return;
     if (j) { setItems(j.items); setMe(j.me); setCounts(j.counts); }
   }, []);
 
   // 닫혀 있어도 "내 할 일" 수는 보여야 한다 — 1분마다, 그리고 피드에서 처리했을 때
   useEffect(() => {
     load();
-    const t = setInterval(load, 60_000);
+    const refreshVisible = () => { if (!document.hidden) load(); };
+    const t = setInterval(refreshVisible, 60_000);
     window.addEventListener('work:changed', load);
+    window.addEventListener('focus', refreshVisible);
+    document.addEventListener('visibilitychange', refreshVisible);
     // 상단 이름 메뉴의 "내 업무 프로필"
     const openProfile = () => { setOpen(true); setShowProfile(true); };
     window.addEventListener('work:open-profile', openProfile);
     return () => {
       clearInterval(t);
+      ++loadRevision.current;
       window.removeEventListener('work:changed', load);
+      window.removeEventListener('focus', refreshVisible);
+      document.removeEventListener('visibilitychange', refreshVisible);
       window.removeEventListener('work:open-profile', openProfile);
     };
   }, [load]);
@@ -168,18 +184,20 @@ export default function WorkChatWidget() {
   const send = async (t = text) => {
     const msg = t.trim();
     if (!msg || sending.current) return;
-    if (!attempt) { toast.error('로그인·요청 보존 공간을 확인하지 못했습니다. 전송하지 않았습니다.'); return; }
+    if (!attempt || !me?.id) { toast.error('로그인·요청 보존 공간을 확인하지 못했습니다. 전송하지 않았습니다.'); return; }
     sending.current = true;
+    setSendBusy(true);
     setPending(msg);
     try {
-      await attempt.run(msg, request => postWork(request.text, request.requestId));
-      setText(current => current.trim() === msg ? '' : current);
+      await attempt.run(msg, request => postWork(request.text, request.requestId, me.id));
+      if (identity.current === me.id) setText(current => current.trim() === msg ? '' : current);
       announceWorkChanged();
     } catch (error) {
       toast.error((error as Error).message || '저장 결과를 확인하지 못했습니다. 원문으로 재시도해주세요.');
     } finally {
       setPending(null);
       sending.current = false;
+      setSendBusy(false);
       refreshAttempt(n => n + 1);
     }
   };
@@ -269,17 +287,18 @@ export default function WorkChatWidget() {
             <div ref={endRef} />
           </div>
 
+          {sendBusy && !pending && <p role="status" className="px-3 py-2 text-xs border-t border-border">이전 계정의 요청 결과를 확인 중입니다. 확인이 끝나면 입력할 수 있습니다.</p>}
           {((frozen && !pending) || attempt?.blocked || (me && !attempt)) && <div role="alert" className="px-3 py-2 text-xs border-t border-border space-y-1">
             <p>{attempt?.blocked || (!attempt ? '요청 보존 공간을 사용할 수 없어 전송을 중단했습니다. 브라우저 저장 공간을 확인해주세요.' : '이전 요청의 저장 결과가 미확인입니다. 복원된 원문·동일 요청 ID로 재시도하세요.')}</p>
             {frozen && <><p className="whitespace-pre-wrap break-words">{frozen.text}</p>
-              <button type="button" disabled={!!pending || !!attempt?.blocked} onClick={() => send(frozen.text)} className="underline disabled:opacity-40">동일 요청 다시 확인</button></>}
+              <button type="button" disabled={sendBusy || !!attempt?.blocked} onClick={() => send(frozen.text)} className="underline disabled:opacity-40">동일 요청 다시 확인</button></>}
             <p>이 탭에서만 요청이 보존됩니다. 다른 탭·기기에서 새로 등록하기 전 업무함에서 저장 여부를 확인하세요.</p>
           </div>}
           <div className="shrink-0 border-t border-border p-2 flex items-end gap-2">
             <textarea
               value={text}
               onChange={e => setText(e.target.value)}
-              disabled={!!pending || !!frozen || !!attempt?.blocked || !attempt}
+              disabled={sendBusy || !!frozen || !!attempt?.blocked || !attempt}
               onKeyDown={e => {
                 // 한글 조합 중 Enter 는 글자 확정이다. 그때 보내면 마지막 글자가 두 번 들어간다
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
@@ -288,7 +307,7 @@ export default function WorkChatWidget() {
               placeholder="업무를 한 줄로 쓰거나 물어보세요"
               className="flex-1 max-h-32 min-h-10 rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none outline-none focus:border-primary/50"
             />
-            <button type="button" onClick={() => send()} disabled={!text.trim() || !!pending || !!frozen || !!attempt?.blocked || !attempt} aria-label="보내기"
+            <button type="button" onClick={() => send()} disabled={!text.trim() || sendBusy || !!frozen || !!attempt?.blocked || !attempt} aria-label="보내기"
               className="h-10 w-10 shrink-0 rounded-lg bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40">
               <Send className="w-4 h-4" />
             </button>

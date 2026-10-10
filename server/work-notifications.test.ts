@@ -52,11 +52,36 @@ test('same saved submission retries delivery without classifying/inserting work 
     for(const expected of [false,true]) {
       const response=await realFetch(`http://127.0.0.1:${(server.address() as {port:number}).port}/api/work`,{
         method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+signJwt({email:member.email,exp:Math.floor(Date.now()/1000)+60})},
-        body:JSON.stringify({text:card.raw_text,requestId:card.id}),
+        body:JSON.stringify({text:card.raw_text,requestId:card.id,...(expected?{expectedUserId:member.id}:{})}),
       });
       assert.equal(response.status,200);const body=await response.json();
       assert.equal(body.reused,true);assert.equal(body.notified,expected);assert.equal(body.card.id,card.id);
     }
     assert.equal(flushes,2);
   } finally {globalThis.fetch=realFetch;await new Promise<void>((r,j)=>server.close(e=>e?j(e):r()));}
+});
+
+test('stale browser identity cannot submit under another authenticated account', async () => {
+  const realFetch=globalThis.fetch;
+  const member={id:'fixture_b',email:'b@test.invalid',name:'테스트 B',role:'사원',team:'국내 MD',is_active:true};
+  let reads=0;const violations:string[]=[];
+  globalThis.fetch=(async(input:any)=>{
+    const url=new URL(String(input));
+    if(url.origin==='http://notification.fixture.invalid'&&url.pathname==='/app_users') {reads++;return new Response(JSON.stringify([member]));}
+    violations.push(url.origin+url.pathname);throw new Error('Prohibited test request');
+  }) as typeof fetch;
+  const app=express();app.use(express.json());app.use(router);const server=app.listen(0,'127.0.0.1');
+  await new Promise<void>(r=>server.once('listening',r));
+  try {
+    for(const expectedUserId of ['fixture_a','',null,{}]) {
+      const before=reads;
+      const response=await realFetch(`http://127.0.0.1:${(server.address() as {port:number}).port}/api/work`,{
+        method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+signJwt({email:member.email,exp:Math.floor(Date.now()/1000)+60})},
+        body:JSON.stringify({text:'A의 보존 업무',requestId:'wc_identityfixture',expectedUserId}),
+      });
+      assert.equal(response.status,409);assert.equal((await response.json()).error,'session_changed');
+      assert.equal(reads-before,1,'Only authentication lookup; no members, work, model or mutation');
+    }
+    assert.deepEqual(violations,[]);
+  } finally {globalThis.fetch=realFetch;server.closeAllConnections();await new Promise<void>((r,j)=>server.close(e=>e?j(e):r()));}
 });

@@ -270,6 +270,10 @@ export function routeFor(kind: Kind, author: Member, all: Member[]): { kind: Kin
 
 router.post('/api/work', requireUser(), async (req: Request, res: Response) => {
   try {
+    const expectedUserId = (req.body ?? {}).expectedUserId;
+    if (expectedUserId !== undefined && expectedUserId !== userOf(req).id) {
+      res.status(409).json({ error: 'session_changed' }); return;
+    }
     const all = await members();
     const me = all.find(m => m.id === userOf(req).id);
     if (!me) { res.status(401).json({ error: 'no_session' }); return; }

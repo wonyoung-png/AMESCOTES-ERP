@@ -65,17 +65,25 @@ export const isTodo = (c: Card, me: Me | null) => c.status === 'open' && !!me &&
   c.assignee_id === me.id || (c.kind === 'schedule' && (c.created_by === me.id || canActOn(c, me)))
 );
 
-export async function postWork(text: string, requestId?: string): Promise<Card | null> {
+class WorkSessionError extends Error {}
+
+export async function postWork(text: string, requestId?: string, expectedUserId?: string): Promise<Card | null> {
   try {
     const r = await fetch('/api/work', {
       method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, requestId }),
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, requestId, expectedUserId }),
+      signal: AbortSignal.timeout(90_000),
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) { toast.error(j.error === 'no_session' ? '로그인이 풀렸습니다' : j.error === 'request_conflict' ? '이전 요청과 내용이 다릅니다. 내용을 확인해주세요' : '올리기 실패'); return null; }
+    if (r.status === 401 || j.error === 'session_changed') throw new WorkSessionError('로그인 계정이 변경되었거나 만료되었습니다. 원래 계정으로 로그인한 뒤 같은 요청을 다시 확인해주세요.');
+    if (!r.ok) { toast.error(j.error === 'request_conflict' ? '이전 요청과 내용이 다릅니다. 내용을 확인해주세요' : '올리기 실패'); return null; }
+    if (expectedUserId && j.card?.created_by !== expectedUserId) { toast.error('저장한 작성자를 확인하지 못했습니다. 원래 계정에서 같은 요청으로 다시 확인해주세요.'); return null; }
     if (j.notified === false) toast.warning('업무는 저장됐습니다. 알림은 전달 대기 중이며 자동으로 재시도됩니다');
     return j.card as Card;
-  } catch { toast.error('올리기 실패 — 통신 상태를 확인해주세요'); return null; }
+  } catch (error) {
+    if (error instanceof WorkSessionError) throw error;
+    toast.error('저장 결과를 확인하지 못했습니다 — 통신 상태를 확인하고 같은 요청으로 다시 확인해주세요'); return null;
+  }
 }
 
 /** 실패하면 null — 순간 장애에 대화·배지가 통째로 비면 안 되니 부르는 쪽이 이전 값을 유지한다 */
@@ -84,7 +92,7 @@ export async function fetchWork(before?: WorkCursor | null, countsOnly = false):
     const params = new URLSearchParams();
     if (before) params.set('before', JSON.stringify(before));
     if (countsOnly) params.set('countsOnly', '1');
-    const r = await fetch(`/api/work${params.size ? '?' + params : ''}`, { credentials: 'include' });
+    const r = await fetch(`/api/work${params.size ? '?' + params : ''}`, { credentials: 'include', cache: 'no-store' });
     if (!r.ok) return null;
     const j = await r.json();
     if (!Array.isArray(j.items)) return null;
