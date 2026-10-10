@@ -436,9 +436,9 @@ function agentList() {
     const a = by.get(k) || { team: k, status: t.open ? 'work' : 'idle', headline: '아직 점검 전이에요', summary: null, needs: [], stats: {}, created_at: null };
     const w = (D.watch || []).find(x => x.team === k);
     return { ...a, division: org ? org.division : '대표 직속', status: t.overdue || w?.alerts ? 'warn'
-      : D.decide.some(c => c.kind === 'request_check' && c._org === k) ? 'report' : t.open || t.newToday ? 'work' : 'idle',
+      : D.decide.some(c => c.kind === 'request_check' && c._org === k) ? 'report' : t.open || t.newToday || t.sharedToday ? 'work' : 'idle',
       headline: (a.stale ? '[오늘 이전 보고] ' : '') + a.headline,
-      stats: { ...a.stats, open: t.open, overdue: t.overdue, doneToday: t.doneToday, newToday: t.newToday,
+      stats: { ...a.stats, open: t.open, overdue: t.overdue, doneToday: t.doneToday, newToday: t.newToday, shared: t.shared || 0, sharedToday: t.sharedToday || 0,
         toCeo: D.decide.filter(c => c.kind === 'request_check' && c._org === k).length,
         alerts: w?.alerts || 0, facts: w?.facts || a.stats?.facts || [] }, liveFacts: !!w };
   });
@@ -478,7 +478,7 @@ function mapView() {
         <button class="btn" type="button" data-run="${esc(a.team)}">이 팀 지금 점검</button></div>
       <p class="head">${esc(a.headline)}</p>
       ${a.summary ? `<p class="sum">${esc(a.summary)}</p>` : ''}
-      <div class="nums"><span><b>${num(a.stats?.open) ?? 0}</b>진행 중</span><span><b>${num(a.stats?.overdue) ?? 0}</b>마감 지남</span><span><b>${num(a.stats?.toCeo) ?? 0}</b>대표 확인 요청</span><span><b>${(D.orders || []).filter(o => o.team === a.team && o.status === 'open').length}</b>내 지시 진행</span><span><b>${num(a.stats?.doneToday) ?? 0}</b>오늘 완료</span></div>
+      <div class="nums"><span><b>${num(a.stats?.open) ?? 0}</b>진행 중</span><span><b>${num(a.stats?.overdue) ?? 0}</b>마감 지남</span><span><b>${num(a.stats?.toCeo) ?? 0}</b>대표 확인 요청</span><span><b>${(D.orders || []).filter(o => o.team === a.team && o.status === 'open').length}</b>내 지시 진행</span><span><b>${num(a.stats?.doneToday) ?? 0}</b>오늘 완료</span><span><b>${num(a.stats?.shared) ?? 0}</b>공유받은 근거</span></div>
       ${a.needs?.length ? `<div><div class="sec-h"><h2>보고 당시 확인 제안</h2><span>${kst(a.created_at)} 기준 · 현재 근거 확인 후 결정</span></div><ul>${a.needs.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul></div>` : ''}
       ${facts(a)}
       ${people(a.team)}

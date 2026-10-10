@@ -35,3 +35,14 @@ test('현재 운영 경고와 대표 확인 요청으로 지도 상태를 결정
   assert.equal(list(d)[0].status, 'report');
   assert.equal(list(d)[0].stats.toCeo, 1);
 });
+
+test('지도는 오늘 공유받은 근거를 표시하되 팀 완료 건수에 더하지 않는다', () => {
+  const d: any = data();
+  d.teams[0].shared = 3;
+  d.teams[0].sharedToday = 1;
+  const [a] = list(d);
+  assert.equal(a.status, 'work');
+  assert.equal(a.stats.shared, 3);
+  assert.equal(a.stats.sharedToday, 1);
+  assert.equal(a.stats.doneToday, 2);
+});

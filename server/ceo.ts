@@ -16,10 +16,10 @@ import { currentUser, restAsServer, CEO_EMAILS, type SessionUser } from './auth.
 import { gcalConfigured, tokenFrom, verifiedEmail, GOOGLE_CLIENT_ID } from './gcal.js';
 import { members, esc, kstToday, ANSWER_MODEL, notify, genId } from './work.js';
 import { dailyFetch } from './daily-bridge.js';
-import { latestRuns, runAgentsOnce, orgOf, isDirective, CEO_DESK, loadRules } from './agents.js';
+import { latestRuns, runAgentsOnce, orgOf, isDirective, CEO_DESK, loadRules, judge } from './agents.js';
 import { ORG, DIVISIONS, DIVISION_HEADS, DEFAULT_RULES, orgTeam } from './org.js';
 import { syncSoon } from './gcal.js';
-import { allRows, reportingCards, prioritizeCards, searchCards, dayStartUtc } from './work-records.js';
+import { allRows, reportingCards, prioritizeCards, searchCards, dayStartUtc, cardEvidence } from './work-records.js';
 import { gatherWatch } from './watch.js';
 
 const router = Router();
@@ -233,24 +233,13 @@ async function gather(me: SessionUser) {
     ...open.filter(c => c.assignee_id === me.id),
     ...open.filter(c => c.kind === 'schedule' && c.assignee_id !== me.id),
   ];
-  const dayAgo = Date.parse(dayStartUtc());
-  type TeamDay = { team: string; open: number; doneToday: number; newToday: number; overdue: number; latest?: string };
-  const teams = new Map<string, TeamDay>();
-  for (const t of ORG) teams.set(t.key, { team: t.key, open: 0, doneToday: 0, newToday: 0, overdue: 0 });
-  for (const c of cards) {
-    if (c.status === 'cancelled') continue;
-    const t: string = c._org;
-    if (t === CEO_DESK) continue; // 대표 본인 업무는 '결정할 것'에서 본다
-    const s: TeamDay = teams.get(t) || { team: t, open: 0, doneToday: 0, newToday: 0, overdue: 0 };
-    if (c.status === 'open') s.open++;
-    if (c.status === 'done' && c.done_at && Date.parse(c.done_at) >= dayAgo) s.doneToday++;
-    if (Date.parse(c.created_at) >= dayAgo) s.newToday++;
-    if (c.kind === 'todo' && c.status === 'open' && c.parsed?.dueDate && c.parsed.dueDate < today) s.overdue++;
-    if (!s.latest) s.latest = c.raw_text;
-    teams.set(t, s);
-  }
+  const teamKeys = new Set([...ORG.map(t => t.key), ...cards.filter(c => c.status !== 'cancelled' && c._org !== CEO_DESK).map(c => c._org)]);
+  const teams = Array.from(teamKeys, team => {
+    const { mine, stats } = judge(team, cards, bossIds, today);
+    return { team, ...stats, latest: mine[0]?.raw_text };
+  });
 
-  return { me, today, cards, open, decide, captures, campaigns, teams: Array.from(teams.values()), members: all, kpi,
+  return { me, today, cards, open, decide, captures, campaigns, teams, members: all, kpi,
     agents: agents.map(a => ({ ...a, stale: a.created_at < dayStartUtc() })),
     watch: Array.from(watch, ([team, w]) => ({ team, ...w })), checkedAt: new Date().toISOString(),
     buyers: captures.length ? await buyerOptions() : [] };
@@ -324,16 +313,12 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
     const g = await gather((req as any).user);
     const matched = await searchCards(question);
     const evidence = prioritizeCards(Array.from(new Map([...g.cards, ...matched].map(c => [c.id, c])).values()), question, 200);
-    const fmtCard = (c: any) => `- ${c.created_at.slice(0, 10)} ${c.created_by_name}(${c.team || '-'}) [${c.kind}/${c.status}] ${c.raw_text}` +
-      (c.reply_text ? ` → ${c.replied_by_name}: ${c.reply_text}` : '') +
-      (c.confirmed_payload ? ` → 확정(${c.done_by_name})` : '') +
-      (c.parsed?.dueDate ? ` (마감 ${c.parsed.dueDate})` : '');
     const records = [
       '[직원]', ...g.members.map(m => `- ${m.name}(${m.team || '-'}${m.position ? '·' + m.position : ''})${m.profile ? ': ' + m.profile.replace(/\s+/g, ' ').slice(0, 300) : ''}`),
       '', '[운영캘린더 — 현재 진행 및 앞으로 30일, 종료 확인 누락은 현재 운영 점검에 별도 포함]', ...g.campaigns.map(c => `- ${c.start_date}~${c.end_date} ${c.channel || ''} ${c.title} (${c.status === 'draft' ? '예정' : c.status}${c.discount_rate != null ? ', ' + c.discount_rate + '%' : ''})`),
       '', '[승인 대기 현장 접수]', ...g.captures.map(c => `- ${c.created_at.slice(0, 10)} ${c.created_by_name} [${c.kind}] ${c.raw_text}`),
       '', `[업무 전수 집계 — 최근 30일 + 오래된 미결/최근 처리] ${g.cards.length}건, 미결 ${g.open.length}건`,
-      '', `[질문 관련 근거 — 과거 검색 포함, 선택 ${evidence.length}건]`, ...evidence.map(fmtCard),
+      '', `[질문 관련 근거 — 과거 검색 포함, 선택 ${evidence.length}건]`, ...evidence.map(cardEvidence),
       '', `[현재 운영 점검 — 조회 ${g.checkedAt}]`, ...g.watch.flatMap(w => [`[${w.team}] 경고 조건 ${w.alerts}개`, ...w.facts]),
       '', '[팀 에이전트 최근 점검 — 과거 보고는 현재 점검과 구분]', ...g.agents.map(a => `- ${a.team} (${a.created_at}) [${a.status}${a.stale ? ', 오늘 이전 보고' : ''}] ${a.headline}${a.summary ? ' / ' + a.summary.replace(/\s+/g, ' ') : ''}`),
       '', '[브랜드 매출 요약 (PMS)]', g.kpi ? JSON.stringify(g.kpi).slice(0, 6000) : '(지금은 불러오지 못함)',
@@ -346,6 +331,7 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
 - 대표가 결정할 일이 보이면 "결정 필요:"로 따로 짚는다.
 - 대표께 존댓말로 답한다. 근거 표본을 전수 검토한 것처럼 표현하지 않는다.
 - 조회 실패는 정상이나 0건으로 답하지 않는다. 과거 팀 보고보다 현재 운영 점검을 우선하며, 자금계획 차액을 은행 잔고나 자금 부족으로 단정하지 않는다.
+- 확정값은 원문의 예정 내용보다 우선한다. 공유 일정은 협업 근거이며, 일정 확정을 마케팅·물류 등 각 팀의 준비 완료로 단정하지 않는다.
 - 채팅창은 글자 그대로 보인다. 마크다운 기호(**, #)는 쓰지 말고 줄바꿈과 "·"로 정리한다.`;
 
     // 앞 대화는 화면이 보내온 것이라 믿을 수 없다. 대화 턴으로 끼우지 않고

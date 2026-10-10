@@ -11,7 +11,7 @@ import { members, esc, kstToday, CLASSIFY_MODEL, type Member } from './work.js';
 import { ORG, orgTeam, orgTeamOfName, DEFAULT_RULES } from './org.js';
 import { gatherWatch, type Watch } from './watch.js';
 import { runSubscriptionUsageChecks } from './subscriptions.js';
-import { allRows, reportingCards, prioritizeCards, dayStartUtc } from './work-records.js';
+import { allRows, reportingCards, prioritizeCards, dayStartUtc, cardEvidence } from './work-records.js';
 
 export type AgentStatus = 'work' | 'idle' | 'warn' | 'report';
 export type AgentRun = {
@@ -21,7 +21,7 @@ export type AgentRun = {
 
 const genId = () => `ag_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 const NO_TEAM = '팀 미지정';
-const CARD_SELECT = 'id,created_at,created_by,created_by_name,kind,status,team,assignee_id,assignee_name,parsed,raw_text,reply_text,replied_by_name,done_at';
+const CARD_SELECT = 'id,created_at,created_by,created_by_name,kind,status,team,assignee_id,assignee_name,parsed,raw_text,reply_text,replied_by_name,done_at,done_by_name,confirmed_payload,shared_teams';
 
 /** 대표 지시 카드인가 — parsed 는 AI 가 채우는 칸이라 그것만 믿지 않는다. 대표가 쓴 것 + 조직도 팀일 때만 (코덱스 지적) */
 export const isDirective = (c: any, bossIds: Set<string>) =>
@@ -35,10 +35,11 @@ export const orgOf = (c: any, bossIds: Set<string>): string =>
 export const CEO_DESK = '대표실';
 
 /** 숫자 근거와 상태 — 규칙만으로 */
-export function judge(team: string, cards: any[], bossIds: Set<string>, today: string, watch?: Watch) {
+export function judge(team: string, cards: any[], bossIds: Set<string>, today: string, watch?: Watch, now = new Date()) {
   const mine = cards.filter(c => c._org === team && c.kind !== 'question' && c.status !== 'cancelled');
+  const shared = cards.filter(c => c._org !== team && c.kind !== 'question' && c.status !== 'cancelled' && Array.isArray(c.shared_teams) && c.shared_teams.includes(team));
   const open = mine.filter(c => c.status === 'open');
-  const dayAgo = Date.parse(dayStartUtc());
+  const dayAgo = Date.parse(dayStartUtc(now));
   const stats = {
     open: open.length,
     overdue: open.filter(c => c.kind === 'todo' && c.parsed?.dueDate && c.parsed.dueDate < today).length,
@@ -46,17 +47,19 @@ export function judge(team: string, cards: any[], bossIds: Set<string>, today: s
     toCeo: open.filter(c => c.kind === 'request_check' && bossIds.has(c.assignee_id)).length,
     newToday: mine.filter(c => Date.parse(c.created_at) >= dayAgo).length,
     doneToday: mine.filter(c => c.status === 'done' && c.done_at && Date.parse(c.done_at) >= dayAgo).length,
-    total30: mine.filter(c => Date.parse(c.created_at) >= Date.now() - 30 * 864e5).length,
+    total30: mine.filter(c => Date.parse(c.created_at) >= now.getTime() - 30 * 864e5).length,
+    shared: shared.length, // 전달받은 근거이며 우리 팀의 할 일·완료 건수에는 합산하지 않는다
+    sharedToday: shared.filter(c => Date.parse(c.done_at || c.created_at) >= dayAgo).length,
     alerts: watch?.alerts || 0, // ERP·PMS 데이터 경고 (watch.ts 규칙)
   };
-  const status: AgentStatus = (stats.overdue || stats.alerts) ? 'warn' : stats.toCeo ? 'report' : (stats.open || stats.newToday) ? 'work' : 'idle';
-  return { mine, open, stats, status };
+  const status: AgentStatus = (stats.overdue || stats.alerts) ? 'warn' : stats.toCeo ? 'report' : (stats.open || stats.newToday || stats.sharedToday) ? 'work' : 'idle';
+  return { mine, shared, open, stats, status };
 }
 
-async function write(team: string, cards: any[], all: Member[], stats: Record<string, number>, status: AgentStatus, facts: string[], rules: string) {
+async function write(team: string, cards: any[], all: Member[], stats: Record<string, number>, status: AgentStatus, facts: string[], rules: string, shared: any[] = []) {
   const key = process.env.ANTHROPIC_API_KEY;
   const org = orgTeam(team);
-  if (!cards.length && !facts.length) {
+  if (!cards.length && !shared.length && !facts.length) {
     const noAccount = org && !org.members.some(p => all.some(x => x.name === p.name));
     return { headline: noAccount ? '팀원 ERP 계정 등록 전 — 아직 볼 기록이 없어요' : '최근 30일 올라온 업무가 없어요', summary: null, needs: [] as AgentRun['needs'] };
   }
@@ -74,10 +77,8 @@ async function write(team: string, cards: any[], all: Member[], stats: Record<st
     return `- ${p.name}(${p.rank}) ${acct ? `최근 7일 ${n7}건` : 'ERP 계정 없음'}${acct?.profile ? ': ' + acct.profile.replace(/\s+/g, ' ').slice(0, 200) : ''}`;
   }).join('\n');
   const selected = prioritizeCards(cards);
-  const lines = selected.map(c =>
-    `- id=${c.id} ${c.created_at.slice(5, 10)} ${c.created_by_name} [${c.kind}/${c.status}] ${c.raw_text}` +
-    (c._dir ? ` (대표 지시${c.assignee_name ? '→' + c.assignee_name : ', 받을 계정 없음'})` : '') +
-    (c.parsed?.dueDate ? ` (마감 ${c.parsed.dueDate})` : '') + (c.reply_text ? ` → ${c.replied_by_name}: ${c.reply_text}` : '')).join('\n');
+  const received = prioritizeCards(shared, '', 60);
+  const lines = selected.map(cardEvidence).join('\n');
 
   const sys = `너는 패션·핸드백 회사 아메스코테스 대표 직속의 "${team}" 팀 감독 에이전트다. 오늘(한국): ${kstToday()}.
 ${org ? `이 팀이 맡은 일: ${org.focus}.\n` : ''}대표에게 이 팀이 일을 제대로 이행하고 있는지 보고한다 — 밀린 것·빠진 것, 대표 지시의 진행, 팀원별로 누가 무엇을 하는지(조용한 사람 포함).
@@ -85,6 +86,7 @@ ${org ? `이 팀이 맡은 일: ${org.focus}.\n` : ''}대표에게 이 팀이 �
 대표가 정한 이 팀 감시 기준: ${rules || '(없음)'}
 이 기준에 비춰 [감시 데이터]와 [업무]를 읽고, 기준에 걸리는 것부터 보고한다. 데이터에 없는 숫자를 만들지 마라.
 전체 집계 ${cards.length}건 중 중요 근거 ${selected.length}건을 읽는다. 표본에 없는 세부 사항을 전수 확인했다고 말하지 마라. 대표께 존댓말로 보고한다.
+공유받은 업무 ${shared.length}건 중 ${received.length}건은 협업 근거다. 우리 팀의 진행·완료 건수에 더하거나 일정 확정을 우리 팀 준비 완료로 해석하지 마라. 확정 내용은 원문의 예정 내용보다 우선한다.
 상태는 이미 정해져 있다: ${status} (숫자 ${JSON.stringify(stats)}). 이 상태와 어긋나는 말을 하지 마라.
 JSON 하나만 출력한다.
 {"headline":"지도에 보일 한 줄, 30자 안, 지금 가장 중요한 일","summary":"3~5줄 보고, 마지막 줄은 팀원별 한 줄. 줄마다 '· '로 시작. 마크다운 금지","needs":[{"text":"대표가 결정·확인할 것 한 줄","cardId":"관련 카드 id 또는 생략"}]}
@@ -92,12 +94,12 @@ needs 는 정말 대표가 볼 것만, 없으면 []. 적혀 있지 않은 건 �
   try {
     const r = await new Anthropic({ apiKey: key }).messages.create({
       model: CLASSIFY_MODEL, max_tokens: 2000, output_config: { effort: 'low' }, system: sys,
-      messages: [{ role: 'user', content: `<records>\n[팀원]\n${esc(people) || '(없음)'}\n\n[감시 데이터 — ERP·PMS]\n${esc(facts.join('\n')) || '(없음)'}\n\n[최근 30일 업무]\n${esc(lines) || '(없음)'}\n</records>` }],
+      messages: [{ role: 'user', content: `<records>\n[팀원]\n${esc(people) || '(없음)'}\n\n[감시 데이터 — ERP·PMS]\n${esc(facts.join('\n')) || '(없음)'}\n\n[팀 업무 — 최근 30일·미결·오늘 처리·앞으로의 확정 일정]\n${esc(lines) || '(없음)'}\n\n[다른 팀에서 공유받은 근거]\n${esc(received.map(cardEvidence).join('\n')) || '(없음)'}\n</records>` }],
     });
     console.log(`[agents] usage ${team} ${r.model} in=${r.usage.input_tokens} out=${r.usage.output_tokens}`);
     const raw = r.content.find(c => c.type === 'text')?.text || '';
     const j = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
-    const ids = new Set(cards.map(c => c.id));
+    const ids = new Set([...cards, ...shared].map(c => c.id));
     return {
       headline: String(j.headline || '').slice(0, 60) || `진행 중 ${stats.open}건`,
       summary: j.summary ? String(j.summary).slice(0, 1200) : null,
@@ -116,8 +118,9 @@ needs 는 정말 대표가 볼 것만, 없으면 []. 적혀 있지 않은 건 �
 export async function loadRules(): Promise<Map<string, string>> {
   const m = new Map(Object.entries(DEFAULT_RULES));
   const r = await restAsServer('team_watch?select=team,rules');
-  if (r.ok) for (const x of await r.json()) if (x.rules?.trim()) m.set(x.team, x.rules); // 빈 값 = 기본값
-  else console.warn('[agents] team_watch 조회 실패', r.status); // 기본값으로 계속
+  if (r.ok) {
+    for (const x of await r.json()) if (x.rules?.trim()) m.set(x.team, x.rules); // 빈 값 = 기본값
+  } else console.warn('[agents] team_watch 조회 실패', r.status); // 기본값으로 계속
   return m;
 }
 
@@ -146,8 +149,8 @@ export async function runAgents(trigger: 'schedule' | 'manual', onlyTeam?: strin
   const targets = Array.from(teams).filter(t => !onlyTeam || t === onlyTeam);
   const one = async (team: string): Promise<AgentRun | null> => {
     const wt = watch.get(team);
-    const { mine, stats, status } = judge(team, cards, bossIds, today, wt);
-    const w = await write(team, mine, all, stats, status, wt?.facts || [], rules.get(team) || '');
+    const { mine, shared, stats, status } = judge(team, cards, bossIds, today, wt);
+    const w = await write(team, mine, all, stats, status, wt?.facts || [], rules.get(team) || '', shared);
     const row = { id: genId(), team, status, headline: w.headline, summary: w.summary, needs: w.needs,
       stats: { ...stats, facts: (wt?.facts || []).slice(0, 40) }, model: CLASSIFY_MODEL, trigger };
     const r = await restAsServer('team_agent_runs', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
