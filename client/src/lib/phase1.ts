@@ -577,13 +577,15 @@ export type BoardOrderInput = {
   factoryUnitPriceKrw?: number;
 };
 
-function buildOrderReceiptSummary(orderId: string, orderQty: number) {
+function buildOrderReceiptSummary(orderId: string, orderQty: number, saved: { receivedQty?: number; defectQty?: number; shippedQty?: number } = {}) {
   const logs = getAll<ReceiptLog>(KEYS.receiptLogs).filter(r => r.orderId === orderId);
   const inbound = logs.filter(l => l.logType === 'inbound');
-  const outbound = logs.filter(l => l.logType === 'outbound_oem' || l.logType === 'outbound_3pl');
-  const receivedQty = inbound.reduce((s, l) => s + l.qty, 0);
-  const defectQty = inbound.reduce((s, l) => s + l.defectQty, 0);
-  const shippedQty = outbound.reduce((s, l) => s + l.qty, 0);
+  const receivedQty = Math.max(saved.receivedQty || 0, inbound.reduce((s, l) => s + l.qty, 0));
+  const defectQty = Math.max(saved.defectQty || 0, inbound.reduce((s, l) => s + l.defectQty, 0));
+  const oemShippedQty = logs.filter(l => l.logType === 'outbound_oem').reduce((s, l) => s + l.qty, 0);
+  const threePlQty = logs.filter(l => l.logType === 'outbound_3pl').reduce((s, l) => s + l.qty, 0);
+  // 과거 누적만 있는 수량은 목적지를 추정하지 않되 출고 한도에는 포함한다.
+  const shippedQty = Math.max(saved.shippedQty || 0, oemShippedQty + threePlQty);
   const advanceQty = inbound.filter(l => l.isAdvance).reduce((s, l) => s + l.qty, 0);
   const byDestination: Record<ReceiptDestination, number> = { korea: 0, china: 0 };
   const byColor: Record<string, number> = {};
@@ -598,6 +600,9 @@ function buildOrderReceiptSummary(orderId: string, orderQty: number) {
     receivedQty,
     defectQty,
     shippedQty,
+    oemShippedQty,
+    threePlQty,
+    unclassifiedShippedQty: shippedQty - oemShippedQty - threePlQty,
     remaining: Math.max(0, orderQty - receivedQty),
     advanceQty,
     byDestination,
@@ -1031,8 +1036,8 @@ export const phase1 = {
     });
   },
 
-  getOrderReceiptSummary: (orderId: string, orderQty: number) =>
-    buildOrderReceiptSummary(orderId, orderQty),
+  getOrderReceiptSummary: (orderId: string, orderQty: number, saved?: { receivedQty?: number; defectQty?: number; shippedQty?: number }) =>
+    buildOrderReceiptSummary(orderId, orderQty, saved),
 
   /** 리오더·오더관리: 스타일별 차수 보드 */
   getReorderOrderBoard: (

@@ -1,5 +1,5 @@
 // 입고 · OEM출고 · 3PL출고 — receipt_logs 기반 부분입고
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, formatNumber, genId, type TradeStatement } from '@/lib/store';
@@ -20,7 +20,7 @@ import { statementUnitPrice } from '@/lib/statement-workflow';
 const LOG_LABELS: Record<ReceiptLogType, string> = {
   inbound: '입고',
   outbound_oem: 'OEM 직출고',
-  outbound_3pl: '3PL 입고',
+  outbound_3pl: '3PL 이동',
 };
 
 export default function ReceivingShipping() {
@@ -35,16 +35,17 @@ export default function ReceivingShipping() {
   const [logFilter, setLogFilter] = useState<ReceiptLogType | 'all'>('all');
   const [modal, setModal] = useState<{ orderId: string; logType: ReceiptLogType; requestId: string } | null>(null);
   const [receiptBusy, setReceiptBusy] = useState(false);
+  const receiptLock = useRef(false);
   const [form, setForm] = useState({ qty: 0, defectQty: 0, defectNote: '', defectDisposition: 'deduct' as DefectDisposition, date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: 'domestic' as DeliveryMarket });
   const [shippingOpen, setShippingOpen] = useState(false);
   const [shippingForm, setShippingForm] = useState({ shipDate: today, method: 'air' as ShippingMethod, orderNo: '', description: '', qty: 0, memo: '' });
-  const [, tick] = useState(0);
+  const [revision, tick] = useState(0);
   const refresh = () => { queryClient.invalidateQueries({ queryKey: ['orders'] }); tick(n => n + 1); };
 
   const enriched = useMemo(() => orders.map(o => {
-    const sum = phase1.getOrderReceiptSummary(o.id, o.qty);
+    const sum = phase1.getOrderReceiptSummary(o.id, o.qty, o);
     return { ...o, ...sum };
-  }), [orders, tick]);
+  }), [orders, revision]);
 
   const filtered = useMemo(() => enriched.filter(o => {
     if (o.status === '초안') return false;   // 확정 전 발주는 입고 대상이 아니다
@@ -66,32 +67,34 @@ export default function ReceivingShipping() {
   const allLogs = useMemo(() => {
     const logs = phase1.getReceiptLogs().sort((a, b) => b.receivedDate.localeCompare(a.receivedDate));
     return logFilter === 'all' ? logs : logs.filter(l => l.logType === logFilter);
-  }, [logFilter, tick]);
+  }, [logFilter, revision]);
 
   const openModal = (orderId: string, logType: ReceiptLogType) => {
     const o = orders.find(x => x.id === orderId);
-    const sum = phase1.getOrderReceiptSummary(orderId, o?.qty || 0);
-    const remain = logType === 'inbound' ? o!.qty - sum.receivedQty : o!.qty - sum.shippedQty;
+    if (!o || receiptLock.current) return;
+    const sum = phase1.getOrderReceiptSummary(orderId, o.qty, o);
+    const remain = logType === 'inbound' ? o.qty - sum.receivedQty : o.qty - sum.shippedQty;
     setForm({ qty: Math.max(0, remain), defectQty: 0, defectNote: '', defectDisposition: 'deduct', date: new Date().toISOString().split('T')[0], memo: '', deliveryMarket: logType === 'outbound_oem' ? 'b2b' : 'domestic' });
     setModal({ orderId, logType, requestId: genId() });
   };
 
   const submitLog = async () => {
-    if (receiptBusy) return;
+    if (receiptLock.current) return;
     if (!modal || !Number.isInteger(form.qty) || form.qty <= 0) { toast.error('수량은 양의 정수로 입력하세요'); return; }
     if (!Number.isInteger(form.defectQty) || form.defectQty < 0) { toast.error('불량수량은 0 이상의 정수여야 합니다'); return; }
     if (!validDate(form.date)) { toast.error('올바른 입출고 날짜를 입력하세요'); return; }
     const o = orders.find(x => x.id === modal.orderId);
     if (!o) return;
-    const cur = phase1.getOrderReceiptSummary(o.id, o.qty);
+    const cur = phase1.getOrderReceiptSummary(o.id, o.qty, o);
     const already = modal.logType === 'inbound' ? cur.receivedQty : cur.shippedQty;
     if (modal.logType !== 'inbound' && already + form.qty > o.qty) {
       toast.error(`발주수량을 넘습니다 — 남은 수량 ${formatNumber(Math.max(0, o.qty - already))}개`);
       return;
     }
     if (form.defectQty > form.qty) { toast.error('불량수량이 입고수량보다 많습니다'); return; }
+    receiptLock.current = true;
+    setReceiptBusy(true);
     if (modal.logType === 'inbound') {
-      setReceiptBusy(true);
       try {
         const result = await phase1.saveKoreaReceipt({ id: modal.requestId, orderId: o.id, qty: form.qty,
           defectQty: form.defectQty, defectNote: form.defectNote, disposition: form.defectDisposition,
@@ -102,75 +105,73 @@ export default function ReceivingShipping() {
         setModal(null); refresh();
         queryClient.invalidateQueries({ queryKey: ['payables'] });
       } catch (error) { toast.error((error as Error).message); }
-      finally { setReceiptBusy(false); }
+      finally { receiptLock.current = false; setReceiptBusy(false); }
       return;
     }
-    const newReceived = cur.receivedQty;
-    const newShipped = cur.shippedQty + form.qty;
-    const newDefect = cur.defectQty;
-    const updates: Record<string, unknown> = {
-      receivedQty: newReceived,
-      defectQty: newDefect,
-      receivedDate: form.date,
-      shippedQty: newShipped,
-    };
-    if (newReceived >= o.qty) updates.status = '입고완료';
-    const updatedOrder = { ...o, ...updates, updatedAt: new Date().toISOString() };
     try {
-      await upsertOrder(updatedOrder);
-    } catch (error) {
-      toast.error(`입출고 기록 저장 실패: ${(error as Error).message}`);
-      return;
-    }
-    store.updateOrder(o.id, updates as Partial<typeof o>);
-    phase1.addReceiptLog({
-      orderId: o.id,
-      orderNo: o.orderNo,
-      projectNo: (o as { projectNo?: string }).projectNo,
-      logType: modal.logType,
-      qty: form.qty,
-      defectQty: form.defectQty,
-      defectNote: form.defectNote,
-      receivedDate: form.date,
-      memo: form.memo,
-      deliveryMarket: form.deliveryMarket,
-    });
-    if (modal.logType === 'outbound_oem' && newShipped >= o.qty) {
-      const marker = `[AUTO-ORDER:${o.id}]`;
-      const exists = store.getTradeStatements().some(s => s.memo?.includes(marker));
-      const buyer = vendors.find(v => v.id === o.buyerId);
-      if (!exists && buyer) {
-        const item = items.find(i => i.id === o.styleId || i.styleNo === o.styleNo);
-        const statement: TradeStatement = {
-          id: genId(),
-          statementNo: store.getNextStatementNo(buyer.code || 'XXX'),
-          vendorId: buyer.id,
-          vendorName: buyer.name,
-          vendorCode: buyer.code || 'XXX',
-          issueDate: form.date,
-          lines: [{
-            id: genId(),
-            description: `[${o.styleNo}] ${o.styleName}`,
-            qty: newShipped,
-            unitPrice: statementUnitPrice(item),
-            taxType: '과세',
-            taxRate: 0.1,
-          }],
-          status: '미청구',
-          projectNo: o.projectNo,
-          workspace: o.workspace ?? 'OEM',
-          memo: `${marker} OEM 직출고 완료 자동 초안`,
-          createdAt: new Date().toISOString(),
-        };
-        store.addTradeStatement(statement);
-        toast.success(`거래명세표 ${statement.statementNo} 초안 자동 생성`);
-      } else if (!exists && !buyer) {
-        toast.warning('바이어가 없어 거래명세표 초안은 생성하지 못했습니다');
+      const newShipped = cur.shippedQty + form.qty;
+      const newOemShipped = cur.oemShippedQty + (modal.logType === 'outbound_oem' ? form.qty : 0);
+      const updates: Record<string, unknown> = {
+        shippedQty: newShipped,
+      };
+      const updatedOrder = { ...o, ...updates, updatedAt: new Date().toISOString() };
+      try {
+        await upsertOrder(updatedOrder);
+      } catch (error) {
+        toast.error(`입출고 기록 저장 실패: ${(error as Error).message}`);
+        return;
       }
-    }
-    toast.success(`${LOG_LABELS[modal.logType]} ${form.qty}개 기록`);
-    setModal(null);
-    refresh();
+      store.setOrders(store.getOrders().map(row => row.id === o.id ? { ...row, ...updatedOrder } : row));
+      phase1.addReceiptLog({
+        orderId: o.id,
+        orderNo: o.orderNo,
+        projectNo: (o as { projectNo?: string }).projectNo,
+        logType: modal.logType,
+        qty: form.qty,
+        defectQty: form.defectQty,
+        defectNote: form.defectNote,
+        receivedDate: form.date,
+        memo: form.memo,
+        deliveryMarket: form.deliveryMarket,
+      });
+      if (modal.logType === 'outbound_oem' && newOemShipped >= o.qty) {
+        const marker = `[AUTO-ORDER:${o.id}]`;
+        const exists = store.getTradeStatements().some(s => s.memo?.includes(marker));
+        const buyer = vendors.find(v => v.id === o.buyerId);
+        if (!exists && buyer) {
+          const item = items.find(i => i.id === o.styleId || i.styleNo === o.styleNo);
+          const statement: TradeStatement = {
+            id: genId(),
+            statementNo: store.getNextStatementNo(buyer.code || 'XXX'),
+            vendorId: buyer.id,
+            vendorName: buyer.name,
+            vendorCode: buyer.code || 'XXX',
+            issueDate: form.date,
+            lines: [{
+              id: genId(),
+              description: `[${o.styleNo}] ${o.styleName}`,
+              qty: newOemShipped,
+              unitPrice: statementUnitPrice(item),
+              taxType: '과세',
+              taxRate: 0.1,
+            }],
+            status: '미청구',
+            projectNo: o.projectNo,
+            workspace: o.workspace ?? 'OEM',
+            memo: `${marker} OEM 직출고 완료 자동 초안`,
+            createdAt: new Date().toISOString(),
+          };
+          store.addTradeStatement(statement);
+          toast.success(`거래명세표 ${statement.statementNo} 초안 자동 생성`);
+        } else if (!exists && !buyer) {
+          toast.warning('바이어가 없어 거래명세표 초안은 생성하지 못했습니다');
+        }
+      }
+      toast.success(`${LOG_LABELS[modal.logType]} ${form.qty}개 기록`);
+      setModal(null);
+      refresh();
+    } catch (error) { toast.error(`출고 저장 결과 확인이 필요합니다: ${(error as Error).message}`); }
+    finally { receiptLock.current = false; setReceiptBusy(false); }
   };
 
   const savePlan = async () => {
@@ -184,7 +185,7 @@ export default function ReceivingShipping() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">입고 · 출고</h1>
-        <p className="text-sm text-muted-foreground">부분입고 · OEM 직출고 · 3PL 입고 (receipt_logs)</p>
+        <p className="text-sm text-muted-foreground">부분입고 · OEM 직출고 · 3PL 이동 — 창고 이동은 OEM 납품으로 계산하지 않습니다.</p>
       </div>
 
       <section className="rounded-lg border bg-card p-4">
@@ -230,14 +231,16 @@ export default function ReceivingShipping() {
               <th>스타일</th>
               <th className="num">발주</th>
               <th className="num">입고</th>
-              <th className="num">출고</th>
-              <th className="num">잔량</th>
+              <th className="num">OEM 직출고</th>
+              <th className="num">3PL 이동</th>
+              <th className="num">미분류 출고</th>
+              <th className="num">미입고</th>
               <th>처리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">
+              <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">
                 <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">{search || filter !== 'all' ? '조건에 맞는 발주가 없습니다' : '입고 대상 발주가 없습니다 — 생산발주에서 먼저 등록하세요'}</p>
               </td></tr>
@@ -251,7 +254,9 @@ export default function ReceivingShipping() {
                 </td>
                 <td className="num">{formatNumber(o.qty)}</td>
                 <td className="num text-[var(--system-green)]">{formatNumber(o.receivedQty)}</td>
-                <td className="num text-primary">{formatNumber(o.shippedQty)}</td>
+                <td className="num text-primary">{formatNumber(o.oemShippedQty)}</td>
+                <td className="num">{formatNumber(o.threePlQty)}</td>
+                <td className="num text-muted-foreground">{formatNumber(o.unclassifiedShippedQty)}</td>
                 <td className="num font-semibold">{formatNumber(o.remaining)}</td>
                 <td>
                   <div className="flex gap-1 flex-wrap">
@@ -262,7 +267,7 @@ export default function ReceivingShipping() {
                       <Truck className="w-3 h-3 mr-1" />OEM출고
                     </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openModal(o.id, 'outbound_3pl')}>
-                      <Warehouse className="w-3 h-3 mr-1" />3PL
+                      <Warehouse className="w-3 h-3 mr-1" />3PL 이동
                     </Button>
                   </div>
                 </td>
@@ -281,7 +286,7 @@ export default function ReceivingShipping() {
               <SelectItem value="all">전체</SelectItem>
               <SelectItem value="inbound">입고</SelectItem>
               <SelectItem value="outbound_oem">OEM출고</SelectItem>
-              <SelectItem value="outbound_3pl">3PL</SelectItem>
+              <SelectItem value="outbound_3pl">3PL 이동</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -314,7 +319,7 @@ export default function ReceivingShipping() {
           <DialogHeader>
             <DialogTitle>{modal ? LOG_LABELS[modal.logType] : ''} 등록</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-2">
+          <fieldset disabled={receiptBusy} className="space-y-3 py-2">
             <div><Label>수량</Label><Input type="number" min="0" value={form.qty} onChange={e => setForm(f => ({ ...f, qty: +e.target.value }))} /></div>
             {modal?.logType === 'inbound' && (
               <>
@@ -349,7 +354,7 @@ export default function ReceivingShipping() {
             )}
             {modal?.logType !== 'inbound' && <div><Label>배송 판매처</Label><Select value={form.deliveryMarket} onValueChange={v => setForm(f => ({ ...f, deliveryMarket: v as DeliveryMarket }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="domestic">국내</SelectItem><SelectItem value="b2b">B2B</SelectItem><SelectItem value="overseas">해외</SelectItem></SelectContent></Select></div>}            <div><Label>일자</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
             <div><Label>메모</Label><Input value={form.memo} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} /></div>
-          </div>
+          </fieldset>
           <DialogFooter>
             <Button variant="outline" onClick={() => setModal(null)} disabled={receiptBusy}>취소</Button>
             <Button onClick={submitLog} disabled={receiptBusy}>{receiptBusy ? '저장 중…' : '저장'}</Button>
