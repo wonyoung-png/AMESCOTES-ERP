@@ -58,6 +58,7 @@ async function persistStatement(statement: TradeStatement, invoiceDate: string) 
   const result = await saveStatementBilling(statement, invoiceDate);
   store.hydrateTradeStatements([...store.getTradeStatements().filter(s => s.id !== result.statement.id), result.statement]);
   if (result.settlement) store.hydrateSettlements([...store.getSettlements().filter(s => s.id !== result.settlement!.id), result.settlement]);
+  return result.statement;
 }
 
 const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -195,13 +196,13 @@ export default function TradeStatement() {
 
     const vendorCode = form.vendorCode || 'XXX';
 
-    const statement = { ...form, id: form.id || genId(), statementNo: form.statementNo || store.getNextStatementNo(vendorCode),
+    const statement = { ...form, id: form.id || genId(), statementNo: form.statementNo || '',
       lines, vendorCode, createdAt: form.createdAt || new Date().toISOString() } as TradeStatement;
     setForm(statement); // 후속 실패에도 같은 ID·번호로 재시도한다.
     setSaving(true);
     try {
-      await persistStatement(statement, statement.issueDate);
-      toast.success(isEdit ? '거래명세표가 수정되었습니다' : `거래명세표 ${statement.statementNo} 저장 완료`);
+      const saved = await persistStatement(statement, statement.issueDate);
+      toast.success(isEdit ? '거래명세표가 수정되었습니다' : `거래명세표 ${saved.statementNo} 저장 완료`);
       refresh(); setShowModal(false);
     } catch (error) { toast.error((error as Error).message); }
     finally { setSaving(false); }
@@ -225,6 +226,7 @@ export default function TradeStatement() {
     setTaxTargetId(s.id);
     setTaxForm({
       issued: false,
+      issuedAt: new Date().toISOString(),
       supplyAmount,
       taxAmount,
       totalAmount: grandTotal,
@@ -247,13 +249,13 @@ export default function TradeStatement() {
     const invoiceData: TaxInvoiceData = {
       ...taxForm,
       issued: true,
-      issuedAt: new Date().toISOString(),
+      issuedAt: taxForm.issuedAt || new Date().toISOString(),
     };
     const target = statements.find(s => s.id === taxTargetId);
     if (!target) { toast.error('명세표를 찾을 수 없습니다'); return; }
     setSaving(true);
     try {
-      await persistStatement({ ...target, taxInvoice: invoiceData, status: '청구완료' }, localDate());
+      await persistStatement({ ...target, taxInvoice: invoiceData, status: '청구완료' }, localDate(new Date(invoiceData.issuedAt!)));
       refresh(); setShowTaxModal(false); toast.success('계산서 발행 정보와 미수금이 저장되었습니다');
     } catch (error) { toast.error((error as Error).message); }
     finally { setSaving(false); }

@@ -725,6 +725,7 @@ export interface TradeStatement {
   collectedDate?: string;
   memo?: string;
   createdAt: string;
+  updatedAt?: string;
   projectNo?: string;
   workspace?: 'OEM' | 'LUMEN' | 'AETALOOF';
 }
@@ -819,10 +820,17 @@ function saveExpenses(list: Expense[]) {
   import('./expenseQueries').then(m => m.pushExpenses(list)).catch(() => {});
 }
 
-/** 거래명세표 저장 — 로컬에 쓰고 서버에도 올린다 (saveExpenses 와 같은 이유) */
-function saveTradeStatements(list: TradeStatement[]) {
-  setAll(KEYS.tradeStatements, list);
-  import('./tradeStatementQueries').then(m => m.pushTradeStatements(list)).catch(() => {});
+/** 변경한 전표 한 건만 버전 검증 후 저장한다. 전체 캐시 업로드는 금지한다. */
+async function saveTradeStatement(statement: TradeStatement) {
+  const { saveStatementBilling } = await import('./statement-workflow');
+  const result = await saveStatementBilling(statement, statement.issueDate);
+  const current = getAll<TradeStatement>(KEYS.tradeStatements);
+  setAll(KEYS.tradeStatements, [...current.filter(s => s.id !== statement.id), result.statement]);
+  if (result.settlement) {
+    const settlements = getAll<Settlement>(KEYS.settlements);
+    setAll(KEYS.settlements, [...settlements.filter(s => s.id !== result.settlement!.id), result.settlement]);
+  }
+  return result.statement;
 }
 
 /** 정산·미수금 저장 — 로컬 표시와 서버 공유를 함께 유지한다. */
@@ -1107,10 +1115,12 @@ export const store = {
   // Orders
   getOrders: () => getAll<ProductionOrder>(KEYS.orders),
   setOrders: (v: ProductionOrder[]) => setAll(KEYS.orders, v),
-  cacheOrderReceipt: (row: { id: string; received_qty: number; defect_qty: number; received_date: string; status: string; updated_at: string }) => {
+  cacheOrderReceipt: (row: { id: string; received_qty: number; defect_qty: number; received_date: string; status: string; updated_at: string; shipped_qty?: number; trade_statement_id?: string | null }) => {
     setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).map(o => o.id === row.id ? { ...o,
       receivedQty: row.received_qty, defectQty: row.defect_qty, receivedDate: row.received_date,
-      status: row.status as OrderStatus, updatedAt: row.updated_at } : o));
+      status: row.status as OrderStatus, updatedAt: row.updated_at,
+      ...(row.shipped_qty === undefined ? {} : { shippedQty: row.shipped_qty }),
+      ...(row.trade_statement_id === undefined ? {} : { tradeStatementId: row.trade_statement_id || undefined }) } : o));
   },
   addOrder: (v: ProductionOrder) => {
     const a = getAll<ProductionOrder>(KEYS.orders); a.push(v); setAll(KEYS.orders, a);
@@ -1567,8 +1577,12 @@ export const store = {
   getTradeStatements: () => getAll<TradeStatement>(KEYS.tradeStatements),
   /** 서버에서 막 읽어온 것을 화면용으로만 채워 넣는다 (hydrateExpenses 와 같은 이유) */
   hydrateTradeStatements: (v: TradeStatement[]) => setAll(KEYS.tradeStatements, v),
-  addTradeStatement: (v: TradeStatement) => { const a = getAll<TradeStatement>(KEYS.tradeStatements); a.push(v); saveTradeStatements(a); },
-  updateTradeStatement: (id: string, u: Partial<TradeStatement>) => { const a = getAll<TradeStatement>(KEYS.tradeStatements); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; saveTradeStatements(a); } },
+  addTradeStatement: (v: TradeStatement) => saveTradeStatement(v),
+  updateTradeStatement: (id: string, u: Partial<TradeStatement>) => {
+    const statement = getAll<TradeStatement>(KEYS.tradeStatements).find(s => s.id === id);
+    if (!statement) return Promise.reject(new Error('명세표를 찾을 수 없습니다'));
+    return saveTradeStatement({ ...statement, ...u });
+  },
   deleteTradeStatement: (id: string) => {
     setAll(KEYS.tradeStatements, getAll<TradeStatement>(KEYS.tradeStatements).filter(x => x.id !== id));
     import('./tradeStatementQueries').then(m => m.deleteTradeStatementSB(id)).catch(() => {});

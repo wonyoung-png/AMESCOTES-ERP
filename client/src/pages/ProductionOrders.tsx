@@ -1223,7 +1223,10 @@ export default function ProductionOrders() {
     setBillingModal(true);
   };
 
-  const handleConfirmBilling = () => {
+  const billingSaveLock = useRef(false);
+  const [billingSaving, setBillingSaving] = useState(false);
+  const handleConfirmBilling = async () => {
+    if (billingSaveLock.current) return;
     if (!billingTarget) return;
     const order = billingTarget;
     const item = items.find(i => i.id === order.styleId);
@@ -1238,6 +1241,7 @@ export default function ProductionOrders() {
     const billQty = Math.max(0, (order.receivedQty !== undefined
       ? (order.receivedQty || 0) - (order.defectQty || 0)
       : order.qty) - pendingPostDefect);
+    if (billQty <= 0) { toast.error('청구 가능한 수량이 없습니다'); return; }
     const rawColorQtys = order.colorQtys && order.colorQtys.length > 0 ? order.colorQtys : [{ color: '기본', qty: order.qty }];
     const orderedTotal = rawColorQtys.reduce((s, c) => s + c.qty, 0) || order.qty || 1;
     // 컬러별로 청구 수량을 발주 비율대로 나눈다 (마지막 컬러가 잔여를 흡수)
@@ -1245,18 +1249,21 @@ export default function ProductionOrders() {
       if (billQty === orderedTotal) return rawColorQtys;
       let left = billQty;
       return rawColorQtys.map((c, i) => {
-        const q = i === rawColorQtys.length - 1 ? left : Math.round((c.qty / orderedTotal) * billQty);
+        const q = i === rawColorQtys.length - 1 ? left : Math.min(left, Math.round((c.qty / orderedTotal) * billQty));
         left -= q;
         return { ...c, qty: Math.max(0, q) };
       });
     })();
     const unitPrice = item.deliveryPrice || item.targetSalePrice || order.factoryUnitPriceKrw || 0;
 
+    billingSaveLock.current = true;
+    setBillingSaving(true);
+    try {
     if (billingMode === 'new') {
       const vendorCode = buyer.vendorCode || buyer.code || 'XXX';
       const statementNo = store.getNextStatementNo(vendorCode);
 
-      const lines: TradeStatementLine[] = colorQtyList.map(cq => ({
+      const lines: TradeStatementLine[] = colorQtyList.filter(cq => cq.qty > 0).map(cq => ({
         id: genId(),
         description: `[${order.styleNo}] ${order.styleName}${cq.color !== '기본' ? ` (${cq.color})` : ''}`,
         qty: cq.qty,
@@ -1269,16 +1276,6 @@ export default function ProductionOrders() {
           pendingPostDefect ? `사후불량 ${pendingPostDefect}개 차감` : '',
         ].filter(Boolean).join(' · '),
       }));
-
-      // 이번 명세표에 반영한 사후불량은 정산 완료로 표시해 다음에 또 빠지지 않게 한다
-      if (pendingPostDefect > 0) {
-        const today2 = today;
-        upsertOrder({
-          ...order,
-          postDefects: (order.postDefects || []).map(d => d.settledAt ? d : { ...d, settledAt: today2 }),
-          updatedAt: new Date().toISOString(),
-        }).catch(onSaveFail('발주'));
-      }
 
       const newStatement: TradeStatement = {
         id: genId(),
@@ -1293,20 +1290,22 @@ export default function ProductionOrders() {
         memo: `발주번호 ${order.orderNo}에서 자동 생성`,
       };
 
-      store.addTradeStatement(newStatement); // 거래명세표 store에 유지
+      const savedStatement = await store.addTradeStatement({ ...newStatement, statementNo: '' });
       const existingOrder1 = (orders as ProductionOrder[]).find(o => o.id === order.id);
       if (existingOrder1) {
-        upsertOrder({ ...existingOrder1, tradeStatementId: newStatement.id, updatedAt: new Date().toISOString() })
-          .then(() => refresh()).catch(onSaveFail('발주'));
+        await upsertOrder({ ...existingOrder1, tradeStatementId: savedStatement.id,
+          postDefects: pendingPostDefect > 0 ? (order.postDefects || []).map(d => d.settledAt ? d : { ...d, settledAt: today }) : order.postDefects,
+          updatedAt: new Date().toISOString() });
+        refresh();
       }
       setBillingModal(false);
-      toast.success(`거래명세표 ${statementNo} 생성 완료 → 거래명세표 탭에서 확인하세요`);
+      toast.success(`거래명세표 ${savedStatement.statementNo} 생성 완료 → 거래명세표 탭에서 확인하세요`);
     } else {
       if (!linkStatementId) { toast.error('연결할 전표를 선택해주세요'); return; }
       const stmt = store.getTradeStatements().find(t => t.id === linkStatementId);
       if (!stmt) { toast.error('선택한 전표를 찾을 수 없습니다'); return; }
 
-      const newLines: TradeStatementLine[] = colorQtyList.map(cq => ({
+      const newLines: TradeStatementLine[] = colorQtyList.filter(cq => cq.qty > 0).map(cq => ({
         id: genId(),
         description: `[${order.styleNo}] ${order.styleName}${cq.color !== '기본' ? ` (${cq.color})` : ''}`,
         qty: cq.qty,
@@ -1316,7 +1315,7 @@ export default function ProductionOrders() {
         memo: `발주번호 ${order.orderNo}`,
       }));
 
-      store.updateTradeStatement(linkStatementId, { lines: [...(stmt.lines || []), ...newLines] });
+      await store.updateTradeStatement(linkStatementId, { lines: [...(stmt.lines || []), ...newLines] });
       const existingOrder2 = (orders as ProductionOrder[]).find(o => o.id === order.id);
       if (existingOrder2) {
         upsertOrder({ ...existingOrder2, tradeStatementId: linkStatementId, updatedAt: new Date().toISOString() })
@@ -1325,6 +1324,8 @@ export default function ProductionOrders() {
       setBillingModal(false);
       toast.success(`${stmt.statementNo}에 발주 항목이 추가됐습니다`);
     }
+    } catch (error) { toast.error((error as Error).message); }
+    finally { billingSaveLock.current = false; setBillingSaving(false); }
   };
 
   const openWorkOrderModal = (order: ProductionOrder, withBom = false) => {
@@ -3242,8 +3243,8 @@ export default function ProductionOrders() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setBillingModal(false)}>취소</Button>
               <Button
-                disabled={billingMode === 'link' && !linkStatementId}
                 onClick={handleConfirmBilling}
+                disabled={billingSaving || (billingMode === 'link' && !linkStatementId)}
               >
                 {billingMode === 'new' ? '명세표 신규 생성' : '전표 연결 완료'}
               </Button>

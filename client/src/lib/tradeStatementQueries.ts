@@ -40,6 +40,7 @@ export const fromRow = (r: any) => ({
   collectedDate: r.collected_date || undefined,
   memo: r.memo || undefined,
   createdAt: r.created_at || '',
+  updatedAt: r.updated_at || r.created_at || undefined,
 });
 
 export async function fetchTradeStatementsSB(): Promise<any[]> {
@@ -56,15 +57,6 @@ export async function fetchTradeStatementsSB(): Promise<any[]> {
  */
 let chain: Promise<unknown> = Promise.resolve();
 const queue = (fn: () => PromiseLike<unknown>) => { chain = chain.then(fn, fn); };
-
-/** 화면을 막지 않는다 — 저장 실패는 콘솔로만 알리고 로컬 값은 그대로 둔다 */
-export function pushTradeStatements(list: any[]): void {
-  if (!list?.length) return;
-  const rows = list.map(tradeStatementRow);
-  queue(() => db.from('trade_statements').upsert(rows).then(({ error }) => {
-    if (error) console.warn('[trade_statements] 서버 저장 실패:', error.message);
-  }));
-}
 
 /**
  * 지우기는 올리기와 따로 가야 한다.

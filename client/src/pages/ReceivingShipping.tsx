@@ -2,9 +2,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { store, formatNumber, genId, type TradeStatement } from '@/lib/store';
+import { store, formatNumber, genId } from '@/lib/store';
 import { phase1, DEFECT_DISPOSITION_LABEL, type DeliveryMarket, type ReceiptLogType, type DefectDisposition } from '@/lib/phase1';
-import { fetchItems, fetchOrders, fetchVendors, upsertOrder } from '@/lib/dbQueries';
+import { fetchOrders } from '@/lib/dbQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,7 @@ import { CheckCircle2, Package, Plane, Ship, Truck, Warehouse } from 'lucide-rea
 import { getCurrentUser } from '@/lib/auth';
 import { confirmShippingPlan, fetchShippingPlans, upsertShippingPlan, type ShippingMethod } from '@/lib/shippingPlans';
 import { validDate } from '../../../shared/schedule';
-import { statementUnitPrice } from '@/lib/statement-workflow';
+import { fromRow as statementFromRow } from '@/lib/tradeStatementQueries';
 
 const LOG_LABELS: Record<ReceiptLogType, string> = {
   inbound: '입고',
@@ -26,8 +26,6 @@ const LOG_LABELS: Record<ReceiptLogType, string> = {
 export default function ReceivingShipping() {
   const queryClient = useQueryClient();
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
-  const { data: items = [] } = useQuery({ queryKey: ['items'], queryFn: fetchItems });
-  const { data: vendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const today = new Date().toISOString().slice(0, 10);
   const { data: shippingPlans = [] } = useQuery({ queryKey: ['shippingPlans'], queryFn: () => fetchShippingPlans(), retry: false });
   const [filter, setFilter] = usePersistedState<'all' | 'pending' | 'partial' | 'done'>('receiving.filter', 'all');
@@ -85,12 +83,7 @@ export default function ReceivingShipping() {
     if (!validDate(form.date)) { toast.error('올바른 입출고 날짜를 입력하세요'); return; }
     const o = orders.find(x => x.id === modal.orderId);
     if (!o) return;
-    const cur = phase1.getOrderReceiptSummary(o.id, o.qty, o);
-    const already = modal.logType === 'inbound' ? cur.receivedQty : cur.shippedQty;
-    if (modal.logType !== 'inbound' && already + form.qty > o.qty) {
-      toast.error(`발주수량을 넘습니다 — 남은 수량 ${formatNumber(Math.max(0, o.qty - already))}개`);
-      return;
-    }
+    // 저장 후 응답이 끊긴 재시도도 서버의 요청 ID 확인까지 도달해야 한다.
     if (form.defectQty > form.qty) { toast.error('불량수량이 입고수량보다 많습니다'); return; }
     receiptLock.current = true;
     setReceiptBusy(true);
@@ -109,65 +102,18 @@ export default function ReceivingShipping() {
       return;
     }
     try {
-      const newShipped = cur.shippedQty + form.qty;
-      const newOemShipped = cur.oemShippedQty + (modal.logType === 'outbound_oem' ? form.qty : 0);
-      const updates: Record<string, unknown> = {
-        shippedQty: newShipped,
-      };
-      const updatedOrder = { ...o, ...updates, updatedAt: new Date().toISOString() };
-      try {
-        await upsertOrder(updatedOrder);
-      } catch (error) {
-        toast.error(`입출고 기록 저장 실패: ${(error as Error).message}`);
-        return;
+      const result = await phase1.saveShipment({ id: modal.requestId, orderId: o.id, qty: form.qty,
+        logType: modal.logType, receivedDate: form.date, memo: form.memo, deliveryMarket: form.deliveryMarket });
+      store.cacheOrderReceipt(result.order);
+      if (result.statement) {
+        const statement = statementFromRow(result.statement);
+        store.hydrateTradeStatements([...store.getTradeStatements().filter(s => s.id !== statement.id), statement]);
+        if (result.statementCreated) toast.success(`거래명세표 ${statement.statementNo} 초안 자동 생성`);
       }
-      store.setOrders(store.getOrders().map(row => row.id === o.id ? { ...row, ...updatedOrder } : row));
-      phase1.addReceiptLog({
-        orderId: o.id,
-        orderNo: o.orderNo,
-        projectNo: (o as { projectNo?: string }).projectNo,
-        logType: modal.logType,
-        qty: form.qty,
-        defectQty: form.defectQty,
-        defectNote: form.defectNote,
-        receivedDate: form.date,
-        memo: form.memo,
-        deliveryMarket: form.deliveryMarket,
-      });
-      if (modal.logType === 'outbound_oem' && newOemShipped >= o.qty) {
-        const marker = `[AUTO-ORDER:${o.id}]`;
-        const exists = store.getTradeStatements().some(s => s.memo?.includes(marker));
-        const buyer = vendors.find(v => v.id === o.buyerId);
-        if (!exists && buyer) {
-          const item = items.find(i => i.id === o.styleId || i.styleNo === o.styleNo);
-          const statement: TradeStatement = {
-            id: genId(),
-            statementNo: store.getNextStatementNo(buyer.code || 'XXX'),
-            vendorId: buyer.id,
-            vendorName: buyer.name,
-            vendorCode: buyer.code || 'XXX',
-            issueDate: form.date,
-            lines: [{
-              id: genId(),
-              description: `[${o.styleNo}] ${o.styleName}`,
-              qty: newOemShipped,
-              unitPrice: statementUnitPrice(item),
-              taxType: '과세',
-              taxRate: 0.1,
-            }],
-            status: '미청구',
-            projectNo: o.projectNo,
-            workspace: o.workspace ?? 'OEM',
-            memo: `${marker} OEM 직출고 완료 자동 초안`,
-            createdAt: new Date().toISOString(),
-          };
-          store.addTradeStatement(statement);
-          toast.success(`거래명세표 ${statement.statementNo} 초안 자동 생성`);
-        } else if (!exists && !buyer) {
-          toast.warning('바이어가 없어 거래명세표 초안은 생성하지 못했습니다');
-        }
-      }
-      toast.success(`${LOG_LABELS[modal.logType]} ${form.qty}개 기록`);
+      if (result.warning === 'buyer_missing') toast.warning('출고 저장 완료 · 바이어가 없어 명세표 초안은 생성하지 않았습니다');
+      if (result.warning === 'price_missing') toast.warning('출고 저장 완료 · 납품가 미확정으로 0원 초안입니다. 청구 전 단가를 확인해주세요');
+      if (result.warning === 'linked_statement_review') toast.warning('출고 저장 완료 · 기존 연결 명세표의 수량·금액은 직접 확인해주세요');
+      toast.success(`${LOG_LABELS[modal.logType]} ${form.qty}개 저장`);
       setModal(null);
       refresh();
     } catch (error) { toast.error(`출고 저장 결과 확인이 필요합니다: ${(error as Error).message}`); }

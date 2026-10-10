@@ -183,7 +183,7 @@ export default function SettlementManagement() {
       const tradeStatements = store.getTradeStatements();
       const linked = tradeStatements.find(ts => ts.statementNo === s.invoiceNo);
       if (linked && linked.status !== '수금완료') {
-        store.updateTradeStatement(linked.id, { status: '수금완료' });
+        void store.updateTradeStatement(linked.id, { status: '수금완료' }).catch((error: Error) => toast.error(`명세표 상태 확인 필요: ${error.message}`));
       }
     }
     refresh();

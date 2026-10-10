@@ -617,7 +617,10 @@ export default function SampleManagement() {
     }
   };
 
-  const handleBillAll = () => {
+  const billingSaveLock = useRef(false);
+  const [billingSaving, setBillingSaving] = useState(false);
+  const handleBillAll = async () => {
+    if (billingSaveLock.current) return;
     const unclaimed = samples.filter(s => s.billingStatus === '미청구');
     if (unclaimed.length === 0) { toast.error('미청구 샘플이 없습니다'); return; }
     const today = new Date().toISOString().split('T')[0];
@@ -631,7 +634,10 @@ export default function SampleManagement() {
     });
 
     let createdCount = 0;
-    byBuyer.forEach((samplesGroup, buyerId) => {
+    billingSaveLock.current = true;
+    setBillingSaving(true);
+    try {
+    for (const [buyerId, samplesGroup] of byBuyer) {
       const vendor = vendors.find(v => v.id === buyerId);
       const buyerName = vendor?.name || buyerId;
       const vendorCode = vendor?.vendorCode || vendor?.code || 'SAMP';
@@ -662,14 +668,16 @@ export default function SampleManagement() {
         createdAt: new Date().toISOString(),
       };
 
-      store.addTradeStatement(statement); // 거래명세표는 store에 유지 (서버 DB 테이블 없음)
+      await store.addTradeStatement({ ...statement, statementNo: '' });
+      await Promise.all(samplesGroup.map(s => upsertSampleSB({ ...s, billingStatus: '청구완료', billingDate: today })));
       createdCount++;
-    });
+    }
 
     // billingStatus 업데이트
-    const updatePromises = unclaimed.map(s => upsertSampleSB({ ...s, billingStatus: '청구완료', billingDate: today }));
-    Promise.all(updatePromises).then(() => refresh()).catch(onSaveFail('샘플'));
+    refresh();
     toast.success(`거래명세표 ${createdCount}건이 생성되었습니다`);
+    } catch (error) { refresh(); toast.error((error as Error).message); }
+    finally { billingSaveLock.current = false; setBillingSaving(false); }
   };
 
   // 차수 메모 추가
@@ -838,7 +846,7 @@ export default function SampleManagement() {
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">샘플 접수 · 차수별 수정요청 · 자재 체크리스트 · 품목 자동생성</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleBillAll} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
+          <Button variant="outline" disabled={billingSaving} onClick={handleBillAll} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
             <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" /><span className="hidden sm:inline">명세표 발행</span><span className="sm:hidden">발행</span>
           </Button>
           <Button onClick={openNew} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
@@ -2290,19 +2298,23 @@ export default function SampleManagement() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setBillingModal(false)}>취소</Button>
               <Button
-                disabled={billingMode === 'link' && !linkStatementId}
-                onClick={() => {
+                disabled={billingSaving || (billingMode === 'link' && !linkStatementId)}
+                onClick={async () => {
+                  if (billingSaveLock.current) return;
+                  billingSaveLock.current = true;
+                  setBillingSaving(true);
                   const today = new Date().toISOString().split('T')[0];
                   const costKrw = billingTarget.costKrw || Math.round((billingTarget.costCny || 0) * settings.cnyKrw);
                   const newLine = { id: 'l-' + billingTarget.id + '-' + Date.now(), description: billingTarget.styleName || billingTarget.styleNo, qty: 1, unitPrice: costKrw, taxType: '과세' as const, taxRate: 0.1, memo: `샘플 ${billingTarget.round || ''}차` };
 
+                  try {
                   if (billingMode === 'new') {
                     const vendor = vendors.find(v => v.id === billingTarget.buyerId);
                     const vendorCode = vendor?.vendorCode || vendor?.code || 'SAMP';
                     const statementNo = store.getNextStatementNo(vendorCode);
-                    store.addTradeStatement({
+                    const savedStatement = await store.addTradeStatement({
                       id: 'ts-' + billingTarget.id + '-' + Date.now(),
-                      statementNo,
+                      statementNo: '',
                       vendorId: billingTarget.buyerId || '',
                       vendorName: vendor?.name || '미지정',
                       vendorCode,
@@ -2311,16 +2323,18 @@ export default function SampleManagement() {
                       status: '미청구',
                       createdAt: new Date().toISOString(),
                     });
-                    toast.success(`거래명세표 ${statementNo} 생성 완료`);
+                    toast.success(`거래명세표 ${savedStatement.statementNo} 생성 완료`);
                   } else {
                     const stmt = store.getTradeStatements().find(t => t.id === linkStatementId);
                     if (stmt) {
-                      store.updateTradeStatement(linkStatementId, { lines: [...(stmt.lines || []), newLine] });
+                      await store.updateTradeStatement(linkStatementId, { lines: [...(stmt.lines || []), newLine] });
                       toast.success(`${stmt.statementNo}에 추가됐습니다`);
                     }
                   }
                   upsertSampleSB({ ...billingTarget, billingStatus: '청구완료', billingDate: today }).then(() => refresh()).catch(onSaveFail('샘플'));
                   setBillingModal(false);
+                  } catch (error) { toast.error((error as Error).message); }
+                  finally { billingSaveLock.current = false; setBillingSaving(false); }
                 }}
               >
                 {billingMode === 'new' ? '명세표 생성 + 청구완료' : '전표 연결 + 청구완료'}

@@ -58,3 +58,26 @@ assert.equal(empty.oemShippedQty, 0);
 assert.equal(empty.threePlQty, 0);
 assert.equal(empty.remaining, 100);
 console.log('phase1 shipment scenarios=5 PASS');
+
+const input = { id: 'ship_request', orderId: 'server_order', logType: 'outbound_oem', qty: 10,
+  deliveryMarket: 'b2b', receivedDate: '2026-10-10' };
+const before = JSON.stringify(phase1.getReceiptLogs());
+globalThis.fetch = async () => ({ ok: false, json: async () => ({ message: 'rollback' }) });
+await assert.rejects(phase1.saveShipment(input), /rollback/);
+assert.equal(JSON.stringify(phase1.getReceiptLogs()), before, 'failed shipment must not change cache');
+const serverResult = { receipt: { id: input.id }, order: { id: input.orderId, shipped_qty: 10 },
+  logs: [{ id: input.id, order_id: input.orderId, log_type: 'outbound_oem', qty: 10, received_date: input.receivedDate }],
+  statement: { id: 'server_statement' }, statementCreated: true };
+globalThis.fetch = async (url, init) => {
+  assert.equal(url, '/api/orders/server_order/ship');
+  assert.equal(JSON.parse(init.body).id, input.id);
+  return { ok: true, json: async () => ({ result: serverResult }) };
+};
+assert.equal((await phase1.saveShipment(input)).statement.id, 'server_statement');
+await phase1.saveShipment(input);
+assert.equal(phase1.getReceiptLogs().filter(r => r.id === input.id).length, 1, 'server retry must replace cache, not add duplicate');
+const saved = JSON.stringify(phase1.getReceiptLogs());
+globalThis.fetch = async () => ({ ok: true, json: async () => ({ result: { ...serverResult, order: { id: 'wrong' } } }) });
+await assert.rejects(phase1.saveShipment(input), /저장 결과/);
+assert.equal(JSON.stringify(phase1.getReceiptLogs()), saved);
+console.log('atomic shipment cache checks=4 PASS');

@@ -619,7 +619,31 @@ function paymentAxisForOrder(orderId: string): OrderPaymentAxis {
   return 'resolution';
 }
 
+function cacheReceiptLogs(orderId: string, rows: any[]) {
+  const logs: ReceiptLog[] = rows.map(r => ({ id: r.id, orderId: r.order_id, orderNo: r.order_no,
+    projectNo: r.project_no, logType: r.log_type, qty: r.qty, defectQty: r.defect_qty || 0,
+    defectNote: r.defect_note, receivedDate: r.received_date, memo: r.memo, destination: r.destination,
+    color: r.color, isAdvance: r.is_advance, deliveryMarket: r.delivery_market, createdAt: r.created_at }));
+  setAll(KEYS.receiptLogs, [...getAll<ReceiptLog>(KEYS.receiptLogs).filter(r => r.orderId !== orderId), ...logs]);
+}
+
 export const phase1 = {
+  saveShipment: async (input: { id: string; orderId: string; qty: number; logType: 'outbound_oem' | 'outbound_3pl';
+    receivedDate: string; deliveryMarket: DeliveryMarket; memo?: string }) => {
+    const response = await fetch(`/api/orders/${encodeURIComponent(input.orderId)}/ship`, {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+    let body;
+    try { body = await response.json(); }
+    catch { throw new Error('출고 저장 결과 확인이 필요합니다 — 같은 내용으로 재시도해주세요'); }
+    if (!response.ok) throw new Error(body.message || '출고 저장 실패');
+    const result = body.result;
+    if (result?.receipt?.id !== input.id || result?.order?.id !== input.orderId || !Array.isArray(result.logs))
+      throw new Error('출고 저장 결과 확인이 필요합니다 — 같은 요청으로 재시도해주세요');
+    try { cacheReceiptLogs(input.orderId, result.logs); }
+    catch { throw new Error('출고는 서버에 저장됐으나 화면 갱신에 실패했습니다 — 같은 요청으로 재시도해주세요'); }
+    return result as { order: any; receipt: any; statement: any; statementCreated: boolean; retry: boolean; warning?: string };
+  },
   /** 한국입고: 서버 트랜잭션 성공 이후에만 캐시를 교체한다. */
   saveKoreaReceipt: async (input: {
     id: string; orderId: string; qty: number; defectQty: number; receivedDate: string;
@@ -634,11 +658,7 @@ export const phase1 = {
     const result = body.result;
     if (!result?.receipt || !result?.order || !Array.isArray(result.logs)) throw new Error('입고 저장 결과 확인이 필요합니다 — 이력을 조회해주세요');
     try {
-      const logs: ReceiptLog[] = result.logs.map((r: any) => ({ id: r.id, orderId: r.order_id, orderNo: r.order_no,
-        projectNo: r.project_no, logType: r.log_type, qty: r.qty, defectQty: r.defect_qty || 0,
-        defectNote: r.defect_note, receivedDate: r.received_date, memo: r.memo, destination: r.destination,
-        color: r.color, isAdvance: r.is_advance, deliveryMarket: r.delivery_market, createdAt: r.created_at }));
-      setAll(KEYS.receiptLogs, [...getAll<ReceiptLog>(KEYS.receiptLogs).filter(r => r.orderId !== input.orderId), ...logs]);
+      cacheReceiptLogs(input.orderId, result.logs);
       if (result.payable) {
         const p = rowToPayable(result.payable);
         setAll(KEYS.payables, [...getAll<Payable>(KEYS.payables).filter(row => row.id !== p.id), p]);
