@@ -34,3 +34,12 @@
 - `scripts/ceo-ai-evidence-check.ts`는 HTML을 포함하므로 esbuild의 HTML text loader로 번들하여 별도 Node 프로세스에서 실행한다. 실모델 실행은 ERP_AI_LIVE=1을 명시한다.
 - 이 하네스는 인증 미들웨어를 테스트하지 않는다. 실제 로그인·Google OAuth·실제 업무 데이터·공급자 장기 안정성은 이번 검증 범위가 아니다.
 - 그래프 탐색은 기존 맵의 legacy agent/report 노드를 출발점으로 사용했으며, 실제 호출부는 server/ceo.ts·work.ts·agents.ts·work-records.ts에서 직접 확인했다. 탐색 토큰 예산 700; 실제 비용 측정값으로 간주하지 않는다.
+
+## 운영 반영 및 확인
+- 기능 커밋 `94f06f583ea4968001c83ab1a122dd70731f2f5a`를 aws-migration에 push 후 전역 배포 잠금 안에서 반영했다. DB 변경은 없다.
+- 앱 이미지 빌드는 1회다. 첫 확인 명령이 한글의 빌드 후 이스케이프 표현을 잘못 검사했고, 첫 보정도 명령 quoting에 반영되지 않아 각각 안전 복귀했다. 앱 자체 오류로 판단하지 않는다.
+- 빌드 결과에서 직접 확인한 ASCII 표식으로 검사를 수정했다. 동일 이미지를 재사용하여 최종 반영 SSM `cbeb0053-0086-432d-a3c9-ce7d5599b22e`, Success.
+- 최종 운영 이미지 `sha256:2b8be19d2a8a955a247a6b83458ce5f08b96f27addd6d10dd4f4816f98bc469d`, healthy. ERP_PRIVATE_MODE=true, 현재 캘린더 공통 규칙과 불완전 답변 차단 코드 확인.
+- 비로그인 ERP 업무·알림·중국재고·PostgREST 업무 조회 각각 401. 대표실 주소 overview 401, ERP 주소에서 대표실 overview 직접 접근 404. 공개 health 200.
+- 이전 이미지 `amescotes-erp:before-ai-evidence-20261010` 보존. 실제 회사 데이터나 직원 사용 잠금은 변경하지 않았다.
+- 이 운영 기록의 후속 커밋은 문서만 동기화하고 앱은 다시 빌드하지 않는다.
