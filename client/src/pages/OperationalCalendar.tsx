@@ -238,7 +238,7 @@ export default function OperationalCalendar() {
 
     const channelRows = CAMPAIGN_CHANNELS.map(ch => {
       const evs: PlacedEvent[] = [];
-      campaigns.filter(c => c.channel === ch && c.status !== 'draft').forEach(c => {
+      campaigns.filter(c => c.channel === ch).forEach(c => {
         const p = eventPosition(c.startDate, c.endDate, band);
         if (p) evs.push({ ...c, _s: p.s, _e: p.e, _lane: 0 });
       });
