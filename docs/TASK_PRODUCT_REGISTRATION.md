@@ -116,3 +116,7 @@
 - `server/product-registration.test.ts`: 검증 규칙(§4, 모델 호출 모킹), 상태 전이, 예약 실행기 선점·중복 방지·부분 실패, 카페24 요청 바디(래퍼 없음, 태그 별도 엔드포인트, 밑줄 제거 코드값), 쇼피파이 이미지가 staged upload 경로만 쓰는지, 완전 삭제 순서(fileUpdate→fileDelete→productDelete), 권한(LUMEN 외·작성자 승인 불가), 정기 점검 사실 생성(차이 감지·누락·404, 모델 호출 없음). 외부 API 는 모킹.
 - `./node_modules/.bin/tsc --noEmit`, `./node_modules/.bin/tsx --test server/*.test.ts`, 클라이언트 빌드 통과.
 - 보고(한국어 짧게): 변경 파일, 마이그레이션 파일명, 필요한 env 목록, Claude 가 실서버에서 확인할 시나리오 5개(테스트 상품 비공개 등록→예약 공개→두 채널 재조회→수정 반영→완전 삭제·원본 보존 확인).
+
+
+## 다음 작업 (대표 지시 10/11)
+이 작업 완료(PRODUCT_REGISTRATION_DONE.md 작성) 직후 **바로** `docs/TASK_SHOP_INSIGHT_AND_ADS_AGENTS.md` §2 메타 광고 분석(분석 전용·데일리·질문하기·모델별 결론→최종 결론)을 착수한다. 완료 시 `docs/ADS_ANALYSIS_DONE.md`.
