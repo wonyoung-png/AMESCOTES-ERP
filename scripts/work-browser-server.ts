@@ -12,6 +12,9 @@ import usersRouter from '../server/users';
 import ceoRouter, { ceoHostGate, ceoHostLock } from '../server/ceo';
 import { restAsServer, requireUser } from '../server/auth';
 import { workHttpLlmCases } from './e2e-work-http';
+import { createAgentSchedulerTick } from '../server/agent-scheduler';
+import { completedScheduleTeams, runAgentsOnce } from '../server/agents';
+import { allRows } from '../server/work-records';
 
 assert.equal(process.env.ERP_BROWSER_ISOLATED, '20261010');
 assert.equal(process.env.POSTGREST_URL, 'http://127.0.0.1:4192');
@@ -22,6 +25,8 @@ assert.ok(process.env.PGRST_JWT_SECRET && process.env.PGRST_JWT_SECRET.length >=
 const nativeFetch = globalThis.fetch;
 export const calls = { classify: 0, answer: 0, report: 0 };
 export const blocked: string[] = [];
+let truncateNextReport = false;
+export const failNextReport = () => { truncateNextReport = true; };
 export const inputs = workHttpLlmCases('2026-10-20');
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
@@ -46,8 +51,10 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         output = '최종 할인율은 20%입니다. 마케팅·물류 준비 미확인입니다.';
       }
     }
+    const truncated = system.includes('팀 감독 에이전트') && truncateNextReport;
+    if (truncated) truncateNextReport = false;
     return new Response(JSON.stringify({ id: 'browser-fixture', type: 'message', role: 'assistant', model: request.model,
-      content: [{ type: 'text', text: output }], stop_reason: 'end_turn', stop_sequence: null,
+      content: [{ type: 'text', text: output }], stop_reason: truncated ? 'max_tokens' : 'end_turn', stop_sequence: null,
       usage: { input_tokens: 0, output_tokens: 0 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
   if (url.origin !== process.env.POSTGREST_URL) {
@@ -66,6 +73,17 @@ export async function read(path: string) {
   }
   return response.json();
 }
+// Exercise the real scheduler tick and report write path for one synthetic team.
+// Never start wall-clock timers or the production server's other background jobs.
+export const scheduledMarketingTick = createAgentSchedulerTick({
+  completed: async (dayStart, signal) => completedScheduleTeams(await allRows(`team_agent_runs?trigger=eq.schedule&created_at=gte.${dayStart}&select=team,stats&order=created_at.asc,id.asc`, path => restAsServer(path, { signal }))),
+  targets: async () => ['마케팅'],
+  fill: async teams => {
+    let saved = 0;
+    for (const team of teams) saved += completedScheduleTeams(await runAgentsOnce('schedule', team) || []).length;
+    return saved;
+  },
+});
 export const users = [
   { id: 'e2e_boss', email: 'wonyoung@atlm.kr', name: '테스트 대표', role: '대표', team: '대표실', position: '대표' },
   { id: 'e2e_staff', email: 'e2e-staff@test.invalid', name: '테스트 직원', role: '사원', team: '국내 MD', position: '사원' },

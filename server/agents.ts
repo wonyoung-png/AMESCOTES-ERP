@@ -6,7 +6,7 @@
 // 하루 한 번(KST 08:30 이후 첫 점검) 자동으로 돌고, 대표 콘솔의 [지금 점검]으로도 돈다.
 // ponytail: 앱 컨테이너 안 setInterval. 컨테이너가 여러 대가 되면 DB 잠금이나 외부 스케줄러로.
 import Anthropic from '@anthropic-ai/sdk';
-import { restAsServer, CEO_EMAILS } from './auth.js';
+import { restAsServer, CEO_EMAILS, withServerReadSignal } from './auth.js';
 import { members, esc, kstToday, CLASSIFY_MODEL, type Member } from './work.js';
 import { ORG, orgTeam, orgTeamOfName, DEFAULT_RULES } from './org.js';
 import { gatherWatch, type Watch } from './watch.js';
@@ -15,6 +15,7 @@ import { allRows, reportingCards, currentCampaignCards, prioritizeCards, dayStar
 import { findCouncilCandidates, openCouncil } from './council.js';
 import { attachCampaignEvidence, CAMPAIGN_EVIDENCE_RULES } from './campaign-evidence.js';
 import { reportStamp } from './report-evidence.js';
+import { createAgentSchedulerTick } from './agent-scheduler.js';
 
 export type AgentStatus = 'work' | 'idle' | 'warn' | 'report';
 export type AgentRun = {
@@ -265,21 +266,16 @@ export async function fillScheduleTeams(teams: string[], run = (team: string) =>
 }
 
 /** KST 08:30 이후, 오늘 자동 점검이 아직 없으면 한 번 돈다. 10분마다 확인 */
+let schedulerStarted = false;
 export function startAgentScheduler() {
-  const tick = async () => {
-    try {
-      const kst = new Date(Date.now() + 9 * 3600e3);
-      if (kst.getUTCHours() * 60 + kst.getUTCMinutes() < 8 * 60 + 30) return;
-      const dayStartUtc = new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()) - 9 * 3600e3).toISOString();
-      const runs = await allRows(`team_agent_runs?trigger=eq.schedule&created_at=gte.${dayStartUtc}&select=team,stats&order=created_at.asc,id.asc`);
-      const ctx = await loadReportContext();
-      const missing = missingScheduleTeams(completedScheduleTeams(runs), reportTeams(ctx.cards));
-      if (!missing.length) return;
-      // 이미 성공한 팀은 다시 AI 호출하지 않고, 빠진 팀만 채운다.
-      const saved = await fillScheduleTeams(missing);
-      console.log(`[agents] 아침 점검 보완 ${saved}/${missing.length}팀`);
-    } catch (e) { console.warn('[agents] 스케줄 점검 실패:', String(e).split('\n')[0]); }
-  };
+  if (schedulerStarted) return;
+  schedulerStarted = true;
+  const check = createAgentSchedulerTick({
+    completed: async (dayStart, signal) => completedScheduleTeams(await allRows(`team_agent_runs?trigger=eq.schedule&created_at=gte.${dayStart}&select=team,stats&order=created_at.asc,id.asc`, path => restAsServer(path, { signal }))),
+    targets: signal => withServerReadSignal(signal, async () => reportTeams((await loadReportContext()).cards)),
+    fill: fillScheduleTeams,
+  });
+  const tick = () => check().catch(e => console.warn('[agents] 스케줄 점검 실패:', String(e).split('\n')[0]));
   setTimeout(tick, 60_000);
   setInterval(tick, 10 * 60_000);
 }

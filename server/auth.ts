@@ -3,11 +3,15 @@
 // 접수함처럼 "누가 올렸나"가 기록으로 남는 기능은 클라이언트가 보낸 사용자 id 를 믿으면 안 된다.
 // 쿠키를 서버에서 열어 app_users 를 다시 읽어야 한다.
 import crypto from 'crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Request, Response, NextFunction } from 'express';
 
 const SECRET = process.env.PGRST_JWT_SECRET || '';
 const POSTGREST_URL = process.env.POSTGREST_URL || 'http://postgrest:3000';
 const PRIVATE_MODE = process.env.ERP_PRIVATE_MODE === 'true';
+const readSignal = new AsyncLocalStorage<AbortSignal>();
+/** Bound a scheduler's read-only context without changing unrelated requests. */
+export const withServerReadSignal = <T>(signal: AbortSignal, read: () => Promise<T>): Promise<T> => readSignal.run(signal, read);
 
 export function b64url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -54,6 +58,7 @@ export async function rest(path: string, init: RequestInit & { role?: string } =
   const { role, ...rest_ } = init;
   return fetch(`${POSTGREST_URL}/${path}`, {
     ...rest_,
+    signal: rest_.signal ?? (['GET', 'HEAD'].includes((rest_.method || 'GET').toUpperCase()) ? readSignal.getStore() : undefined),
     headers: {
       Authorization: `Bearer ${serviceToken(60, role || 'anon')}`,
       'Content-Type': 'application/json',

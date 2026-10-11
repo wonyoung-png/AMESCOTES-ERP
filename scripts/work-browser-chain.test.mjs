@@ -240,6 +240,24 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
   await ceo.screenshot({ path: path.join(root, '.codex/work-browser-report-20261010.jpg'), type: 'jpeg' });
   pass('actual_ceo_screen_manual_report_stored_reload');
   assert.deepEqual(harness.calls, { classify: 4, answer: 1, report: 1 });
+  const todayKst = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const morning = new Date(todayKst + 'T08:30:00+09:00');
+  await harness.scheduledMarketingTick(new Date(morning.getTime() - 1));
+  assert.equal((await harness.read('team_agent_runs?trigger=eq.schedule&select=id')).length, 0);
+  harness.failNextReport();
+  await harness.scheduledMarketingTick(morning);
+  const failedReports = await harness.read('team_agent_runs?trigger=eq.schedule&select=*');
+  assert.equal(failedReports.length, 1);
+  assert.equal(failedReports[0].stats.reportAvailable, false);
+  assert.equal(failedReports[0].stats.evidence.complete, false);
+  await harness.scheduledMarketingTick(morning);
+  const retried = await harness.read('team_agent_runs?trigger=eq.schedule&select=*');
+  assert.equal(retried.length, 2);
+  assert.equal(retried.filter(report => report.stats.reportAvailable === true).length, 1);
+  await harness.scheduledMarketingTick(morning);
+  assert.equal((await harness.read('team_agent_runs?trigger=eq.schedule&select=id')).length, 2);
+  assert.deepEqual(harness.calls, { classify: 4, answer: 1, report: 3 });
+  pass('scheduled_report_clock_gate_failed_ai_retry_success_without_duplicate');
   for (const table of ['production_orders', 'trade_statements', 'settlements', 'payables']) assert.equal((await harness.read(table + '?select=id')).length, 0);
   assert.deepEqual(errors, []);
   pass('no_financial_rows_no_browser_runtime_errors');
@@ -247,7 +265,7 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
     schemaSnapshot: { extractedAt: snapshot.extractedAt, sourceVersion: snapshot.sourceVersion, sha256: snapshot.sha256 },
     frontend: 'actual Login/WorkHub/WorkChatWidget/OperationalCalendar/CEO console; test wrapper instead of full ERP shell',
     database: 'real local PostgreSQL and PostgREST 12.2.12; production schema only, no company rows', financialWrites: 0,
-    limits: ['No real Google OAuth', 'No scheduler', 'No live model', 'No production browser writes', 'No 25-user browser load test'], calls: harness.calls };
+    limits: ['No real Google OAuth', 'Scheduler tick simulated clock, one synthetic team; no wall-clock timer or 14-team load test', 'No live model', 'No production browser writes', 'No 25-user browser load test'], calls: harness.calls };
 } catch (error) {
   failure = error;
   console.error('BROWSER_CHAIN_FAILED: ' + error.message);

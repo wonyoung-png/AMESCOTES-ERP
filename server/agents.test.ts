@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { judge, missingScheduleTeams, completedScheduleTeams, reportTeams, fillScheduleTeams, AgentRunFailure, agentRunResult, type AgentRun } from './agents';
+import { judge, missingScheduleTeams, completedScheduleTeams, reportTeams, fillScheduleTeams, startAgentScheduler, AgentRunFailure, agentRunResult, type AgentRun } from './agents';
 import { dayStartUtc } from './work-records';
 
 test('한국 자정 완료를 포함하고 취소·재개 업무를 완료로 세지 않는다', () => {
@@ -69,4 +69,14 @@ test('수동 점검 결과는 저장된 정상 보고·AI 실패·미저장 팀�
   const result=agentRunResult(failure.runs,failure.failedTeams);
   assert.equal(result.saved,2);assert.deepEqual(result.reportFailures,['마케팅']);assert.deepEqual(result.saveFailures,['생산관리']);
   assert.equal(result.runs,runs);assert.match(failure.message,/2\/3/);
+});
+
+test('자동 점검 시작을 두 번 요청해도 timer는 한 세트만 등록된다', t => {
+  const timeout = globalThis.setTimeout, interval = globalThis.setInterval;
+  t.after(() => { globalThis.setTimeout = timeout; globalThis.setInterval = interval; });
+  const delays: number[] = [];
+  globalThis.setTimeout = ((_callback: unknown, delay: number) => { delays.push(delay); return {} as NodeJS.Timeout; }) as typeof setTimeout;
+  globalThis.setInterval = ((_callback: unknown, delay: number) => { delays.push(delay); return {} as NodeJS.Timeout; }) as typeof setInterval;
+  startAgentScheduler(); startAgentScheduler();
+  assert.deepEqual(delays, [60_000, 600_000]);
 });
