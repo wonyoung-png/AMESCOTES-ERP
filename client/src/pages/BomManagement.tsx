@@ -295,7 +295,8 @@ function StylePicker({
 }
 
 const COUNTRY_OPTIONS = ['중국', '한국', '기타'] as const;
-const CURRENCY_OPTIONS = ['CNY', 'USD', 'KRW'] as const;
+// CNY is retained only for historical records, never offered for new costs.
+const CURRENCY_OPTIONS = ['USD', 'KRW'] as const;
 // P&L 가정 입력 필드 (사전/사후 공용 — 모듈 상수)
 const PNL_RATE_FIELDS = [
   { label: '할인율 (Discount)', field: 'discountRate' as keyof BomPnlAssumptions },
@@ -435,7 +436,10 @@ function createNewBom(settings: ReturnType<typeof store.getSettings>): ExtBom {
     pnl: defaultPnl(), sourceFileName: '',
     postMaterials: BOM_SECTIONS.flatMap(cat => [newExtLine(cat)]),
     postProcessingFee: 0,
-    currency: 'CNY',
+    currency: 'USD',
+    preCurrency: 'USD',
+    exchangeRateUsd: settings.usdKrw,
+    preExchangeRateUsd: settings.usdKrw,
     manufacturingCountry: '중국',
     exchangeRateCny: settings.cnyKrw,
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
@@ -811,7 +815,10 @@ function SimpleCostModal({
             postColorBoms: [],
             postMaterials: [],
             postProcessingFee: 0,
-            currency: 'CNY',
+            currency: 'USD',
+            preCurrency: 'USD',
+            exchangeRateUsd: settings.usdKrw,
+            preExchangeRateUsd: settings.usdKrw,
             manufacturingCountry: '중국',
             exchangeRateCny: settings.cnyKrw,
             // 간단 원가 필드
@@ -971,6 +978,10 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
   // 마진율 설정
   const [internalMargin, setInternalMargin] = useState(Math.round((bom?.productionMarginRate ?? 0.3) * 100)); // %
   const [quoteMargin, setQuoteMargin] = useState(16); // %
+  const quoteCurrency = tab === 'pre' ? (bom.preCurrency || bom.currency || 'CNY') : (bom.currency || 'CNY');
+  const quoteRate = quoteCurrency === 'KRW' ? 1 : quoteCurrency === 'USD'
+    ? (tab === 'pre' ? (bom.preExchangeRateUsd || bom.exchangeRateUsd) : (bom.exchangeRateUsd || bom.preExchangeRateUsd)) || 1380
+    : (tab === 'pre' ? bom.preExchangeRateCny : bom.exchangeRateCny) || bom.snapshotCnyKrw || 191;
   const [marginInfo, setMarginInfo] = useState<{ factoryCost: number; internalPrice: number; marginAmt: number; gap: number } | null>(null);
   const [marginApplied, setMarginApplied] = useState(false);
 
@@ -1237,7 +1248,7 @@ function VendorQuoteModal({ bom, onClose, tab = 'pre', colorBom }: { bom: ExtBom
               <div className="gold"></div>
               <div className="meta">
                 <div><div className="mr"><span className="ml">날  짜 :</span><span className="mv">{dateStr}</span></div><div className="mr"><span className="ml">수  신 :</span><span className="mv">{recipient}</span></div><div className="mr"><span className="ml">STYLE :</span><span className="mv">{bom.styleNo} {bom.styleName}</span></div></div>
-                <div><div className="mr"><span className="ml">시  즌 :</span><span className="mv">{bom.season}</span></div><div className="mr"><span className="ml">환  율 :</span><span className="mv">CNY {bom.snapshotCnyKrw}</span></div></div>
+                <div><div className="mr"><span className="ml">시  즌 :</span><span className="mv">{bom.season}</span></div><div className="mr"><span className="ml">환  율 :</span><span className="mv">{quoteCurrency === 'KRW' ? 'KRW 직접' : `${quoteCurrency}→KRW ${quoteRate}`}</span></div></div>
               </div>
               <div className="greet">아래와 같이 견적합니다.</div>
               <div className="total-box"><span className="tl">합계금액 (공급가액 + 세액)</span><span className="ta">{fmtKrw(grandTotal)}</span></div>
@@ -2302,7 +2313,7 @@ export default function BomManagement() {
   const postFileRef = useRef<HTMLInputElement>(null);
 
   // 공장 원가표 업로드 통화 — 중국 공장은 보통 USD로 보낸다
-  const [uploadCurrency, setUploadCurrency] = useState<'USD' | 'CNY' | 'KRW'>('USD');
+  const [uploadCurrency, setUploadCurrency] = useState<'USD' | 'KRW'>('USD');
 
   const markDirty = () => setIsDirty(true);
 
@@ -3161,7 +3172,9 @@ export default function BomManagement() {
       ...prev,
       postMaterials: prev.lines.map(l => ({ ...l, id: genId() })),
       postProcessingFee: prev.processingFee,
-      exchangeRateCny: prev.snapshotCnyKrw,
+      currency: prev.preCurrency || prev.currency || 'CNY',
+      exchangeRateUsd: prev.preExchangeRateUsd || prev.exchangeRateUsd,
+      exchangeRateCny: prev.preExchangeRateCny || prev.snapshotCnyKrw,
     } : prev);
     markDirty();
     toast.success('사전원가 데이터를 사후원가로 복사했습니다');
@@ -3376,7 +3389,10 @@ export default function BomManagement() {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
 
-      const fallback = editBom.preExchangeRateCny ?? editBom.snapshotCnyKrw ?? 191;
+      const preCurrency = editBom.preCurrency || editBom.currency || 'CNY';
+      const fallback = preCurrency === 'USD'
+        ? editBom.preExchangeRateUsd || editBom.exchangeRateUsd || settings.usdKrw
+        : preCurrency === 'KRW' ? 1 : editBom.preExchangeRateCny || editBom.snapshotCnyKrw || 191;
       const { materials: preMaterials, parsedProcessingFee, parsedRate, postProcessLines: parsedPostLines } = parseExcelBomSheet(raw, fallback);
 
       setEditBom(prev => {
@@ -3400,7 +3416,8 @@ export default function BomManagement() {
           lines: preMaterials.length > 0 ? preMaterials : prev.lines,
           processingFee: parsedProcessingFee || prev.processingFee,
           postProcessLines: parsedPostLines.length > 0 ? parsedPostLines : prev.postProcessLines,
-          snapshotCnyKrw: parsedRate,
+          ...(preCurrency === 'USD' ? { preExchangeRateUsd: parsedRate }
+            : preCurrency === 'CNY' ? { preExchangeRateCny: parsedRate, snapshotCnyKrw: parsedRate } : {}),
           preSourceFileName: file.name,
           colorBoms: updatedColorBoms,
         };
@@ -3426,7 +3443,9 @@ export default function BomManagement() {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
 
-      const fallback = editBom.exchangeRateCny ?? editBom.snapshotCnyKrw ?? 191;
+      const fallback = uploadCurrency === 'USD'
+        ? editBom.exchangeRateUsd || settings.usdKrw
+        : 1;
       const { materials: postMaterials, parsedProcessingFee, parsedRate, postProcessLines: parsedPostLines2 } = parseExcelBomSheet(raw, fallback);
 
       setEditBom(prev => {
@@ -4014,7 +4033,7 @@ export default function BomManagement() {
                           onValueChange={v => {
                             if (v === '기타') { updateField('preManufacturingCountry', ''); return; }
                             updateField('preManufacturingCountry', v);
-                            if (v === '중국') updateField('preCurrency', 'CNY');
+                            if (v === '중국' && preCur !== 'CNY') updateField('preCurrency', 'USD');
                             else if (v === '한국') updateField('preCurrency', 'KRW');
                           }}
                         >
@@ -4040,23 +4059,24 @@ export default function BomManagement() {
                       <Select value={preCur} onValueChange={v => updateField('preCurrency', v as ExtBom['preCurrency'])}>
                         <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
                         <SelectContent>
+                          {preCur === 'CNY' && <SelectItem value="CNY" disabled className="text-xs">CNY · 과거 기록</SelectItem>}
                           {CURRENCY_OPTIONS.map(cur => (
                             <SelectItem key={cur} value={cur} className="text-xs">
-                              {cur === 'CNY' ? '¥ CNY' : cur === 'USD' ? '$ USD' : '₩ KRW'}
+                              {cur === 'USD' ? '$ USD' : '₩ KRW'}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     {/* 환율 CNY */}
-                    {preCur !== 'KRW' && (
+                    {preCur === 'CNY' && (
                       <div>
                         <label className="text-xs text-muted-foreground mb-1 block font-medium">CNY→KRW 환율</label>
                         <Input type="number" min="0" value={editBom.preExchangeRateCny ?? editBom.snapshotCnyKrw} onChange={e => updateField('preExchangeRateCny', Number(e.target.value))} className="h-8 text-xs border-border text-right w-28" />
                       </div>
                     )}
                     {/* 환율 USD */}
-                    {preCur !== 'KRW' && (
+                    {preCur === 'USD' && (
                       <div>
                         <label className="text-xs text-muted-foreground mb-1 block font-medium">USD→KRW 환율</label>
                         <Input type="number" min="0" value={preUsdKrw} onChange={e => updateField('preExchangeRateUsd', Number(e.target.value))} className="h-8 text-xs border-border text-right w-28" />
@@ -4131,7 +4151,7 @@ export default function BomManagement() {
                       </Button>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      입력 통화: {preCur} {preCur !== 'KRW' && `| CNY→KRW ${preCnyKrw} | USD→KRW ${preUsdKrw}`}
+                      입력 통화: {preCur} {preCur === 'CNY' ? `| 과거 기록 · CNY→KRW ${preCnyKrw}` : preCur === 'USD' ? `| USD→KRW ${preUsdKrw}` : ''}
                     </span>
                   </div>
                   <div className="overflow-x-auto">
@@ -4612,7 +4632,7 @@ export default function BomManagement() {
                         onValueChange={v => {
                           if (v === '기타') { updateField('manufacturingCountry', ''); return; }
                           updateField('manufacturingCountry', v);
-                          if (v === '중국') updateField('currency', 'CNY');
+                          if (v === '중국' && editBom.currency !== 'CNY') updateField('currency', 'USD');
                           else if (v === '한국') updateField('currency', 'KRW');
                         }}
                       >
@@ -4638,16 +4658,17 @@ export default function BomManagement() {
                     <Select value={editBom.currency || 'CNY'} onValueChange={v => updateField('currency', v as ExtBom['currency'])}>
                       <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
                       <SelectContent>
+                        {(editBom.currency || 'CNY') === 'CNY' && <SelectItem value="CNY" disabled className="text-xs">CNY · 과거 기록</SelectItem>}
                         {CURRENCY_OPTIONS.map(cur => (
                           <SelectItem key={cur} value={cur} className="text-xs">
-                            {cur === 'CNY' ? '¥ CNY' : cur === 'USD' ? '$ USD' : '₩ KRW'}
+                            {cur === 'USD' ? '$ USD' : '₩ KRW'}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   {/* 환율 — CNY */}
-                  {(editBom.currency || 'CNY') !== 'KRW' && (
+                  {(editBom.currency || 'CNY') === 'CNY' && (
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block font-medium">CNY→KRW 환율</label>
                       <Input
@@ -4659,7 +4680,7 @@ export default function BomManagement() {
                     </div>
                   )}
                   {/* 환율 — USD */}
-                  {(editBom.currency || 'CNY') !== 'KRW' && (
+                  {editBom.currency === 'USD' && (
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block font-medium">USD→KRW 환율</label>
                       <Input
@@ -4675,11 +4696,10 @@ export default function BomManagement() {
                   <div className="flex items-end gap-1.5">
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block font-medium">원가표 통화</label>
-                      <Select value={uploadCurrency} onValueChange={v => setUploadCurrency(v as 'USD' | 'CNY' | 'KRW')}>
+                      <Select value={uploadCurrency} onValueChange={v => setUploadCurrency(v as 'USD' | 'KRW')}>
                         <SelectTrigger className="h-8 text-xs w-24"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="USD" className="text-xs">$ USD</SelectItem>
-                          <SelectItem value="CNY" className="text-xs">¥ CNY</SelectItem>
                           <SelectItem value="KRW" className="text-xs">₩ KRW</SelectItem>
                         </SelectContent>
                       </Select>
@@ -4754,7 +4774,7 @@ export default function BomManagement() {
                         </Button>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground">입력 통화: {postCur} {postCur !== 'KRW' && `| CNY→KRW ${postCnyKrw} | USD→KRW ${postUsdKrw}`}</span>
+                        <span className="text-xs text-muted-foreground">입력 통화: {postCur} {postCur === 'CNY' ? `| 과거 기록 · CNY→KRW ${postCnyKrw}` : postCur === 'USD' ? `| USD→KRW ${postUsdKrw}` : ''}</span>
                         {/* 다른 컬러에서 복사 */}
                         {otherPostColors.length > 0 && (
                           <div className="flex items-center gap-2">

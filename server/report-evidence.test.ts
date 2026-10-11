@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { councilStamp, evidenceFreshness, evidenceStamp, reportStamp } from './report-evidence.js';
+import { attachSampleEvidence, councilStamp, evidenceFreshness, evidenceStamp, reportStamp, sampleEvidence } from './report-evidence.js';
+import { attachCampaignEvidence, campaignEvidence } from './campaign-evidence.js';
 
 const card = {id:'wc_1',kind:'schedule',status:'done',confirmed_payload:{discountRate:20},
   result_ref:{table:'campaigns',id:'cp_1'},_campaignEvidence:{state:'current',checkedAt:'first',
@@ -57,4 +58,109 @@ test('협의 근거는 조회시각·팀 순서를 제외하고 변경·다음�
   assert.equal(evidenceFreshness(saved,councilStamp({...c,topic:'새 결정'},'2026-10-10')),'changed');
   assert.equal(evidenceFreshness(saved,councilStamp(c,'2026-10-11')),'changed');
   assert.equal(evidenceFreshness(saved,undefined),'unknown');
+});
+
+const sampleCard = { id:'wc_sample',kind:'request_check',status:'done',assignee_id:'lead',
+  parsed:{sampleReview:true,sampleId:'sample_a'},result_ref:{table:'samples',id:'sample_a'},
+  confirmed_payload:{sampleId:'sample_a',acceptedBy:'lead',sampleUnitPrice:50000},
+  _campaignEvidence:{state:'unlinked'} };
+const sampleRow = { id:'sample_a',style_name:'Reviewed',buyer_id:'buyer',brand_code:'FB',
+  review_card_id:'wc_sample',review_assignee_id:'lead',review_status:'accepted',
+  completed_at:'2026-10-10T01:00:00Z',accepted_at:'2026-10-10T02:00:00Z',accepted_by:'lead',
+  sample_unit_price:50000,billing_status:'미청구',billing_statement_id:null,workflow_version:2,updated_at:'v2' };
+const sampleStamp = (cards:any[]) => reportStamp('제품개발',cards,[],[],{},'idle',[],'','2026-10-11');
+const readSample = (rows:any[]) => async () => ({ok:true,json:async()=>rows});
+
+test('수락 샘플은 캠페인 연결 대신 현재 원본으로 검증하고 청구·가격·바이어 변경을 감지한다',async()=>{
+  let path='';
+  const cards=await attachSampleEvidence([sampleCard],async p=>{path=p;return {ok:true,json:async()=>[sampleRow]};});
+  assert.match(path,/^samples\?id=in\.\(sample_a\)/);
+  assert.equal(cards[0]._sampleEvidence.state,'current');
+  const saved=sampleStamp(cards);assert.equal(saved.complete,true);
+  assert.equal(evidenceFreshness(saved,sampleStamp(await attachSampleEvidence([sampleCard],readSample([sampleRow])))),'current');
+  for(const change of [{sample_unit_price:75000},{buyer_id:'another'},{brand_code:'NEW'},
+    {style_name:'Renamed'},{billing_status:'청구완료',billing_statement_id:'statement'},
+    {billing_status:'수금완료',collected_date:'2026-10-11'},{workflow_version:3}]) {
+    const current=sampleStamp(await attachSampleEvidence([sampleCard],readSample([{...sampleRow,...change}])));
+    assert.equal(evidenceFreshness(saved,current),'changed');
+  }
+  const later=structuredClone(cards);later[0]._sampleEvidence.checkedAt='later';
+  later[0]._campaignEvidence={state:'unavailable'};
+  assert.equal(evidenceFreshness(saved,sampleStamp(later)),'current');
+  assert.equal((sampleCard as any)._sampleEvidence,undefined);
+});
+
+test('샘플 원본 삭제·조회실패·잘못된 연결·검증 누락은 최신 상태로 인정하지 않는다',async()=>{
+  const saved=sampleStamp(await attachSampleEvidence([sampleCard],readSample([sampleRow])));
+  for(const read of [readSample([]),async()=>({ok:false,json:async()=>[]}),async()=>{throw Error('offline');},
+    readSample([{...sampleRow,review_card_id:'another'}]),readSample([{...sampleRow,review_assignee_id:'other'}]),
+    readSample([{...sampleRow,review_status:'pending'}]),readSample([{...sampleRow,workflow_version:undefined}]),
+    readSample([sampleRow,sampleRow]),readSample([{...sampleRow,id:'unexpected'}])]) {
+    assert.equal(evidenceFreshness(saved,sampleStamp(await attachSampleEvidence([sampleCard],read))),'unknown');
+  }
+  assert.equal(evidenceFreshness(saved,sampleStamp([sampleCard])),'unknown');
+  let reads=0;
+  for(const c of [{...sampleCard,result_ref:{table:'samples',id:'unsafe,id'}},
+    {...sampleCard,parsed:{sampleReview:true,sampleId:'wrong'}},
+    {...sampleCard,confirmed_payload:{sampleId:'wrong'}}]) {
+    const cards=await attachSampleEvidence([c],async()=>{reads++;return {ok:true,json:async()=>[sampleRow]};});
+    assert.equal(cards[0]._sampleEvidence.state,'unlinked');assert.equal(sampleStamp(cards).complete,false);
+  }
+  assert.equal(reads,0);
+});
+
+test('수락 대기 샘플도 원본을 검증하고 일반 일정 카드는 기존 검증을 유지한다',async()=>{
+  const pending={...sampleCard,status:'open',confirmed_payload:null};
+  const current={...sampleRow,review_status:'pending',accepted_at:null,accepted_by:null};
+  const cards=await attachSampleEvidence([pending,card],readSample([current]));
+  assert.equal(cards[0]._sampleEvidence.state,'current');assert.equal(sampleStamp(cards).complete,true);
+  assert.equal(cards[1],card);
+  assert.equal(sampleStamp([pending]).complete,false);
+});
+
+test('샘플 카드는 캠페인 연결 판정을 건너뛰고 보고에는 현재 샘플 원본을 넣는다',async()=>{
+  const original={...sampleCard};delete (original as any)._campaignEvidence;
+  const campaignChecked=await attachCampaignEvidence([original],async()=>{throw Error('campaign lookup forbidden');});
+  assert.equal(campaignChecked[0],original);assert.equal(campaignEvidence(original),'');
+  await attachCampaignEvidence([{...original,result_ref:{table:'campaigns',id:'cmp_a'}}],async()=>{throw Error('sample marker must not query campaigns');});
+  const [verified]=await attachSampleEvidence(campaignChecked,readSample([sampleRow]));
+  assert.match(sampleEvidence(verified),/현재 원본 샘플.*"sample_unit_price":50000/);
+  assert.match(sampleEvidence(original),/샘플 원본 현재 상태 미확인/);
+  assert.equal(sampleEvidence(card),'');
+});
+
+test('샘플 원본은 중복 없이 배치 조회하며 일부 실패가 다른 배치의 검증을 바꾸지 않는다',async()=>{
+  const cards=Array.from({length:81},(_,i)=>({...sampleCard,id:`wc_${i}`,parsed:{sampleReview:true,sampleId:`s_${i}`},
+    result_ref:{table:'samples',id:`s_${i}`},confirmed_payload:{sampleId:`s_${i}`}}));
+  let reads=0;
+  const enriched=await attachSampleEvidence([...cards,cards[0]],async path=>{
+    reads++;const ids=path.match(/id=in\.\(([^)]+)\)/)![1].split(',');
+    return {ok:reads===1,json:async()=>ids.map(id=>({...sampleRow,id,review_card_id:`wc_${id.slice(2)}`}))};
+  });
+  assert.equal(reads,2);assert.equal(enriched[0]._sampleEvidence.state,'current');
+  assert.equal(enriched[80]._sampleEvidence.state,'unavailable');assert.equal(enriched[81]._sampleEvidence.state,'current');
+});
+
+test('실제 agents 자료 조회·보고 최신성 흐름이 샘플 원본을 매번 다시 읽는다',async()=>{
+  const {loadReportContext,teamEvidence}=await import('./agents.js');
+  const {_campaignEvidence,...rawSampleCard}=sampleCard;
+  const previousFetch=globalThis.fetch;let source={...sampleRow};let sourceReads=0;
+  globalThis.fetch=async input=>{
+    const url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url);
+    const table=url.pathname.split('/').at(-1);
+    let rows:any[]=[];
+    if(table==='work_cards')rows=[{...rawSampleCard,team:'제품개발',created_by:'staff',created_by_name:'Fixture Staff',created_at:new Date().toISOString()}];
+    if(table==='app_users')rows=[{id:'staff',name:'Fixture Staff',team:'제품개발',role:'사원',email:'fixture@example.invalid',is_active:true}];
+    if(table==='samples') {rows=[source];if(url.searchParams.get('id'))sourceReads++;}
+    return new Response(JSON.stringify(rows),{headers:{'Content-Type':'application/json'}});
+  };
+  try {
+    const first=await loadReportContext();assert.equal(first.cards[0]._sampleEvidence.state,'current');
+    assert.equal(first.cards[0]._campaignEvidence,undefined);first.watch=new Map();
+    const saved=teamEvidence('제품개발',first);assert.equal(saved.complete,true);
+    source={...source,sample_unit_price:75000,workflow_version:3};
+    const second=await loadReportContext();second.watch=new Map();
+    assert.equal(evidenceFreshness(saved,teamEvidence('제품개발',second)),'changed');
+    assert.equal(sourceReads,2);
+  }finally{globalThis.fetch=previousFetch;}
 });

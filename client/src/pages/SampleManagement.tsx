@@ -3,7 +3,8 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useLocation, useSearch } from 'wouter';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { billSampleGroups } from '@/lib/sampleBilling';
+import { sampleBillable, sampleCompletionMonth, sampleWorkflowRequest } from '@/lib/sampleWorkflow';
+import { SampleWorkflowActions } from '@/components/SampleWorkflowActions';
 import { fetchTradeStatementsSB } from '@/lib/tradeStatementQueries';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -145,6 +146,9 @@ export default function SampleManagement() {
   const [billingTarget, setBillingTarget] = useState<typeof samples[0] | null>(null);
   const [billingMode, setBillingMode] = useState<'new' | 'link'>('new');
   const [linkStatementId, setLinkStatementId] = useState('');
+  const [billingMonth,setBillingMonth]=useState(new Date(Date.now()+9*3600_000).toISOString().slice(0,7));
+  const [monthlyBillingIds,setMonthlyBillingIds]=useState<string[]>([]);
+  useEffect(()=>{if(!billingModal)setMonthlyBillingIds([]);},[billingModal]);
 
   // 메인 등록/수정 모달
   const [showModal, setShowModal] = useState(false);
@@ -170,6 +174,13 @@ export default function SampleManagement() {
   // 상세 모달 (차수별 메모 / 자재 체크리스트)
   const [detailSample, setDetailSample] = useState<Sample | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  useEffect(() => {
+    setDetailSample(previous => {
+      if (!previous) return previous;
+      const fresh = allSamples.find(s => s.id === previous.id);
+      return fresh && fresh.workflowVersion !== previous.workflowVersion ? fresh : previous;
+    });
+  }, [allSamples]);
 
   // 이미지 업로드
   const imageFileRef = useRef<HTMLInputElement>(null);
@@ -412,7 +423,7 @@ export default function SampleManagement() {
         const label = [buyerLabelById(sm.buyerId, sm.brandCode), sm.styleName || sm.styleNo, sm.stage].filter(Boolean).join(' - ');
         if (sm.requestDate === ds) events.push({ id: sm.id + '-r', label, kind: 'req', late: false });
         if (sm.expectedDate === ds) {
-          events.push({ id: sm.id + '-d', label, kind: 'due', late: ds < todayIso && sm.stage !== '최종승인' });
+          events.push({ id: sm.id + '-d', label, kind: 'due', late: ds < todayIso && !sm.completedAt && sm.stage !== '최종승인' });
         }
       });
       cells.push({ day: d, events });
@@ -630,11 +641,8 @@ export default function SampleManagement() {
 
   // 리스트에서 바로 단계 변경
   const handleStageChange = (id: string, stage: SampleStage) => {
+    if(stage==='최종승인'){const sample=samples.find(s=>s.id===id);if(sample)openDetail(sample);return;}
     const updates: Partial<Sample> = { stage };
-    if (stage === '최종승인') {
-      updates.approvedBy = '관리자';
-      // ⚠️ 자동 ACTIVE 전환 제거: 승인 후 담당자가 정식 스타일번호로 품목 마스터에 직접 등록해야 함
-    }
     const targetSample = (samples as Sample[]).find(s => s.id === id);
     if (targetSample) {
       upsertSampleSB({ ...targetSample, ...updates })
@@ -647,16 +655,21 @@ export default function SampleManagement() {
   const [billingSaving, setBillingSaving] = useState(false);
   const handleBillAll = async () => {
     if (billingSaveLock.current) return;
-    const unclaimed = samples.filter(s => s.billingStatus === '미청구');
+    const unclaimed = samples.filter(s => sampleBillable(s) && sampleCompletionMonth(s)===billingMonth
+      && (filterBuyer==='all'||(s.buyerId===filterBuyer.split('::')[0]&&(!filterBuyer.split('::')[1]||s.brandCode===filterBuyer.split('::')[1]))));
     if (unclaimed.length === 0) { toast.error('미청구 샘플이 없습니다'); return; }
+    if(new Set(unclaimed.map(s=>s.buyerId)).size===1){
+      setBillingTarget(unclaimed[0]);setMonthlyBillingIds(unclaimed.map(s=>s.id));setBillingMode('new');setLinkStatementId('');setBillingModal(true);return;
+    }
+    if(!confirm(`${billingMonth} 완료·수락된 샘플 ${unclaimed.length}건을 바이어별로 청구하시겠습니까? 기존 명세표에 추가하려면 먼저 바이어를 선택해주세요.`))return;
     const today = new Date().toISOString().split('T')[0];
 
     billingSaveLock.current = true;
     setBillingSaving(true);
     try {
-    const createdCount = await billSampleGroups(unclaimed, vendors, today, settings.cnyKrw, {
-      statements: fetchTradeStatementsSB, saveStatement: store.addTradeStatement, saveSample: upsertSampleSB,
-    });
+    const result=await sampleWorkflowRequest('/api/samples/workflow/bill',{ids:unclaimed.map(s=>s.id),month:billingMonth});
+    const createdCount=new Set(result.links.map((link:any)=>link.statementId)).size;
+    store.hydrateTradeStatements(await fetchTradeStatementsSB());
     refresh();
     toast.success(`샘플 청구 연결 완료 · 신규 명세표 ${createdCount}건`);
     } catch (error) { refresh(); toast.error((error as Error).message); }
@@ -737,6 +750,8 @@ export default function SampleManagement() {
       requestDate: today,
       expectedDate: undefined,
       approvedBy: undefined,
+      completedAt:undefined,completedBy:undefined,reviewStatus:undefined,reviewAssigneeId:undefined,reviewCardId:undefined,
+      acceptedAt:undefined,acceptedBy:undefined,workflowVersion:0,collectedDate:undefined,
       receivedDate: undefined,
       billingStatus: '미청구',
       billingDate: undefined,
@@ -755,11 +770,6 @@ export default function SampleManagement() {
     } catch (e) {
       toast.error(`다음 차수 생성 실패: ${(e as Error).message}`);
     }
-  };
-
-  const handleApprove = (s: Sample) => {
-    upsertSampleSB({ ...s, stage: '최종승인', approvedBy: '관리자' }).then(() => { refresh(); toast.success(`${s.styleNo} 최종 승인 완료`); }).catch(onSaveFail('샘플'));
-    // 승인은 샘플 단계만 "최종승인"으로 변경 (품목은 접수 때 이미 등록됨)
   };
 
   // 품목 등록 (최종승인 샘플에서 품목 마스터로 이동 + prefill)
@@ -821,9 +831,10 @@ export default function SampleManagement() {
           <h1 className="text-xl md:text-2xl font-bold text-foreground">샘플 관리</h1>
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">샘플 접수 · 차수별 수정요청 · 자재 체크리스트 · 품목 자동생성</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Input type="month" aria-label="샘플 완료월" value={billingMonth} onChange={e=>setBillingMonth(e.target.value)} className="w-40"/>
           <Button variant="outline" disabled={billingSaving} onClick={handleBillAll} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
-            <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" /><span className="hidden sm:inline">명세표 발행</span><span className="sm:hidden">발행</span>
+            <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" /><span>완료월 청구</span>
           </Button>
           <Button onClick={openNew} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
             <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />샘플 접수
@@ -1278,7 +1289,7 @@ export default function SampleManagement() {
                   </td>
                   <td className="nw num font-mono text-foreground text-xs">{formatKRW(s.costKrw || Math.round((s.costCny || 0) * settings.cnyKrw))}</td>
                   <td>
-                    {s.billingStatus === '미청구' ? (
+                    {sampleBillable(s) ? (
                       <button
                         onClick={() => {
                           setBillingTarget(s);
@@ -1300,7 +1311,8 @@ export default function SampleManagement() {
                           <button
                             onClick={() => {
                               if (confirm('청구완료를 미청구로 되돌리겠습니까?')) {
-                                upsertSampleSB({ ...s, billingStatus: '미청구', billingDate: undefined }).then(() => refresh()).catch(onSaveFail('샘플'));
+                                sampleWorkflowRequest(`/api/samples/${encodeURIComponent(s.id)}/unbill`,{version:s.workflowVersion??0})
+                                  .then(async()=>{store.hydrateTradeStatements(await fetchTradeStatementsSB());refresh();}).catch(onSaveFail('샘플'));
                               }
                             }}
                             className="text-[11px] text-muted-foreground hover:text-[var(--system-red)]"
@@ -1316,14 +1328,8 @@ export default function SampleManagement() {
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(s)}>수정</Button>
-                      {s.stage !== '최종승인' && (
-                        <>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-primary hover:text-primary"
-                            onClick={() => openNextRound(s)}>다음 차수</Button>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-[var(--system-green)] hover:text-[var(--system-green)]"
-                            onClick={() => handleApprove(s)}>승인</Button>
-                        </>
-                      )}
+                      <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-primary hover:text-primary"
+                        onClick={() => openNextRound(s)}>다음 차수</Button>
                       {s.stage === '최종승인' && (() => {
                         // 품목 등록 여부 확인:
                         // 1) TEMP 스타일번호가 아닌 정식 스타일번호로 등록된 ACTIVE 품목 찾기
@@ -1424,7 +1430,7 @@ export default function SampleManagement() {
               {/* 하단 액션 */}
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
                 <div>
-                  {s.billingStatus === '미청구' ? (
+                {sampleBillable(s) ? (
                     <button
                       onClick={() => { setBillingTarget(s); setBillingMode('new'); setLinkStatementId(''); setBillingModal(true); }}
                       className="text-xs px-2.5 py-1 rounded-full border bg-[var(--fill-quaternary)] text-muted-foreground border-border hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
@@ -1440,9 +1446,7 @@ export default function SampleManagement() {
                     <Eye className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openEdit(s)}>수정</Button>
-                  {s.stage !== '최종승인' && (
-                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-[var(--system-green)]" onClick={() => handleApprove(s)}>승인</Button>
-                  )}
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={()=>openNextRound(s)}>다음 차수</Button>
                   {s.stage === '최종승인' && (() => {
                     // 모바일 뷰: TEMP 스타일번호 여부 + 정식 ACTIVE 품목 등록 여부 확인
                     const isTempStyleNo = s.styleNo.startsWith('TEMP');
@@ -1459,8 +1463,12 @@ export default function SampleManagement() {
                         <PackagePlus className="w-3 h-3 mr-1" />품목
                       </Button>
                     ) : (
-                      /* 품목 등록 완료(ACTIVE) → 텍스트만 표시, 버튼 없음 */
-                      <span className="text-xs text-[var(--system-green)] font-medium px-1">✓ 완료</span>
+                      /* 모바일도 같은 상품의 BOM으로 이어진다. 별도 등록 화면을 만들지 않는다. */
+                      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-primary"
+                        onClick={() => navigate(`/bom?styleNo=${encodeURIComponent(registeredItem.styleNo)}`)}
+                        title={`${registeredItem.styleNo} BOM 작성`}>
+                        <ClipboardList className="w-3 h-3 mr-1" />BOM 작성
+                      </Button>
                     );
                   })()}
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
@@ -1620,7 +1628,7 @@ export default function SampleManagement() {
                     <Label className="text-xs">단계</Label>
                     <Select value={form.stage || '1차'} onValueChange={v => setForm(f => ({ ...f, stage: v as SampleStage }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                      <SelectContent>{STAGES.filter(s => s !== '최종승인' || form.stage === '최종승인').map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 ) : (
@@ -1980,6 +1988,8 @@ export default function SampleManagement() {
               </DialogHeader>
 
               <div className="space-y-5 py-2">
+                <SampleWorkflowActions sample={detailSample} vendors={vendors} onSaved={s=>{setDetailSample(s);refresh();}}
+                  onBill={()=>{setBillingTarget(detailSample);setBillingMode('new');setLinkStatementId('');setBillingModal(true);}}/>
                 {/* 자재 요청 목록 */}
                 {(detailSample.materialRequests || []).length > 0 && (
                   <div className="space-y-2">
@@ -2244,7 +2254,7 @@ export default function SampleManagement() {
         <Dialog open={billingModal} onOpenChange={setBillingModal}>
           <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>청구하기 — {billingTarget.styleNo}</DialogTitle>
+              <DialogTitle>청구하기 — {monthlyBillingIds.length?`${billingMonth} 완료 ${monthlyBillingIds.length}건`:billingTarget.styleNo}</DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
                 거래명세표를 새로 생성하거나 기존 전표에 연결하세요
               </DialogDescription>
@@ -2267,16 +2277,15 @@ export default function SampleManagement() {
               </div>
 
               {billingMode === 'link' && (() => {
-                const thisMonth = new Date().toISOString().slice(0,7);
                 const buyerStatements = store.getTradeStatements()
                   .filter(t => {
                     const matchBuyer = !!billingTarget.buyerId && t.vendorId === billingTarget.buyerId;
-                    const matchMonth = t.issueDate.startsWith(thisMonth);
-                    return matchBuyer && matchMonth && t.status !== '수금완료';
+                    const matchMonth = true; // Same buyer's editable statements, including prior-month aggregation.
+                    return matchBuyer && matchMonth && t.status === '미청구';
                   });
                 return (
                   <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">이번 달 전표 ({thisMonth}) — 바이어: {buyerLabelById(billingTarget.buyerId) || '미지정'}</p>
+                    <p className="text-xs text-muted-foreground">추가 가능한 미청구 전표 — 바이어: {buyerLabelById(billingTarget.buyerId) || '미지정'}</p>
                     {buyerStatements.length === 0 ? (
                       <p className="text-xs text-muted-foreground py-3 text-center">해당 조건의 전표가 없습니다. 신규 생성을 선택하세요.</p>
                     ) : (
@@ -2303,49 +2312,22 @@ export default function SampleManagement() {
                   <p className="font-medium mb-1 text-foreground">생성될 거래명세표</p>
                   <p>바이어: {buyerLabelById(billingTarget.buyerId) || '미지정'}</p>
                   <p>품목: {billingTarget.styleNo} — {billingTarget.styleName}</p>
-                  <p>금액: {(billingTarget.costKrw || Math.round((billingTarget.costCny || 0) * settings.cnyKrw)).toLocaleString()}원</p>
+                  <p>금액: {(monthlyBillingIds.length?samples.filter(s=>monthlyBillingIds.includes(s.id)).reduce((sum,s)=>sum+(s.sampleUnitPrice??0),0):(billingTarget.sampleUnitPrice??0)).toLocaleString()}원</p>
                 </div>
               )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setBillingModal(false)}>취소</Button>
               <Button
-                disabled={billingSaving || !billingTarget.buyerId || (billingMode === 'link' && !linkStatementId)}
+                disabled={billingSaving || !sampleBillable(billingTarget) || (billingMode === 'link' && !linkStatementId)}
                 onClick={async () => {
                   if (billingSaveLock.current) return;
                   billingSaveLock.current = true;
                   setBillingSaving(true);
-                  const today = new Date().toISOString().split('T')[0];
-                  const costKrw = billingTarget.costKrw || Math.round((billingTarget.costCny || 0) * settings.cnyKrw);
-                  const newLine = { id: 'sample-line-' + billingTarget.id, description: billingTarget.styleName || billingTarget.styleNo, qty: 1, unitPrice: costKrw, taxType: '과세' as const, taxRate: 0.1, memo: `샘플 ${billingTarget.round || ''}차` };
-
                   try {
+                  await sampleWorkflowRequest('/api/samples/workflow/bill',{ids:monthlyBillingIds.length?monthlyBillingIds:[billingTarget.id],
+                    statementId:billingMode==='link'?linkStatementId:null,month:monthlyBillingIds.length?billingMonth:null});
                   store.hydrateTradeStatements(await fetchTradeStatementsSB());
-                  let statementId = linkStatementId;
-                  let billingDate = today;
-                  if (billingMode === 'new') {
-                    const vendor = vendors.find(v => v.id === billingTarget.buyerId);
-                    const vendorCode = vendor?.vendorCode || vendor?.code || 'SAMP';
-                    const savedStatement = store.getTradeStatements().find(t => t.id === 'sample-statement-' + billingTarget.id) || await store.addTradeStatement({
-                      id: 'sample-statement-' + billingTarget.id,
-                      statementNo: '',
-                      vendorId: billingTarget.buyerId || '',
-                      vendorName: vendor?.name || '미지정',
-                      vendorCode,
-                      issueDate: today,
-                      lines: [newLine],
-                      status: '미청구',
-                      createdAt: new Date().toISOString(),
-                    });
-                    statementId = savedStatement.id;
-                    billingDate = savedStatement.issueDate;
-                  } else {
-                    const stmt = store.getTradeStatements().find(t => t.id === linkStatementId);
-                    if (!stmt || stmt.vendorId !== billingTarget.buyerId) throw new Error('해당 바이어의 연결할 전표를 찾을 수 없습니다. 다시 선택해주세요.');
-                    billingDate = stmt.issueDate;
-                    if (!(stmt.lines || []).some(line => line.id === newLine.id)) await store.updateTradeStatement(linkStatementId, { lines: [...(stmt.lines || []), newLine] });
-                  }
-                  await upsertSampleSB({ ...billingTarget, billingStatus: '청구완료', billingDate, billingStatementId: statementId });
                   refresh();
                   toast.success('샘플 청구 연결이 저장되었습니다');
                   setBillingModal(false);

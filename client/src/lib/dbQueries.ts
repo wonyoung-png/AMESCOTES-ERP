@@ -666,6 +666,14 @@ export async function fetchSamples(): Promise<Sample[]> {
     billingStatementId: row.billing_statement_id,
     billingDate: row.billing_date,
     collectedDate: row.collected_date,
+    completedAt: row.completed_at ?? undefined,
+    completedBy: row.completed_by ?? undefined,
+    reviewStatus: row.review_status ?? undefined,
+    reviewAssigneeId: row.review_assignee_id ?? undefined,
+    reviewCardId: row.review_card_id ?? undefined,
+    acceptedAt: row.accepted_at ?? undefined,
+    acceptedBy: row.accepted_by ?? undefined,
+    workflowVersion: row.workflow_version ?? 0,
     createdAt: row.created_at,
     memo: row.memo,
   }));
@@ -708,8 +716,18 @@ export async function upsertSample(sample: Record<string, any>) {
     billing_date: sample.billingDate,
     collected_date: sample.collectedDate,
   });
-  const { error } = await db.from('samples').upsert(row);
-  if (error) throw error;
+  const { data: existing, error: readError } = await db.from('samples').select('id').eq('id', sample.id).maybeSingle();
+  if (readError) throw readError;
+  if (existing) {
+    let query = db.from('samples').update(row).eq('id', sample.id);
+    if (sample.workflowVersion !== undefined) query = query.eq('workflow_version', sample.workflowVersion);
+    const { data, error } = await query.select('id');
+    if (error) throw error;
+    if (data?.length !== 1) throw new Error('샘플이 변경됐습니다. 새로고침 후 다시 저장해주세요.');
+  } else {
+    const { error } = await db.from('samples').insert(row);
+    if (error) throw error;
+  }
 }
 
 export async function deleteSample(id: string) {
@@ -1009,9 +1027,11 @@ export async function fetchPurchaseItems(options: { strict?: boolean } = {}): Pr
     orderNo: row.order_no || '',
     purchaseDate: row.purchase_date || '',
     itemName: row.item_name || '',
+    spec:row.spec || '',
     qty: row.qty || 0,
     unit: row.unit || '',
     unitPriceCny: row.unit_price_cny || 0,
+    legacyPricingIdentity:row.unit_price_cny==null||row.applied_rate==null,
     currency: row.currency || 'CNY',
     appliedRate: row.applied_rate || 191,
     amountKrw: row.amount_krw || 0,
@@ -1036,6 +1056,7 @@ export async function upsertPurchaseItem(item: Record<string, any>): Promise<voi
     order_no: item.orderNo || null,
     purchase_date: item.purchaseDate || null,
     item_name: item.itemName,
+    ...(item.spec===undefined?{}:{spec:item.spec}),
     qty: item.qty || 0,
     unit: item.unit || null,
     unit_price_cny: item.unitPriceCny || 0,
@@ -1062,6 +1083,7 @@ export async function upsertPurchaseItem(item: Record<string, any>): Promise<voi
       orderNo: item.orderNo || '',
       purchaseDate: item.purchaseDate || '',
       itemName: item.itemName,
+      spec:item.spec,
       qty: item.qty || 0,
       unit: item.unit || '',
       unitPriceCny: item.unitPriceCny || 0,

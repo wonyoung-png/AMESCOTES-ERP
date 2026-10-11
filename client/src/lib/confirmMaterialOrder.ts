@@ -13,8 +13,9 @@
 //     (여러 발주를 담아 확정하면 A의 자재비가 B 손익에 전가됨)
 // 이 파일은 양쪽의 올바른 동작을 합친 것이다.
 
-import { store, genId, type CartItem, type ProductionOrder, type Vendor } from './store';
+import { store, genId, type CartItem, type ProductionOrder, type Vendor, type Currency, type PurchaseItem } from './store';
 import { fetchMaterials, upsertMaterial, fetchPurchaseItems, upsertPurchaseItem } from './dbQueries';
+import { materialCartIdentity } from './materialCartIdentity';
 
 export interface ConfirmMaterialOrderParams {
   cartItems: CartItem[];
@@ -23,6 +24,8 @@ export interface ConfirmMaterialOrderParams {
   vendors: Vendor[];
   /** CNY→KRW 환율 */
   cnyKrw: number;
+  /** USD→KRW 환율 (USD 자재에 명시 환율이 없을 때만 사용) */
+  usdKrw?: number;
   /**
    * 장바구니 항목이 어느 발주에도 매칭되지 않을 때 사용할 발주.
    * (발주 완료 팝업에서 바로 확정하는 경로)
@@ -40,31 +43,81 @@ export interface ConfirmMaterialOrderResult {
 export async function confirmMaterialOrder(
   params: ConfirmMaterialOrderParams,
 ): Promise<ConfirmMaterialOrderResult> {
-  const { cartItems, orders, vendors, cnyKrw, fallbackOrder } = params;
+  const { cartItems, orders, vendors, cnyKrw, usdKrw, fallbackOrder } = params;
   const today = new Date().toISOString().split('T')[0];
 
-  // 발주필요수량이 0보다 큰 항목만 대상
-  const targets = cartItems
-    .map(item => ({ item, orderQty: Math.max(0, item.qty - (item.stockQty ?? 0)) }))
-    .filter(t => t.orderQty > 0)
-    // 모든 귀속을 저장 전에 검증한다. 실패하면 DB와 장바구니 모두 그대로 유지한다.
-    .map(t => ({ ...t, allocations: resolveOrderWeights(t.item, orders, fallbackOrder) }));
+  // 재고로 충당되는 행도 같은 가격 계약으로 합친 뒤 발주 필요수량을 계산한다.
+  const sourceTargets = cartItems
+    .map(item => {
+      if (!Number.isFinite(item.qty) || item.qty < 0 || !Number.isFinite(item.stockQty ?? 0) || (item.stockQty ?? 0) < 0) {
+        throw new Error(`${item.materialName}: 수량·재고가 올바르지 않습니다. 장바구니 수량을 확인해 주세요.`);
+      }
+      return { item, pricing: resolveMaterialCartPricing(item, cnyKrw, usdKrw) };
+    });
+  // 미지정 환율과 명시 환율이 같은 계약으로 정규화되면 수량·재고·귀속도 합친다.
+  const normalized = new Map<string, typeof sourceTargets[number]>();
+  for (const target of sourceTargets) {
+    const item = { ...target.item, ...target.pricing, orders: [...target.item.orders] };
+    const key = materialCartIdentity(item);
+    const previous = normalized.get(key);
+    if (previous) {
+      previous.item.qty = round3(previous.item.qty + item.qty);
+      previous.item.stockQty = round3((previous.item.stockQty ?? 0) + (item.stockQty ?? 0));
+      previous.item.orders.push(...item.orders);
+    } else {
+      normalized.set(key, { ...target, item });
+    }
+  }
+  const quantityGroups = [...normalized.values()]
+    .map(target => ({ ...target, orderQty: Math.max(0, target.item.qty - (target.item.stockQty ?? 0)) }));
+  const targets = quantityGroups
+    .filter(target => target.orderQty > 0)
+    .map(target => ({ ...target, allocations: resolveOrderWeights(target.item, orders, fallbackOrder) }));
+  // 금액 오버플로도 첫 저장 전에 확인한다.
+  for (const { item, orderQty, pricing } of targets) {
+    if (!Number.isFinite(orderQty * pricing.unitPriceCny * pricing.appliedRate)) {
+      throw new Error(`${item.materialName}: 구매 금액이 올바르지 않습니다. 수량·단가·환율을 확인해 주세요.`);
+    }
+  }
+  // 재시도 때 설정 환율이 바뀌어도 이미 저장된 구매와 동일한 가격 계약을 사용한다.
+  // 현재 장바구니의 수량·다른 항목은 공용 store가 그대로 보존한다.
+  store.freezeMaterialCartPricing(sourceTargets.map(({ item, pricing }) => ({
+    item, currency: pricing.currency, appliedRate: pricing.appliedRate,
+  })));
 
   // ── 1단계: 서버 DB materials 저장 ──
-  // 구매는 공급처별로 나누되 자재 정본은 이름·단위별 한 번만 저장한다.
+  // 구매는 공급처·가격별로 나누되 자재 정본은 이름·규격·단위별 한 번만 저장한다.
   const materialGroups = new Map<string, { item: CartItem; orderQty: number; vendors: Set<string> }>();
   for (const { item, orderQty } of targets) {
-    const key = JSON.stringify([item.materialName, item.unit]);
+    const key = JSON.stringify([item.materialName, item.spec || '', item.unit]);
     const group = materialGroups.get(key);
     if (group) { group.orderQty = round3(group.orderQty + orderQty); group.vendors.add(item.vendorName || '미지정'); }
     else materialGroups.set(key, { item, orderQty, vendors: new Set([item.vendorName || '미지정']) });
   }
   const existingMaterials = await fetchMaterials();
+  const existingPurchases = await fetchPurchaseItems({ strict: true });
+  // 전량 재고 충당이어도 기존 구매가 있는 계약은 필요수량 0과의 충돌을 검증한다.
+  const coveredRetries = quantityGroups.filter(({ item, orderQty, pricing }) => orderQty === 0
+    && existingPurchases.some(p => samePurchaseContract(p, item, pricing)))
+    .map(target => ({ ...target, allocations: resolveOrderWeights(target.item, orders, fallbackOrder) }));
+  const plannedPurchases = [...targets, ...coveredRetries].flatMap(({ item, orderQty, allocations, pricing }) =>
+    splitQtyByOrders(orderQty, allocations)
+      .map(({ order, qty }) => ({ item, order, qty, pricing })));
+  // 재시도는 가격 계약과 필요수량이 모두 일치할 때만 기존 구매를 보존한다.
+  const purchasesToSave = plannedPurchases.filter(({ item, order, qty, pricing }) => {
+    const matches = existingPurchases.filter(p => p.orderNo === order.orderNo && samePurchaseContract(p, item, pricing));
+    if (matches.length === 0) return qty > 0;
+    if (matches.length !== 1 || !Number.isFinite(matches[0].qty) || round3(matches[0].qty) !== round3(qty)) {
+      throw new Error(`${item.materialName}: ${order.orderNo}의 기존 구매수량과 필요수량 ${qty}이 일치하지 않거나 구매전표가 중복됩니다. 기존 구매전표와 장바구니 수량을 확인해 주세요.`);
+    }
+    return false;
+  });
   let materialCount = 0;
   for (const { item, orderQty, vendors: supplierNames } of materialGroups.values()) {
     const vendorName = [...supplierNames].join(', ');
     const existing = existingMaterials.find(
-      (m: any) => m.name === item.materialName && m.unit === item.unit,
+      (m: any) => m.name === item.materialName && m.unit === item.unit
+        && (!item.spec || (m.spec || '') === item.spec),
     );
     await upsertMaterial({
       id: existing?.id || genId(),
@@ -87,33 +140,12 @@ export async function confirmMaterialOrder(
   }
 
   // ── 2단계: 자재구매 전표 생성 (발주별로 분리) ──
-  const existingPurchases = await fetchPurchaseItems({ strict: true });
-  // 공급처가 다르면 별도 구매다. 재시도만 기존 조합을 보존한다.
-  const seen = new Set(
-    existingPurchases.map(p => JSON.stringify([p.orderNo, p.itemName, p.unit, p.vendorName || '미지정'])),
-  );
-
   let purchaseCount = 0;
   const skippedNoOrder: string[] = [];
 
-  for (const { item, orderQty, allocations } of targets) {
-    if (allocations.length === 0) {
-      // 발주번호를 모르면 저장하지 않는다.
-      // 예전엔 스타일번호를 발주번호 자리에 넣어서 이후 조인이 전부 깨졌다.
-      skippedNoOrder.push(item.materialName);
-      continue;
-    }
+  for (const { item, order, qty, pricing } of purchasesToSave) {
+      const { unitPriceCny, currency, appliedRate } = pricing;
 
-    // 소요수량을 발주 수량 비율대로 배분 (합계가 orderQty와 일치하도록 마지막에 잔여 배정)
-    const qtyByOrder = splitQtyByOrders(orderQty, allocations);
-
-    for (const { order, qty } of qtyByOrder) {
-      if (qty <= 0) continue;
-      const key = JSON.stringify([order.orderNo, item.materialName, item.unit, item.vendorName || '미지정']);
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      const unitPriceCny = item.unitPriceCny ?? 0;
       await upsertPurchaseItem({
         id: genId(),
         orderId: order.id,
@@ -124,23 +156,67 @@ export async function confirmMaterialOrder(
         itemName: item.materialName,
         qty,
         unit: item.unit,
+        spec: item.spec || '',
         unitPriceCny,
-        currency: 'CNY',
-        appliedRate: cnyKrw || 191,
-        amountKrw: Math.round(unitPriceCny * qty * (cnyKrw || 191)),
+        currency,
+        appliedRate,
+        amountKrw: Math.round(unitPriceCny * qty * appliedRate),
         vendorName: item.vendorName || '미지정',
         paymentMethod: '기타',
         purchaseStatus: '미발주',
         createdAt: new Date().toISOString(),
       });
       purchaseCount++;
-    }
   }
 
   // ── 3단계: 장바구니 비우기 (저장이 모두 끝난 뒤에만) ──
   store.clearMaterialCart();
 
   return { materialCount, purchaseCount, skippedNoOrder };
+}
+
+type PricedCartItem = CartItem & { currency?: Currency; appliedRate?: number };
+
+export function resolveMaterialCartPricing(item: PricedCartItem, cnyKrw: number, usdKrw?: number) {
+  const currency = item.currency ?? 'CNY';
+  const unitPriceCny = item.unitPriceCny ?? 0;
+  if (!['CNY', 'USD', 'KRW'].includes(currency) || !Number.isFinite(unitPriceCny) || unitPriceCny < 0) {
+    throw new Error(`${item.materialName}: 통화·단가가 올바르지 않습니다. BOM/원가에서 확인한 뒤 다시 담아 주세요.`);
+  }
+  const appliedRate = currency === 'KRW' ? 1 : item.appliedRate ?? (currency === 'USD' ? usdKrw : cnyKrw);
+  if (!Number.isFinite(appliedRate) || (appliedRate ?? 0) <= 0) {
+    throw new Error(`${item.materialName}: ${currency} 적용 환율이 누락되었거나 올바르지 않습니다. BOM/원가 또는 설정에서 ${currency}→KRW 환율을 확인해 주세요.`);
+  }
+  return { currency, unitPriceCny, appliedRate: appliedRate as number };
+}
+
+/** 화면·인쇄도 확정 시와 같은 환율을 사용하며 오류는 금액 대신 안내를 표시한다. */
+export function getMaterialCartAmountKrw(item: PricedCartItem, qty: number, cnyKrw: number, usdKrw?: number): number | null {
+  try {
+    const pricing = resolveMaterialCartPricing(item, cnyKrw, usdKrw);
+    const amount = Math.round(qty * pricing.unitPriceCny * pricing.appliedRate);
+    return Number.isFinite(amount) ? amount : null;
+  } catch { return null; }
+}
+
+function purchaseIdentity(orderNo: string, name: string, unit: string, vendor: string | undefined,
+  spec: string | undefined, currency: Currency, price: number, rate: number | undefined): string {
+  return JSON.stringify([orderNo, name, unit, vendor || '미지정', spec || '', currency, price, rate]);
+}
+
+function samePurchaseContract(
+  purchase: PurchaseItem,
+  item: CartItem,
+  pricing: ReturnType<typeof resolveMaterialCartPricing>,
+): boolean {
+  const sameBase = purchase.itemName === item.materialName && purchase.unit === item.unit
+    && (purchase.vendorName || '미지정') === (item.vendorName || '미지정');
+  if (sameBase && pricing.currency === 'CNY' && !item.spec && !purchase.spec
+    && (!purchase.currency || purchase.currency === 'CNY') && purchase.legacyPricingIdentity === true) return true;
+  return purchaseIdentity('', purchase.itemName, purchase.unit, purchase.vendorName, purchase.spec,
+    purchase.currency ?? 'CNY', purchase.unitPriceCny ?? 0,
+    purchase.currency === 'KRW' ? 1 : purchase.appliedRate) === purchaseIdentity('', item.materialName,
+      item.unit, item.vendorName, item.spec, pricing.currency, pricing.unitPriceCny, pricing.appliedRate);
 }
 
 type OrderWeight = { order: ProductionOrder; weight: number };

@@ -552,7 +552,7 @@ export default function ItemMaster() {
   }>(null);
   const costSheetRef = useRef<HTMLInputElement>(null);
   // 원가표 통화 — 중국 공장은 보통 USD로 보낸다
-  const [costSheetCurrency, setCostSheetCurrency] = useState<'USD' | 'CNY' | 'KRW'>('USD');
+  const [costSheetCurrency, setCostSheetCurrency] = useState<'USD' | 'KRW'>('USD');
   const [editItem, setEditItem] = useState<Partial<Item>>({ ...emptyItem });
   const [isEdit, setIsEdit] = useState(false);
   // 변경사항 추적
@@ -854,7 +854,10 @@ export default function ItemMaster() {
             erpCategory: itemData.erpCategory,
             lineName: '',
             manufacturingCountry: '중국',
-            currency: 'CNY',
+            currency: 'USD',
+            preCurrency: 'USD',
+            exchangeRateUsd: store.getSettings().usdKrw,
+            preExchangeRateUsd: store.getSettings().usdKrw,
             snapshotCnyKrw: cnyKrwRate,
             exchangeRateCny: cnyKrwRate,
             lines: [],
@@ -998,7 +1001,11 @@ export default function ItemMaster() {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
       const existingBom = (boms as any[]).find(b => b.styleId === itemId || b.styleNo === (items as Item[]).find(i => i.id === itemId)?.styleNo);
-      const fallback = existingBom?.exchangeRateCny ?? 191;
+      if (existingBom && (existingBom.currency || 'CNY') === 'CNY') {
+        toast.error('과거 CNY 원가표는 일괄 업로드에서 변경할 수 없습니다. 원가 관리에서 별도 USD 원가를 작성해주세요.');
+        return;
+      }
+      const fallback = existingBom?.currency === 'KRW' ? 1 : existingBom?.exchangeRateUsd || store.getSettings().usdKrw;
       const { materials, parsedProcessingFee, parsedRate, postProcessLines } = parseExcelBomSheet(raw, fallback);
       setBatchCostItems(prev => prev.map(bi =>
         bi.item.id === itemId
@@ -1044,7 +1051,7 @@ export default function ItemMaster() {
             postMaterials: newPostMaterials,
             postProcessingFee: newProcessingFee,
             postProcessLines: newPostProcLines,
-            exchangeRateCny: exchangeRateCny || bi.bom.exchangeRateCny,
+            ...(bi.bom.currency === 'KRW' ? {} : { exchangeRateUsd: exchangeRateCny || bi.bom.exchangeRateUsd }),
             // 패킹자재·포장/검사비: 엑셀 업로드로 변경 안됨 — 기존 BOM 값 유지
             packagingCostKrw: bi.bom.packagingCostKrw ?? 0,
             packingCostKrw: bi.bom.packingCostKrw ?? 0,
@@ -1053,6 +1060,9 @@ export default function ItemMaster() {
           updatedBom = {
             id: genId(), styleNo: bi.item.styleNo, styleId: bi.item.id, styleName: bi.item.name,
             colorBoms: [],
+            currency: 'USD', preCurrency: 'USD',
+            exchangeRateUsd: exchangeRateCny || store.getSettings().usdKrw,
+            preExchangeRateUsd: exchangeRateCny || store.getSettings().usdKrw,
             postColorBoms: [{ color: '기본', lines: materials.map(l => ({ ...l, id: genId() })), postProcessLines: postProcessLines.map(l => ({ ...l, id: genId() })), processingFee: processingFee || 0 }],
             postMaterials: materials.map(l => ({ ...l, id: genId() })),
             postProcessingFee: processingFee || 0,
@@ -1696,7 +1706,7 @@ export default function ItemMaster() {
       const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
       const existing = (boms as any[]).find(b => b.styleId === editItem.id || b.styleNo === editItem.styleNo);
       const { materials, parsedProcessingFee, parsedRate, postProcessLines } =
-        parseExcelBomSheet(raw, existing?.exchangeRateCny ?? 191);
+        parseExcelBomSheet(raw, costSheetCurrency === 'KRW' ? 1 : existing?.exchangeRateUsd || store.getSettings().usdKrw);
       if (!materials.length) { toast.error('원가표에서 자재를 읽지 못했습니다'); return; }
       setCostSheetData({ materials, processingFee: parsedProcessingFee, exchangeRateCny: parsedRate, postProcessLines });
       setCostSheetName(file.name);
@@ -1719,6 +1729,8 @@ export default function ItemMaster() {
     const base = existing || {
       id: genId(), styleId: item.id, styleNo: item.styleNo, styleName: item.name,
       version: 1, season: item.season, lines: [], postProcessLines: [], processingFee: 0,
+      currency: costSheetCurrency, preCurrency: costSheetCurrency,
+      exchangeRateUsd: store.getSettings().usdKrw, preExchangeRateUsd: store.getSettings().usdKrw,
       snapshotCnyKrw: exchangeRateCny || 191, colorBoms: [], postColorBoms: [],
       productionMarginRate: 0.16, logisticsCostKrw: 0, packagingCostKrw: 0, packingCostKrw: 0,
       pnl: { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 },
@@ -1732,8 +1744,6 @@ export default function ItemMaster() {
           preProcessingFee: processingFee || 0,
           postProcessLines: withIds(postProcessLines),
           colorBoms: colors.map(color => ({ color, lines: withIds(materials), postProcessLines: withIds(postProcessLines), processingFee: processingFee || 0 })),
-          exchangeRateCny: exchangeRateCny || base.exchangeRateCny,
-          snapshotCnyKrw: exchangeRateCny || base.snapshotCnyKrw,
         }
       : {
           ...base,
@@ -1741,12 +1751,15 @@ export default function ItemMaster() {
           postProcessingFee: processingFee || 0,
           postProcessLines: withIds(postProcessLines),
           postColorBoms: colors.map(color => ({ color, lines: withIds(materials), postProcessLines: withIds(postProcessLines), processingFee: processingFee || 0 })),
-          exchangeRateCny: exchangeRateCny || base.exchangeRateCny,
-          snapshotCnyKrw: exchangeRateCny || base.snapshotCnyKrw,
         };
     // 원가표에 적힌 환율은 '그 통화 → KRW'. 고른 통화 자리에 넣는다
-    bom.currency = costSheetCurrency;
-    if (costSheetCurrency === 'USD') bom.exchangeRateUsd = exchangeRateCny || bom.exchangeRateUsd;
+    if (costSheetMode === 'pre') {
+      bom.preCurrency = costSheetCurrency;
+      if (costSheetCurrency === 'USD') bom.preExchangeRateUsd = exchangeRateCny || bom.preExchangeRateUsd || store.getSettings().usdKrw;
+    } else {
+      bom.currency = costSheetCurrency;
+      if (costSheetCurrency === 'USD') bom.exchangeRateUsd = exchangeRateCny || bom.exchangeRateUsd || store.getSettings().usdKrw;
+    }
     const { totalCostKrw, factoryUnitCostKrw } = calcBomCosts(bom);
     if (costSheetMode === 'post') { bom.postSubtotalKrw = totalCostKrw; bom.postTotalCostKrw = totalCostKrw; }
     if (factoryUnitCostKrw > 0) bom.pnl = { ...(bom.pnl || {}), factoryUnitCostKrw };
@@ -3278,11 +3291,10 @@ export default function ItemMaster() {
                 </select>
                 <select
                   value={costSheetCurrency}
-                  onChange={e => setCostSheetCurrency(e.target.value as 'USD' | 'CNY' | 'KRW')}
+                  onChange={e => setCostSheetCurrency(e.target.value as 'USD' | 'KRW')}
                   className="h-8 text-xs border border-border rounded-md bg-card px-2"
                 >
                   <option value="USD">$ USD</option>
-                  <option value="CNY">¥ CNY</option>
                   <option value="KRW">₩ KRW</option>
                 </select>
                 <input ref={costSheetRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleCostSheetPick} />

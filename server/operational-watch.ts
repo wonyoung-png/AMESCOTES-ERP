@@ -39,10 +39,14 @@ export async function operationalWatch(today: string, read = restAsServer, appro
   for (const result of changes) add(result.teams, result.facts, result.alerts);
   try {
     const [samples, vendors] = await Promise.all([
-      allRows('samples?select=id,style_no,style_name,buyer_id,brand_code,stage,location,request_date,expected_date&order=id.asc', read),
+      allRows('samples?select=id,style_no,style_name,buyer_id,brand_code,stage,location,request_date,expected_date,completed_at,review_status,review_assignee_id,billing_status,billing_statement_id&order=id.asc', read),
       allRows('vendors?type=eq.바이어&select=id,name,name_en,brands&order=id.asc', read),
     ]);
     const active = samples.filter(s => !['최종승인', '반려'].includes(s.stage));
+    const reviewPending=samples.filter(s=>s.completed_at&&s.review_status==='pending');
+    const billPending=samples.filter(s=>s.completed_at&&s.review_status==='accepted'&&s.billing_status==='미청구'&&!s.billing_statement_id);
+    add(['제품개발'],[`완료 샘플 팀장 수락 대기 ${reviewPending.length}건`,...reviewPending.slice(0,8).map(s=>`  · 샘플 id=${s.id} ${s.style_no} ${s.style_name||''} / 완료 ${s.completed_at} / 수락 담당 id=${s.review_assignee_id||'미지정'}`)],reviewPending.length);
+    add(['제품개발','경영지원'],[`수락 완료 샘플 미청구 ${billPending.length}건`,...billPending.slice(0,8).map(s=>`  · 샘플 id=${s.id} ${s.style_no} ${s.style_name||''} / 완료 ${s.completed_at}`)],billPending.length);
     const unresolved = active.filter(s => !s.brand_code && Array.isArray(vendors.find(v => v.id === s.buyer_id)?.brands) && vendors.find(v => v.id === s.buyer_id).brands.length > 1);
     if (unresolved.length) add(['제품개발'], [`브랜드 미지정 샘플 ${unresolved.length}건 — 브랜드팀 일정에 표시되지 않으므로 귀속 확인 필요 (원본 기준 ${stamp(unresolved)})`], unresolved.length);
     const label = (s: any) => {
@@ -55,7 +59,7 @@ export async function operationalWatch(today: string, read = restAsServer, appro
       ['루멘 디자인', active.filter(s => ['LUMEN', '루멘', 'LUM'].includes(String(label(s)).trim().toUpperCase()))],
       ['에탈루프 디자인', active.filter(s => ['AETALOOF', 'AETALOOP', '에탈루프', 'AET'].includes(String(label(s)).trim().toUpperCase()))],
     ] as [string, any[]][]) {
-      const late = rows.filter(s => s.expected_date && s.expected_date < today);
+      const late = rows.filter(s => !s.completed_at && s.expected_date && s.expected_date < today);
       const missing = rows.filter(s => !s.request_date || !s.expected_date);
       const prioritized = [...late, ...missing, ...rows].filter((s, i, list) => list.findIndex(v => v.id === s.id) === i);
       add([team], [`샘플 진행 ${rows.length}건 / 마감 경과 ${late.length}건 / 접수·마감 날짜 미입력 ${missing.length}건 (원본 기준 ${stamp(rows)}, 공장 진행률·완료 여부는 단계 기록 기준)`,

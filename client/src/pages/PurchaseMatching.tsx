@@ -2,7 +2,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useSearch } from 'wouter';
-import { confirmMaterialOrder } from '@/lib/confirmMaterialOrder';
+import { confirmMaterialOrder, getMaterialCartAmountKrw } from '@/lib/confirmMaterialOrder';
+import { materialCartIdentity } from '@/lib/materialCartIdentity';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchPurchaseItems, upsertPurchaseItem, deletePurchaseItem as deletePurchaseItemSB,
@@ -920,7 +921,7 @@ export default function PurchaseMatching() {
                       <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
                       <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
                       <th className="nw ctr text-[13px] font-semibold text-muted-foreground">단위</th>
-                      <th className="num text-[13px] font-semibold text-muted-foreground">단가(CNY)</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground">단가·통화</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">발주수량</th>
@@ -936,14 +937,14 @@ export default function PurchaseMatching() {
                       const orderQty = Math.max(0, item.qty - stockQty);
                       const isSufficient = orderQty === 0;
                       const unitPriceCny = item.unitPriceCny ?? 0;
-                      const amountKrw = Math.round(orderQty * unitPriceCny * settings.cnyKrw);
+                      const amountKrw = getMaterialCartAmountKrw(item, orderQty, settings.cnyKrw, settings.usdKrw);
                       return (
-                      <tr key={idx} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                      <tr key={materialCartIdentity(item)} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
                         <td className="font-medium text-foreground">{item.materialName}</td>
                         <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
                         <td className="ctr text-muted-foreground">{item.unit}</td>
                         <td className="nw num font-mono text-muted-foreground text-xs">
-                          {unitPriceCny > 0 ? formatNumber(unitPriceCny, 2) : <span className="text-muted-foreground">-</span>}
+                          {formatNumber(unitPriceCny, 2)} {item.currency ?? 'CNY'}
                         </td>
                         <td className="nw num font-mono text-muted-foreground text-sm">
                           {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
@@ -957,7 +958,7 @@ export default function PurchaseMatching() {
                             placeholder="0"
                             onChange={e => {
                               const val = parseFloat(e.target.value) || 0;
-                              store.updateCartItemStock(item.materialName, item.unit, val);
+                              store.updateCartItemStock(item.materialName, item.unit, val, item);
                               refreshCart();
                             }}
                             className="w-20 h-7 text-right font-mono text-sm border border-border rounded px-2 focus:outline-none focus:ring-1 focus:ring-ring"
@@ -972,7 +973,7 @@ export default function PurchaseMatching() {
                             onChange={e => {
                               const newQty = parseFloat(e.target.value) || 0;
                               const newStock = Math.max(0, item.qty - newQty);
-                              store.updateCartItemStock(item.materialName, item.unit, newStock);
+                              store.updateCartItemStock(item.materialName, item.unit, newStock, item);
                               refreshCart();
                             }}
                             className={`w-24 h-7 text-right font-mono text-sm border rounded px-2 focus:outline-none focus:ring-1 ${
@@ -983,7 +984,7 @@ export default function PurchaseMatching() {
                           />
                         </td>
                         <td className="nw num font-mono text-xs text-muted-foreground">
-                          {amountKrw > 0 ? formatKRW(amountKrw) : <span className="text-muted-foreground">-</span>}
+                          {amountKrw === null ? '단가·환율 확인' : formatKRW(amountKrw)}
                         </td>
                         <td className="text-xs text-muted-foreground">
                           {item.orders.map((o, i) => (
@@ -999,7 +1000,7 @@ export default function PurchaseMatching() {
                           <button
                             className="text-muted-foreground hover:text-[var(--system-red)] transition-colors"
                             onClick={() => {
-                              store.removeCartItem(item.materialName, item.unit);
+                              store.removeCartItem(item.materialName, item.unit, item);
                               refreshCart();
                             }}
                           >
@@ -1091,7 +1092,7 @@ export default function PurchaseMatching() {
                         <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
                         <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
                         <th className="nw ctr text-[13px] font-semibold text-muted-foreground">단위</th>
-                        <th className="num text-[13px] font-semibold text-muted-foreground">단가(CNY)</th>
+                        <th className="num text-[13px] font-semibold text-muted-foreground">단가·통화</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">발주수량</th>
@@ -1102,9 +1103,9 @@ export default function PurchaseMatching() {
                     <tbody>
                       {items.map((item, i) => {
                         const unitPriceCny = item.unitPriceCny ?? 0;
-                        const amountKrw = Math.round(item.orderQty * unitPriceCny * settings.cnyKrw);
+                        const amountKrw = getMaterialCartAmountKrw(item, item.orderQty, settings.cnyKrw, settings.usdKrw);
                         return (
-                        <tr key={i} className="border-b border-border">
+                        <tr key={materialCartIdentity(item)} className="border-b border-border">
                           <td className="ctr text-muted-foreground text-xs">{i + 1}</td>
                           <td className="ctr">
                             {item.imageUrl ? (
@@ -1117,7 +1118,7 @@ export default function PurchaseMatching() {
                           <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
                           <td className="ctr text-muted-foreground">{item.unit}</td>
                           <td className="nw num font-mono text-muted-foreground text-xs">
-                            {unitPriceCny > 0 ? formatNumber(unitPriceCny, 2) : '-'}
+                            {formatNumber(unitPriceCny, 2)} {item.currency ?? 'CNY'}
                           </td>
                           <td className="nw num font-mono text-muted-foreground text-xs">
                             {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
@@ -1129,7 +1130,7 @@ export default function PurchaseMatching() {
                             {item.orderQty % 1 === 0 ? item.orderQty.toLocaleString() : item.orderQty.toFixed(3)}
                           </td>
                           <td className="nw num font-mono text-xs text-muted-foreground">
-                            {amountKrw > 0 ? formatKRW(amountKrw) : '-'}
+                            {amountKrw === null ? '단가·환율 확인' : formatKRW(amountKrw)}
                           </td>
                           <td className="text-xs text-muted-foreground">
                             {item.orders.map((o, j) => (
@@ -1150,7 +1151,9 @@ export default function PurchaseMatching() {
                           {items.reduce((s, i) => s + i.orderQty, 0).toFixed(0)}
                         </td>
                         <td className="num text-xs font-bold text-foreground">
-                          {formatKRW(items.reduce((s, i) => s + Math.round(i.orderQty * (i.unitPriceCny ?? 0) * settings.cnyKrw), 0))}
+                          {items.some(i => getMaterialCartAmountKrw(i, i.orderQty, settings.cnyKrw, settings.usdKrw) === null)
+                            ? '단가·환율 확인'
+                            : formatKRW(items.reduce((s, i) => s + (getMaterialCartAmountKrw(i, i.orderQty, settings.cnyKrw, settings.usdKrw) ?? 0), 0))}
                         </td>
                         <td></td>
                       </tr>
@@ -1227,7 +1230,8 @@ export default function PurchaseMatching() {
                       cartItems,
                       orders,
                       vendors: allVendors,
-                      cnyKrw: settings.cnyKrw || 191,
+                      cnyKrw: settings.cnyKrw,
+                      usdKrw: settings.usdKrw,
                     });
                     queryClient.invalidateQueries({ queryKey: ['materials'] });
                     queryClient.invalidateQueries({ queryKey: ['purchaseItems'] });
@@ -1242,6 +1246,7 @@ export default function PurchaseMatching() {
                     setVendorOrderModal(false);
                   } catch (e: any) {
                     console.error('발주 확정 오류:', e);
+                    refreshCart();
                     toast.error(`발주 확정 실패: ${e?.message || '알 수 없는 오류'}`);
                   } finally { cartConfirmLock.current = false; setCartConfirming(false); }
                 }}

@@ -2,7 +2,7 @@ import { restAsServer } from './auth.js';
 
 type Reader = (path: string) => Promise<{ ok: boolean; json(): Promise<any> }>;
 const SELECT = 'id,title,channel,start_date,end_date,status,discount_rate,workspace,product_discounts,category_discounts,updated_at';
-const linkedId = (c: any): string | undefined => c.confirmed_payload && c.result_ref?.table === 'campaigns'
+const linkedId = (c: any): string | undefined => c.parsed?.sampleReview !== true && c.confirmed_payload && c.result_ref?.table === 'campaigns'
   && typeof c.result_ref.id === 'string' && /^[a-zA-Z0-9_-]{1,160}$/.test(c.result_ref.id) ? c.result_ref.id : undefined;
 
 /** Only look up campaigns linked to cards already authorized for this reader. */
@@ -27,6 +27,7 @@ export async function attachCampaignEvidence(cards: any[], read: Reader = restAs
     }
   }
   return cards.map(c => {
+    if (c.parsed?.sampleReview === true || c.result_ref?.table === 'samples') return c;
     const id = linkedId(c);
     return { ...c, _campaignEvidence: c.confirmed_payload
       ? id ? states.get(id) : { state: 'unlinked', checkedAt } : undefined };
@@ -39,6 +40,7 @@ export const CAMPAIGN_EVIDENCE_RULES = `업무 카드의 확정값은 당시 결
 캘린더 마감/closed, 일정 확정, 팀별 준비 완료는 서로 다르다. 원천 조회시각 이후 변경까지 확인했다고 말하지 마라.`;
 
 export function campaignEvidence(c: any): string {
+  if (c.parsed?.sampleReview === true || c.result_ref?.table === 'samples') return '';
   if (!c.confirmed_payload) return '';
   const e = c._campaignEvidence;
   const stamp = e?.checkedAt ? ` (조회 ${e.checkedAt})` : '';

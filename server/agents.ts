@@ -14,7 +14,7 @@ import { runSubscriptionUsageChecks } from './subscriptions.js';
 import { allRows, reportingCards, currentCampaignCards, prioritizeCards, dayStartUtc, cardEvidence } from './work-records.js';
 import { findCouncilCandidates, openCouncil } from './council.js';
 import { attachCampaignEvidence, CAMPAIGN_EVIDENCE_RULES } from './campaign-evidence.js';
-import { reportStamp } from './report-evidence.js';
+import { attachSampleEvidence, reportStamp, sampleEvidence } from './report-evidence.js';
 import { createAgentSchedulerTick } from './agent-scheduler.js';
 
 export type AgentStatus = 'work' | 'idle' | 'warn' | 'report';
@@ -102,7 +102,7 @@ async function write(team: string, cards: any[], all: Member[], stats: Record<st
   }).join('\n');
   const selected = prioritizeCards(cards);
   const received = prioritizeCards(shared, '', 60);
-  const lines = selected.map(cardEvidence).join('\n');
+  const lines = selected.map(c => cardEvidence(c) + sampleEvidence(c)).join('\n');
 
   const sys = `너는 패션·핸드백 회사 아메스코테스 대표 직속의 "${team}" 팀 감독 에이전트다. 오늘(한국): ${kstToday()}.
 ${org ? `이 팀이 맡은 일: ${org.focus}.\n` : ''}대표에게 이 팀이 일을 제대로 이행하고 있는지 보고한다 — 밀린 것·빠진 것, 대표 지시의 진행, 팀원별로 누가 무엇을 하는지(조용한 사람 포함).
@@ -122,7 +122,7 @@ needs 는 정말 대표가 볼 것만, 없으면 []. 적혀 있지 않은 건 �
   try {
     const r = await new Anthropic({ apiKey: key }).messages.create({
       model: CLASSIFY_MODEL, max_tokens: 2000, output_config: { effort: 'low' }, system: sys,
-      messages: [{ role: 'user', content: `<records>\n[팀원]\n${esc(people) || '(없음)'}\n\n[감시 데이터 — ERP·PMS]\n${esc(facts.join('\n')) || '(없음)'}\n\n[팀 업무 — 최근 30일·미결·오늘 처리·앞으로의 확정 일정]\n${esc(lines) || '(없음)'}\n\n[다른 팀에서 공유받은 근거]\n${esc(received.map(cardEvidence).join('\n')) || '(없음)'}\n</records>` }],
+      messages: [{ role: 'user', content: `<records>\n[팀원]\n${esc(people) || '(없음)'}\n\n[감시 데이터 — 통합 ERP]\n${esc(facts.join('\n')) || '(없음)'}\n\n[팀 업무 — 최근 30일·미결·오늘 처리·앞으로의 확정 일정]\n${esc(lines) || '(없음)'}\n\n[다른 팀에서 공유받은 근거]\n${esc(received.map(c => cardEvidence(c) + sampleEvidence(c)).join('\n')) || '(없음)'}\n</records>` }],
     });
     console.log(`[agents] usage ${team} ${r.model} in=${r.usage.input_tokens} out=${r.usage.output_tokens}`);
     const raw = r.content.filter(c => c.type === 'text').map(c => c.text).join('').trim();
@@ -179,7 +179,7 @@ export async function loadReportContext(allowUnavailable = false, brandApprovals
     }
   };
   const [cards, all, watch, rules] = await Promise.all([
-    read('업무 자료',recentCards(since).then(cards => attachCampaignEvidence(cards)),[]),
+    read('업무 자료',recentCards(since).then(cards => attachCampaignEvidence(cards)).then(cards => attachSampleEvidence(cards)),[]),
     read('직원 업무 범위',members(true),[]),gatherWatch(undefined, undefined, brandApprovals),read('팀 감시 기준',loadRules(true),new Map<string,string>()),
   ]);
   const bossIds = new Set(all.filter(m => CEO_EMAILS.includes(m.email.toLowerCase())).map(m => m.id));

@@ -27,6 +27,9 @@ import brandWorkflowRouter from "./brand-workflow.js";
 import payablePaymentRouter from "./payable-payment.js";
 import receiptWorkflowRouter from "./receipt-workflow.js";
 import inventoryRouter from "./inventory.js";
+import sampleWorkflowRouter from "./sample-workflow.js";
+import defectApprovalRouter from "./defect-approval.js";
+import expensePayableRouter from "./expense-payable.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -82,6 +85,9 @@ async function startServer() {
   app.use(payablePaymentRouter);
   app.use(receiptWorkflowRouter);
   app.use(inventoryRouter);
+  app.use(sampleWorkflowRouter);
+  app.use(defectApprovalRouter);
+  app.use(expensePayableRouter);
 
   // OCR 라우터
   app.use(yardageOcrRouter);

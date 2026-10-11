@@ -6,7 +6,10 @@ import { usePersistedState } from '@/hooks/usePersistedState';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchOrders, upsertOrder, deleteOrder as deleteOrderSB, fetchBoms, fetchVendors, fetchItems, fetchMaterials, upsertMaterial, fetchPurchaseItems, upsertPurchaseItem } from '@/lib/dbQueries';
 import { phase1 } from '@/lib/phase1';
-import { confirmMaterialOrder } from '@/lib/confirmMaterialOrder';
+import { confirmMaterialOrder, getMaterialCartAmountKrw } from '@/lib/confirmMaterialOrder';
+import { materialCartIdentity } from '@/lib/materialCartIdentity';
+import { workOrderColors } from '@/lib/workOrderColors';
+import { pickWorkOrderBom } from '@/lib/workOrderBom';
 import { addHqMaterialsToCart, pickBomForOrder, hqGroups, hqMaterialsForDisplay } from '@/lib/hqMaterialCart';
 import { nextOrderNo } from '@/lib/orderNo';
 import {
@@ -183,7 +186,7 @@ export default function ProductionOrders() {
 
   // 발주 완료 후 액션 팝업 상태
   const [postOrderModal, setPostOrderModal] = useState(false);
-  const [postOrderInfo, setPostOrderInfo] = useState<{ order: ProductionOrder; bomMaterials: Array<any>; ambiguous?: boolean } | null>(null);
+  const [postOrderInfo, setPostOrderInfo] = useState<{ order: ProductionOrder; bomMaterials: Array<any>; ambiguous?: boolean; materialError?: string } | null>(null);
   const [materialImagePreview, setMaterialImagePreview] = useState<string | null>(null);
 
   // 자재 장바구니 모달 상태
@@ -829,13 +832,20 @@ export default function ProductionOrders() {
     try {
       const mats = await fetchMaterials();
       let hit = 0;
+      const remainingStock = new Map<string, number>();
       for (const item of store.getMaterialCart()) {
         const m = (mats as any[]).find(x =>
-          x.name === item.materialName && (!x.unit || !item.unit || x.unit === item.unit));
+          x.name === item.materialName && (!x.unit || !item.unit || x.unit === item.unit)
+          && (x.spec || '') === (item.spec || ''));
         if (!m) continue;
-        const total = (Number(m.stockQty) || 0) + (Number(m.factoryStockQty) || 0);
-        if (total <= 0) continue;
-        store.updateCartItemStock(item.materialName, item.unit, total);
+        const poolKey = JSON.stringify([item.materialName, item.spec || '', item.unit]);
+        if (!remainingStock.has(poolKey)) {
+          remainingStock.set(poolKey, Math.max(0, (Number(m.stockQty) || 0) + (Number(m.factoryStockQty) || 0)));
+        }
+        const remaining = remainingStock.get(poolKey)!;
+        const allocated = Math.min(Math.max(0, item.qty), remaining);
+        remainingStock.set(poolKey, Math.max(0, remaining - allocated));
+        store.updateCartItemStock(item.materialName, item.unit, allocated, item);
         hit += 1;
       }
       refreshCart();
@@ -845,13 +855,31 @@ export default function ProductionOrders() {
     }
   };
 
-  /** 발주서를 공장에 보낸 것으로 표시 — 이미지/인쇄 직후 자동으로도 찍힌다 */
+  /** 실제 공장 전달을 사용자가 확인한 뒤 기록한다. 인쇄·파일 저장은 전달이 아니다. */
+  const transmissionPending = useRef(new Set<string>());
+  const transmissionRecorded = useRef(new Set<string>());
   const markSent = async (o: ProductionOrder) => {
-    if (o.sentAt) return;
+    if (o.sentAt || transmissionRecorded.current.has(o.id)) return true;
+    if (transmissionPending.current.has(o.id)) return false;
+    const picked = pickWorkOrderBom(boms as Bom[], o);
+    const readiness = workOrderColors(o, picked.bom);
+    if (picked.error || picked.ambiguous || !readiness.ready || (!picked.bom && !o.workOrderHtml)) {
+      toast.error(picked.error || (picked.ambiguous ? 'BOM이 여러 개입니다. 해당 발주의 BOM을 확인해주세요.'
+        : readiness.missingColors.length ? `작업지시서의 ${readiness.missingColors.join(', ')} 색상 BOM을 먼저 등록해주세요.`
+        : 'BOM 또는 작성된 작업지시서가 필요합니다.'));
+      return false;
+    }
+    transmissionPending.current.add(o.id);
     try {
-      await upsertOrder({ ...o, sentAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      const sentAt = new Date().toISOString();
+      await upsertOrder({ ...o, sentAt, updatedAt: sentAt });
+      transmissionRecorded.current.add(o.id);
+      setPoTarget(current => current?.id === o.id ? { ...current, sentAt } : current);
+      setBatchSheet(current => current ? { ...current, orders: current.orders.map(order => order.id === o.id ? { ...order, sentAt } : order) } : current);
       refresh();
-    } catch (e) { onSaveFail('발주')(e); }
+      return true;
+    } catch (e) { onSaveFail('발주')(e); return false; }
+    finally { transmissionPending.current.delete(o.id); }
   };
 
   /** 공장 회신 기록 — 납기 분쟁의 근거가 된다 */
@@ -934,13 +962,18 @@ export default function ProductionOrders() {
         known.push(order as any);
         created.push(order);
         ok += 1;
+      } catch (e) {
+        toast.error(`${item.styleNo} 발주 실패: ${(e as Error).message}`);
+        continue;
+      }
+      try {
         // 본사제공 자재는 우리가 사서 보낸다 — 발주와 동시에 자재 장바구니에 담는다.
         // 여기에 이게 없어서 일괄 발주한 건은 자재구매로 넘어가지 않았다
         const { bom: hqBom, ambiguous } = pickBomForOrder(boms as Bom[], item.styleNo, item.id, order.colorQtys, order.qty);
         if (ambiguous) hqAmbiguous.push(item.styleNo);
         else hqAdded += addHqMaterialsToCart(hqGroups(hqBom, order.colorQtys, order.qty), item.styleNo, item.name, order);
       } catch (e) {
-        toast.error(`${item.styleNo} 발주 실패: ${(e as Error).message}`);
+        toast.warning(`${item.styleNo} 발주 저장 완료 · 자재 담기 중단`, { description: (e as Error).message });
       }
     }
     if (ok > 0) {
@@ -1084,20 +1117,26 @@ export default function ProductionOrders() {
     // 예전엔 팝업과 장바구니가 서로 다른 규칙을 써서, 보여준 자재와 담긴 자재가 달랐다 (코덱스 지적).
     // 장바구니 쪽은 이관 전 서버 DB 주소를 직접 읽고 있었다. 그 인스턴스가 아직 살아 있어
     // 실패가 아니라 "얼어붙은 옛 BOM"을 조용히 읽었다. 이미 메모리에 있는 BOM 을 쓴다
-    const { bom: _hqBom, ambiguous: _hqAmbiguous } =
-      pickBomForOrder(boms as Bom[], form.styleNo || order.styleNo, form.styleId || order.styleId, order.colorQtys, totalQty);
-    const _hqGroups = hqGroups(_hqBom, order.colorQtys, totalQty);
-    const bomMaterials = hqMaterialsForDisplay(_hqGroups);
-
-    if (_hqAmbiguous) {
-      // 어느 BOM 이 맞는지 코드로 가릴 수 없다. 조용히 아무거나 담으면 엉뚱한 자재를 산다
-      toast.warning(`${order.styleNo} 는 자재가 다른 BOM 이 여러 개입니다. 자재는 직접 담아주세요`);
-    } else {
-      addHqMaterialsToCart(_hqGroups, order.styleNo, order.styleName, order);
+    let bomMaterials: ReturnType<typeof hqMaterialsForDisplay> = [];
+    let _hqAmbiguous = false;
+    let materialError: string | undefined;
+    try {
+      const picked = pickBomForOrder(boms as Bom[], form.styleNo || order.styleNo, form.styleId || order.styleId, order.colorQtys, totalQty);
+      _hqAmbiguous = picked.ambiguous;
+      const groups = hqGroups(picked.bom, order.colorQtys, totalQty);
+      bomMaterials = hqMaterialsForDisplay(groups);
+      if (_hqAmbiguous) {
+        toast.warning(`${order.styleNo} 는 자재가 다른 BOM 이 여러 개입니다. 자재는 직접 담아주세요`);
+      } else {
+        addHqMaterialsToCart(groups, order.styleNo, order.styleName, order);
+      }
+    } catch (e) {
+      materialError = (e as Error).message;
+      toast.warning('발주 저장 완료 · 자재 담기 중단', { description: materialError });
     }
     refreshCart();
 
-    setPostOrderInfo({ order, bomMaterials, ambiguous: _hqAmbiguous });
+    setPostOrderInfo({ order, bomMaterials, ambiguous: _hqAmbiguous, materialError });
     setPostOrderModal(true);
 
     {
@@ -3346,7 +3385,10 @@ export default function ProductionOrders() {
               try { await saveDocAsImage(poSheetRef.current, `발주서_${poTarget?.orderNo}`); toast.success('이미지 저장됨'); }
               catch (e) { toast.error((e as Error).message); }
             }}>이미지 저장</Button>
-            <Button onClick={() => { if (poTarget) void markSent(poTarget); printDoc(poSheetRef.current); }}>
+            <Button variant="outline" disabled={!!poTarget?.sentAt} onClick={() => {
+              if (poTarget && confirm('이 발주서와 작업지시서를 공장에 실제로 전달하셨습니까?')) void markSent(poTarget);
+            }}>{poTarget?.sentAt ? '공장 전달 기록됨' : '공장 전달 확인'}</Button>
+            <Button onClick={() => { printDoc(poSheetRef.current); }}>
               <Printer className="w-4 h-4 mr-1.5" />A4 인쇄 · PDF
             </Button>
           </DialogFooter>
@@ -3415,12 +3457,17 @@ export default function ProductionOrders() {
               suppressContentEditableWarning
               className={woEditing ? 'outline outline-2 outline-primary/40 rounded' : ''}
             >
+              {pickWorkOrderBom(boms as Bom[], workOrderTarget).error && (
+                <div role="alert" className="border-2 border-red-600 p-2 text-center font-bold text-red-600">
+                  전달 준비 불가 — {pickWorkOrderBom(boms as Bom[], workOrderTarget).error}
+                </div>
+              )}
               {workOrderTarget.workOrderHtml ? (
                 <div dangerouslySetInnerHTML={{ __html: workOrderTarget.workOrderHtml }} />
               ) : (
                 <WorkOrderDoc
                   order={workOrderTarget}
-                  bom={getBomForOrderFromList(boms as Bom[], workOrderTarget.styleNo).bom as any}
+                  bom={pickWorkOrderBom(boms as Bom[], workOrderTarget).bom as any}
                   item={items.find(i => i.id === workOrderTarget.styleId || i.styleNo === workOrderTarget.styleNo) as any}
                   vendors={allVendors as any}
                   note={workOrderNote}
@@ -3489,7 +3536,12 @@ export default function ProductionOrders() {
                   </div>
                 </button>
                 {/* 자재 장바구니 자동 저장 안내 */}
-                {postOrderInfo.ambiguous ? (
+                {postOrderInfo.materialError ? (
+                  <div className="w-full p-3 rounded-md border border-[var(--system-orange)]/30 bg-[var(--system-orange)]/10 text-left">
+                    <p className="text-sm font-semibold text-[var(--system-orange)]">발주 저장 완료 · 자재를 담지 않았습니다</p>
+                    <p className="text-xs text-muted-foreground">{postOrderInfo.materialError}</p>
+                  </div>
+                ) : postOrderInfo.ambiguous ? (
                   // 담지 않았는데 "저장 완료"라고 하면 안 된다 (코덱스 지적)
                   <div className="w-full flex items-center gap-3 p-3 rounded-md border border-[var(--system-orange)]/30 bg-[var(--system-orange)]/10 text-left">
                     <AlertTriangle className="w-5 h-5 text-[var(--system-orange)]" />
@@ -3559,9 +3611,11 @@ export default function ProductionOrders() {
                       <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
                       <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
                       <th className="nw ctr text-[13px] font-semibold text-muted-foreground">단위</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground">단가·통화</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
                       <th className="num text-[13px] font-semibold text-muted-foreground">발주수량</th>
+                      <th className="num text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
                       <th className="text-[13px] font-semibold text-muted-foreground">담긴 발주</th>
                       <th className="text-[13px] font-semibold text-muted-foreground">구매처</th>
                       <th className="ctr text-[13px] font-semibold text-muted-foreground">삭제</th>
@@ -3572,11 +3626,13 @@ export default function ProductionOrders() {
                       const stockQty = item.stockQty ?? 0;
                       const orderQty = Math.max(0, item.qty - stockQty);
                       const isSufficient = orderQty === 0;
+                      const amountKrw = getMaterialCartAmountKrw(item, orderQty, store.getSettings().cnyKrw, store.getSettings().usdKrw);
                       return (
-                      <tr key={idx} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
+                      <tr key={materialCartIdentity(item)} className="border-b border-border hover:bg-[var(--fill-quaternary)]">
                         <td className="font-medium text-foreground">{item.materialName}</td>
                         <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
                         <td className="ctr text-muted-foreground">{item.unit}</td>
+                        <td className="nw num font-mono text-xs">{formatNumber(item.unitPriceCny ?? 0, 2)} {item.currency ?? 'CNY'}</td>
                         <td className="nw num font-mono text-muted-foreground text-sm">
                           {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                         </td>
@@ -3589,7 +3645,7 @@ export default function ProductionOrders() {
                             placeholder="0"
                             onChange={e => {
                               const val = parseFloat(e.target.value) || 0;
-                              store.updateCartItemStock(item.materialName, item.unit, val);
+                              store.updateCartItemStock(item.materialName, item.unit, val, item);
                               refreshCart();
                             }}
                             className="w-20 h-7 text-right font-mono text-sm border border-border rounded px-2 focus:outline-none focus:ring-1 focus:ring-ring"
@@ -3605,7 +3661,7 @@ export default function ProductionOrders() {
                               const newQty = parseFloat(e.target.value) || 0;
                               // 발주수량 수동 조정 시 stockQty를 역산하여 저장
                               const newStock = Math.max(0, item.qty - newQty);
-                              store.updateCartItemStock(item.materialName, item.unit, newStock);
+                              store.updateCartItemStock(item.materialName, item.unit, newStock, item);
                               refreshCart();
                             }}
                             className={`w-24 h-7 text-right font-mono text-sm border rounded px-2 focus:outline-none focus:ring-1 ${
@@ -3615,6 +3671,7 @@ export default function ProductionOrders() {
                             }`}
                           />
                         </td>
+                        <td className="nw num font-mono text-xs">{amountKrw === null ? '단가·환율 확인' : formatKRW(amountKrw)}</td>
                         <td className="text-xs text-muted-foreground">
                           {item.orders.map((o, i) => (
                             <span key={i}>
@@ -3629,7 +3686,7 @@ export default function ProductionOrders() {
                           <button
                             className="text-muted-foreground hover:text-[var(--system-red)] transition-colors"
                             onClick={() => {
-                              store.removeCartItem(item.materialName, item.unit);
+                              store.removeCartItem(item.materialName, item.unit, item);
                               refreshCart();
                             }}
                           >
@@ -3763,11 +3820,12 @@ export default function ProductionOrders() {
               try { await saveDocAsImage(batchSheetRef.current, `발주서_${batchSheet?.batchNo ?? ''}`); toast.success('이미지 저장됨'); }
               catch (e) { toast.error((e as Error).message); }
             }}>이미지 저장</Button>
-            <Button onClick={() => {
+            <Button variant="outline" onClick={async () => {
               const sheet = batchSheet;
-              if (sheet) sheet.orders.forEach(o => void markSent(o));
-              printDoc(batchSheetRef.current);
-            }}>
+              if (!sheet || !confirm('이 묶음의 발주서와 작업지시서를 모두 공장에 실제로 전달하셨습니까?')) return;
+              for (const order of sheet.orders) if (!(await markSent(order))) break;
+            }}>묶음 공장 전달 확인</Button>
+            <Button onClick={() => { printDoc(batchSheetRef.current); }}>
               <Printer className="w-4 h-4 mr-1.5" />A4 인쇄 · PDF
             </Button>
           </DialogFooter>
@@ -3826,15 +3884,19 @@ export default function ProductionOrders() {
                         <th className="text-[13px] font-semibold text-muted-foreground">자재명</th>
                         <th className="text-[13px] font-semibold text-muted-foreground">규격</th>
                         <th className="nw ctr text-[13px] font-semibold text-muted-foreground">단위</th>
+                        <th className="num text-[13px] font-semibold text-muted-foreground">단가·통화</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">소요수량</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">보유재고</th>
                         <th className="num text-[13px] font-semibold text-muted-foreground">발주수량</th>
+                        <th className="num text-[13px] font-semibold text-muted-foreground">금액(KRW)</th>
                         <th className="text-[13px] font-semibold text-muted-foreground">비고 (담긴 발주)</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {items.map((item, i) => (
-                        <tr key={i} className="border-b border-border">
+                      {items.map((item, i) => {
+                        const amountKrw = getMaterialCartAmountKrw(item, item.orderQty, store.getSettings().cnyKrw, store.getSettings().usdKrw);
+                        return (
+                        <tr key={materialCartIdentity(item)} className="border-b border-border">
                           <td className="ctr text-muted-foreground text-xs">{i + 1}</td>
                           <td className="ctr">
                             {(item as any).imageUrl ? (
@@ -3846,6 +3908,7 @@ export default function ProductionOrders() {
                           <td className="font-medium text-foreground">{item.materialName}</td>
                           <td className="text-muted-foreground text-xs">{item.spec || '-'}</td>
                           <td className="ctr text-muted-foreground">{item.unit}</td>
+                          <td className="nw num font-mono text-xs">{formatNumber(item.unitPriceCny ?? 0, 2)} {item.currency ?? 'CNY'}</td>
                           <td className="nw num font-mono text-muted-foreground text-xs">
                             {item.qty % 1 === 0 ? item.qty.toLocaleString() : item.qty.toFixed(3)}
                           </td>
@@ -3855,6 +3918,7 @@ export default function ProductionOrders() {
                           <td className="nw num font-mono font-semibold text-primary">
                             {item.orderQty % 1 === 0 ? item.orderQty.toLocaleString() : item.orderQty.toFixed(3)}
                           </td>
+                          <td className="nw num font-mono text-xs">{amountKrw === null ? '단가·환율 확인' : formatKRW(amountKrw)}</td>
                           <td className="text-xs text-muted-foreground">
                             {item.orders.map((o, j) => (
                               <span key={j}>
@@ -3864,12 +3928,18 @@ export default function ProductionOrders() {
                             ))}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                     <tfoot>
                       <tr className="bg-[var(--fill-quaternary)] border-t border-border">
-                        <td colSpan={6} className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">합계 {items.length}종</td>
+                        <td colSpan={8} className="px-3 py-2 text-xs font-medium text-muted-foreground text-right">합계 {items.length}종</td>
                         <td className="num text-xs font-bold text-foreground">{items.length}종 발주</td>
+                        <td className="num text-xs font-bold text-foreground">
+                          {items.some(i => getMaterialCartAmountKrw(i, i.orderQty, store.getSettings().cnyKrw, store.getSettings().usdKrw) === null)
+                            ? '단가·환율 확인'
+                            : formatKRW(items.reduce((s, i) => s + (getMaterialCartAmountKrw(i, i.orderQty, store.getSettings().cnyKrw, store.getSettings().usdKrw) ?? 0), 0))}
+                        </td>
                         <td></td>
                       </tr>
                     </tfoot>
@@ -3939,7 +4009,8 @@ export default function ProductionOrders() {
                       cartItems,
                       orders,
                       vendors: allVendors,
-                      cnyKrw: store.getSettings().cnyKrw || 191,
+                      cnyKrw: store.getSettings().cnyKrw,
+                      usdKrw: store.getSettings().usdKrw,
                       fallbackOrder: postOrderInfo?.order ?? null,
                     });
                     queryClient.invalidateQueries({ queryKey: ['materials'] });
@@ -3954,6 +4025,7 @@ export default function ProductionOrders() {
                     setVendorOrderModal(false);
                   } catch (e: any) {
                     console.error('발주 확정 오류:', e);
+                    refreshCart();
                     toast.error(`발주 확정 실패: ${e?.message || '알 수 없는 오류'}`);
                   }
                 }}

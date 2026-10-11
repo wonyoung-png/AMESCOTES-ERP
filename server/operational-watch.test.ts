@@ -12,6 +12,15 @@ function reader(tables: Record<string, any[]>, fail = '') {
     return { ok: table !== fail, status: table === fail ? 503 : 200, json: async () => rows.slice(Number(p.get('offset')), Number(p.get('offset')) + 500) } as Response;
   };
 }
+test('사진 완료는 지연에서 빠지고 수락·청구 대기가 같은 샘플 근거로 보고된다',async()=>{
+  const w=await operationalWatch('2026-10-11',reader({samples:[
+    {id:'review',style_no:'FIX-1',stage:'1차',request_date:'2026-10-01',expected_date:'2026-10-02',completed_at:'2026-10-02T01:00:00Z',review_status:'pending',review_assignee_id:'lead'},
+    {id:'bill',style_no:'FIX-2',stage:'최종승인',completed_at:'2026-10-02T01:00:00Z',review_status:'accepted',billing_status:'미청구'},
+  ]}));
+  const facts=w.get('제품개발')!.facts.join('\n');
+  assert.match(facts,/수락 대기 1건/);assert.match(facts,/수락 완료 샘플 미청구 1건/);assert.match(facts,/마감 경과 0건/);
+  assert.match(facts,/id=review/);assert.match(w.get('경영지원')!.facts.join('\n'),/id=bill/);
+});
 test('비서실 종합 집계는 같은 샘플 마감 경과를 두 번 경고하지 않는다', async () => {
   const read = reader({ samples: [{ id: 'late-sample', style_no: 'TY-LATE', stage: '1차', request_date: '2020-01-01', expected_date: '2020-01-02', location: '내부개발실', billing_status: '미청구', cost_krw: 100 }] });
   const watch = await gatherWatch(read, async () => null);

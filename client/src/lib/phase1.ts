@@ -111,6 +111,8 @@ export interface Payable {
   projectNo?: string;
   sourceType: 'purchase' | 'expense' | 'processing' | 'manual' | 'order_receipt';
   sourceId?: string;
+  sourceExpenseKey?: string;
+  expenseApprovalSnapshot?: Record<string, unknown>;
   amountKrw: number;
   paidAmountKrw: number;
   dueDate: string;
@@ -1703,6 +1705,7 @@ async function syncPayable(p: Payable, isNew = false) {
 }
 
 const rowToPayable = (r: any): Payable => ({ id: r.id, vendorId: r.vendor_id, vendorName: r.vendor_name,
+  sourceExpenseKey: r.source_expense_key || undefined, expenseApprovalSnapshot: r.expense_approval_snapshot || undefined,
   projectNo: r.project_no, sourceType: r.source_type, sourceId: r.source_id, amountKrw: Number(r.amount_krw),
   paidAmountKrw: Number(r.paid_amount_krw || 0), dueDate: r.due_date, status: r.status, memo: r.memo,
   payeeType: r.payee_type, orderId: r.order_id, receiptLogIds: r.receipt_log_ids || [], createdAt: r.created_at });
@@ -1907,6 +1910,8 @@ export async function syncPhase1FromDb() {
         projectNo: r.project_no,
         sourceType: r.source_type,
         sourceId: r.source_id,
+        sourceExpenseKey: r.source_expense_key || undefined,
+        expenseApprovalSnapshot: r.expense_approval_snapshot || undefined,
         amountKrw: r.amount_krw,
         paidAmountKrw: r.paid_amount_krw,
         dueDate: r.due_date,

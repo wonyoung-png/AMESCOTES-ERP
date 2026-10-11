@@ -48,7 +48,7 @@ export async function gatherWatch(read = restAsServer, readPms = pms, approvals?
   const [orders, receipts, samples, stmts, settlements, payables, camps, subscriptions, lumen, aeta, operations] = await Promise.all([
     rows('production_orders?status=neq.초안&select=id,order_no,style_no,style_name,vendor_name,quantity,received_qty,defect_qty,shipped_qty,status,delivery_date,confirmed_date,sent_at,confirmed_at,hq_supply_items,factory_unit_price_krw,trade_statement_id,workspace').catch(e => e as Error),
     rows('receipt_logs?log_type=in.(inbound,outbound_oem,outbound_3pl)&select=id,order_id,log_type,qty,defect_qty,destination').catch(e => e as Error),
-    rows('samples?select=id,style_no,style_name,stage,expected_date,assignee,billing_status,cost_krw,brand_code').catch(e => e as Error),
+    rows('samples?select=id,style_no,style_name,stage,expected_date,assignee,billing_status,cost_krw,brand_code,completed_at,review_status,sample_unit_price,billing_statement_id').catch(e => e as Error),
     rows('trade_statements?status=in.(미청구,청구완료)&select=id,statement_no,vendor_name,issue_date,lines,status,workspace').catch(e => e as Error),
     rows('settlements?select=id,buyer_name,due_date,billed_amount_krw,collected_amount_krw,status').catch(e => e as Error),
     rows('payables?select=id,source_type,order_id,amount_krw,paid_amount_krw,due_date,status,memo').catch(e => e as Error),
@@ -114,8 +114,10 @@ export async function gatherWatch(read = restAsServer, readPms = pms, approvals?
   // 샘플 일정·지연은 operationalWatch에서 브랜드별로 집계한다. 여기서는 미청구만 집계.
   if (samples instanceof Error) failed('경영지원', '샘플비', samples);
   else {
-    const sb = samples.filter(s => s.billing_status === '미청구');
-    add('경영지원', [`미청구 샘플비 ${sb.length}건 ${won(sb.reduce((v, s) => v + (Number(s.cost_krw) || 0), 0))}`]);
+    const sb = samples.filter(s => s.billing_status === '미청구'&&s.completed_at&&s.review_status==='accepted'&&!s.billing_statement_id);
+    const legacy=samples.filter(s=>s.billing_status==='미청구'&&!s.review_status);
+    add('경영지원', [`수락 완료 미청구 샘플비 ${sb.length}건 ${won(sb.reduce((v, s) => v + (Number(s.sample_unit_price) || 0), 0))}`,
+      `기존 미청구 샘플비 ${legacy.length}건 — 완료·수락 기록 확인 전이며 청구 예정액에 합산하지 않음`]);
   }
 
   // ── 청구·수금

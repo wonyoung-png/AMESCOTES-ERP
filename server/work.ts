@@ -395,6 +395,9 @@ async function loadForActor(req: Request, res: Response) {
   const r = await restAsServer(`work_cards?id=eq.${encodeURIComponent(String(req.params.id))}&select=*`);
   const card = r.ok ? (await r.json())[0] : null;
   if (!card) { res.status(404).json({ error: 'not_found' }); return null; }
+  if(card.parsed?.sampleReview && card.result_ref?.table==='samples') {
+    res.status(409).json({error:'sample_workflow_required',message:'원본 샘플에서 사진을 확인하고 수락해주세요.'});return null;
+  }
   const directive=!!card.parsed?.directive && all.some(m=>m.id===card.created_by && isBoss(m))
     && ORG.some(t=>t.key===card.parsed.directive.team);
   const leader = isTeamLeader(me) && me.team === (directive ? card.parsed.directive.team : card.team);
