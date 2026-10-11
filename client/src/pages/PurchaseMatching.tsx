@@ -1,13 +1,14 @@
 // AMESCOTES ERP — 자재 구매 매칭
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useSearch } from 'wouter';
 import { confirmMaterialOrder } from '@/lib/confirmMaterialOrder';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchPurchaseItems, upsertPurchaseItem, deletePurchaseItem as deletePurchaseItemSB,
-  updatePurchaseItemStatus, fetchOrders, upsertOrder, fetchVendors,
+  updatePurchaseItemStatus, fetchOrders, fetchOrdersStrict, fetchVendors, startProductionAfterPurchases,
 } from '@/lib/dbQueries';
+import { linkShippedPurchases } from '@/lib/purchaseProductionLink';
 import {
   store, genId, formatKRW, formatNumber,
   type PurchaseItem, type Currency, type ExpenseType, type Expense, type ExpenseCategory,
@@ -75,6 +76,13 @@ export default function PurchaseMatching() {
   const vendors = allVendorsData.filter((v: any) => v.type === '자재거래처');
   const allVendors = store.getVendors();
   const settings = store.getSettings();
+  const [retryStatus, setRetryStatus] = useState<{ id: string; status: string; remaining?: PurchaseItem[]; orderNo?: string } | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const statusLock = useRef(false);
+  const [purchaseSaving, setPurchaseSaving] = useState(false);
+  const purchaseSaveLock = useRef(false);
+  const cartConfirmLock = useRef(false);
+  const [cartConfirming, setCartConfirming] = useState(false);
   const [filterOrder, setFilterOrder] = usePersistedState('purchase.filterOrder', 'all');
   const [filterStatus, setFilterStatus] = usePersistedState('purchase.filterStatus', 'all');
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
@@ -110,29 +118,8 @@ export default function PurchaseMatching() {
   };
 
   const handleGroupStatusChange = async (orderNo: string, items: PurchaseItem[], status: string) => {
-    for (const item of items) {
-      await updatePurchaseItemStatus(item.id, status);
-      if (status === '발송완료') {
-        try {
-          const allOrders = await fetchOrders();
-          const relatedOrder = allOrders.find((o: any) => o.orderNo === item.orderNo);
-          if (relatedOrder && (relatedOrder.status === '발주생성' || !relatedOrder.status)) {
-            await upsertOrder({ ...relatedOrder, status: '생산중', updatedAt: new Date().toISOString() });
-            store.updateOrder(relatedOrder.id, { status: '생산중' });
-          } else {
-            const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
-            if (localOrder && localOrder.status === '발주생성') {
-              store.updateOrder(localOrder.id, { status: '생산중' });
-              upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(onSaveFail('자재구매'));
-            }
-          }
-        } catch {
-          const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
-          if (localOrder && localOrder.status === '발주생성') {
-            store.updateOrder(localOrder.id, { status: '생산중' });
-          }
-        }
-      }
+    for (const [index, item] of items.entries()) {
+      if (!(await handleStatusChange(item.id, status))) { setRetryStatus({ id: item.id, status, remaining: items.slice(index), orderNo }); return; }
     }
     refresh();
     toast.success(`[${orderNo}] ${items.length}종 → ${status}로 변경됐어요`);
@@ -281,14 +268,19 @@ export default function PurchaseMatching() {
   };
 
   const handleSave = async () => {
+    if (purchaseSaveLock.current) return;
     if (!form.orderId) { toast.error('발주번호를 선택해주세요'); return; }
     if (!form.itemName) { toast.error('품목명을 입력해주세요'); return; }
+    if (!Number.isFinite(form.qty) || Number(form.qty) <= 0) { toast.error('구매 수량은 0보다 크게 입력해주세요'); return; }
+    purchaseSaveLock.current = true;
+    setPurchaseSaving(true);
+    const savedId = editId || form.id || genId();
+    try {
     if (editId) {
-      await upsertPurchaseItem({ ...form, id: editId });
-      toast.success('수정되었습니다');
+      await upsertPurchaseItem({ ...form, id: savedId });
     } else {
       const p: PurchaseItem = {
-        id: genId(),
+        id: savedId,
         orderId: form.orderId!,
         orderNo: form.orderNo!,
         purchaseDate: form.purchaseDate || new Date().toISOString().split('T')[0],
@@ -307,11 +299,18 @@ export default function PurchaseMatching() {
         memo: form.memo,
         createdAt: new Date().toISOString(),
       };
+      setForm(f => ({ ...f, id: p.id }));
       await upsertPurchaseItem(p);
-      toast.success('구매 내역이 등록되었습니다');
     }
+    if (form.purchaseStatus === '발송완료') await linkShippedPurchases({ ...form, id: savedId } as PurchaseItem, {
+      purchases: () => fetchPurchaseItems({ strict: true }), orders: fetchOrdersStrict, save: order => startProductionAfterPurchases(order.id),
+    });
+    await queryClient.invalidateQueries({ queryKey: ['orders'] });
+    toast.success(editId ? '수정되었습니다' : '구매 내역이 등록되었습니다');
     refresh();
     setShowModal(false);
+    } catch (error) { toast.error(`구매 저장·연결 확인 실패: ${(error as Error).message}. 입력을 유지했습니다. 다시 저장해주세요.`); }
+    finally { purchaseSaveLock.current = false; setPurchaseSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
@@ -322,38 +321,30 @@ export default function PurchaseMatching() {
   };
 
   const handleStatusChange = async (id: string, status: string) => {
+    if (statusLock.current) return false;
+    statusLock.current = true;
+    setStatusBusy(true);
+    try {
     await updatePurchaseItemStatus(id, status);
-
-    // 발송완료로 변경 시 → 해당 발주번호의 생산발주 상태를 '생산중'으로 자동 변경
     if (status === '발송완료') {
       const item = purchases.find(p => p.id === id);
-      if (item?.orderNo) {
-        try {
-          const allOrders = await fetchOrders();
-          const relatedOrder = allOrders.find((o: any) => o.orderNo === item.orderNo);
-          if (relatedOrder && (relatedOrder.status === '발주생성' || !relatedOrder.status)) {
-            await upsertOrder({ ...relatedOrder, status: '생산중', updatedAt: new Date().toISOString() });
-            store.updateOrder(relatedOrder.id, { status: '생산중' });
-            toast.success(`생산발주 [${item.orderNo}] → 생산중으로 자동 변경됐어요`);
-          } else {
-            const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
-            if (localOrder && localOrder.status === '발주생성') {
-              store.updateOrder(localOrder.id, { status: '생산중' });
-              upsertOrder({ ...localOrder, status: '생산중', updatedAt: new Date().toISOString() }).catch(onSaveFail('자재구매'));
-              toast.success(`생산발주 [${item.orderNo}] → 생산중으로 변경됐어요`);
-            }
-          }
-        } catch {
-          const localOrder = store.getOrders().find(o => o.orderNo === item.orderNo);
-          if (localOrder) {
-            store.updateOrder(localOrder.id, { status: '생산중' });
-            toast.success(`생산발주 [${item.orderNo}] → 생산중으로 변경됐어요`);
-          }
-        }
+      if (item) {
+        await linkShippedPurchases(item, {
+          purchases: () => fetchPurchaseItems({ strict: true }), orders: fetchOrdersStrict,
+          save: order => startProductionAfterPurchases(order.id),
+        });
       }
     }
-
+    await queryClient.invalidateQueries({ queryKey: ['orders'] });
+    setRetryStatus(null);
+    } catch (error) {
+      setRetryStatus({ id, status });
+      toast.error(`저장·생산 연결을 확인하지 못했습니다: ${(error as Error).message}. 다시 시도 버튼을 눌러주세요.`);
+      refresh();
+      return false;
+    } finally { statusLock.current = false; setStatusBusy(false); }
     refresh();
+    return true;
   };
 
   // ── 미지급 등록(Payable) 생성 ──────────────────────────────────────────
@@ -526,6 +517,10 @@ export default function PurchaseMatching() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      {retryStatus && <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+        <span>저장·생산 연결 확인이 필요합니다. 이미 저장된 구매는 중복 생성하지 않습니다.</span>
+        <Button disabled={statusBusy} onClick={() => retryStatus.remaining ? handleGroupStatusChange(retryStatus.orderNo || '', retryStatus.remaining, retryStatus.status) : handleStatusChange(retryStatus.id, retryStatus.status)}>{statusBusy ? '확인 중…' : '저장·연결 다시 시도'}</Button>
+      </div>}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-foreground">자재 구매</h1>
@@ -732,7 +727,7 @@ export default function PurchaseMatching() {
                         <td><Badge variant="outline" className="text-xs">{p.paymentMethod}</Badge></td>
                         <td>
                           <div className="flex items-center gap-1.5">
-                            <Select value={p.purchaseStatus} onValueChange={v => handleStatusChange(p.id, v)}>
+                            <Select disabled={statusBusy} value={p.purchaseStatus} onValueChange={v => handleStatusChange(p.id, v)}>
                               <SelectTrigger className={`h-7 text-xs w-24 border ${STATUS_COLOR[p.purchaseStatus]}`}>
                                 <SelectValue />
                               </SelectTrigger>
@@ -852,7 +847,7 @@ export default function PurchaseMatching() {
               </div>
               <div className="space-y-1.5">
                 <Label>수량</Label>
-                <Input type="number" min="0" value={form.qty || ''} onChange={e => updateAmount(parseInt(e.target.value) || 0, form.unitPriceCny || 0, form.currency || 'KRW')} />
+                <Input type="number" min="0" step="any" value={form.qty || ''} onChange={e => updateAmount(Number(e.target.value) || 0, form.unitPriceCny || 0, form.currency || 'KRW')} />
               </div>
               <div className="space-y-1.5">
                 <Label>통화</Label>
@@ -893,7 +888,7 @@ export default function PurchaseMatching() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>취소</Button>
-            <Button onClick={handleSave}>{editId ? '수정' : '등록'}</Button>
+            <Button disabled={purchaseSaving} onClick={handleSave}>{purchaseSaving ? '저장 중…' : editId ? '수정' : '등록'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1218,7 +1213,11 @@ export default function PurchaseMatching() {
               {/* 발주 확정 버튼 */}
               <Button
                 className="h-8 text-xs"
+                disabled={cartConfirming}
                 onClick={async () => {
+                  if (cartConfirmLock.current) return;
+                  cartConfirmLock.current = true;
+                  setCartConfirming(true);
                   // 정본: lib/confirmMaterialOrder.ts
                   // 예전엔 여기 사본에 1단계(서버 DB materials 저장)와
                   // invalidateQueries(['materials'])가 통째로 빠져 있어서,
@@ -1244,7 +1243,7 @@ export default function PurchaseMatching() {
                   } catch (e: any) {
                     console.error('발주 확정 오류:', e);
                     toast.error(`발주 확정 실패: ${e?.message || '알 수 없는 오류'}`);
-                  }
+                  } finally { cartConfirmLock.current = false; setCartConfirming(false); }
                 }}
               >
                 발주 확정

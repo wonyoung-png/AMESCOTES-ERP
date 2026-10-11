@@ -11,6 +11,7 @@ import captureRouter from '../server/capture';
 import usersRouter from '../server/users';
 import brandWorkflowRouter from '../server/brand-workflow';
 import receiptWorkflowRouter from '../server/receipt-workflow';
+import inventoryRouter from '../server/inventory';
 import ceoRouter, { ceoHostGate, ceoHostLock } from '../server/ceo';
 import { restAsServer, requireUser } from '../server/auth';
 import { workHttpLlmCases } from './e2e-work-http';
@@ -30,6 +31,9 @@ export const calls = { classify: 0, answer: 0, report: 0 };
 export const blocked: string[] = [];
 let truncateNextReport = false;
 let capacityFixtures = false;
+let failTable: string | null = null;
+let failSkip = 0;
+export function failNextTableWrite(table: string, skip = 0) { assert.ok(['production_orders', 'samples', 'items', 'purchase_items'].includes(table)); assert.ok(Number.isInteger(skip) && skip >= 0 && skip <= 5); failTable = table; failSkip = skip; }
 export const enableCapacityFixtures = () => { capacityFixtures = true; };
 export const disableCapacityFixtures = () => { capacityFixtures = false; };
 export const capacityTeams = ORG.map(team => team.key);
@@ -122,11 +126,18 @@ export async function start(frontend: string, password: string) {
   const app = express();
   app.use(express.json());
   app.use(ceoHostLock());
-  app.use(sessionRouter, workRouter, captureRouter, usersRouter, brandWorkflowRouter, receiptWorkflowRouter, ceoRouter);
+  app.use(sessionRouter, workRouter, captureRouter, usersRouter, brandWorkflowRouter, receiptWorkflowRouter, inventoryRouter, ceoRouter);
   app.use('/rest/v1', requireUser(), async (req, res) => {
-    if (!['GET', 'HEAD'].includes(req.method)) { res.status(405).end(); return; }
+    const table = req.url.split('?')[0].replace(/^\//, '');
+    const writable = ['purchase_items', 'production_orders', 'samples', 'items'];
+    if (!['GET', 'HEAD'].includes(req.method) && !(writable.includes(table) && ['POST', 'PATCH'].includes(req.method))) { res.status(405).end(); return; }
+    if (!['GET', 'HEAD'].includes(req.method) && failTable === table) {
+      if (failSkip > 0) failSkip--;
+      else { failTable = null; res.status(500).json({ message: 'isolated injected save failure' }); return; }
+    }
     const response = await nativeFetch(process.env.POSTGREST_URL + req.url, { method: req.method,
-      headers: { Authorization: req.headers.authorization || '', Accept: req.headers.accept || '*/*' }, redirect: 'error' });
+      headers: { Authorization: req.headers.authorization || '', Accept: req.headers.accept || '*/*', 'Content-Type': 'application/json', Prefer: req.headers.prefer || '' },
+      ...(!['GET', 'HEAD'].includes(req.method) ? { body: JSON.stringify(req.body) } : {}), redirect: 'error' });
     res.status(response.status);
     for (const header of ['content-type', 'content-range', 'range-unit']) {
       const value = response.headers.get(header); if (value) res.set(header, value);

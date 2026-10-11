@@ -38,6 +38,31 @@ export async function operationalWatch(today: string, read = restAsServer, appro
   }));
   for (const result of changes) add(result.teams, result.facts, result.alerts);
   try {
+    const [samples, vendors] = await Promise.all([
+      allRows('samples?select=id,style_no,style_name,buyer_id,brand_code,stage,location,request_date,expected_date&order=id.asc', read),
+      allRows('vendors?type=eq.바이어&select=id,name,name_en,brands&order=id.asc', read),
+    ]);
+    const active = samples.filter(s => !['최종승인', '반려'].includes(s.stage));
+    const unresolved = active.filter(s => !s.brand_code && Array.isArray(vendors.find(v => v.id === s.buyer_id)?.brands) && vendors.find(v => v.id === s.buyer_id).brands.length > 1);
+    if (unresolved.length) add(['제품개발'], [`브랜드 미지정 샘플 ${unresolved.length}건 — 브랜드팀 일정에 표시되지 않으므로 귀속 확인 필요 (원본 기준 ${stamp(unresolved)})`], unresolved.length);
+    const label = (s: any) => {
+      const v = vendors.find(v => v.id === s.buyer_id);
+      const brands = Array.isArray(v?.brands) ? v.brands.map((b: any) => typeof b === 'string' ? { name: b, code: '' } : b) : [];
+      return s.brand_code ? brands.find((b: any) => b.code === s.brand_code)?.name || s.brand_code : brands.length === 1 ? brands[0].name : v?.name_en || v?.name || '브랜드 미확인';
+    };
+    for (const [team, rows] of [
+      ['제품개발', active],
+      ['루멘 디자인', active.filter(s => ['LUMEN', '루멘', 'LUM'].includes(String(label(s)).trim().toUpperCase()))],
+      ['에탈루프 디자인', active.filter(s => ['AETALOOF', 'AETALOOP', '에탈루프', 'AET'].includes(String(label(s)).trim().toUpperCase()))],
+    ] as [string, any[]][]) {
+      const late = rows.filter(s => s.expected_date && s.expected_date < today);
+      const missing = rows.filter(s => !s.request_date || !s.expected_date);
+      const prioritized = [...late, ...missing, ...rows].filter((s, i, list) => list.findIndex(v => v.id === s.id) === i);
+      add([team], [`샘플 진행 ${rows.length}건 / 마감 경과 ${late.length}건 / 접수·마감 날짜 미입력 ${missing.length}건 (원본 기준 ${stamp(rows)}, 공장 진행률·완료 여부는 단계 기록 기준)`,
+        ...prioritized.slice(0, 8).map(s => `  · 샘플 id=${s.id} ${label(s)} ${s.style_no} ${s.style_name || ''} / ${s.location || '장소 미확인'} / 접수 ${s.request_date || '없음'} / 마감 ${s.expected_date || '없음'} / ${s.stage || '단계 미확인'}`)], new Set([...late, ...missing].map(s => s.id)).size);
+    }
+  } catch { add(['제품개발', '루멘 디자인', '에탈루프 디자인'], ['(샘플 일정: 조회 실패 — 판단 보류)'], 1); }
+  try {
     const batches = await (approvals || loadBrandApprovals(read));
     for (const [workspace, team] of [['LUMEN', '루멘 디자인'], ['AETALOOF', '에탈루프 디자인']]) {
       const pending = batches.filter(b => b.workspace === workspace);

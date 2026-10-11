@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { operationalWatch, shipmentWatch, loadBrandApprovals, brandApprovalQueue } from './operational-watch';
+import { gatherWatch } from './watch';
 
 function reader(tables: Record<string, any[]>, fail = '') {
   return async (path: string) => {
@@ -11,6 +12,27 @@ function reader(tables: Record<string, any[]>, fail = '') {
     return { ok: table !== fail, status: table === fail ? 503 : 200, json: async () => rows.slice(Number(p.get('offset')), Number(p.get('offset')) + 500) } as Response;
   };
 }
+test('비서실 종합 집계는 같은 샘플 마감 경과를 두 번 경고하지 않는다', async () => {
+  const read = reader({ samples: [{ id: 'late-sample', style_no: 'TY-LATE', stage: '1차', request_date: '2020-01-01', expected_date: '2020-01-02', location: '내부개발실', billing_status: '미청구', cost_krw: 100 }] });
+  const watch = await gatherWatch(read, async () => null);
+  assert.equal(watch.get('제품개발')!.alerts, 1);
+  assert.match(watch.get('제품개발')!.facts.join('\n'), /마감 경과 1건/);
+  assert.match(watch.get('경영지원')!.facts.join('\n'), /미청구 샘플비 1건/);
+});
+test('샘플은 접수·마감·거점 원본을 전수 집계하고 한 바이어의 다른 브랜드를 구분한다', async () => {
+  const samples = Array.from({ length: 1001 }, (_, i) => ({ id: 'sample-' + i, buyer_id: 'v', brand_code: 'LUM', style_no: 'TY-' + i, stage: '1차', location: i % 2 ? '중국공장' : '내부개발실', request_date: '2026-10-01', expected_date: '2026-10-10' }));
+  samples.push({ ...samples[0], id: 'other-brand', brand_code: 'AET', expected_date: '2026-10-20' });
+  const watch = await operationalWatch('2026-10-11', reader({ samples, vendors: [{ id: 'v', brands: [{ name: 'LUMEN', code: 'LUM' }, { name: 'AETALOOF', code: 'AET' }] }] }));
+  const lumen = watch.get('루멘 디자인')!.facts.join('\n');
+  assert.match(lumen, /샘플 진행 1001건 \/ 마감 경과 1001건/);
+  assert.ok(!lumen.includes('other-brand'));
+  assert.match(lumen, /중국공장/);
+  assert.match(watch.get('에탈루프 디자인')!.facts.join('\n'), /샘플 진행 1건 \/ 마감 경과 0건/);
+});
+test('샘플 조회 실패는 0건 정상 보고가 아닌 세 팀의 판단 보류다', async () => {
+  const watch = await operationalWatch('2026-10-11', reader({}, 'samples'));
+  for (const team of ['제품개발', '루멘 디자인', '에탈루프 디자인']) assert.match(watch.get(team)!.facts.join('\n'), /샘플 일정: 조회 실패 — 판단 보류/);
+});
 test('대표 승인 원본은 페이지 한도를 넘어 전수 조회하고 카드 생성을 요구하지 않는다', async () => {
   const rows = Array.from({ length: 1001 }, (_, i) => ({ id: String(i), workspace: 'LUMEN', status: 'in_approval' }));
   assert.equal((await loadBrandApprovals(reader({ brand_order_batches: rows }))).length, 1001);

@@ -111,15 +111,9 @@ export async function gatherWatch(read = restAsServer, readPms = pms, approvals?
       `입고 끝났는데 거래명세표 없는 발주 ${unbilled.length}건${unbilled.length ? ': ' + unbilled.slice(0, 6).map(o => o.order_no).join(', ') : ''}`], unbilled.length);
   }
 
-  // ── 샘플 (지금 ERP 샘플은 OEM 바이어 것뿐 — 제품개발)
-  if (samples instanceof Error) failed('제품개발', '샘플', samples);
+  // 샘플 일정·지연은 operationalWatch에서 브랜드별로 집계한다. 여기서는 미청구만 집계.
+  if (samples instanceof Error) failed('경영지원', '샘플비', samples);
   else {
-    const prog = samples.filter(s => !['최종승인', '반려'].includes(s.stage));
-    const late = prog.filter(s => s.expected_date && s.expected_date < today);
-    add('제품개발', [
-      `진행 중 샘플 ${prog.length}건 — 예정일 지남 ${late.length}`,
-      ...late.slice(0, 8).map(s => `  · ${s.style_name || s.style_no} ${s.stage} / 예정 ${s.expected_date} / 담당 ${s.assignee || '-'}`),
-    ], late.length);
     const sb = samples.filter(s => s.billing_status === '미청구');
     add('경영지원', [`미청구 샘플비 ${sb.length}건 ${won(sb.reduce((v, s) => v + (Number(s.cost_krw) || 0), 0))}`]);
   }

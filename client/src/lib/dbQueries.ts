@@ -417,9 +417,9 @@ export async function fetchItems() {
   return mergeByIdStyleNo(remote, store.getItems() as any[]);
 }
 
-export async function upsertItem(item: Record<string, any>) {
+export async function upsertItem(item: Record<string, any>, options: { strict?: boolean } = {}) {
   // 1) 로컬 먼저 저장 — 네트워크 장애여도 품목 등록 가능
-  try {
+  const cacheItem = () => { try {
     const list = store.getItems();
     const idx = list.findIndex(x => x.id === item.id || x.styleNo === item.styleNo);
     const full = {
@@ -436,7 +436,8 @@ export async function upsertItem(item: Record<string, any>) {
     }
   } catch (e) {
     console.warn('[upsertItem] localStorage 저장 실패', e);
-  }
+  } };
+  if (!options.strict) cacheItem();
 
   // 2) 서버 DB 동기화 시도 (실패해도 로컬 저장은 유지)
   const row = filterForTable('items', {
@@ -465,9 +466,12 @@ export async function upsertItem(item: Record<string, any>) {
   try {
     const { error } = await db.from('items').upsert(row);
     if (error) {
+      if (options.strict) throw error;
       console.warn('[upsertItem] 서버 DB 동기화 실패 (로컬에는 저장됨):', error.message);
     }
+    if (options.strict) cacheItem();
   } catch (e) {
+    if (options.strict) throw e;
     console.warn('[upsertItem] 서버 DB 네트워크 오류 (로컬에는 저장됨):', e);
   }
 }
@@ -713,12 +717,21 @@ export async function deleteSample(id: string) {
   if (error) throw error;
 }
 
+/** Calendar movement edits only a date, preserving concurrent memo/material edits. */
+export async function updateSampleCalendarDate(sample: Sample, kind: 'req' | 'due', date: string) {
+  let query = db.from('samples').update(kind === 'req' ? { request_date: date } : { expected_date: date }).eq('id', sample.id);
+  query = sample.requestDate ? query.eq('request_date', sample.requestDate) : query.is('request_date', null);
+  query = sample.expectedDate ? query.eq('expected_date', sample.expectedDate) : query.is('expected_date', null);
+  const { data, error } = await query.select('id,request_date,expected_date');
+  if (error) throw error;
+  if (data?.length !== 1) throw new Error('다른 곳에서 일정이 변경됐습니다. 새로고침 후 다시 이동해주세요.');
+}
+
 // ─────────────────────────────────────────────
 // PRODUCTION ORDERS
 // ─────────────────────────────────────────────
 
-export async function fetchOrders(): Promise<ProductionOrder[]> {
-  return withLocalFallback<ProductionOrder>(async () => {
+export async function fetchOrdersStrict(): Promise<ProductionOrder[]> {
   const { data, error } = await db
     .from('production_orders')
     .select('*')
@@ -780,7 +793,10 @@ export async function fetchOrders(): Promise<ProductionOrder[]> {
     updatedAt: row.updated_at,
     memo: row.memo,
   }));
-  }, () => store.getOrders());
+}
+
+export async function fetchOrders(): Promise<ProductionOrder[]> {
+  return withLocalFallback(fetchOrdersStrict, () => store.getOrders());
 }
 
 export async function upsertOrder(order: Record<string, any>) {
@@ -843,6 +859,19 @@ export async function upsertOrder(order: Record<string, any>) {
   });
   const { error } = await db.from('production_orders').upsert(row, { onConflict: 'id' });
   if (error) throw error;
+}
+
+// Purchase dispatch must not overwrite quantities, receipts or a newer state.
+export async function startProductionAfterPurchases(id: string) {
+  const { data, error } = await db.from('production_orders')
+    .update({ status: '생산중', updated_at: new Date().toISOString() })
+    .eq('id', id).eq('status', '발주생성').select('id,status');
+  if (error) throw error;
+  if (data?.length) return true;
+  const current = await db.from('production_orders').select('id,status').eq('id', id);
+  if (current.error) throw current.error;
+  if (current.data?.length === 1 && ['생산중', '생산완료', '입고완료'].includes(current.data[0].status)) return false;
+  throw new Error('생산발주 상태 변경을 확인하지 못했습니다. 원본 상태를 확인해주세요.');
 }
 
 export async function deleteOrder(id: string) {

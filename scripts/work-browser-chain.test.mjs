@@ -114,15 +114,18 @@ for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_
   assert.ok(ready, 'Local PostgREST not ready, exit=' + postgrest.exitCode);
   assert.equal(postgrest.exitCode, null, 'Must use the newly spawned PostgREST');
   const frontend = await build({ stdin: { contents: `
-import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
+import React,{useState,useEffect} from 'react';import {createRoot} from 'react-dom/client';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';import {Toaster} from 'sonner';import {Link,Route,Switch} from 'wouter';
 import Login from './client/src/pages/Login';import WorkHub from './client/src/pages/WorkHub';import WorkChatWidget from './client/src/components/WorkChatWidget';
 import OperationalCalendar from './client/src/pages/OperationalCalendar';import {WorkspaceProvider} from './client/src/contexts/WorkspaceContext';
 import BrandOrders from './client/src/pages/BrandOrders';import InboundPO from './client/src/pages/InboundPO';
+import ReceivingShipping from './client/src/pages/ReceivingShipping';import ChinaWarehouse from './client/src/pages/ChinaWarehouse';import {syncPhase1FromDb} from './client/src/lib/phase1';
+import PurchaseMatching from './client/src/pages/PurchaseMatching';import SampleManagement from './client/src/pages/SampleManagement';
 import {logout,getCurrentUser} from './client/src/lib/auth';
+function Restored({children}){const [ready,setReady]=useState(false);useEffect(()=>{syncPhase1FromDb().then(()=>setReady(true))},[]);return ready?children:<p>원본 조회 중</p>}
 function App(){const [user,setUser]=useState(getCurrentUser());return <WorkspaceProvider>{!user?<Login onLogin={()=>setUser(getCurrentUser())}/>:<>
 <nav><Link href="/work">업무함</Link> <Link href="/calendar">운영 캘린더</Link> <button onClick={()=>{logout();setUser(null)}}>로그아웃</button><span>{user.name}</span></nav>
-<main><Switch><Route path="/calendar"><OperationalCalendar/></Route><Route path="/brand-orders"><BrandOrders/></Route><Route path="/inbound-po"><InboundPO/></Route><Route><WorkHub/></Route></Switch></main><WorkChatWidget/></>}<Toaster/></WorkspaceProvider>}
+<main><Switch><Route path="/calendar"><OperationalCalendar/></Route><Route path="/brand-orders"><BrandOrders/></Route><Route path="/inbound-po"><InboundPO/></Route><Route path="/receiving"><Restored><ReceivingShipping/></Restored></Route><Route path="/china-stock"><ChinaWarehouse/></Route><Route path="/purchase"><PurchaseMatching/></Route><Route path="/samples"><SampleManagement/></Route><Route><WorkHub/></Route></Switch></main><WorkChatWidget/></>}<Toaster/></WorkspaceProvider>}
 createRoot(document.getElementById('root')).render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><App/></QueryClientProvider>);
 `, resolveDir: root, loader: 'tsx' }, bundle: true, write: false, format: 'esm', platform: 'browser', jsx: 'automatic', logLevel: 'silent',
     define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': JSON.stringify({ PROD: true, VITE_ENABLE_DEMO_SEED: 'false', BASE_URL: '/' }) } });
@@ -284,25 +287,40 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
     console.log('CAPACITY ' + JSON.stringify(capacity));
   }
   let brandWorkflow;
+  await client.query('SET search_path=public,pg_catalog');
   if (process.env.ERP_BROWSER_BRAND === '1') {
     const { verifyBrandBrowserWorkflow } = await import('./work-browser-brand.mjs');
     brandWorkflow = await verifyBrandBrowserWorkflow({ client, boss, staff, production: await actor('production'), reportContext: harness.originalReportContext });
     pass('actual_brand_approval_issue_oem_acceptance_deadline_reload');
   }
-  assert.equal((await harness.read('production_orders?select=id')).length, brandWorkflow ? 1 : 0);
+  let stockWorkflow;
+  if (process.env.ERP_BROWSER_STOCK === '1') {
+    const { verifyStockBrowserWorkflow } = await import('./work-browser-stock.mjs');
+    stockWorkflow = await verifyStockBrowserWorkflow({ client, page: contexts.production?.page || await actor('production'), reportContext: harness.originalReportContext });
+    pass('actual_receiving_shipping_china_transfer_partial_arrival_reload');
+  }
+  let manufacturingWorkflow;
+  if (process.env.ERP_BROWSER_MANUFACTURING === '1') {
+    const { verifyManufacturingBrowserWorkflow } = await import('./work-browser-manufacturing.mjs');
+    manufacturingWorkflow = await verifyManufacturingBrowserWorkflow({ client, page: boss, reportContext: harness.originalReportContext, failNextWrite: harness.failNextTableWrite });
+    pass('actual_purchase_status_decimal_quantity_sample_calendar_drag_reload_report');
+  }
+  assert.equal((await harness.read('production_orders?select=id')).length, (brandWorkflow ? 1 : 0) + (stockWorkflow ? 2 : 0) + (manufacturingWorkflow ? 1 : 0));
   for (const table of ['trade_statements', 'settlements', 'payables']) assert.equal((await harness.read(table + '?select=id')).length, 0);
   assert.deepEqual(errors, []);
-  pass('no_financial_rows_no_browser_runtime_errors');
+  pass('no_financial_rows_remaining_no_browser_runtime_errors');
   result = { status: 'PASS', runId, resultPath, screenshotPath, checks, model: 'fixed fixtures, not live intelligence', authentication: 'real test account login; CEO proof test-signed, not Google OAuth',
     schemaSnapshot: { extractedAt: snapshot.extractedAt, sourceVersion: snapshot.sourceVersion, sha256: snapshot.sha256 },
     frontend: 'actual ERP pages in test wrapper, not full ERP shell; see individual workflow results',
-    database: 'real local PostgreSQL and PostgREST 12.2.12; production schema only, no company rows', financialWrites: 0,
+    database: 'real local PostgreSQL and PostgREST 12.2.12; production schema only, no company rows', financialWrites: manufacturingWorkflow?.billing?.syntheticStatements || 0, financialRowsRemaining: 0,
     limits: ['No real Google OAuth', 'Scheduler tick simulated clock, no wall-clock timer', 'No live model', 'No production browser writes',
       sqlWorkflows ? 'SQL checks do not verify full browser screens' : 'SQL workflow suites not run',
       brandWorkflow ? 'Brand fixture created through DB, not draft-entry UI; receipt HTTP/DB only' : 'Brand browser workflow not run',
       'Inter-agent council generation not verified by this harness',
       ...(capacity ? ['Capacity timing is local, not a production SLA'] : ['No 14-team or 25-user browser load test'])],
     sqlWorkflows: sqlWorkflows || { status: 'NOT_RUN' }, capacity: capacity || { status: 'NOT_RUN' }, brandWorkflow: brandWorkflow || { status: 'NOT_RUN' }, calls: harness.calls };
+  result.stockWorkflow = stockWorkflow || { status: 'NOT_RUN' };
+  result.manufacturingWorkflow = manufacturingWorkflow || { status: 'NOT_RUN' };
 } catch (error) {
   failure = error;
   console.error('BROWSER_CHAIN_FAILED: ' + error.stack);
