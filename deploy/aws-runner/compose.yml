@@ -1,0 +1,26 @@
+services:
+  runner:
+    build:
+      context: .
+      dockerfile: deploy/aws-runner/Dockerfile
+    image: ames-ads-runner:20261012
+    container_name: ames-ads-runner
+    user: "1000:1000"
+    restart: unless-stopped
+    read_only: true
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 768m
+    cpus: 0.5
+    pids_limit: 96
+    environment:
+      HOME: /home/node
+    volumes:
+      - ./private/config:/home/node/.config/ames-ads:ro
+      - ./private/codex:/home/node/.codex
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=128m,mode=1777
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
