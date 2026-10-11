@@ -1,4 +1,5 @@
 FROM node:24-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN npm install --global --ignore-scripts @openai/codex@0.162.1 && npm cache clean --force
 WORKDIR /opt/ads-runner
 COPY scripts/macmini/ads-runner.sh scripts/macmini/ads-runner-launch.mjs ./

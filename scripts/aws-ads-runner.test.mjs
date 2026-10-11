@@ -6,6 +6,8 @@ test('AWS runner is isolated, pinned, non-root and preserves existing logical le
   const compose=await readFile(new URL('../deploy/aws-runner/compose.yml',import.meta.url),'utf8');
   const prepare=await readFile(new URL('./prepare-aws-ads-runner.py',import.meta.url),'utf8');
   assert.match(docker,/@openai\/codex@0\.162\.1/); assert.match(docker,/USER node/);
+  assert.match(docker,/install -y --no-install-recommends ca-certificates/);
+  assert.doesNotMatch(docker,/NODE_TLS_REJECT_UNAUTHORIZED|SSL_VERIFY.*false/);
   for(const text of ['read_only: true','cap_drop: [ALL]','no-new-privileges:true','restart: unless-stopped','mem_limit: 768m'])
     assert.ok(compose.includes(text));
   assert.doesNotMatch(compose,/privileged:|docker.sock|network_mode: host|env_file:|\.env|POSTGRES|META_ADS_TOKEN|ports:/);
