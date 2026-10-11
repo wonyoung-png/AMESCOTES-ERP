@@ -12,8 +12,13 @@ import puppeteer from 'puppeteer';
 
 const root = process.cwd();
 const runId = crypto.randomUUID();
-const resultPath = path.join(root, '.codex/work-browser-chain-result.json');
-await fs.writeFile(resultPath, JSON.stringify({ status: 'RUNNING', runId }));
+const resultBase = process.env.ERP_BROWSER_RESULT || path.join(root, '.codex/work-browser-chain-result.json');
+assert.ok(path.isAbsolute(resultBase), 'Explicit absolute browser result path required');
+const resultName = path.parse(resultBase);
+const resultPath = path.join(resultName.dir, resultName.name + '-' + runId + (resultName.ext || '.json'));
+const screenshotPath = path.join(root, '.codex/work-browser-report-' + runId + '.jpg');
+await fs.writeFile(resultPath, JSON.stringify({ status: 'RUNNING', runId }), { flag: 'wx' });
+console.log('RESULT_FILE ' + resultPath);
 let client, postgres, postgrest, browser, api, debugPage, databaseDir;
 let result, failure;
 const checks = [];
@@ -81,6 +86,10 @@ for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_
     try { await attempt.connect(); client = attempt; break; } catch { await attempt.end(); await new Promise(resolve => setTimeout(resolve, 250)); }
   }
   assert.ok(client, 'Local PostgreSQL not ready');
+  await client.query('CREATE DATABASE erp_e2e');
+  await client.end();
+  client = new Client({ host: '127.0.0.1', port: 4191, user: 'postgres', password, database: 'erp_e2e' });
+  await client.connect();
   const roles = new Set(['anon', 'authenticated', 'service_role', 'erp_server', 'authenticator']);
   for (const match of schema.matchAll(/(?:TO|FROM) ([a-z_][a-z_0-9]*)[;,]/g)) if (!['PUBLIC', 'postgres'].includes(match[1])) roles.add(match[1]);
   for (const role of roles) await client.query('CREATE ROLE "' + role + '" NOLOGIN');
@@ -93,7 +102,8 @@ for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_
   const empty = await client.query('SELECT count(*)::int AS n FROM public.app_users'); assert.equal(empty.rows[0].n, 0);
   pass('schema_only_empty_database');
   postgrest = spawn(path.join(root, '.codex/postgrest-portable/postgrest.exe'), [], { env: { ...process.env,
-    PGRST_DB_URI: `postgres://authenticator:${password}@127.0.0.1:4191/postgres`, PGRST_DB_SCHEMAS: 'public', PGRST_DB_ANON_ROLE: 'anon',
+    PATH: pgBin + path.delimiter + (process.env.PATH || ''),
+    PGRST_DB_URI: `postgres://authenticator:${password}@127.0.0.1:4191/erp_e2e`, PGRST_DB_SCHEMAS: 'public', PGRST_DB_ANON_ROLE: 'anon',
     PGRST_JWT_SECRET: secret, PGRST_SERVER_HOST: '127.0.0.1', PGRST_SERVER_PORT: '4192' }, windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
   postgrest.stderr.on('data', data => { console.error('POSTGREST ' + String(data).replaceAll(password, '[test-password]').slice(0, 600)); });
   let spawnError;
@@ -108,10 +118,11 @@ import React,{useState} from 'react';import {createRoot} from 'react-dom/client'
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';import {Toaster} from 'sonner';import {Link,Route,Switch} from 'wouter';
 import Login from './client/src/pages/Login';import WorkHub from './client/src/pages/WorkHub';import WorkChatWidget from './client/src/components/WorkChatWidget';
 import OperationalCalendar from './client/src/pages/OperationalCalendar';import {WorkspaceProvider} from './client/src/contexts/WorkspaceContext';
+import BrandOrders from './client/src/pages/BrandOrders';import InboundPO from './client/src/pages/InboundPO';
 import {logout,getCurrentUser} from './client/src/lib/auth';
 function App(){const [user,setUser]=useState(getCurrentUser());return <WorkspaceProvider>{!user?<Login onLogin={()=>setUser(getCurrentUser())}/>:<>
 <nav><Link href="/work">업무함</Link> <Link href="/calendar">운영 캘린더</Link> <button onClick={()=>{logout();setUser(null)}}>로그아웃</button><span>{user.name}</span></nav>
-<main><Switch><Route path="/calendar"><OperationalCalendar/></Route><Route><WorkHub/></Route></Switch></main><WorkChatWidget/></>}<Toaster/></WorkspaceProvider>}
+<main><Switch><Route path="/calendar"><OperationalCalendar/></Route><Route path="/brand-orders"><BrandOrders/></Route><Route path="/inbound-po"><InboundPO/></Route><Route><WorkHub/></Route></Switch></main><WorkChatWidget/></>}<Toaster/></WorkspaceProvider>}
 createRoot(document.getElementById('root')).render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><App/></QueryClientProvider>);
 `, resolveDir: root, loader: 'tsx' }, bundle: true, write: false, format: 'esm', platform: 'browser', jsx: 'automatic', logLevel: 'silent',
     define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': JSON.stringify({ PROD: true, VITE_ENABLE_DEMO_SEED: 'false', BASE_URL: '/' }) } });
@@ -119,6 +130,12 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
   await build({ entryPoints: ['scripts/work-browser-server.ts'], outfile: serverFile, bundle: true, platform: 'node', format: 'cjs',
     packages: 'external', loader: { '.html': 'text' }, logLevel: 'silent' });
   const harness = createRequire(import.meta.url)(serverFile);
+  let sqlWorkflows;
+  if (process.env.ERP_BROWSER_SQL === '1') {
+    const { verifyDatabaseWorkflows } = await import('./work-browser-sql.mjs');
+    sqlWorkflows = await verifyDatabaseWorkflows({ client, root });
+    pass('real_database_workflow_regressions_rolled_back');
+  }
   api = await harness.start(frontend.outputFiles[0].text, password);
   const privateFile = path.join(root, '.codex/work-browser-private-check.cjs');
   await build({ entryPoints: ['scripts/work-browser-private-check.ts'], outfile: privateFile, bundle: true, platform: 'node', format: 'cjs', packages: 'external', logLevel: 'silent' });
@@ -216,6 +233,7 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
   const savedQuestion = (await harness.read('work_cards?id=eq.' + question.id + '&select=*'))[0]; assert.equal(savedQuestion.parsed.answer, question.parsed.answer);
   pass('question_answer_from_confirmed_evidence_saved');
   const bossTask = await send(boss, harness.inputs.boss.text); assert.equal(bossTask.assignee_id, 'e2e_boss');
+  assert.equal((await harness.read('work_cards?id=eq.' + bossTask.id + '&select=assignee_id'))[0].assignee_id, 'e2e_boss');
   pass('representative_decision_stays_with_representative');
   const cookie = (await contexts.boss.context.cookies()).find(cookie => cookie.name === 'erp_token'); assert.ok(cookie);
   await contexts.boss.context.setCookie({ name: 'erp_token', value: cookie.value, domain: 'ceo.localhost', path: '/', secure: true, httpOnly: true },
@@ -237,7 +255,7 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
   await ceo.waitForSelector('.map-node[data-team="마케팅"]');
   await ceo.$eval('.map-node[data-team="마케팅"]', node => node.dispatchEvent(new MouseEvent('click', { bubbles: true })));
   await ceo.waitForFunction(() => document.querySelector('#view')?.textContent.includes('10/20 확정 20%'), { polling: 100 });
-  await ceo.screenshot({ path: path.join(root, '.codex/work-browser-report-20261010.jpg'), type: 'jpeg' });
+  await ceo.screenshot({ path: screenshotPath, type: 'jpeg' });
   pass('actual_ceo_screen_manual_report_stored_reload');
   assert.deepEqual(harness.calls, { classify: 4, answer: 1, report: 1 });
   const todayKst = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
@@ -261,19 +279,30 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
   let capacity;
   if (process.env.ERP_BROWSER_CAPACITY === '1') {
     const { verifyBrowserCapacity } = await import('./work-browser-capacity.mjs');
-    capacity = await verifyBrowserCapacity({ browser, client, harness, password, bossContext: contexts.boss.context, ceoProof: api.ceoProof });
+    capacity = await verifyBrowserCapacity({ browser, client, harness, password, bossContext: contexts.boss.context, ceoProof: api.ceoProof, guardPage });
     pass('25_browser_sessions_1000_actual_http_db_records_and_14_team_reports');
     console.log('CAPACITY ' + JSON.stringify(capacity));
   }
-  for (const table of ['production_orders', 'trade_statements', 'settlements', 'payables']) assert.equal((await harness.read(table + '?select=id')).length, 0);
+  let brandWorkflow;
+  if (process.env.ERP_BROWSER_BRAND === '1') {
+    const { verifyBrandBrowserWorkflow } = await import('./work-browser-brand.mjs');
+    brandWorkflow = await verifyBrandBrowserWorkflow({ client, boss, staff, production: await actor('production'), reportContext: harness.originalReportContext });
+    pass('actual_brand_approval_issue_oem_acceptance_deadline_reload');
+  }
+  assert.equal((await harness.read('production_orders?select=id')).length, brandWorkflow ? 1 : 0);
+  for (const table of ['trade_statements', 'settlements', 'payables']) assert.equal((await harness.read(table + '?select=id')).length, 0);
   assert.deepEqual(errors, []);
   pass('no_financial_rows_no_browser_runtime_errors');
-  result = { status: 'PASS', runId, checks, model: 'fixed fixtures, not live intelligence', authentication: 'real test account login; CEO proof test-signed, not Google OAuth',
+  result = { status: 'PASS', runId, resultPath, screenshotPath, checks, model: 'fixed fixtures, not live intelligence', authentication: 'real test account login; CEO proof test-signed, not Google OAuth',
     schemaSnapshot: { extractedAt: snapshot.extractedAt, sourceVersion: snapshot.sourceVersion, sha256: snapshot.sha256 },
-    frontend: 'actual Login/WorkHub/WorkChatWidget/OperationalCalendar/CEO console; test wrapper instead of full ERP shell',
+    frontend: 'actual ERP pages in test wrapper, not full ERP shell; see individual workflow results',
     database: 'real local PostgreSQL and PostgREST 12.2.12; production schema only, no company rows', financialWrites: 0,
     limits: ['No real Google OAuth', 'Scheduler tick simulated clock, no wall-clock timer', 'No live model', 'No production browser writes',
-      ...(capacity ? ['Capacity timing is local, not a production SLA'] : ['No 14-team or 25-user browser load test'])], capacity, calls: harness.calls };
+      sqlWorkflows ? 'SQL checks do not verify full browser screens' : 'SQL workflow suites not run',
+      brandWorkflow ? 'Brand fixture created through DB, not draft-entry UI; receipt HTTP/DB only' : 'Brand browser workflow not run',
+      'Inter-agent council generation not verified by this harness',
+      ...(capacity ? ['Capacity timing is local, not a production SLA'] : ['No 14-team or 25-user browser load test'])],
+    sqlWorkflows: sqlWorkflows || { status: 'NOT_RUN' }, capacity: capacity || { status: 'NOT_RUN' }, brandWorkflow: brandWorkflow || { status: 'NOT_RUN' }, calls: harness.calls };
 } catch (error) {
   failure = error;
   console.error('BROWSER_CHAIN_FAILED: ' + error.stack);

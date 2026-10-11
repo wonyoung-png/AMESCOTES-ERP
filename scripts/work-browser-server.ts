@@ -9,6 +9,8 @@ import sessionRouter from '../server/session';
 import workRouter from '../server/work';
 import captureRouter from '../server/capture';
 import usersRouter from '../server/users';
+import brandWorkflowRouter from '../server/brand-workflow';
+import receiptWorkflowRouter from '../server/receipt-workflow';
 import ceoRouter, { ceoHostGate, ceoHostLock } from '../server/ceo';
 import { restAsServer, requireUser } from '../server/auth';
 import { workHttpLlmCases } from './e2e-work-http';
@@ -29,9 +31,11 @@ export const blocked: string[] = [];
 let truncateNextReport = false;
 let capacityFixtures = false;
 export const enableCapacityFixtures = () => { capacityFixtures = true; };
+export const disableCapacityFixtures = () => { capacityFixtures = false; };
 export const capacityTeams = ORG.map(team => team.key);
 export const failNextReport = () => { truncateNextReport = true; };
 export const inputs = workHttpLlmCases('2026-10-20');
+export { loadReportContext as originalReportContext };
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
   if (url.origin === 'https://api.anthropic.com') {
@@ -104,6 +108,7 @@ export const users = [
   { id: 'e2e_leader', email: 'e2e-leader@test.invalid', name: '테스트 팀장', role: '팀장', team: '국내 MD', position: '팀장' },
   { id: 'e2e_marketing', email: 'e2e-marketing@test.invalid', name: '테스트 마케팅', role: '사원', team: '마케팅', position: '사원' },
   { id: 'e2e_logistics', email: 'e2e-logistics@test.invalid', name: '테스트 물류', role: '사원', team: '물류·CS', position: '사원' },
+  { id: 'e2e_production', email: 'e2e-production@test.invalid', name: '테스트 생산', role: '사원', team: '생산관리', position: '사원' },
 ];
 
 export async function start(frontend: string, password: string) {
@@ -117,7 +122,7 @@ export async function start(frontend: string, password: string) {
   const app = express();
   app.use(express.json());
   app.use(ceoHostLock());
-  app.use(sessionRouter, workRouter, captureRouter, usersRouter, ceoRouter);
+  app.use(sessionRouter, workRouter, captureRouter, usersRouter, brandWorkflowRouter, receiptWorkflowRouter, ceoRouter);
   app.use('/rest/v1', requireUser(), async (req, res) => {
     if (!['GET', 'HEAD'].includes(req.method)) { res.status(405).end(); return; }
     const response = await nativeFetch(process.env.POSTGREST_URL + req.url, { method: req.method,
