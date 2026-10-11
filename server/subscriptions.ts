@@ -25,6 +25,30 @@ export const renewContractTerm = (termEndOn: string, months: number) => {
 export const isContractCancellation = (answer: string, autoRenew: boolean) => answer === '안 씀' && autoRenew;
 export const hasNoticeStage = (checks: Array<{ subscription_id: string; notice_stage?: string }>, subscriptionId: string, stage: string | null) =>
   !!stage && checks.some(x => x.subscription_id === subscriptionId && x.notice_stage === stage);
+export const renewalStage = (today: string, nextBillingOn: string) => {
+  const days = Math.round((Date.parse(nextBillingOn) - Date.parse(today)) / 864e5);
+  return days >= 0 && days <= 7 ? 'D-7' : days >= 0 && days <= 30 ? 'D-30' : null;
+};
+export const rollBillingDate = (nextBillingOn: string, cycle: string, today: string) => {
+  const d = new Date(nextBillingOn + 'T00:00:00Z');
+  while (d.toISOString().slice(0, 10) < today) {
+    if (cycle === '연') d.setUTCFullYear(d.getUTCFullYear() + 1);
+    else {
+      const day = d.getUTCDate();
+      d.setUTCDate(1);
+      d.setUTCMonth(d.getUTCMonth() + 1);
+      const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+      d.setUTCDate(Math.min(day, lastDay));
+    }
+  }
+  return d.toISOString().slice(0, 10);
+};
+export const isContractRenewal = (subscription: { auto_renew?: boolean; notice_days?: number | null; notice_by?: string | null }) =>
+  !!subscription.auto_renew && subscription.notice_days != null && !!subscription.notice_by;
+export const isPostCancellationPayment = (subscription: { merchant_pattern?: string; cancel_requested_at?: string | null; updated_at?: string | null }, transaction: { merchant_key?: string; approved_on?: string }) => {
+  const cancelledOn = (subscription.cancel_requested_at || subscription.updated_at || '').slice(0, 10);
+  return !!cancelledOn && normalizeMerchant(subscription.merchant_pattern || '') === transaction.merchant_key && !!transaction.approved_on && transaction.approved_on > cancelledOn;
+};
 
 async function requireSubscriptionAdmin(req: Request, res: Response, next: NextFunction) {
   try {
@@ -108,7 +132,7 @@ router.post('/api/card-transactions/upload', async (req, res) => {
   } catch (e) { console.error('[subscriptions] 업로드 실패', e); res.status(500).json({ error: 'internal' }); }
 });
 
-const CATEGORIES = ['AI 도구','마케팅','업무 도구','인프라'];
+const CATEGORIES = ['AI 도구','마케팅','업무 도구','인프라','임대·리스','렌탈·유지보수','대행·자문','통신·보안','기타'];
 const STATUSES = ['사용 중','검토 필요','해지 예정','해지됨'];
 router.post('/api/subscriptions/candidates/:id/confirm', async (req, res) => {
   try {
@@ -156,6 +180,8 @@ router.patch('/api/subscriptions/:id', async (req, res) => {
     if (STATUSES.includes(req.body?.status)) body.status = req.body.status;
     if (CATEGORIES.includes(req.body?.category)) body.category = req.body.category;
     if (dateOk(text(req.body?.nextBillingOn, 10))) body.next_billing_on = req.body.nextBillingOn;
+    if (['월', '연'].includes(req.body?.billingCycle)) body.billing_cycle = req.body.billingCycle;
+    if ('paymentMethod' in (req.body || {})) body.payment_method = text(req.body.paymentMethod, 100) || null;
     if ('ownerId' in (req.body || {})) body.owner_id = text(req.body.ownerId) || null;
     if ('autoRenew' in (req.body || {})) body.auto_renew = req.body.autoRenew === true;
     if ('termEndOn' in (req.body || {})) body.term_end_on = dateOk(text(req.body.termEndOn, 10)) ? req.body.termEndOn : null;
@@ -170,13 +196,27 @@ router.patch('/api/subscriptions/:id', async (req, res) => {
 
 export async function runSubscriptionUsageChecks() {
   const today = kstToday(), now = new Date().toISOString();
-  const [subs, all, openChecks, noticeChecks] = await Promise.all([
-    db('subscriptions?status=in.(사용 중,검토 필요)&select=*'), members(),
+  const [subs, cancelledSubs, all, openChecks, noticeChecks, recentTransactions] = await Promise.all([
+    db('subscriptions?status=in.(사용 중,검토 필요)&select=*'),
+    db('subscriptions?status=in.(해지 예정,해지됨)&repayment_alerted_at=is.null&select=*'),
+    members(),
     db('subscription_usage_checks?answered_at=is.null&select=*'),
     db('subscription_usage_checks?notice_stage=not.is.null&select=*'),
+    db('card_transactions?select=id,merchant_key,merchant_name,approved_on,amount,currency&order=approved_on.desc&limit=20000'),
   ]);
   const ceo = all.find(x => CEO_EMAILS.includes(x.email.toLowerCase()));
   const supportLead = all.find(x => ['경영지원', '경영관리'].includes(x.team) && isTeamLeader(x));
+  for (const s of cancelledSubs) {
+    const transaction = recentTransactions.find((x: any) => isPostCancellationPayment(s, x));
+    if (!transaction || (!supportLead && !ceo)) continue;
+    const claimed = await restAsServer(`subscriptions?id=eq.${encodeURIComponent(s.id)}&repayment_alerted_at=is.null`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ repayment_alerted_at: now, repayment_transaction_id: transaction.id, updated_at: now }) });
+    if (!claimed.ok || !(await claimed.json())[0]) continue;
+    const owner = supportLead || ceo!;
+    const cardId = genId('wc');
+    const raw = `${s.service_name} 해지 후 ${transaction.approved_on} 재결제 감지 · ${Number(transaction.amount).toLocaleString()} ${transaction.currency}`;
+    const wr = await restAsServer('work_cards', { method: 'POST', body: JSON.stringify({ id: cardId, created_by: 'subscription-watch', created_by_name: '구독 감시', team: owner.team || '경영지원', raw_text: raw, kind: 'request_check', status: 'open', parsed: { title: `${s.service_name} 해지 후 재결제`, subscriptionId: s.id, transactionId: transaction.id }, assignee_id: owner.id, assignee_name: owner.name }) });
+    if (wr.ok) await notify([...new Map([supportLead, ceo].filter(Boolean).map((x: any) => [x.id, { user_id: x.id, card_id: cardId, title: `${s.service_name} 해지 후 재결제 경고`, body: raw }])).values()]);
+  }
   for (const check of openChecks) {
     if (check.notice_stage || check.escalated_at || Date.now() - Date.parse(check.requested_at) < 7 * 864e5 || !ceo) continue;
     const reassigned = await restAsServer(`work_cards?id=eq.${encodeURIComponent(check.work_card_id)}&status=eq.open`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ assignee_id: ceo.id, assignee_name: ceo.name, updated_at: now }) });
@@ -186,7 +226,11 @@ export async function runSubscriptionUsageChecks() {
     await notify([{ user_id: ceo.id, card_id: check.work_card_id, title: '구독 사용 확인이 7일째 답이 없습니다' }]);
   }
   for (const s of subs) {
-    if (s.auto_renew && s.term_end_on && s.notice_by && s.renewal_months) {
+    if (s.next_billing_on && s.next_billing_on < today) {
+      s.next_billing_on = rollBillingDate(s.next_billing_on, s.billing_cycle, today);
+      await restAsServer(`subscriptions?id=eq.${encodeURIComponent(s.id)}`, { method: 'PATCH', body: JSON.stringify({ next_billing_on: s.next_billing_on, updated_at: now }) });
+    }
+    if (isContractRenewal(s) && s.term_end_on && s.renewal_months) {
       const contractChecks = noticeChecks.filter((x: any) => x.subscription_id === s.id);
       const unansweredContractChecks = contractChecks.filter((x: any) => !x.answered_at);
       if (s.notice_by < today && !s.cancel_requested_at) {
@@ -209,7 +253,8 @@ export async function runSubscriptionUsageChecks() {
         continue;
       }
       const stage = contractNoticeStage(today, s.notice_by);
-      const already = hasNoticeStage(contractChecks, s.id, stage);
+      // 이번 주기에 이미 답했으면(D-30 계속 씀) D-7 재질문 안 함
+      const already = !!stage && contractChecks.some((x: any) => x.renewal_key === s.notice_by && (x.notice_stage === stage || x.answered_at));
       if (stage && !already && !s.cancel_requested_at) {
         const owner = all.find(x => x.id === s.owner_id)
           || all.find(x => x.team === s.owner_team && isTeamLeader(x)) || supportLead || ceo;
@@ -217,7 +262,7 @@ export async function runSubscriptionUsageChecks() {
           const days = Math.round((Date.parse(s.notice_by) - Date.parse(today)) / 864e5);
           const cardId = genId('wc'), checkId = genId('suc');
           const raw = `${s.service_name} 해지 통보 기한 ${s.notice_by} (D-${days}). 계속/해지 요청 중 선택`;
-          const reserved = await restAsServer('subscription_usage_checks', { method: 'POST', body: JSON.stringify({ id: checkId, subscription_id: s.id, work_card_id: cardId, owner_id: owner.id, notice_stage: stage }) });
+          const reserved = await restAsServer('subscription_usage_checks', { method: 'POST', body: JSON.stringify({ id: checkId, subscription_id: s.id, work_card_id: cardId, owner_id: owner.id, notice_stage: stage, renewal_key: s.notice_by }) });
           if (reserved.ok) {
             const card = { id: cardId, created_by: 'subscription-watch', created_by_name: '구독 감시', team: owner.team || '경영지원', raw_text: raw,
               kind: 'request_check', status: 'open', parsed: { title: `${s.service_name} 계약 확인`, subscriptionId: s.id, subscriptionCheck: true, contractNotice: true }, assignee_id: owner.id, assignee_name: owner.name };
@@ -227,10 +272,29 @@ export async function runSubscriptionUsageChecks() {
           }
         }
       }
+      continue;
     }
-    const dueSoon = s.next_billing_on && s.next_billing_on >= today && Date.parse(s.next_billing_on) - Date.parse(today) <= 5 * 864e5;
+    if (s.billing_cycle === '연' && s.next_billing_on) {
+      const stage = renewalStage(today, s.next_billing_on);
+      const already = noticeChecks.some((x: any) => x.subscription_id === s.id && x.renewal_key === s.next_billing_on && (x.notice_stage === stage || x.answered_at));
+      if (stage && !already) {
+        const owner = all.find(x => x.id === s.owner_id) || supportLead || ceo;
+        if (owner) {
+          const cardId = genId('wc'), checkId = genId('suc');
+          const amount = `${Number(s.latest_amount).toLocaleString()} ${s.currency}`;
+          const raw = `연간 갱신 ${s.next_billing_on}, 금액 ${amount}. 계속/해지 요청`;
+          const reserved = await restAsServer('subscription_usage_checks', { method: 'POST', body: JSON.stringify({ id: checkId, subscription_id: s.id, work_card_id: cardId, owner_id: owner.id, notice_stage: stage, renewal_key: s.next_billing_on }) });
+          if (reserved.ok) {
+            const wr = await restAsServer('work_cards', { method: 'POST', body: JSON.stringify({ id: cardId, created_by: 'subscription-watch', created_by_name: '구독 감시', team: owner.team || '경영지원', raw_text: raw, kind: 'request_check', status: 'open', parsed: { title: `${s.service_name} 연간 갱신`, subscriptionId: s.id, subscriptionCheck: true, annualRenewal: true }, assignee_id: owner.id, assignee_name: owner.name }) });
+            if (wr.ok) await notify([{ user_id: owner.id, card_id: cardId, title: `${s.service_name} 연간 갱신 확인`, body: raw }]);
+            else await restAsServer(`subscription_usage_checks?id=eq.${encodeURIComponent(checkId)}`, { method: 'DELETE' });
+          }
+        }
+      }
+      continue;
+    }
     const monthly = !s.last_usage_checked_at || new Date(s.last_usage_checked_at).toISOString().slice(0, 7) < today.slice(0, 7);
-    if (!dueSoon && !monthly) continue;
+    if (!monthly) continue;
     if (openChecks.some((x: any) => x.subscription_id === s.id)) continue;
     const owner = all.find(x => x.id === s.owner_id) || ceo;
     if (!owner) continue;

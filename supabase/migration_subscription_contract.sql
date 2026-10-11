@@ -6,6 +6,21 @@ alter table public.subscriptions add column if not exists notice_days integer;
 alter table public.subscriptions add column if not exists owner_team text;
 alter table public.subscriptions add column if not exists cancel_requested_at timestamptz;
 alter table public.subscriptions add column if not exists cancel_requested_by text;
+alter table public.subscriptions add column if not exists payment_method text;
+alter table public.subscriptions add column if not exists repayment_alerted_at timestamptz;
+alter table public.subscriptions add column if not exists repayment_transaction_id text;
+
+do $$ declare v_name text; begin
+  select c.conname into v_name from pg_constraint c
+  join pg_class t on t.oid = c.conrelid
+  where t.relname = 'subscriptions' and c.contype = 'c'
+    and pg_get_constraintdef(c.oid) like '%category%';
+  if v_name is not null then execute format('alter table public.subscriptions drop constraint %I', v_name); end if;
+  if not exists (select 1 from pg_constraint where conname = 'subscriptions_category_valid') then
+    alter table public.subscriptions add constraint subscriptions_category_valid
+      check (category in ('AI 도구','마케팅','업무 도구','인프라','임대·리스','렌탈·유지보수','대행·자문','통신·보안','기타'));
+  end if;
+end $$;
 
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'subscriptions_renewal_months_positive') then
@@ -24,14 +39,16 @@ do $$ begin
 end $$;
 
 alter table public.subscription_usage_checks add column if not exists notice_stage text;
+alter table public.subscription_usage_checks add column if not exists renewal_key text;
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'subscription_checks_notice_stage_valid') then
     alter table public.subscription_usage_checks add constraint subscription_checks_notice_stage_valid
       check (notice_stage is null or notice_stage in ('D-30','D-7'));
   end if;
 end $$;
-create unique index if not exists subscription_checks_notice_stage_once_idx
-  on public.subscription_usage_checks (subscription_id, notice_stage) where notice_stage is not null;
+drop index if exists public.subscription_checks_notice_stage_once_idx;
+create unique index if not exists subscription_checks_notice_stage_period_once_idx
+  on public.subscription_usage_checks (subscription_id, notice_stage, coalesce(renewal_key, 'contract')) where notice_stage is not null;
 create index if not exists subscriptions_notice_idx on public.subscriptions (notice_by) where auto_renew;
 
 create or replace function public.answer_subscription_check(
