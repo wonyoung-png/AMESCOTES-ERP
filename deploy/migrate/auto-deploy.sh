@@ -35,6 +35,18 @@ healthy() {
   esac
 }
 
+restore_previous() {
+  local svc=$1 image=$2 name=$3
+  if docker image inspect "${svc}-prev:latest" >/dev/null 2>&1 &&
+     docker tag "${svc}-prev:latest" "$image" &&
+     docker compose up -d "$svc" >>"$LOG" 2>&1; then
+    sleep 10
+    if healthy "$name"; then log "$svc 되돌림 성공"; return 0; fi
+  fi
+  log "$svc 되돌림 실패 — 사람이 봐야 한다"
+  return 1
+}
+
 CHANGED=""
 for n in erp daily hr; do
   BR=$(branch_of "$n")
@@ -44,7 +56,15 @@ for n in erp daily hr; do
   # 띄우는 데 성공한 커밋과 비교한다. HEAD 와 비교하면 빌드가 한 번 깨진 뒤
   # 다음 실행이 "바뀐 것 없음" 으로 보고 영원히 배포되지 않는다 (코덱스 지적)
   DONE=$(cat "$STATE/$n" 2>/dev/null || echo none)
+  # Legacy installation did not persist states. Do not rebuild unrelated apps just
+  # to invent a baseline: start recording them on their next actual source change.
+  if [ "$n" != erp ] && [ "$DONE" = none ] &&
+     [ "$(git -C "$APP/src/$n" rev-parse HEAD)" = "$AFTER" ]; then
+    continue
+  fi
   [ "$DONE" = "$AFTER" ] && continue
+  # A failed replacement must not repeatedly take the service down every two minutes.
+  [ "$(cat "$STATE/$n.failed" 2>/dev/null || true)" = "$AFTER" ] && continue
   git -C "$APP/src/$n" reset -q --hard "$AFTER"
   log "$n 새 커밋 ${AFTER:0:7} — $(git -C "$APP/src/$n" log --oneline -1)"
   CHANGED="$CHANGED $n"
@@ -65,7 +85,8 @@ for n in $CHANGED; do
   AFTER_SHA=$(git -C "$APP/src/$n" rev-parse HEAD)
   IMG=$(docker compose config --images "$SVC" 2>/dev/null | head -1)
   # 되돌릴 자리를 먼저 만들어 둔다. 지금 돌던 이미지에 :prev 딱지를 붙인다
-  [ -n "$IMG" ] && docker tag "$IMG" "${SVC}-prev:latest" 2>/dev/null || true
+  OLD_IMAGE=$(docker inspect -f '{{.Image}}' "app-${SVC}-1" 2>/dev/null || true)
+  [ -n "$OLD_IMAGE" ] && docker tag "$OLD_IMAGE" "${SVC}-prev:latest" 2>/dev/null || true
 
   # 빌드가 깨지면 새 이미지가 안 생기고, 안 생기면 교체도 없다 — 돌던 것이 계속 돈다
   if ! docker compose build "$SVC" >>"$LOG" 2>&1; then
@@ -76,7 +97,9 @@ for n in $CHANGED; do
   # up 이 실패해도 옛 컨테이너가 그대로 돌고 있으면 healthy 를 통과한다.
   # 그러면 "배포됐다"고 적어 버려서 새 커밋이 영영 안 올라간다 (코덱스 지적)
   if ! docker compose up -d "$SVC" >>"$LOG" 2>&1; then
-    log "$SVC 기동 실패 — 돌던 버전 그대로 둔다"
+    log "$SVC 기동 실패 — 직전 버전으로 되돌린다"
+    echo "$AFTER_SHA" > "$STATE/$n.failed"
+    restore_previous "$SVC" "$IMG" "$n" || true
     FAILED="$FAILED $n"
     continue
   fi
@@ -87,13 +110,8 @@ for n in $CHANGED; do
     log "$SVC 교체 완료"
   else
     log "$SVC 헬스체크 실패 — 직전 버전으로 되돌린다"
-    if docker image inspect "${SVC}-prev:latest" >/dev/null 2>&1; then
-      docker tag "${SVC}-prev:latest" "$IMG" && docker compose up -d "$SVC" >>"$LOG" 2>&1
-      sleep 10
-      healthy "$n" && log "$SVC 되돌림 성공" || log "$SVC 되돌려도 안 산다 — 사람이 봐야 한다"
-    else
-      log "$SVC 되돌릴 이미지가 없다 — 사람이 봐야 한다"
-    fi
+    echo "$AFTER_SHA" > "$STATE/$n.failed"
+    restore_previous "$SVC" "$IMG" "$n" || true
     FAILED="$FAILED $n"
   fi
 done

@@ -10,6 +10,8 @@ import {
   scoreAdsRun,
   adsOfficeSummary,
   syncAdsConnectionNotice,
+  startAdsAnalysisScheduler,
+  checkAdsMetaConnection,
   ADS_DAILY_QUESTION,
   groundedText,
 } from "./ads-council";
@@ -20,6 +22,84 @@ import type {
   AdsOpinion,
 } from "../shared/ads-analysis";
 const now = new Date("2026-10-11T01:00:00Z");
+test("disabled analysis still persists expiry notices at KST day rollover without paid/model/provider calls", async t => {
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  let clock = new Date("2026-11-09T14:59:59Z");
+  const notices: any[] = [];
+  const calls: string[] = [];
+  const service = createAdsService({
+    now: () => clock,
+    enabled: () => false,
+    connection: async now => ({ available: true, checkedAt: now.toISOString() }),
+    rest: (async (path: string, init: any = {}) => {
+      calls.push(path);
+      if (path.startsWith("ads_analysis_runs?")) return new Response("[]");
+      assert.equal(path, "ads_analysis_notices?on_conflict=id");
+      notices.push(JSON.parse(init.body));
+      return new Response("");
+    }) as any,
+    model: async () => { throw Error("must_not_call_model"); },
+    collect: async () => { throw Error("must_not_call_provider"); },
+  });
+  const stop = startAdsAnalysisScheduler(service);
+  t.after(stop);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0].payload.state, "cleared");
+  clock = new Date("2026-11-09T15:00:00Z");
+  t.mock.timers.tick(30_000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(notices.length, 2);
+  assert.equal(notices[1].payload.state, "active");
+  assert.equal(notices[1].payload.expiresOn, "2026-11-24");
+  t.mock.timers.tick(30_000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(notices.length, 2);
+  assert.equal(calls.length, 4);
+});
+test("connection notice failures retry next tick while analysis stays disabled", async t => {
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  let writes = 0, checks = 0;
+  const service = createAdsService({
+    enabled: () => false, now: () => now,
+    connection: async date => { checks++; return { available: true, checkedAt: date.toISOString() }; },
+    rest: (async (path: string) => path.startsWith("ads_analysis_runs?") ? new Response("[]") : new Response("", { status: ++writes === 1 ? 500 : 200 })) as any,
+  });
+  t.mock.method(console, "warn", () => {});
+  const stop = startAdsAnalysisScheduler(service); t.after(stop);
+  await new Promise(resolve => setImmediate(resolve));
+  t.mock.timers.tick(30_000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(writes, 2); assert.equal(checks, 2);
+});
+test("daily Meta authentication probe is header-only GET and returns fixed failure state", async () => {
+  let requests = 0;
+  const env = { META_ADS_TOKEN: "synthetic-not-a-secret", META_AD_ACCOUNT_ID: "act_123" };
+  const transport = (async (url: any, init: any) => {
+    requests++; assert.equal(new URL(url).hostname, "graph.facebook.com");
+    assert.equal(init.method, "GET"); assert.equal(new URL(url).searchParams.has("access_token"), false);
+    return new Response(JSON.stringify({ account_status: 1 }));
+  }) as typeof fetch;
+  assert.equal((await checkAdsMetaConnection(now, env, transport)).available, true);
+  assert.equal(requests, 1);
+  assert.equal((await checkAdsMetaConnection(now, {}, transport)).available, false);
+  assert.equal(requests, 1);
+  assert.equal((await checkAdsMetaConnection(now, env, (async () => new Response("", {status:401})) as typeof fetch)).available, false);
+});
+test("verified renewed expiry and fresh authentication override old failed snapshots", async t => {
+  const old = process.env.META_ADS_DATA_ACCESS_EXPIRES_ON;
+  process.env.META_ADS_DATA_ACCESS_EXPIRES_ON = "2027-03-01";
+  t.after(() => { if (old === undefined) delete process.env.META_ADS_DATA_ACCESS_EXPIRES_ON; else process.env.META_ADS_DATA_ACCESS_EXPIRES_ON = old; });
+  let saved: any;
+  const rest = (async (path: string, init: any = {}) => {
+    if (path.startsWith("ads_analysis_runs?")) return new Response(JSON.stringify([{ tokenExpiresOn: "2026-10-01", tokenNeedsRenewal: true, sources: [{source:"meta.auth",state:"unavailable"}] }]));
+    saved = JSON.parse(init.body); return new Response("");
+  }) as any;
+  await syncAdsConnectionNotice(rest, now, { available: true, checkedAt: now.toISOString() });
+  assert.equal(saved.payload.state, "cleared"); assert.equal(saved.payload.expiresOn, "2027-03-01");
+  await syncAdsConnectionNotice(rest, now, { available: false, checkedAt: now.toISOString() });
+  assert.equal(saved.payload.state, "active");
+});
 const snap: AdsSnapshot = {
   id: "snapshot",
   market: "lm-kr",

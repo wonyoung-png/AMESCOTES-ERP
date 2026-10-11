@@ -65,6 +65,7 @@ type IO = {
   ) => Promise<{ value: any; costUsd: number }>;
   authenticate: typeof currentUser;
   enabled: () => boolean;
+  connection: typeof checkAdsMetaConnection;
 };
 const errorCode = (e: unknown) =>
   e instanceof Error && /^(ads_|model_)[a-z_]+$/.test(e.message)
@@ -313,6 +314,7 @@ const defaults: IO = {
   model: opus,
   authenticate: currentUser,
   enabled: () => process.env.ADS_ANALYSIS_ENABLED === "true",
+  connection: checkAdsMetaConnection,
 };
 export function createAdsService(overrides: Partial<IO> = {}) {
   const io = { ...defaults, ...overrides };
@@ -672,6 +674,10 @@ export function createAdsRouter(service: Service = createAdsService()) {
         res.status(401).json({ error: "runner_unauthorized" });
         return;
       }
+      if (!service.io.enabled()) {
+        res.json({ job: null });
+        return;
+      }
       const runnerId = String(req.query.runnerId || "macmini");
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(runnerId)) {
         res.status(400).json({ error: "invalid_runner" });
@@ -958,7 +964,28 @@ export async function adsOfficeSummary(
     return { state: "unavailable", day: dayOf(now), analyses: [], notices: [] };
   }
 }
-export async function syncAdsConnectionNotice(rest: IO["rest"], now: Date) {
+export async function checkAdsMetaConnection(
+  now: Date,
+  env: NodeJS.ProcessEnv = process.env,
+  transport: typeof fetch = fetch
+) {
+  const checkedAt = now.toISOString();
+  if (!env.META_ADS_TOKEN || !/^act_\d{1,40}$/.test(env.META_AD_ACCOUNT_ID || ""))
+    return { available: false, checkedAt };
+  try {
+    const response = await transport(
+      `https://graph.facebook.com/v26.0/${env.META_AD_ACCOUNT_ID}?fields=account_status`,
+      { method: "GET", redirect: "error", headers: { Authorization: `Bearer ${env.META_ADS_TOKEN}` }, signal: AbortSignal.timeout(15_000) }
+    );
+    if (!response.ok) return { available: false, checkedAt };
+    const body = await response.json();
+    return { available: !body.error && body.account_status === 1, checkedAt };
+  } catch { return { available: false, checkedAt }; }
+}
+export async function syncAdsConnectionNotice(
+  rest: IO["rest"], now: Date,
+  connection?: { available: boolean; checkedAt: string }
+) {
   const recent = await rows(
     rest,
     "ads_analysis_runs?payload->snapshot=not.is.null&select=tokenExpiresOn:payload->snapshot->>tokenExpiresOn,tokenNeedsRenewal:payload->snapshot->tokenNeedsRenewal,sources:payload->snapshot->sources,collectedAt:payload->snapshot->>collectedAt,updated_at&order=updated_at.desc,id.desc&limit=1"
@@ -971,12 +998,14 @@ export async function syncAdsConnectionNotice(rest: IO["rest"], now: Date) {
     | undefined = recent
     .map(r => r.snapshot || r.payload?.snapshot || r)
     .find(r => r.tokenExpiresOn);
-  const expiry = snapshot?.tokenExpiresOn || configuredExpiry();
-  const failed = !!snapshot?.sources?.some(
+  const configured = configuredExpiry();
+  const hasVerifiedRenewal = process.env.META_ADS_DATA_ACCESS_EXPIRES_ON === configured && configured !== snapshot?.tokenExpiresOn;
+  const expiry = hasVerifiedRenewal ? configured : snapshot?.tokenExpiresOn || configured;
+  const failed = connection ? !connection.available : !!snapshot?.sources?.some(
     s => s.source === "meta.auth" && s.state === "unavailable"
   );
   const renew =
-    !!snapshot?.tokenNeedsRenewal ||
+    (!hasVerifiedRenewal && !!snapshot?.tokenNeedsRenewal) ||
     +now >= Date.parse(expiry + "T00:00:00+09:00") - 14 * 864e5;
   const result = await rest("ads_analysis_notices?on_conflict=id", {
     method: "POST",
@@ -989,7 +1018,7 @@ export async function syncAdsConnectionNotice(rest: IO["rest"], now: Date) {
           ? "메타 인증 실패 — 데이터 연결 확인 필요"
           : "메타 토큰 재연장 필요",
         expiresOn: expiry,
-        checkedAt: snapshot?.collectedAt || now.toISOString(),
+        checkedAt: connection?.checkedAt || snapshot?.collectedAt || now.toISOString(),
         link: "/ads-analysis?ws=LUMEN",
       },
       updated_at: now.toISOString(),
@@ -1000,8 +1029,8 @@ export async function syncAdsConnectionNotice(rest: IO["rest"], now: Date) {
 export function startAdsAnalysisScheduler(
   service: Service = createAdsService()
 ) {
-  if (!service.io.enabled()) return;
   let running = false,
+    lastNoticeDay = "",
     lastScoringDay = "";
   async function tick() {
     if (running) return;
@@ -1009,6 +1038,15 @@ export function startAdsAnalysisScheduler(
     try {
       const now = service.io.now(),
         kst = new Date(+now + 9 * 3600e3);
+      // Credential expiry is operational safety, not a paid analysis capability.
+      // Persist at startup/day rollover even while analysis is disabled.
+      if (lastNoticeDay !== dayOf(now)) {
+        try {
+          await syncAdsConnectionNotice(service.io.rest, now, await service.io.connection(now));
+          lastNoticeDay = dayOf(now);
+        } catch { console.warn("[ads] connection notice unavailable"); }
+      }
+      if (!service.io.enabled()) return;
       if (kst.getUTCHours() >= 9)
         for (const market of ["lm-kr", "lm-gl"] as const) {
           try {
@@ -1027,7 +1065,6 @@ export function startAdsAnalysisScheduler(
       for (let n = 0; n < 8; n++) {
         await service.tick();
       }
-      await syncAdsConnectionNotice(service.io.rest, now);
       if (lastScoringDay === dayOf(now)) return;
       const due = await rows(
         service.io.rest,
