@@ -11,7 +11,7 @@ where lower(service_name) in ('shopmy', 'shopmyshelf')
 insert into public.subscriptions
   (id, service_name, merchant_pattern, card_last4, latest_amount, average_amount, currency,
    billing_cycle, category, status, auto_renew, term_end_on, renewal_months, notice_days, owner_team, memo)
-select 'sub_shopmy', 'ShopMyShelf', 'shopmy', '2200', 670000, 670000, 'KRW',
+select 'sub_shopmy', 'ShopMyShelf', 'shopmy', '0107', 670000, 670000, 'KRW',
   '월', '마케팅', '사용 중', true, date '2027-02-05', 6, 45, 'MD',
   'Launch Package, 8/5 DocuSign(원채은). 8~10월 귀속매출 $864(bella 1명) vs 구독료 약 207만'
 where not exists (
