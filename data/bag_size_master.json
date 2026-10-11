@@ -1,0 +1,394 @@
+{
+ "2WAY MESH BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "ANNEAU FLAP BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "ANNEAU FRAME BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "ARC CROSSBODY BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "ARC TOTE BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "ARETE BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "ARETE DEMI BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "BAIA BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "BASE BARREL BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "BATO TOTE BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "BIJOU BAG": {
+  "size": "미니",
+  "status": "판매"
+ },
+ "BLEP CROSSBODY BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "BLEP SHOULDER BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "BON BALLON BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "BON BIEN BAG": {
+  "size": "미니",
+  "status": "판매"
+ },
+ "BRISE BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "BRISE GRAND BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "BRISE MEDIUM BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "COLLEN BUCKET BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "COTE BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "CUBE HOBO BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "CUBE MINI BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "DOUBLE STRAP BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "DOUBLE STRAP SHOULDER BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "DUAL SHEARLING BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "EASY NYLON BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "FADE BOSTON BAG": {
+  "size": "",
+  "status": "판매"
+ },
+ "FADE CROSSBODY BAG": {
+  "size": "",
+  "status": "판매"
+ },
+ "FANTINE BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "GRAIN RAFFIA BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "GRID MINI SLING BAG": {
+  "size": "미니",
+  "status": "판매"
+ },
+ "GRID SLING BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "KARRY SHOULDER BAG": {
+  "size": "",
+  "status": "판매"
+ },
+ "LOG LARGE BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "LOG MIDDLE BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "LUNE FORME BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "LUNE FORME TOTE BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "MARRON BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "MARRON DEMI BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "MON BAG": {
+  "size": "미니",
+  "status": "판매"
+ },
+ "MONIQUE SHOULDER BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "MOON BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "MOSSY HOBO BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "NADEL BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "NADEL BOWLING SHOULDER BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "NADEL BOWLING TOTE BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "NADEL MINI BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "NADEL ZIP TOTE BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "NOTE BUCKLE BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "ORB CROCHET BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "ORB MINI CROCHET BAG": {
+  "size": "미니",
+  "status": "판매"
+ },
+ "PANIER DOUX GRAND BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "PANIER DOUX PETIT BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "PANIER DOUX TOTE BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "PANIER FLAP BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "PANIER GRAND BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "PANIER PETIT BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "PANIER TOTE BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "PANIER WOVEN BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "PAVE PETIT BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "PAVE TOTE BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "PILLOW HOBO BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "PILLOW TOTE BAG": {
+  "size": "스몰",
+  "status": "판매"
+ },
+ "PLIER PHONE HOLDER": {
+  "size": "미니",
+  "status": "판매"
+ },
+ "ROOF SHOULDER BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "SOFIA WEAVING BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "TWIG BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "TWIG BASKET GRAND BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "TWIG BASKET SHOULDER BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "TWIG BASKET TOTE BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "TWIG PETIT BAG": {
+  "size": "미니",
+  "status": "판매"
+ },
+ "VERE FLAP BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "[LUMEN x IHNN] BOJAGI CROSSBODY BAG": {
+  "size": "",
+  "status": "미출시"
+ },
+ "[LUMEN x IHNN] BOJAGI SHOULDER BAG": {
+  "size": "라지",
+  "status": "단종/미출시"
+ },
+ "[LUMEN x IHNN] BOJAGI SLING BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "[LUMEN x IHNN] BOJAGI TOTE BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "[LUMEN x IHNN] BOSTON LARGE BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "[LUMEN x IHNN] BOSTON SM BAG": {
+  "size": "미디엄",
+  "status": "판매"
+ },
+ "[LUMEN x IHNN] BOSTON XL BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "[LUMEN x Maria Sainte] MARIA BIG BAG": {
+  "size": "라지",
+  "status": "판매"
+ },
+ "BASE CROSSBODY BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "CHARLOTTE BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "EPOQUE GRAND BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "EPOQUE PETIT BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "FELINE BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "FORME BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "GOUTER BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "JOURNAL BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "JOURNAL PUFFER BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "JOURNAL SHOULDER BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "MARRON BACKPACK": {
+  "size": "",
+  "status": "단종"
+ },
+ "NICE BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "POCO COOLER BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "VALENTINE BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "VOYAGE BOSTON BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "VOYAGE SHOPPER BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "[LUMEN x Maria Sainte] MARIA REUSABLE BAG": {
+  "size": "",
+  "status": "단종"
+ },
+ "[REFURB] NADEL MINI BAG": {
+  "size": "",
+  "status": "단종"
+ }
+}

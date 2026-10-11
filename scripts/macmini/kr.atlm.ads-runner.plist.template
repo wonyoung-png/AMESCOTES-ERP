@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template only: replace paths/origin before installing; this task never installs it.
+     Node >=22 and authenticated Codex must be on PATH.
+     Supply ADS_RUNNER_TOKEN externally with launchctl setenv before bootstrap.
+     Do not store a real token in this plist, repository, argv or logs.
+     No environment file is sourced/executed. Runner owns the 30-second polling loop. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>kr.atlm.ads-runner</string>
+  <key>ProgramArguments</key>
+  <array><string>/bin/sh</string><string>__REPO_ABSOLUTE_PATH__/scripts/macmini/ads-runner.sh</string></array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:__HOME_ABSOLUTE_PATH__/.local/bin</string>
+    <key>ADS_API_URL</key><string>https://__ERP_HOST__</string>
+    <key>ADS_RUNNER_ID</key><string>macmini</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>/dev/null</string>
+  <key>StandardErrorPath</key><string>/dev/null</string>
+</dict>
+</plist>

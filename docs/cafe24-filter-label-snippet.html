@@ -1,0 +1,30 @@
+<!-- PREPARE ONLY: Claude applies after approval and before/after desktop/mobile screenshots.
+     Do not paste candidate production codes. Fill the JSON with reviewed output of:
+     tsx scripts/cafe24-filter-tags-migrate.ts --labels
+     This reads saved verified settings. No store mutation. --labels emits the shared code table.
+     Scope the existing filter container with data-erp-filter-labels. Individual code labels
+     must have data-filter-code, or an anchor query custom_1~4. Never rewrite product text.
+     Retain old external underscore links; verify ads/SNS before changing filter values.
+     Empty JSON is deliberately inert; it does not claim all candidate mappings are confirmed. -->
+<script type="application/json" id="erp-verified-filter-labels">{}</script>
+<script>
+(() => {
+  const source = document.getElementById('erp-verified-filter-labels');
+  let labels;
+  try { labels = JSON.parse(source.textContent); } catch { return; }
+  if (!labels || Array.isArray(labels) || typeof labels !== 'object') return;
+  document.querySelectorAll('[data-erp-filter-labels] [data-filter-code], [data-erp-filter-labels] a[href]').forEach(node => {
+    let code = node.getAttribute('data-filter-code');
+    if (!code && node.hasAttribute('href')) {
+      let url; try { url = new URL(node.getAttribute('href'), document.baseURI); } catch { return; }
+      for (const key of ['custom_1', 'custom_2', 'custom_3', 'custom_4']) {
+        if (url.searchParams.has(key)) { code = url.searchParams.get(key); break; }
+      }
+    }
+    const label = labels[code];
+    // Preserve counters/icons/links: only a dedicated label node or plain-text anchor.
+    const target = node.querySelector('[data-filter-label]') || (node.children.length === 0 ? node : null);
+    if (target && typeof label === 'string' && /^[A-Z0-9 ]+$/.test(label)) target.textContent = label;
+  });
+})();
+</script>

@@ -1,6 +1,7 @@
 // 작업지시서 — 수기로 쓰던 엑셀 양식을 그대로 옮기고 BOM에서 값을 끌어온다.
 // 컬러 한 줄 = 메인자재 / 우라 / 장식 / 불박로고 / 기리매 / 실 / 지퍼 / 발주수량 / 출고지
 import type { ProductionOrder, Bom, BomLine, Item, Vendor } from '@/lib/store';
+import { workOrderColors } from '@/lib/workOrderColors';
 import { SignatureSlot } from './SignaturePad';
 
 type ColorRow = {
@@ -48,26 +49,12 @@ export function WorkOrderDoc({ order, bom, item, vendors, note, onSign, inherite
   onPatch?: (make: (prev: ProductionOrder) => Partial<ProductionOrder>) => void;
 }) {
   const factory = order.vendorName || '';
-  const colorBoms: any[] = ((bom as any)?.postColorBoms?.length ? (bom as any).postColorBoms : (bom as any)?.colorBoms) || [];
-  const allLines: BomLine[] = colorBoms.flatMap((cb: any) => cb.lines || []);
-  /**
-   * 그 컬러의 BOM 줄. 컬러를 못 찾으면 첫 번째 컬러 하나로 떨어진다.
-   *
-   * 전에는 모든 컬러를 이어붙인 allLines 로 떨어졌다. 거기에 발주 수량을 곱하면 같은 자재가
-   * 컬러 수만큼 부푼다 — 컬러가 '기본' 한 줄일 때 바로 이렇게 됐다
-   * (CLAUDE.md: flatMap 전체 사용 금지). 표와 수량이 같은 줄을 봐야 하므로 한 함수로 쓴다.
-   */
-  const linesOf = (color: string): BomLine[] => {
-    const hit = colorBoms.find((cb: any) => (cb.color || '').trim() === color.trim());
-    return (hit?.lines || colorBoms[0]?.lines || allLines) as BomLine[];
-  };
-
-  const colorQtys = (order.colorQtys || []).length > 0
-    ? order.colorQtys!
-    : [{ color: '기본', qty: order.qty || 0 }];
+  const { rows: colorQtys, missingColors, ready } = workOrderColors(order, bom);
+  const activeColors = colorQtys.filter(cq => cq.qty > 0);
+  const allLines = activeColors.flatMap(cq => cq.lines);
 
   const rows: ColorRow[] = colorQtys.map(cq => {
-    const ls = linesOf(cq.color);
+    const ls = cq.lines;
     const raw = ls.filter(l => l.category === '원자재' || l.category === ('가죽' as any) || l.category === ('원단' as any));
     return {
       color: cq.color, qty: cq.qty,
@@ -81,10 +68,10 @@ export function WorkOrderDoc({ order, bom, item, vendors, note, onSign, inherite
 
   // 소요량 합계 — 수기 양식 상단의 "가죽 / 안감 소요량"
   const sum = (test: (l: BomLine) => boolean) =>
-    rows.reduce((acc, r) => {
-      const ls = linesOf(r.color).filter(test);
+    activeColors.reduce((acc, r) => {
+      const ls = r.lines.filter(test);
       return acc + ls.reduce((s, l) => s + (l.netQty || 0) * (1 + (l.lossRate || 0)), 0);
-    }, 0) / Math.max(1, rows.length);
+    }, 0) / Math.max(1, activeColors.length);
 
   const leather = allLines.find(l => l.subPart === '바디');
   const lining = allLines.find(l => l.subPart === '안감');
@@ -96,9 +83,9 @@ export function WorkOrderDoc({ order, bom, item, vendors, note, onSign, inherite
   //
   // 컬러별로 쌓아야 한다. 컬러를 다 합친 뒤 전체 수량을 곱하면 컬러 수만큼 부풀고,
   // 한 컬러에만 들어가는 자재(컬러마다 다른 로고 같은 것)는 아예 틀린 수가 나온다.
-  const hqItems = colorQtys.reduce(
+  const hqItems = activeColors.reduce(
     (acc: Array<{ name: string; spec: string; unit: string; qty: number }>, cq) => {
-      linesOf(cq.color).filter(l => l.isHqProvided).forEach(l => {
+      cq.lines.filter(l => l.isHqProvided).forEach(l => {
         const need = (l.netQty || 0) * (1 + (l.lossRate || 0)) * (cq.qty || 0);
         const hit = acc.find(a =>
           a.name === l.itemName && a.spec === (l.spec || '') && a.unit === (l.unit || ''));
@@ -138,10 +125,16 @@ export function WorkOrderDoc({ order, bom, item, vendors, note, onSign, inherite
   );
 
   return (
-    <div className="bg-white text-neutral-900 p-4 space-y-2 text-[12px]">
+    <div className="bg-white text-neutral-900 p-4 space-y-2 text-[12px]" data-work-order-ready={ready}>
       <div className="border border-neutral-400 bg-neutral-100 text-center py-2">
         <h1 className="text-lg font-bold tracking-[0.4em]">작 업 지 시 서</h1>
       </div>
+      {!ready && (
+        <div role="alert" className="border-2 border-red-600 px-3 py-2 text-center font-bold text-red-600">
+          전달 준비 불가 — {missingColors.map(c => c || '(컬러명 없음)').join(', ')} 컬러의 BOM이 없습니다.
+          {' '}BOM/원가에서 해당 컬러의 자재를 등록한 뒤 작업지시서를 다시 확인해 주세요.
+        </div>
+      )}
 
       {/* 상단 — 발주일 / 납기 / 스타일 / 작업장 */}
       <table className="w-full border-collapse">

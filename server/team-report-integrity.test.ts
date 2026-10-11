@@ -42,7 +42,7 @@ for (const scenario of ['valid','split','truncated','empty','missing_summary','w
       }
       if(url.origin===REST&&method==='GET') {
         const table=url.pathname.slice(1);
-        if(['app_users','work_cards','campaigns','gcal_links','team_watch','production_orders','receipt_logs','samples','trade_statements','settlements','payables','subscriptions','subscription_usage_checks','card_transactions'].includes(table)) {
+        if(['app_users','work_cards','campaigns','gcal_links','team_watch','production_orders','receipt_logs','samples','vendors','trade_statements','settlements','payables','subscriptions','subscription_usage_checks','card_transactions','items','boms','materials','brand_order_batches','purchase_items','china_stock_moves','china_stock_transfers'].includes(table)) {
           return json(table==='app_users'?[{...member,is_active:true}]:table==='work_cards'?[{...card}]:[]);
         }
       }

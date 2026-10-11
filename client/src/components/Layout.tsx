@@ -66,6 +66,7 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/projects', label: '프로젝트', icon: <ClipboardList size={17} />, table: 'projects' },
       { path: '/calendar', label: '운영 캘린더 · 기획전', icon: <CalendarDays size={17} />, table: 'campaigns' },
+      { path: '/ads-analysis', label: '광고 분석', icon: <BarChart3 size={17} />, lumenOnly: true },
     ],
   },
   {
@@ -74,6 +75,7 @@ const navGroups: NavGroup[] = [
       { path: '/vendors', label: '거래처 마스터', icon: <Building2 size={17} />, table: 'vendors' },
       { path: '/samples', label: '샘플 관리', icon: <FlaskConical size={17} />, table: 'samples' },
       { path: '/items', label: '품목 마스터', icon: <Package size={17} />, table: 'items' },
+      { path: '/product-registration', label: '상품 등록', icon: <Package size={17} />, lumenOnly: true },
       { path: '/materials', label: '자재 마스터', icon: <Layers size={17} />, table: 'materials' },
     ],
   },
@@ -285,6 +287,31 @@ export default function Layout({ children, onLogout }: LayoutProps) {
   const settings = store.getSettings();
   const currentUser = getCurrentUser();
   const [subscriptionAccess, setSubscriptionAccess] = useState(false);
+  const [registrationAccess, setRegistrationAccess] = useState(false);
+  const [adsAccess, setAdsAccess] = useState(false);
+  React.useEffect(() => {
+    setAdsAccess(false);
+    if (workspace !== 'LUMEN' || !currentUser?.id) return;
+    let active = true;
+    const headers = new Headers({ 'X-Workspace': 'LUMEN' });
+    const token = localStorage.getItem('erp_token');
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    fetch('/api/ads-council/access', { credentials: 'include', headers })
+      .then(r => r.ok ? r.json() : null).then(j => { if (active) setAdsAccess(j?.allowed === true); }).catch(() => {});
+    return () => { active = false; };
+  }, [workspace, currentUser?.id]);
+  React.useEffect(() => {
+    setRegistrationAccess(false);
+    if (workspace !== 'LUMEN' || !currentUser?.id) return;
+    let active = true;
+    const headers = new Headers({ 'X-Workspace': 'LUMEN' });
+    const token = localStorage.getItem('erp_token');
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    fetch('/api/product-registration/access', { credentials: 'include', headers })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (active) setRegistrationAccess(j?.allowed === true); }).catch(() => {});
+    return () => { active = false; };
+  }, [workspace, currentUser?.id]);
   React.useEffect(() => {
     fetch('/api/subscriptions/access', { credentials: 'include' }).then(r => r.ok ? r.json() : null)
       .then(j => setSubscriptionAccess(j?.allowed === true)).catch(() => {});
@@ -304,7 +331,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
   /** 이 워크스페이스·이 사람에게 보이는 메뉴인가 */
   const visible = (i: NavItem) =>
-    !(i.oemOnly && isBrand) && !(i.lumenOnly && !isBrand) && !(i.adminOnly && !isAdminEmail(currentUser?.email)) && !(i.subscriptionOnly && !subscriptionAccess);
+    !(i.oemOnly && isBrand) && !(i.lumenOnly && !isBrand) && !(i.path === '/product-registration' && (workspace !== 'LUMEN' || !registrationAccess)) && !(i.path === '/ads-analysis' && (workspace !== 'LUMEN' || !adsAccess)) && !(i.adminOnly && !isAdminEmail(currentUser?.email)) && !(i.subscriptionOnly && !subscriptionAccess);
 
   /** 즐겨찾기로 찍어둔 메뉴 — 저장한 순서대로, 지금 안 보이는 것은 빼고 */
   const favItems = favorites

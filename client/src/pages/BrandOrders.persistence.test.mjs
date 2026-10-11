@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 
-const exports = ['useMemo', 'useRef', 'useState', 'Link', 'useQuery', 'useQueryClient',
+const exports = ['useMemo', 'useRef', 'useState', 'useEffect', 'useSearch', 'Link', 'useQuery', 'useQueryClient',
   'useWorkspace', 'store', 'formatNumber', 'genId', 'phase1', 'pullBrandOrders',
   'fetchOrders', 'Button', 'Input', 'Label', 'Badge', 'Tabs', 'TabsContent', 'TabsList',
   'TabsTrigger', 'Dialog', 'DialogContent', 'DialogHeader', 'DialogTitle', 'DialogFooter',
@@ -58,6 +58,9 @@ async function mount() {
       return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }];
     },
     useRef(initial) { const i = cursor++; return slots[i] ||= { current: initial }; },
+    // Persistence handlers are tested without a deep-link query; deep-link behavior
+    // has its own brandBatchDeepLink tests. No query means the new effect is inert.
+    useEffect() {}, useSearch: () => '',
     useMemo: fn => fn(), useWorkspace: () => ({ workspace: 'LUMEN' }),
     useQuery: () => ({ data: undefined }), useQueryClient: () => ({ invalidateQueries() {} }),
     store: { getOrders: () => [], getItems: () => [], getVendors: () => [{ id: 'factory', name: 'Factory', type: '공장' }] },

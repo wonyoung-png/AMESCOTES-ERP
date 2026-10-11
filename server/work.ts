@@ -395,6 +395,9 @@ async function loadForActor(req: Request, res: Response) {
   const r = await restAsServer(`work_cards?id=eq.${encodeURIComponent(String(req.params.id))}&select=*`);
   const card = r.ok ? (await r.json())[0] : null;
   if (!card) { res.status(404).json({ error: 'not_found' }); return null; }
+  if(card.parsed?.sampleReview && card.result_ref?.table==='samples') {
+    res.status(409).json({error:'sample_workflow_required',message:'원본 샘플에서 사진을 확인하고 수락해주세요.'});return null;
+  }
   const directive=!!card.parsed?.directive && all.some(m=>m.id===card.created_by && isBoss(m))
     && ORG.some(t=>t.key===card.parsed.directive.team);
   const leader = isTeamLeader(me) && me.team === (directive ? card.parsed.directive.team : card.team);
@@ -414,10 +417,11 @@ router.post('/api/work/:id/reply', requireUser(), async (req: Request, res: Resp
   try {
     const ctx = await loadForActor(req, res);
     if (!ctx) return;
-    const { me, card, leader } = ctx;
-    // 받은 사람이 답한다. 팀장·대표는 받은 사람이 자리에 없을 때 대신 답할 수 있다(의도된 설계).
+    const { me, card, leader, all } = ctx;
+    // 받은 사람이 답한다. 팀장은 일반 팀 요청만 대행하며 대표에게 배정된 결정은 닫지 못한다.
     // 다만 쓴 사람이 자기 요청에 스스로 답해 닫는 건 막는다
-    const proxy = (leader || isBoss(me)) && card.created_by !== me.id;
+    const assignedToBoss = all.some(m => m.id === card.assignee_id && isBoss(m));
+    const proxy = (isBoss(me) || (leader && !assignedToBoss)) && card.created_by !== me.id;
     if (card.created_by === me.id || !(card.assignee_id === me.id || proxy)) { res.status(403).json({ error: 'forbidden' }); return; }
     // 일정 카드를 답변으로 닫으면 캘린더 등록 없이 끝나버린다 (코덱스 지적)
     if (card.kind !== 'request_check') { res.status(400).json({ error: 'not_request' }); return; }
@@ -480,7 +484,7 @@ router.post('/api/work/:id/kind', requireUser(), async (req: Request, res: Respo
     const ctx = await loadForActor(req, res);
     if (!ctx) return;
     const { all, me, card, leader } = ctx;
-    if (!canManage(card, me, leader)) { res.status(403).json({ error: 'forbidden' }); return; }
+    if (!canManage(card, me, leader) || card.kind === 'request_check' && all.some(m => m.id === card.assignee_id && isBoss(m)) && !isBoss(me)) { res.status(403).json({ error: 'forbidden' }); return; }
     if(ctx.directive) { res.status(400).json({error:'protected_directive',message:'대표 지시는 종류를 변경할 수 없습니다. 처리 결과를 남기거나 취소해주세요.'});return; }
     const want = String((req.body ?? {}).kind || '') as Kind;
     if (!KINDS.includes(want) || want === card.kind) { res.status(400).json({ error: 'bad_kind' }); return; }
@@ -523,8 +527,9 @@ router.post('/api/work/:id/cancel', requireUser(), async (req: Request, res: Res
   try {
     const ctx = await loadForActor(req, res);
     if (!ctx) return;
-    const { me, card, leader } = ctx;
+    const { me, card, leader, all } = ctx;
     if (!canManage(card, me, leader)) { res.status(403).json({ error: 'forbidden' }); return; }
+    if (card.kind === 'request_check' && all.some(m => m.id === card.assignee_id && isBoss(m)) && !isBoss(me)) { res.status(403).json({ error: 'forbidden' }); return; }
     // 끝난 카드(캘린더에 이미 올라간 일정 등)는 여기서 못 되돌린다
     const now = new Date().toISOString();
     const r = await restAsServer(mutationQuery(card, 'open'), {

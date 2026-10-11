@@ -53,6 +53,7 @@ export const RELATED_TEAMS: Record<string, string[]> = {
   campaign: ['마케팅', '국내 MD', '물류·CS'],
   sample: ['제품개발', '루멘 디자인', '에탈루프 디자인'],
   finance: ['경영지원', '영업'],
+  product_integrity: ['국내 MD', '글로벌 MD', '비주얼·콘텐츠'],
 };
 
 const byName = new Map<string, string>();

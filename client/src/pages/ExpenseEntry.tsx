@@ -1,7 +1,8 @@
 // AMESCOTES ERP — 지출 전표 (거래명세표 방식: 여러 항목 입력)
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchOrders, fetchVendors } from '@/lib/dbQueries';
+import { db } from '@/lib/db';
 import {
   store, genId, formatKRW, formatNumber,
   type Expense, type ExpenseLine, type ExpenseType, type ExpenseCategory,
@@ -90,6 +91,7 @@ function ExpenseDetailModal({
   };
 
   const [detailLines, setDetailLines] = useState<ExpenseLine[]>(() => getInitialLines(expense));
+  const [detailSaving, setDetailSaving] = useState(false);
 
   const updateDetailLine = (id: string, field: keyof ExpenseLine, value: string | number) => {
     setDetailLines(prev => prev.map(l => {
@@ -115,19 +117,32 @@ function ExpenseDetailModal({
   const supplyAmount = Math.round(detailTotal / 1.1);
   const taxAmount = detailTotal - supplyAmount;
 
-  const handleDetailSave = () => {
+  const handleDetailSave = async () => {
+    if (detailSaving) return;
     if (detailLines.some(l => !l.description)) {
       toast.error('품목명을 모두 입력해주세요');
       return;
     }
-    store.updateExpense(expense.id, {
+    const patch = {
       lines: detailLines,
       description: detailLines[0].description,
       amountKrw: detailTotal,
-    });
-    onSaved();
-    toast.success('전표가 수정되었습니다');
-    onClose();
+    };
+    setDetailSaving(true);
+    try {
+      // UPDATE a single row. Never UPSERT the whole cache over linked liabilities.
+      const { data, error } = await db.from('expenses').update({ lines: patch.lines,
+        description: patch.description, amount_krw: patch.amountKrw,
+      }).eq('id', expense.id).select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('서버에 저장된 전표를 찾을 수 없습니다');
+      store.hydrateExpenses(store.getExpenses().map(e => e.id === expense.id ? { ...e, ...patch } : e));
+      onSaved();
+      toast.success('전표가 수정되었습니다');
+    } catch (e: any) {
+      toast.error(e.message?.includes('expense_payable_conflict')
+        ? '미지급금에 연결된 경비의 금액·품목은 변경할 수 없습니다' : e.message || '전표 수정 실패');
+    } finally { setDetailSaving(false); }
   };
 
   // 전표번호 생성 (간단 포맷)
@@ -311,8 +326,8 @@ function ExpenseDetailModal({
           >
             <Printer className="w-4 h-4" />거래명세표 출력
           </Button>
-          <Button onClick={handleDetailSave}>
-            수정 저장
+          <Button disabled={detailSaving} onClick={handleDetailSave}>
+            {detailSaving ? '저장 중…' : '수정 저장'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -414,6 +429,50 @@ function printExpenseTradeStatement(expense: Expense) {
 }
 
 export default function ExpenseEntry() {
+  const queryClient = useQueryClient();
+  // Server inspection supplies the approved snapshot; browser caches never grant permission.
+  const [payableLink, setPayableLink] = useState<{
+    expenseId: string; amountKrw: number; vendorName: string; approvalId: string;
+    payable: { id: string; due_date: string; status: string } | null;
+  } | null>(null);
+  const [dueDate, setDueDate] = useState('');
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState('');
+  const linkError = (error: string) => ({
+    forbidden: '대표 또는 경영지원 팀장만 연결할 수 있습니다',
+    expense_not_approved: '승인된 접수와 연결된 기존 경비만 가능합니다',
+    expense_not_found: '서버에 저장된 경비를 찾을 수 없습니다',
+    expense_snapshot_mismatch: '경비와 승인 금액·거래처가 달라 연결할 수 없습니다',
+    expense_mapping_required: '승인된 계좌이체 금액·거래처를 확인해야 합니다',
+    expense_payable_conflict: '기존 미지급금과 충돌합니다. 최신 기록을 확인해주세요',
+  }[error] || '연결 결과를 확인하지 못했습니다. 최신 기록을 조회해주세요');
+  const inspectPayable = async (id: string) => {
+    if (linkBusy) return;
+    setLinkBusy(true);
+    try {
+      const r = await fetch(`/api/expenses/${encodeURIComponent(id)}/payable`, { credentials: 'include' });
+      const j = await r.json();
+      if (!r.ok) throw new Error(linkError(j.error));
+      setPayableLink(j); setDueDate(j.payable?.due_date || '');
+    } catch (e) { toast.error(e instanceof Error ? e.message : '연결 확인 실패'); }
+    finally { setLinkBusy(false); }
+  };
+  const linkPayable = async () => {
+    if (!payableLink || !dueDate || linkBusy) return;
+    setLinkBusy(true);
+    try {
+      const r = await fetch(`/api/expenses/${encodeURIComponent(payableLink.expenseId)}/payable`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dueDate }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(linkError(j.error));
+      setPayableLink(j);
+      await queryClient.invalidateQueries({ queryKey: ['payables'] });
+      toast.success('미지급금 연결 완료 · 자금계획에서 같은 지급 건을 확인할 수 있습니다');
+    } catch (e) { toast.error(e instanceof Error ? e.message : '연결 실패'); }
+    finally { setLinkBusy(false); }
+  };
   const [expenses, setExpenses] = useState<Expense[]>(() => store.getExpenses());
   const [showModal, setShowModal] = useState(false);
   // 프로젝트 항목에서 '결의' 를 누르고 오면 내용·금액이 실려 온다. 다시 타이핑하지 않게 채운다.
@@ -535,11 +594,21 @@ export default function ExpenseEntry() {
     toast.success('지출 전표가 등록되었습니다');
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    if (deleteBusy) return;
     if (!confirm('삭제하시겠습니까?')) return;
-    store.deleteExpense(id);
-    refresh();
-    toast.success('삭제되었습니다');
+    setDeleteBusy(id);
+    try {
+      const { data, error } = await db.from('expenses').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('서버에 저장된 전표를 찾을 수 없습니다');
+      store.hydrateExpenses(store.getExpenses().filter(e => e.id !== id));
+      refresh();
+      toast.success('삭제되었습니다');
+    } catch (e: any) {
+      toast.error(e.message?.includes('expense_payable_conflict')
+        ? '미지급금에 연결된 경비는 삭제할 수 없습니다' : e.message || '전표 삭제 실패');
+    } finally { setDeleteBusy(''); }
   };
 
   return (
@@ -641,6 +710,8 @@ export default function ExpenseEntry() {
                   <td className="num font-semibold text-foreground">{formatKRW(e.amountKrw)}</td>
                   <td onClick={ev => ev.stopPropagation()}>
                     <div className="flex items-center gap-1">
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={linkBusy}
+                        onClick={() => inspectPayable(e.id)}>미지급 연결</Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -650,7 +721,7 @@ export default function ExpenseEntry() {
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(e.id)}>
+                      <Button variant="ghost" size="sm" disabled={!!deleteBusy} className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(e.id)}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -663,6 +734,23 @@ export default function ExpenseEntry() {
       </div>
 
       {/* 전표 상세 모달 */}
+      <Dialog open={!!payableLink} onOpenChange={open => { if (!open && !linkBusy) setPayableLink(null); }}>
+        <DialogContent onInteractOutside={e => e.preventDefault()}>
+          <DialogHeader><DialogTitle>승인 경비 · 미지급 연결</DialogTitle></DialogHeader>
+          <p className="text-sm">{payableLink?.vendorName} · {formatKRW(payableLink?.amountKrw || 0)}</p>
+          <p className="text-xs text-muted-foreground">승인된 경비를 기존 미지급금·자금계획의 같은 지급 건으로 연결합니다.</p>
+          <Label htmlFor="expense-payable-due">지급예정일 *</Label>
+          <Input id="expense-payable-due" type="date" value={dueDate} disabled={!!payableLink?.payable || linkBusy}
+            onChange={e => setDueDate(e.target.value)} />
+          {payableLink?.payable && <p className="text-sm">기존 지급 건: {payableLink.payable.id} · {payableLink.payable.status}</p>}
+          <DialogFooter>
+            <Button variant="outline" disabled={linkBusy} onClick={() => setPayableLink(null)}>닫기</Button>
+            <Button disabled={linkBusy || !dueDate} onClick={linkPayable}>
+              {linkBusy ? '연결 중…' : payableLink?.payable ? '같은 지급 건 연결 확인' : '미지급 연결'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {detailExpense && (
         <ExpenseDetailModal
           expense={detailExpense}

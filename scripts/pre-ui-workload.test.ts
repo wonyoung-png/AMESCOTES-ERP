@@ -210,23 +210,26 @@ test('real watch rules read 200 confirmed schedules; sharing does not complete p
       { team: '디자인', label: '배너 완료', dueDate: '2026-10-09', done: true },
     ] }));
   const tables: Record<string, any[]> = { campaigns, production_orders: [], receipt_logs: [], samples: [],
-    trade_statements: [], settlements: [], payables: [], subscriptions: [] };
+    trade_statements: [], settlements: [], payables: [], subscriptions: [], items: [], boms: [], materials: [],
+    brand_order_batches: [], purchase_items: [], china_stock_moves: [], china_stock_transfers: [], vendors: [] };
   const calls: string[] = [], brands: string[] = [];
   const watch = await gatherWatch(async path => {
     calls.push(path);
     const [table, query] = path.split('?');
     assert.ok(Object.hasOwn(tables, table), `unexpected table: ${table}`);
     const params = new URLSearchParams(query);
-    assert.equal(params.get('order'), 'id.asc');
+    assert.equal(params.get('order'), table === 'brand_order_batches' && params.get('status') === 'in.(draft,in_approval)' ? 'created_at.asc,id.asc' : 'id.asc');
     assert.equal(params.get('limit'), '500');
     const offset = Number(params.get('offset'));
     return { ok: true, status: 200, json: async () => tables[table].slice(offset, offset + 500), text: async () => '' };
   }, async brand => { brands.push(brand); return { sales: { daily30: [] }, inventory: {} }; });
-  assert.equal(calls.length, 8);
+  assert.equal(calls.length, 18);
+  assert.equal(calls.filter(path => path.startsWith('samples?')).length, 2, 'billing and brand-scoped sample operations read their own evidence');
+  assert.equal(calls.filter(path => path.startsWith('vendors?')).length, 1, 'brand attribution uses registered buyers, not name guesses');
   assert.deepEqual(brands.sort(), ['aetaloof', 'lumen']);
   assert.equal(watch.get('마케팅')!.alerts, 200);
   assert.equal(watch.get('물류·CS')!.alerts, 200);
-  assert.equal(watch.has('루멘 디자인'), false, 'completed design preparation is not escalated');
+  assert.doesNotMatch(watch.get('루멘 디자인')!.facts.join('\n'), /배너 완료|준비 안 됨/, 'completed design preparation is not escalated');
   assert.match(watch.get('마케팅')!.facts.join('\n'), /30일 안 기획전 200건/);
   assert.ok(watch.get('마케팅')!.facts.some(fact => fact.includes(campaigns[0].title) && fact.includes('광고 준비')));
   const report = judge('마케팅', tagged(reportRows), bossIds, TODAY, watch.get('마케팅'), NOW);

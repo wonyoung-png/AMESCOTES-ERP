@@ -21,9 +21,11 @@ import { emptyOnFailure, findCouncilCandidates, openCouncil, pendingCouncilActio
 import { ORG, DIVISIONS, DIVISION_HEADS, DEFAULT_RULES, orgTeam } from './org.js';
 import { syncSoon } from './gcal.js';
 import { allRows, prioritizeCards, searchCards, cardEvidence } from './work-records.js';
-import { councilStamp, evidenceFreshness } from './report-evidence.js';
+import { councilStamp, evidenceFreshness, shopReportFreshness } from './report-evidence.js';
 import { deliverWorkNotifications, directiveNotificationsReady } from './work-notifications.js';
 import { attachCampaignEvidence, CAMPAIGN_EVIDENCE_RULES } from './campaign-evidence.js';
+import { loadBrandApprovals } from './operational-watch.js';
+import { adsOfficeSummary } from './ads-council.js';
 
 const router = Router();
 
@@ -205,10 +207,11 @@ async function salesKpi(): Promise<any | null> {
 
 async function gather(me: SessionUser) {
   const today = kstToday();
+  const approvalRead = loadBrandApprovals();
   const in30 = new Date(Date.now() + 9 * 3600e3 + 30 * 864e5).toISOString().slice(0, 10);
-  const [context, pr, kr, kpi, agents, councilRows, councilMessages] = await Promise.all([
+  const [context, pr, kr, kpi, agents, councilRows, councilMessages, brandApprovals] = await Promise.all([
     // 대표는 전부 본다 — 질문(개인 대화)만 뺀다
-    loadReportContext(true),
+    loadReportContext(true, approvalRead),
     // 사진은 빼고 — 콘솔이 /api/ceo/capture-photo/:id 로 따로 받는다 (요약에 넣으면 응답이 수십 MB 가 될 수 있다, 코덱스 지적)
     allRows(`capture_inbox?status=eq.pending&select=id,created_at,created_by_name,raw_text,kind,parsed,confidence&order=created_at.desc,id.desc`),
     allRows(`campaigns?select=id,title,channel,start_date,end_date,status,discount_rate,workspace` +
@@ -217,6 +220,7 @@ async function gather(me: SessionUser) {
     latestRuns(),
     allRows('agent_councils?select=*&order=created_at.desc,id.desc&limit=50').catch(emptyOnFailure('협의')),
     allRows('agent_council_messages?select=*&order=round.asc,created_at.asc,id.asc&limit=500').catch(emptyOnFailure('협의 메시지')),
+    approvalRead.catch(() => null),
   ]);
   const {cards,all,bossIds,watch,rules}=context;
   const candidates=findCouncilCandidates(cards,watch);
@@ -244,10 +248,12 @@ async function gather(me: SessionUser) {
     return { team, ...stats, latest: mine[0]?.raw_text };
   });
 
-  return { me, today, cards, open, decide, captures, campaigns, teams, members: all, kpi, councils, councilMessages,rules,
-    agents: agents.map(a => { const freshness=evidenceFreshness(a.stats?.evidence,teamEvidence(a.team,context));
+  return { me, today, cards, open, decide, captures, campaigns, brandApprovals, teams, members: all, kpi, councils, councilMessages,rules,
+    agents: agents.map(a => { const freshness = a.team === '자사몰관리'
+        ? shopReportFreshness(a)
+        : evidenceFreshness(a.stats?.evidence,teamEvidence(a.team,context));
       return {...a,freshness,stale:freshness!=='current',councilIncluded:councilTeams.has(a.team)}; }),
-    watch: Array.from(watch, ([team, w]) => ({ team, ...w })), checkedAt: new Date().toISOString(),sourceErrors:context.sourceErrors,
+    watch: Array.from(watch, ([team, w]) => ({ team, ...w })), checkedAt: new Date().toISOString(),sourceErrors:[...context.sourceErrors, ...(brandApprovals === null ? ['브랜드 생산 의뢰 승인 대기 조회 실패'] : [])],
     buyers: captures.length ? await buyerOptions() : [] };
 }
 
@@ -274,12 +280,20 @@ router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response
       today: g.today,
       decide: g.decide,
       captures: g.captures,
+      brandApprovals: g.brandApprovals,
       buyers: g.buyers,
       campaigns: g.campaigns,
       teams: g.teams,
       recent: g.cards.slice(0, 20),
       kpi: g.kpi,
       agents: g.agents,
+      adsAnalysis: await adsOfficeSummary(),
+      officeAgents: [{ team: '자사몰관리', division: '대표 직속', focus: '예약 공개·상품 정합성·프리오더 점검' }],
+      shopDecisions: g.agents.filter(a => a.team === '자사몰관리' && a.freshness === 'current')
+        .flatMap(a => a.needs.filter((n: any) => n.source === 'product_registration').map((n: any) => ({
+          text: String(n.text || ''), listingId: String(n.listingId || ''), issueId: String(n.issueId || ''),
+          checkedAt: a.created_at,
+        }))),
       councils: g.councils.map((c: any) => ({ ...c, messages: g.councilMessages.filter((m: any) => m.council_id === c.id) })),
       watch: g.watch,
       checkedAt: g.checkedAt,
@@ -327,6 +341,7 @@ router.post('/api/ceo/ask', requireCeo(), async (req: Request, res: Response) =>
       '[직원]', ...g.members.map(m => `- ${m.name}(${m.team || '-'}${m.position ? '·' + m.position : ''})${m.profile ? ': ' + m.profile.replace(/\s+/g, ' ').slice(0, 300) : ''}`),
       '', '[운영캘린더 — 현재 진행 및 앞으로 30일, 종료 확인 누락은 현재 운영 점검에 별도 포함]', ...g.campaigns.map(c => `- ${c.start_date}~${c.end_date} ${c.channel || ''} ${c.title} (${c.status === 'draft' ? '예정' : c.status}${c.discount_rate != null ? ', ' + c.discount_rate + '%' : ''})`),
       '', '[승인 대기 현장 접수]', ...g.captures.map(c => `- ${c.created_at.slice(0, 10)} ${c.created_by_name} [${c.kind}] ${c.raw_text}`),
+      '', '[브랜드 생산 의뢰 대표 승인 대기 — 원본 조회]', ...(g.brandApprovals === null ? ['조회 실패 — 판단 보류'] : g.brandApprovals.map(b => `- id=${b.id} ${b.workspace} ${b.project_no} ${b.title || ''} / 변경 ${b.updated_at}`)),
       '', `[업무 전수 집계 — 최근 30일 + 오래된 미결/최근 처리] ${g.cards.length}건, 미결 ${g.open.length}건`,
       '', `[질문 관련 근거 — 과거 검색 포함, 선택 ${evidence.length}건]`, ...evidence.map(cardEvidence),
       '', `[현재 운영 점검 — 조회 ${g.checkedAt}]`, ...g.watch.flatMap(w => [`[${w.team}] 경고 조건 ${w.alerts}개`, ...w.facts]),

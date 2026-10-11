@@ -1,0 +1,24 @@
+# Representative generated INPUT shapes, checked as well as the variable-based operations.
+# Documentation-only fixture, never executed against a merchant shop.
+mutation RegistrationInputSchema {
+  productSet(input:{
+    title:"MOCK BAG (BROWN)",handle:"mock-bag-brown",vendor:"Atelier de LUMEN",status:DRAFT,
+    descriptionHtml:"<p>Mock bag</p>",tags:["26FW","erp-listing:mock"],category:"gid://shopify/TaxonomyCategory/aa-1",
+    collections:["gid://shopify/Collection/1"],seo:{title:"Mock Bag | Bag",description:"Mock description"},
+    productOptions:[{name:"Title",position:1,values:[{name:"Default Title"}]}],
+    variants:[{id:"gid://shopify/ProductVariant/1",optionValues:[{optionName:"Title",name:"Default Title"}],sku:"MOCK",barcode:"123456",price:"250.00",taxable:true,inventoryPolicy:CONTINUE,
+      inventoryItem:{tracked:true,cost:100,countryCodeOfOrigin:KR,harmonizedSystemCode:"420221",requiresShipping:true,measurement:{weight:{value:500,unit:GRAMS}}},
+      inventoryQuantities:[{locationId:"gid://shopify/Location/1",name:"available",quantity:0}]}]
+  },identifier:{id:"gid://shopify/Product/1"},synchronous:true){product{id}userErrors{field message code}}
+}
+mutation RegistrationFileInputSchema {
+  stagedUploadsCreate(input:[{filename:"erp-mock.jpg",mimeType:"image/jpeg",resource:IMAGE,httpMethod:POST,fileSize:"1024"}]){stagedTargets{url resourceUrl parameters{name value}}userErrors{field message}}
+  fileCreate(files:[{originalSource:"https://storage.googleapis.com/mock",filename:"erp-mock.jpg",contentType:IMAGE,duplicateResolutionMode:RAISE_ERROR}]){files{id fileStatus}userErrors{field message code}}
+  fileUpdate(files:[{id:"gid://shopify/MediaImage/1",alt:"Mock Bag",referencesToAdd:["gid://shopify/Product/1"],referencesToRemove:["gid://shopify/Product/2"]}]){files{id}userErrors{field message code}}
+}
+mutation RegistrationCustomInputSchema {
+  metafieldsSet(metafields:[{ownerId:"gid://shopify/Product/1",namespace:"custom",key:"product_details",type:"multi_line_text_field",value:"Mock details"}]){metafields{id}userErrors{field message code}}
+  metafieldsDelete(metafields:[{ownerId:"gid://shopify/Product/1",namespace:"custom",key:"preorder_label"}]){deletedMetafields{ownerId key namespace}userErrors{field message}}
+  translationsRegister(resourceId:"gid://shopify/Product/1",translations:[{locale:"ja",key:"body_html",value:"Mock Japanese description",translatableContentDigest:"mock-digest"}]){translations{key value}userErrors{field message}}
+  productVariantsBulkUpdate(productId:"gid://shopify/Product/1",variants:[{id:"gid://shopify/ProductVariant/1",inventoryPolicy:DENY}]){productVariants{id inventoryPolicy}userErrors{field message}}
+}

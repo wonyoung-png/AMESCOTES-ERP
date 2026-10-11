@@ -69,7 +69,7 @@ export const TABLE_COLUMNS: Record<string, string[]> = {
   purchase_items: ['id', 'order_id', 'order_no', 'project_no', 'purchase_date', 'item_name',
                    'qty', 'unit', 'unit_price_cny', 'currency', 'applied_rate', 'amount_krw',
                    'vendor_id', 'vendor_name', 'payment_method', 'purchase_status',
-                   'statement_no', 'memo', 'created_at'],
+                   'statement_no', 'memo', 'created_at', 'spec'],
 };
 
 /** camelCase → snake_case (최상위 키만) */
