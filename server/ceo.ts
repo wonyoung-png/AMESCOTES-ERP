@@ -25,6 +25,7 @@ import { councilStamp, evidenceFreshness, shopReportFreshness } from './report-e
 import { deliverWorkNotifications, directiveNotificationsReady } from './work-notifications.js';
 import { attachCampaignEvidence, CAMPAIGN_EVIDENCE_RULES } from './campaign-evidence.js';
 import { loadBrandApprovals } from './operational-watch.js';
+import { adsOfficeSummary } from './ads-council.js';
 
 const router = Router();
 
@@ -286,6 +287,7 @@ router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response
       recent: g.cards.slice(0, 20),
       kpi: g.kpi,
       agents: g.agents,
+      adsAnalysis: await adsOfficeSummary(),
       officeAgents: [{ team: '자사몰관리', division: '대표 직속', focus: '예약 공개·상품 정합성·프리오더 점검' }],
       shopDecisions: g.agents.filter(a => a.team === '자사몰관리' && a.freshness === 'current')
         .flatMap(a => a.needs.filter((n: any) => n.source === 'product_registration').map((n: any) => ({

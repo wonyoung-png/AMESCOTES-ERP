@@ -33,6 +33,7 @@ import { readMonitorSnapshot } from "./channels/index.js";
 import sampleWorkflowRouter from "./sample-workflow.js";
 import defectApprovalRouter from "./defect-approval.js";
 import expensePayableRouter from "./expense-payable.js";
+import adsCouncilRouter, { startAdsAnalysisScheduler } from "./ads-council.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -93,6 +94,7 @@ async function startServer() {
   app.use(sampleWorkflowRouter);
   app.use(defectApprovalRouter);
   app.use(expensePayableRouter);
+  app.use(adsCouncilRouter);
 
   // OCR 라우터
   app.use(yardageOcrRouter);
@@ -160,6 +162,7 @@ async function startServer() {
     startWorkNotificationDelivery(); // 저장된 알림 의도만 재전송 (업무 재작성 없음)
     startProductRegistrationScheduler();
     startShopMonitor(readMonitorSnapshot);
+    startAdsAnalysisScheduler();
   });
 }
 
