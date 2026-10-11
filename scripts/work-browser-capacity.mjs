@@ -1,7 +1,8 @@
 // 25 independent Chrome cookie sessions, real API and disposable PostgreSQL only.
 import assert from 'node:assert/strict';
 
-export async function verifyBrowserCapacity({ browser, client, harness, password, bossContext, ceoProof }) {
+export async function verifyBrowserCapacity({ browser, client, harness, password, bossContext, ceoProof, guardPage }) {
+  assert.equal(typeof guardPage, 'function', 'Shared request isolation and runtime-error guard required for every page');
   assert.equal(process.env.ERP_BROWSER_ISOLATED, '20261010');
   assert.equal(process.env.POSTGREST_URL, 'http://127.0.0.1:4192');
   assert.equal(process.env.ANTHROPIC_API_KEY, 'isolated-fixture-not-real');
@@ -28,12 +29,7 @@ export async function verifyBrowserCapacity({ browser, client, harness, password
     const logins = await Promise.allSettled(people.map(async (person, index) => {
       const context = await browser.createBrowserContext();
       const actor = { person, index, context, page: await context.newPage() }; actors.push(actor);
-      await actor.page.setRequestInterception(true);
-      actor.page.on('request', req => {
-        const url = new URL(req.url());
-        if (url.origin === 'https://localhost:4189' || url.protocol === 'data:') req.continue();
-        else req.abort();
-      });
+      await guardPage(actor.page, 'load-' + index);
       await actor.page.goto('https://localhost:4189/');
       const login = await request(actor.page, '/api/login', { email: person.email, password });
       assert.equal(login.status, 200); assert.equal(login.data.user.id, person.id);
@@ -78,6 +74,7 @@ export async function verifyBrowserCapacity({ browser, client, harness, password
     assert.equal((await client.query("SELECT count(*)::int AS n FROM public.work_cards WHERE id LIKE 'wc_load25%'")).rows[0].n, 1000);
     assert.equal(harness.calls.classify - beforeCalls.classify, 1000, 'Replays cannot reclassify');
     const boss = await bossContext.newPage();
+    await guardPage(boss, 'capacity-boss');
     await boss.goto('https://localhost:4189/');
     const ids = new Set(); let cursor;
     for (let n = 0; n < 10; n++) {
@@ -88,6 +85,7 @@ export async function verifyBrowserCapacity({ browser, client, harness, password
     }
     assert.equal(cursor, null); for (const row of rows) assert.ok(ids.has(row.id), 'Boss pagination must include every source record');
     const ceo = await bossContext.newPage();
+    await guardPage(ceo, 'capacity-ceo');
     await bossContext.setCookie({ name: 'ceo_g', value: ceoProof, domain: 'ceo.localhost', path: '/', secure: true, httpOnly: true });
     await ceo.goto('https://ceo.localhost:4189/');
     const reportsStarted = performance.now();
@@ -120,5 +118,8 @@ export async function verifyBrowserCapacity({ browser, client, harness, password
       timing: { submissionsMs: Math.round(totalMs), requestP50Ms: Math.round(elapsed[499]), requestP95Ms: Math.round(elapsed[949]),
         requestMaxMs: Math.round(elapsed.at(-1)), manualReportsMs: Math.round(reportsMs) },
       limits: ['Local test-machine timing, not production SLA', 'Fixed model fixtures, not live inference', 'CEO proof test-signed, not Google OAuth'] };
-  } finally { await Promise.allSettled(actors.map(a => a.context.close())); }
+  } finally {
+    harness.disableCapacityFixtures();
+    await Promise.allSettled(actors.map(a => a.context.close()));
+  }
 }

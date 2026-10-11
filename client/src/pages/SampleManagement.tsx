@@ -2,6 +2,10 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useLocation, useSearch } from 'wouter';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { sampleBillable, sampleCompletionMonth, sampleWorkflowRequest } from '@/lib/sampleWorkflow';
+import { SampleWorkflowActions } from '@/components/SampleWorkflowActions';
+import { fetchTradeStatementsSB } from '@/lib/tradeStatementQueries';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   store, genId, formatKRW, formatNumber,
@@ -9,7 +13,7 @@ import {
   type SampleLocation, type SampleRevisionNote, type SampleMaterialCheckItem,
   type SampleMaterialRequest, type SampleDocument,
   type Item, type TradeStatement, type TradeStatementLine, normalizeBrands } from '@/lib/store';
-import { fetchSamples, upsertSample as upsertSampleSB, fetchItems, fetchVendors, upsertItem as upsertItemSB } from '@/lib/dbQueries';
+import { fetchSamples, upsertSample as upsertSampleSB, fetchItems, fetchVendors, upsertItem as upsertItemSB, updateSampleCalendarDate } from '@/lib/dbQueries';
 import { generateStyleNo, prefixCodeOf } from '@/lib/styleNo';
 import { resizeImage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -103,12 +107,22 @@ export default function SampleManagement() {
   const [, navigate] = useLocation();
   // URL 파라미터 읽기 (Dashboard에서 "샘플 관리로 이동" 클릭 시 openId 전달됨)
   const searchString = useSearch();
-  const { data: samples = [] } = useQuery({ queryKey: ['samples'], queryFn: fetchSamples });
+  const { workspace } = useWorkspace();
+  const { data: allSamples = [] } = useQuery({ queryKey: ['samples'], queryFn: fetchSamples });
   const setSamples = (_v: Sample[]) => {}; // no-op
   const { data: items = [] } = useQuery({ queryKey: ['items'], queryFn: fetchItems });
   const setItems = (_v: Item[]) => {}; // no-op
   const { data: allVendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const vendors = allVendors.filter((v: any) => v.type === '바이어');
+  const unresolvedBrands = allSamples.filter(s => normalizeBrands(vendors.find(v => v.id === s.buyerId)?.brands).length > 1 && !s.brandCode && !items.find(i => i.id === s.styleId)?.brandCode);
+  const samples = workspace === 'OEM' ? allSamples : allSamples.filter(sample => {
+    const item = items.find(i => i.id === sample.styleId);
+    const vendor = vendors.find(v => v.id === sample.buyerId);
+    const code = sample.brandCode || item?.brandCode;
+    const brands = normalizeBrands(vendor?.brands);
+    const name = code ? brands.find(b => b.code === code)?.name || code : brands.length === 1 ? brands[0].name : vendor?.nameEn || vendor?.name || '';
+    return (workspace === 'LUMEN' ? ['LUMEN', '루멘', 'LUM'] : ['AETALOOF', 'AETALOOP', '에탈루프', 'AET']).includes(name.trim().toUpperCase());
+  });
   // 자재거래처 목록
   const materialVendors = allVendors.filter((v: any) => v.type === '자재거래처');
   const settings = store.getSettings();
@@ -132,11 +146,16 @@ export default function SampleManagement() {
   const [billingTarget, setBillingTarget] = useState<typeof samples[0] | null>(null);
   const [billingMode, setBillingMode] = useState<'new' | 'link'>('new');
   const [linkStatementId, setLinkStatementId] = useState('');
+  const [billingMonth,setBillingMonth]=useState(new Date(Date.now()+9*3600_000).toISOString().slice(0,7));
+  const [monthlyBillingIds,setMonthlyBillingIds]=useState<string[]>([]);
+  useEffect(()=>{if(!billingModal)setMonthlyBillingIds([]);},[billingModal]);
 
   // 메인 등록/수정 모달
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<Partial<Sample>>({});
   const [editId, setEditId] = useState<string | null>(null);
+  const [savingSample, setSavingSample] = useState(false);
+  const sampleSaveLock = useRef(false);
   const [requestDoc, setRequestDoc] = useState<Sample | null>(null);
   const reqDocRef = useRef<HTMLDivElement>(null);
   const [manualStyleNo, setManualStyleNo] = useState(false);
@@ -155,6 +174,13 @@ export default function SampleManagement() {
   // 상세 모달 (차수별 메모 / 자재 체크리스트)
   const [detailSample, setDetailSample] = useState<Sample | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  useEffect(() => {
+    setDetailSample(previous => {
+      if (!previous) return previous;
+      const fresh = allSamples.find(s => s.id === previous.id);
+      return fresh && fresh.workflowVersion !== previous.workflowVersion ? fresh : previous;
+    });
+  }, [allSamples]);
 
   // 이미지 업로드
   const imageFileRef = useRef<HTMLInputElement>(null);
@@ -302,7 +328,10 @@ export default function SampleManagement() {
     else if (filterStage !== 'all') list = list.filter(s => s.stage === filterStage);
     if (filterBilling !== 'all') list = list.filter(s => s.billingStatus === filterBilling);
     if (filterSeason !== 'all') list = list.filter(s => s.season === filterSeason);
-    if (filterBuyer !== 'all') list = list.filter(s => s.buyerId === filterBuyer);
+    if (filterBuyer !== 'all') {
+      const [buyerId, brandCode] = filterBuyer.split('::');
+      list = list.filter(s => s.buyerId === buyerId && (!brandCode || s.brandCode === brandCode));
+    }
     if (filterAssignee !== 'all') list = list.filter(s => (s.assignee || '미지정') === filterAssignee);
     if (search) list = list.filter(s =>
       s.styleNo.toLowerCase().includes(search.toLowerCase()) ||
@@ -360,14 +389,19 @@ export default function SampleManagement() {
   const [calYear, setCalYear] = useState(todayD.getFullYear());
   const [calMonth, setCalMonth] = useState(todayD.getMonth());
   const [calPlace, setCalPlace] = useState<'all' | '내부개발실' | '중국공장'>('all');
+  const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
+  const [calendarEdit, setCalendarEdit] = useState<{ sample: Sample; kind: 'req' | 'due'; date: string } | null>(null);
+  const [calendarSaving, setCalendarSaving] = useState(false);
+  const calendarSaveLock = useRef(false);
 
   /** 운영은 브랜드명 기준 — 브랜드가 있으면 브랜드명, 없으면 회사명 */
-  const buyerLabel = (v?: { name?: string; brands?: string[]; nameEn?: string } | null) => {
+  function buyerLabel(v?: { name?: string; brands?: unknown; nameEn?: string } | null, brandCode?: string) {
     if (!v) return '';
-    const brand = normalizeBrands(v.brands)[0]?.name || v.nameEn;
+    const brands = normalizeBrands(v.brands);
+    const brand = brandCode ? brands.find(b => b.code === brandCode)?.name || brandCode : brands[0]?.name || v.nameEn;
     return brand || v.name || '';
-  };
-  const buyerLabelById = (id?: string) => buyerLabel(vendors.find((x: any) => x.id === id) as any);
+  }
+  function buyerLabelById(id?: string, brandCode?: string) { return buyerLabel(vendors.find((x: any) => x.id === id), brandCode); }
 
   /**
    * 샘플 일정 캘린더 — 의뢰일(접수)과 목표완료일을 한 달력에 얹는다.
@@ -386,10 +420,10 @@ export default function SampleManagement() {
         (filtered as Sample[]).forEach(sm => {
         if (calPlace !== 'all' && (sm.location || '내부개발실') !== calPlace) return;
         // 브랜드명 - 제품명 - 차수
-        const label = [buyerLabelById(sm.buyerId), sm.styleName || sm.styleNo, sm.stage].filter(Boolean).join(' - ');
+        const label = [buyerLabelById(sm.buyerId, sm.brandCode), sm.styleName || sm.styleNo, sm.stage].filter(Boolean).join(' - ');
         if (sm.requestDate === ds) events.push({ id: sm.id + '-r', label, kind: 'req', late: false });
         if (sm.expectedDate === ds) {
-          events.push({ id: sm.id + '-d', label, kind: 'due', late: ds < todayIso && sm.stage !== '최종승인' });
+          events.push({ id: sm.id + '-d', label, kind: 'due', late: ds < todayIso && !sm.completedAt && sm.stage !== '최종승인' });
         }
       });
       cells.push({ day: d, events });
@@ -450,10 +484,21 @@ export default function SampleManagement() {
     const item = items.find(i => i.id === styleId);
     if (!item) return;
     // 품목의 바이어를 자동으로 연결
-    setForm(f => ({ ...f, styleId: item.id, styleNo: item.styleNo, styleName: item.name, buyerId: item.buyerId }));
+    setForm(f => ({ ...f, styleId: item.id, styleNo: item.styleNo, styleName: item.name, buyerId: item.buyerId, brandCode: item.brandCode }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (sampleSaveLock.current) return;
+    if (!form.requestDate) { toast.error('의뢰일을 입력해주세요'); return; }
+    if (normalizeBrands(vendors.find(v => v.id === form.buyerId)?.brands).length > 1 && !form.brandCode) { toast.error('해당 바이어의 브랜드를 선택해주세요'); return; }
+    if (form.expectedDate && form.expectedDate < form.requestDate) { toast.error('목표 완료일은 의뢰일 이후로 선택해주세요'); return; }
+    if (!editId && !form.id && form.styleNo) {
+      const dupSample = samples.find(s => s.styleNo === form.styleNo);
+      if (dupSample && !confirm(`스타일번호 '${form.styleNo}'가 이미 샘플에 등록되어 있습니다.\n(${dupSample.styleName}, ${dupSample.stage})\n\n그래도 등록하시겠습니까?`)) return;
+    }
+    sampleSaveLock.current = true;
+    setSavingSample(true);
+    try {
     let styleId = form.styleId;
     let styleNo = form.styleNo;
     let styleName = form.styleName;
@@ -470,10 +515,11 @@ export default function SampleManagement() {
         buyerId: form.buyerId,
         brandCode: form.brandCode || undefined,
       };
-      upsertItemSB(newItem as any).catch((e: Error) => toast.error(`품목 생성 실패: ${e.message}`));
+      await upsertItemSB(newItem as any, { strict: true });
       styleId = newItem.id;
       styleNo = newItem.styleNo;
       styleName = newItem.name;
+      setForm(f => ({ ...f, styleId, styleNo, styleName }));
       toast.success(`품목 ${newItem.styleNo} 등록 — 품목 마스터에 함께 저장됐습니다`);
       queryClient.invalidateQueries({ queryKey: ['items'] });
     }
@@ -481,22 +527,13 @@ export default function SampleManagement() {
     if (!styleId && !styleNo) { toast.error('스타일번호를 입력해주세요'); return; }
     if (!form.requestDate) { toast.error('의뢰일을 입력해주세요'); return; }
 
-    // 스타일번호 중복 체크 (신규 등록 시)
-    if (!editId && form.styleNo) {
-      const dupSample = (samples as Sample[]).find(s => s.styleNo === form.styleNo);
-      if (dupSample) {
-        const confirmed = confirm(`스타일번호 '${form.styleNo}'가 이미 샘플에 등록되어 있습니다.\n(${dupSample.styleName}, ${dupSample.stage})\n\n그래도 등록하시겠습니까?`);
-        if (!confirmed) return;
-      }
-    }
-
     // 샘플 단가는 원화(sampleUnitPrice)로 입력 → costKrw로 저장
     const costKrw = form.sampleUnitPrice || (form.costCny || 0) * settings.cnyKrw;
 
     const sampleData = editId
       ? { ...form, id: editId, styleId: styleId || form.styleId || '', styleNo: form.styleNo || styleNo || '', styleName: form.styleName || styleName || '', costKrw } as Sample
       : {
-          id: genId(),
+          id: form.id || genId(),
           styleId: form.styleId || styleId || genId(),
           styleNo: form.styleNo || styleNo || '',
           styleName: form.styleName || styleName || '',
@@ -528,14 +565,14 @@ export default function SampleManagement() {
           memo: form.memo,
         } as Sample;
 
-    upsertSampleSB(sampleData)
-      .then(() => {
+    setForm(f => ({ ...f, id: sampleData.id }));
+    await upsertSampleSB(sampleData);
         toast.success(editId ? '수정되었습니다' : '샘플이 등록되었습니다');
         refresh();
         setIsDirty(false);
         setShowModal(false);
-      })
-      .catch((e: Error) => toast.error(`저장 실패: ${e.message}`));
+    } catch (e) { toast.error(`저장 실패: ${(e as Error).message}. 입력을 유지했습니다. 다시 저장해주세요.`); }
+    finally { sampleSaveLock.current = false; setSavingSample(false); }
   };
 
   // form 변경 감지로 isDirty 설정 (초기화 시는 무시)
@@ -604,11 +641,8 @@ export default function SampleManagement() {
 
   // 리스트에서 바로 단계 변경
   const handleStageChange = (id: string, stage: SampleStage) => {
+    if(stage==='최종승인'){const sample=samples.find(s=>s.id===id);if(sample)openDetail(sample);return;}
     const updates: Partial<Sample> = { stage };
-    if (stage === '최종승인') {
-      updates.approvedBy = '관리자';
-      // ⚠️ 자동 ACTIVE 전환 제거: 승인 후 담당자가 정식 스타일번호로 품목 마스터에 직접 등록해야 함
-    }
     const targetSample = (samples as Sample[]).find(s => s.id === id);
     if (targetSample) {
       upsertSampleSB({ ...targetSample, ...updates })
@@ -621,61 +655,23 @@ export default function SampleManagement() {
   const [billingSaving, setBillingSaving] = useState(false);
   const handleBillAll = async () => {
     if (billingSaveLock.current) return;
-    const unclaimed = samples.filter(s => s.billingStatus === '미청구');
+    const unclaimed = samples.filter(s => sampleBillable(s) && sampleCompletionMonth(s)===billingMonth
+      && (filterBuyer==='all'||(s.buyerId===filterBuyer.split('::')[0]&&(!filterBuyer.split('::')[1]||s.brandCode===filterBuyer.split('::')[1]))));
     if (unclaimed.length === 0) { toast.error('미청구 샘플이 없습니다'); return; }
+    if(new Set(unclaimed.map(s=>s.buyerId)).size===1){
+      setBillingTarget(unclaimed[0]);setMonthlyBillingIds(unclaimed.map(s=>s.id));setBillingMode('new');setLinkStatementId('');setBillingModal(true);return;
+    }
+    if(!confirm(`${billingMonth} 완료·수락된 샘플 ${unclaimed.length}건을 바이어별로 청구하시겠습니까? 기존 명세표에 추가하려면 먼저 바이어를 선택해주세요.`))return;
     const today = new Date().toISOString().split('T')[0];
 
-    // 바이어별로 그룹핑
-    const byBuyer = new Map<string, typeof unclaimed>();
-    unclaimed.forEach(s => {
-      const buyerId = s.buyerId || 'unknown';
-      if (!byBuyer.has(buyerId)) byBuyer.set(buyerId, []);
-      byBuyer.get(buyerId)!.push(s);
-    });
-
-    let createdCount = 0;
     billingSaveLock.current = true;
     setBillingSaving(true);
     try {
-    for (const [buyerId, samplesGroup] of byBuyer) {
-      const vendor = vendors.find(v => v.id === buyerId);
-      const buyerName = vendor?.name || buyerId;
-      const vendorCode = vendor?.vendorCode || vendor?.code || 'SAMP';
-
-      // statementNo 채번 (YYYYMM-vendorCode-순번 형식)
-      const statementNo = store.getNextStatementNo(vendorCode);
-
-      // 라인 생성
-      const lines: TradeStatementLine[] = samplesGroup.map(s => ({
-        id: genId(),
-        description: `[${s.styleNo}] ${s.styleName || ''} ${s.stage} 샘플비`,
-        qty: 1,
-        unitPrice: s.costKrw || Math.round((s.costCny || 0) * settings.cnyKrw),
-        taxType: '과세' as const,
-        taxRate: 0.1,
-        memo: s.id,
-      }));
-
-      const statement: TradeStatement = {
-        id: genId(),
-        statementNo,
-        vendorId: buyerId,
-        vendorName: buyerName,
-        vendorCode,
-        issueDate: today,
-        lines,
-        status: '미청구' as const,
-        createdAt: new Date().toISOString(),
-      };
-
-      await store.addTradeStatement({ ...statement, statementNo: '' });
-      await Promise.all(samplesGroup.map(s => upsertSampleSB({ ...s, billingStatus: '청구완료', billingDate: today })));
-      createdCount++;
-    }
-
-    // billingStatus 업데이트
+    const result=await sampleWorkflowRequest('/api/samples/workflow/bill',{ids:unclaimed.map(s=>s.id),month:billingMonth});
+    const createdCount=new Set(result.links.map((link:any)=>link.statementId)).size;
+    store.hydrateTradeStatements(await fetchTradeStatementsSB());
     refresh();
-    toast.success(`거래명세표 ${createdCount}건이 생성되었습니다`);
+    toast.success(`샘플 청구 연결 완료 · 신규 명세표 ${createdCount}건`);
     } catch (error) { refresh(); toast.error((error as Error).message); }
     finally { billingSaveLock.current = false; setBillingSaving(false); }
   };
@@ -692,10 +688,7 @@ export default function SampleManagement() {
       ...detailSample,
       revisionHistory: [...(detailSample.revisionHistory || []), note],
     };
-    upsertSampleSB({ ...updated }).then(() => refresh()).catch(onSaveFail('샘플'));
-    setDetailSample(updated);
-    setNewRevNote('');
-    toast.success('메모가 추가되었습니다');
+    upsertSampleSB(updated).then(() => { refresh(); setDetailSample(updated); setNewRevNote(''); toast.success('메모가 추가되었습니다'); }).catch(onSaveFail('샘플'));
   };
 
   // 자재 체크리스트 항목 추가
@@ -706,9 +699,7 @@ export default function SampleManagement() {
       ...detailSample,
       materialChecklist: [...(detailSample.materialChecklist || []), item],
     };
-    upsertSampleSB({ ...updated }).then(() => refresh()).catch(onSaveFail('샘플'));
-    setDetailSample(updated);
-    setNewCheckItem('');
+    upsertSampleSB(updated).then(() => { refresh(); setDetailSample(updated); setNewCheckItem(''); }).catch(onSaveFail('샘플'));
   };
 
   // 체크리스트 토글
@@ -720,8 +711,7 @@ export default function SampleManagement() {
         c.id === itemId ? { ...c, isReady: !c.isReady } : c
       ),
     };
-    upsertSampleSB({ ...updated }).then(() => refresh()).catch(onSaveFail('샘플'));
-    setDetailSample(updated);
+    upsertSampleSB(updated).then(() => { refresh(); setDetailSample(updated); }).catch(onSaveFail('샘플'));
   };
 
   // 샘플 승인 처리 — 품목은 접수 시 이미 정식 스타일번호로 만들어져 있다
@@ -760,6 +750,8 @@ export default function SampleManagement() {
       requestDate: today,
       expectedDate: undefined,
       approvedBy: undefined,
+      completedAt:undefined,completedBy:undefined,reviewStatus:undefined,reviewAssigneeId:undefined,reviewCardId:undefined,
+      acceptedAt:undefined,acceptedBy:undefined,workflowVersion:0,collectedDate:undefined,
       receivedDate: undefined,
       billingStatus: '미청구',
       billingDate: undefined,
@@ -778,13 +770,6 @@ export default function SampleManagement() {
     } catch (e) {
       toast.error(`다음 차수 생성 실패: ${(e as Error).message}`);
     }
-  };
-
-  const handleApprove = (s: Sample) => {
-    upsertSampleSB({ ...s, stage: '최종승인', approvedBy: '관리자' }).then(() => refresh()).catch(onSaveFail('샘플'));
-    // 승인은 샘플 단계만 "최종승인"으로 변경 (품목은 접수 때 이미 등록됨)
-    refresh();
-    toast.success(`${s.styleNo} 최종 승인 완료`);
   };
 
   // 품목 등록 (최종승인 샘플에서 품목 마스터로 이동 + prefill)
@@ -840,14 +825,16 @@ export default function SampleManagement() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      {unresolvedBrands.length > 0 && <p role="status" className="text-sm text-muted-foreground">{workspace === 'OEM' ? `브랜드 미지정 샘플 ${unresolvedBrands.length}건 — 브랜드를 지정하면 해당 브랜드 캘린더에 표시됩니다.` : '브랜드가 지정되지 않은 일정은 표시되지 않습니다. 제품개발팀에 브랜드 확인을 요청해주세요.'}</p>}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-foreground">샘플 관리</h1>
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">샘플 접수 · 차수별 수정요청 · 자재 체크리스트 · 품목 자동생성</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Input type="month" aria-label="샘플 완료월" value={billingMonth} onChange={e=>setBillingMonth(e.target.value)} className="w-40"/>
           <Button variant="outline" disabled={billingSaving} onClick={handleBillAll} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
-            <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" /><span className="hidden sm:inline">명세표 발행</span><span className="sm:hidden">발행</span>
+            <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" /><span>완료월 청구</span>
           </Button>
           <Button onClick={openNew} className="gap-1 md:gap-2 text-xs md:text-sm h-8 md:h-10 px-2 md:px-4">
             <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />샘플 접수
@@ -1046,7 +1033,10 @@ export default function SampleManagement() {
           <SelectTrigger className="w-32 h-9"><SelectValue placeholder="바이어" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">전체 바이어</SelectItem>
-            {vendors.map(v => <SelectItem key={v.id} value={v.id}>{buyerLabel(v as any)}</SelectItem>)}
+            {vendors.flatMap(v => {
+              const brands = normalizeBrands(v.brands);
+              return brands.length ? brands.map(b => <SelectItem key={`${v.id}::${b.code || b.name}`} value={b.code ? `${v.id}::${b.code}` : v.id}>{b.name}</SelectItem>) : [<SelectItem key={v.id} value={v.id}>{buyerLabel(v)}</SelectItem>];
+            })}
           </SelectContent>
         </Select>
         {/* 담당자 필터 */}
@@ -1117,7 +1107,7 @@ export default function SampleManagement() {
 
       {view === 'calendar' && (
         <div className="bg-card rounded-lg border border-border p-4 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <button onClick={() => { const m = calMonth - 1; if (m < 0) { setCalMonth(11); setCalYear(calYear - 1); } else setCalMonth(m); }}
                 className="p-1.5 rounded-md hover:bg-[var(--fill-quaternary)] text-muted-foreground"><ChevronLeft size={16} /></button>
@@ -1148,36 +1138,53 @@ export default function SampleManagement() {
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden">
+          <div className="overflow-x-auto">
+          <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden min-w-[840px]">
             {['일', '월', '화', '수', '목', '금', '토'].map(d => (
               <div key={d} className="bg-[var(--fill-quaternary)] py-1.5 text-center text-[11px] font-semibold text-muted-foreground">{d}</div>
             ))}
             {calendarDays.map((c, i) => (
-              <div key={i} className="bg-card min-h-[92px] p-1.5 align-top">
+              <div key={i} data-calendar-day={c.day || undefined} className="bg-card min-h-[144px] p-1.5 align-top"
+                onDragOver={e => { if (c.day) e.preventDefault(); }}
+                onDrop={e => {
+                  e.preventDefault();
+                  if (!c.day) return;
+                  const payload = e.dataTransfer.getData('application/x-erp-sample');
+                  const event = calendarDays.flatMap(d => d.events).find(ev => ev.id === payload);
+                  const sample = samples.find(s => event && s.id === event.id.slice(0, -2));
+                  if (!event || !sample) return;
+                  const date = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`;
+                  setCalendarEdit({ sample, kind: event.kind, date });
+                }}>
                 {c.day > 0 && (
                   <>
                     <p className="text-[11px] text-muted-foreground mb-1">{c.day}</p>
                     <div className="space-y-0.5">
-                      {c.events.slice(0, 3).map(ev => (
-                        <div key={ev.id}
-                          className={`text-[10px] px-1 py-0.5 rounded truncate ${
+                      {(expandedDays.has(c.day) ? c.events : c.events.slice(0, 2)).map(ev => (
+                        <button type="button" key={ev.id} draggable data-sample-event={ev.id}
+                          onDragStart={e => { e.dataTransfer.setData('application/x-erp-sample', ev.id); e.dataTransfer.effectAllowed = 'move'; }}
+                          onClick={() => { const sample = samples.find(s => s.id === ev.id.slice(0, -2)); if (sample) openEdit(sample); }}
+                          className={`w-full text-left text-xs px-1.5 py-1 rounded break-words focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${
                             ev.late ? 'bg-[var(--system-red)]/15 text-[var(--system-red)]'
                               : ev.kind === 'req' ? 'bg-[var(--system-green)]/15 text-[var(--system-green)]'
                               : 'bg-primary/10 text-primary'
                           }`}
                           title={ev.label}
                         >
-                          {ev.label}
-                        </div>
+                          <span className="font-semibold">{ev.kind === 'req' ? '접수' : '마감'}</span>
+                          {(() => { const sample = samples.find(s => s.id === ev.id.slice(0, -2)); const photo = sample?.imageUrls?.[0] || items.find(it => it.id === sample?.styleId)?.imageUrl; return photo ? <img src={photo} alt={sample?.styleName || '샘플'} className="w-8 h-8 object-cover rounded float-left mr-1" /> : null; })()}
+                          <span className="block">{ev.label}</span>
+                        </button>
                       ))}
-                      {c.events.length > 3 && (
-                        <p className="text-[10px] text-muted-foreground">+{c.events.length - 3}건</p>
+                      {c.events.length > 2 && (
+                        <button type="button" className="text-xs text-muted-foreground underline" onClick={() => setExpandedDays(prev => { const next = new Set(prev); if (next.has(c.day)) next.delete(c.day); else next.add(c.day); return next; })}>{expandedDays.has(c.day) ? '접기' : `+${c.events.length - 2}건 보기`}</button>
                       )}
                     </div>
                   </>
                 )}
               </div>
             ))}
+          </div>
           </div>
         </div>
       )}
@@ -1241,7 +1248,7 @@ export default function SampleManagement() {
                   <td>
                     {s.buyerId ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fill-tertiary)] text-foreground border border-border">
-                        {buyerLabelById(s.buyerId) || '-'}
+                        {buyerLabelById(s.buyerId, s.brandCode) || '-'}
                       </span>
                     ) : <span className="text-muted-foreground text-xs">-</span>}
                   </td>
@@ -1282,7 +1289,7 @@ export default function SampleManagement() {
                   </td>
                   <td className="nw num font-mono text-foreground text-xs">{formatKRW(s.costKrw || Math.round((s.costCny || 0) * settings.cnyKrw))}</td>
                   <td>
-                    {s.billingStatus === '미청구' ? (
+                    {sampleBillable(s) ? (
                       <button
                         onClick={() => {
                           setBillingTarget(s);
@@ -1304,7 +1311,8 @@ export default function SampleManagement() {
                           <button
                             onClick={() => {
                               if (confirm('청구완료를 미청구로 되돌리겠습니까?')) {
-                                upsertSampleSB({ ...s, billingStatus: '미청구', billingDate: undefined }).then(() => refresh()).catch(onSaveFail('샘플'));
+                                sampleWorkflowRequest(`/api/samples/${encodeURIComponent(s.id)}/unbill`,{version:s.workflowVersion??0})
+                                  .then(async()=>{store.hydrateTradeStatements(await fetchTradeStatementsSB());refresh();}).catch(onSaveFail('샘플'));
                               }
                             }}
                             className="text-[11px] text-muted-foreground hover:text-[var(--system-red)]"
@@ -1320,14 +1328,8 @@ export default function SampleManagement() {
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => openEdit(s)}>수정</Button>
-                      {s.stage !== '최종승인' && (
-                        <>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-primary hover:text-primary"
-                            onClick={() => openNextRound(s)}>다음 차수</Button>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-[var(--system-green)] hover:text-[var(--system-green)]"
-                            onClick={() => handleApprove(s)}>승인</Button>
-                        </>
-                      )}
+                      <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-primary hover:text-primary"
+                        onClick={() => openNextRound(s)}>다음 차수</Button>
                       {s.stage === '최종승인' && (() => {
                         // 품목 등록 여부 확인:
                         // 1) TEMP 스타일번호가 아닌 정식 스타일번호로 등록된 ACTIVE 품목 찾기
@@ -1393,8 +1395,8 @@ export default function SampleManagement() {
                 {/* 정보 */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-foreground text-sm">{s.styleNo}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-foreground text-sm break-all">{s.styleNo}</p>
                       <p className="text-xs text-muted-foreground truncate">{s.styleName}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -1412,7 +1414,7 @@ export default function SampleManagement() {
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     {s.buyerId && (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--fill-tertiary)] text-foreground border border-border">
-                        {buyerLabelById(s.buyerId) || '-'}
+                        {buyerLabelById(s.buyerId, s.brandCode) || '-'}
                       </span>
                     )}
                     <Badge variant="outline" className="text-[11px]">{s.season}</Badge>
@@ -1428,7 +1430,7 @@ export default function SampleManagement() {
               {/* 하단 액션 */}
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
                 <div>
-                  {s.billingStatus === '미청구' ? (
+                {sampleBillable(s) ? (
                     <button
                       onClick={() => { setBillingTarget(s); setBillingMode('new'); setLinkStatementId(''); setBillingModal(true); }}
                       className="text-xs px-2.5 py-1 rounded-full border bg-[var(--fill-quaternary)] text-muted-foreground border-border hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
@@ -1444,9 +1446,7 @@ export default function SampleManagement() {
                     <Eye className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openEdit(s)}>수정</Button>
-                  {s.stage !== '최종승인' && (
-                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-[var(--system-green)]" onClick={() => handleApprove(s)}>승인</Button>
-                  )}
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={()=>openNextRound(s)}>다음 차수</Button>
                   {s.stage === '최종승인' && (() => {
                     // 모바일 뷰: TEMP 스타일번호 여부 + 정식 ACTIVE 품목 등록 여부 확인
                     const isTempStyleNo = s.styleNo.startsWith('TEMP');
@@ -1463,8 +1463,12 @@ export default function SampleManagement() {
                         <PackagePlus className="w-3 h-3 mr-1" />품목
                       </Button>
                     ) : (
-                      /* 품목 등록 완료(ACTIVE) → 텍스트만 표시, 버튼 없음 */
-                      <span className="text-xs text-[var(--system-green)] font-medium px-1">✓ 완료</span>
+                      /* 모바일도 같은 상품의 BOM으로 이어진다. 별도 등록 화면을 만들지 않는다. */
+                      <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-primary"
+                        onClick={() => navigate(`/bom?styleNo=${encodeURIComponent(registeredItem.styleNo)}`)}
+                        title={`${registeredItem.styleNo} BOM 작성`}>
+                        <ClipboardList className="w-3 h-3 mr-1" />BOM 작성
+                      </Button>
                     );
                   })()}
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(s.id)}>
@@ -1478,6 +1482,21 @@ export default function SampleManagement() {
       </div>
 
       {/* ── 변경사항 확인 다이얼로그 ── */}
+      <Dialog open={!!calendarEdit} onOpenChange={open => { if (!open && !calendarSaving) setCalendarEdit(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>샘플 {calendarEdit?.kind === 'req' ? '접수일' : '마감일'} 변경</DialogTitle><DialogDescription>{calendarEdit && `${buyerLabelById(calendarEdit.sample.buyerId, calendarEdit.sample.brandCode)} · ${calendarEdit.sample.styleName}`}</DialogDescription></DialogHeader>
+          <div className="space-y-2"><Label htmlFor="sample-calendar-date">변경 날짜</Label><Input id="sample-calendar-date" type="date" value={calendarEdit?.date || ''} onChange={e => setCalendarEdit(value => value ? { ...value, date: e.target.value } : null)} /></div>
+          <DialogFooter><Button variant="outline" disabled={calendarSaving} onClick={() => setCalendarEdit(null)}>취소</Button><Button disabled={calendarSaving} onClick={async () => {
+            if (!calendarEdit || calendarSaveLock.current) return;
+            const { sample, kind, date } = calendarEdit;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || (kind === 'req' && sample.expectedDate && date > sample.expectedDate) || (kind === 'due' && sample.requestDate && date < sample.requestDate)) { toast.error('접수일은 마감일 이전으로 선택해주세요'); return; }
+            calendarSaveLock.current = true; setCalendarSaving(true);
+            try { await updateSampleCalendarDate(sample, kind, date); refresh(); setCalendarEdit(null); toast.success('샘플 날짜가 변경되었습니다'); }
+            catch (error) { toast.error(`날짜 저장 실패: ${(error as Error).message}. 입력을 유지했습니다.`); }
+            finally { calendarSaveLock.current = false; setCalendarSaving(false); }
+          }}>{calendarSaving ? '저장 중…' : '날짜 저장'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       <UnsavedChangesDialog
         open={showUnsavedDialog}
         onSaveAndClose={() => { setShowUnsavedDialog(false); handleSave(); }}
@@ -1541,6 +1560,7 @@ export default function SampleManagement() {
                       styleNo: item.styleNo,
                       styleName: item.name,
                       buyerId: item.buyerId || f.buyerId,
+                      brandCode: item.brandCode,
                     }));
                   }
                 }}>
@@ -1608,7 +1628,7 @@ export default function SampleManagement() {
                     <Label className="text-xs">단계</Label>
                     <Select value={form.stage || '1차'} onValueChange={v => setForm(f => ({ ...f, stage: v as SampleStage }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                      <SelectContent>{STAGES.filter(s => s !== '최종승인' || form.stage === '최종승인').map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 ) : (
@@ -1918,7 +1938,7 @@ export default function SampleManagement() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => handleModalClose(true)}>취소</Button>
-            <Button onClick={handleSave}>{editId ? '수정' : '접수'}</Button>
+            <Button onClick={handleSave} disabled={savingSample}>{savingSample ? '저장 중…' : editId ? '수정' : '접수'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1968,6 +1988,8 @@ export default function SampleManagement() {
               </DialogHeader>
 
               <div className="space-y-5 py-2">
+                <SampleWorkflowActions sample={detailSample} vendors={vendors} onSaved={s=>{setDetailSample(s);refresh();}}
+                  onBill={()=>{setBillingTarget(detailSample);setBillingMode('new');setLinkStatementId('');setBillingModal(true);}}/>
                 {/* 자재 요청 목록 */}
                 {(detailSample.materialRequests || []).length > 0 && (
                   <div className="space-y-2">
@@ -2232,7 +2254,7 @@ export default function SampleManagement() {
         <Dialog open={billingModal} onOpenChange={setBillingModal}>
           <DialogContent onInteractOutside={e => e.preventDefault()} className="w-full h-full rounded-none sm:w-[95vw] sm:h-auto sm:max-w-lg sm:rounded-md sm:max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>청구하기 — {billingTarget.styleNo}</DialogTitle>
+              <DialogTitle>청구하기 — {monthlyBillingIds.length?`${billingMonth} 완료 ${monthlyBillingIds.length}건`:billingTarget.styleNo}</DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
                 거래명세표를 새로 생성하거나 기존 전표에 연결하세요
               </DialogDescription>
@@ -2255,16 +2277,15 @@ export default function SampleManagement() {
               </div>
 
               {billingMode === 'link' && (() => {
-                const thisMonth = new Date().toISOString().slice(0,7);
                 const buyerStatements = store.getTradeStatements()
                   .filter(t => {
-                    const matchBuyer = !billingTarget.buyerId || t.vendorId === billingTarget.buyerId;
-                    const matchMonth = t.issueDate.startsWith(thisMonth);
-                    return matchBuyer && matchMonth && t.status !== '수금완료';
+                    const matchBuyer = !!billingTarget.buyerId && t.vendorId === billingTarget.buyerId;
+                    const matchMonth = true; // Same buyer's editable statements, including prior-month aggregation.
+                    return matchBuyer && matchMonth && t.status === '미청구';
                   });
                 return (
                   <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">이번 달 전표 ({thisMonth}) — 바이어: {buyerLabelById(billingTarget.buyerId) || '미지정'}</p>
+                    <p className="text-xs text-muted-foreground">추가 가능한 미청구 전표 — 바이어: {buyerLabelById(billingTarget.buyerId) || '미지정'}</p>
                     {buyerStatements.length === 0 ? (
                       <p className="text-xs text-muted-foreground py-3 text-center">해당 조건의 전표가 없습니다. 신규 생성을 선택하세요.</p>
                     ) : (
@@ -2291,47 +2312,24 @@ export default function SampleManagement() {
                   <p className="font-medium mb-1 text-foreground">생성될 거래명세표</p>
                   <p>바이어: {buyerLabelById(billingTarget.buyerId) || '미지정'}</p>
                   <p>품목: {billingTarget.styleNo} — {billingTarget.styleName}</p>
-                  <p>금액: {(billingTarget.costKrw || Math.round((billingTarget.costCny || 0) * settings.cnyKrw)).toLocaleString()}원</p>
+                  <p>금액: {(monthlyBillingIds.length?samples.filter(s=>monthlyBillingIds.includes(s.id)).reduce((sum,s)=>sum+(s.sampleUnitPrice??0),0):(billingTarget.sampleUnitPrice??0)).toLocaleString()}원</p>
                 </div>
               )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setBillingModal(false)}>취소</Button>
               <Button
-                disabled={billingSaving || (billingMode === 'link' && !linkStatementId)}
+                disabled={billingSaving || !sampleBillable(billingTarget) || (billingMode === 'link' && !linkStatementId)}
                 onClick={async () => {
                   if (billingSaveLock.current) return;
                   billingSaveLock.current = true;
                   setBillingSaving(true);
-                  const today = new Date().toISOString().split('T')[0];
-                  const costKrw = billingTarget.costKrw || Math.round((billingTarget.costCny || 0) * settings.cnyKrw);
-                  const newLine = { id: 'l-' + billingTarget.id + '-' + Date.now(), description: billingTarget.styleName || billingTarget.styleNo, qty: 1, unitPrice: costKrw, taxType: '과세' as const, taxRate: 0.1, memo: `샘플 ${billingTarget.round || ''}차` };
-
                   try {
-                  if (billingMode === 'new') {
-                    const vendor = vendors.find(v => v.id === billingTarget.buyerId);
-                    const vendorCode = vendor?.vendorCode || vendor?.code || 'SAMP';
-                    const statementNo = store.getNextStatementNo(vendorCode);
-                    const savedStatement = await store.addTradeStatement({
-                      id: 'ts-' + billingTarget.id + '-' + Date.now(),
-                      statementNo: '',
-                      vendorId: billingTarget.buyerId || '',
-                      vendorName: vendor?.name || '미지정',
-                      vendorCode,
-                      issueDate: today,
-                      lines: [newLine],
-                      status: '미청구',
-                      createdAt: new Date().toISOString(),
-                    });
-                    toast.success(`거래명세표 ${savedStatement.statementNo} 생성 완료`);
-                  } else {
-                    const stmt = store.getTradeStatements().find(t => t.id === linkStatementId);
-                    if (stmt) {
-                      await store.updateTradeStatement(linkStatementId, { lines: [...(stmt.lines || []), newLine] });
-                      toast.success(`${stmt.statementNo}에 추가됐습니다`);
-                    }
-                  }
-                  upsertSampleSB({ ...billingTarget, billingStatus: '청구완료', billingDate: today }).then(() => refresh()).catch(onSaveFail('샘플'));
+                  await sampleWorkflowRequest('/api/samples/workflow/bill',{ids:monthlyBillingIds.length?monthlyBillingIds:[billingTarget.id],
+                    statementId:billingMode==='link'?linkStatementId:null,month:monthlyBillingIds.length?billingMonth:null});
+                  store.hydrateTradeStatements(await fetchTradeStatementsSB());
+                  refresh();
+                  toast.success('샘플 청구 연결이 저장되었습니다');
                   setBillingModal(false);
                   } catch (error) { toast.error((error as Error).message); }
                   finally { billingSaveLock.current = false; setBillingSaving(false); }

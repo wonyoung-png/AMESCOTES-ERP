@@ -3,6 +3,7 @@
 
 import { db } from './db';
 import { filterForTable, toSnakeCase } from './tableColumns';
+import { materialCartIdentity } from './materialCartIdentity';
 
 /**
  * PostgREST 직접 호출용 — db.ts와 같은 자체 서버를 본다.
@@ -382,6 +383,8 @@ export interface OrderMilestone {
 }
 
 export interface ProductionOrder {
+  /** Original DB snapshot stamp, never replaced by a draft edit timestamp. */
+  persistedUpdatedAt?: string;
   id: string;
   orderNo: string;
   styleId: string;
@@ -529,6 +532,14 @@ export interface Sample {
   billingStatementId?: string;
   billingDate?: string;
   collectedDate?: string;
+  completedAt?: string;
+  completedBy?: string;
+  reviewStatus?: 'pending' | 'accepted';
+  reviewAssigneeId?: string;
+  reviewCardId?: string;
+  acceptedAt?: string;
+  acceptedBy?: string;
+  workflowVersion?: number;
   createdAt: string;
   memo?: string;
 }
@@ -610,6 +621,8 @@ export interface PurchaseItem {
   orderNo: string;
   purchaseDate: string;
   itemName: string;
+  spec?: string;
+  legacyPricingIdentity?: boolean;
   qty: number;
   unit: string;
   unitPriceCny: number;
@@ -742,6 +755,8 @@ export interface CartItem {
   isHqProvided: boolean   // 본사제공 여부
   imageUrl?: string       // BOM 자재 이미지
   unitPriceCny?: number   // BOM 단가 (CNY)
+  currency?: Currency;
+  appliedRate?: number;
   orders: { orderId?: string; orderNo?: string; styleNo: string; styleName: string; qty: number }[] // 담긴 발주 목록
 }
 
@@ -1124,7 +1139,7 @@ export const store = {
   cacheOrderReceipt: (row: { id: string; received_qty: number; defect_qty: number; received_date: string; status: string; updated_at: string; shipped_qty?: number; trade_statement_id?: string | null }) => {
     setAll(KEYS.orders, getAll<ProductionOrder>(KEYS.orders).map(o => o.id === row.id ? { ...o,
       receivedQty: row.received_qty, defectQty: row.defect_qty, receivedDate: row.received_date,
-      status: row.status as OrderStatus, updatedAt: row.updated_at,
+      status: row.status as OrderStatus, updatedAt: row.updated_at, persistedUpdatedAt: row.updated_at,
       ...(row.shipped_qty === undefined ? {} : { shippedQty: row.shipped_qty }),
       ...(row.trade_statement_id === undefined ? {} : { tradeStatementId: row.trade_statement_id || undefined }) } : o));
   },
@@ -1515,14 +1530,13 @@ export const store = {
   addSample: (v: Sample) => { const a = getAll<Sample>(KEYS.samples); a.push(v); setAll(KEYS.samples, a); dbUpsert('samples', v); },
   updateSample: (id: string, u: Partial<Sample>) => { const a = getAll<Sample>(KEYS.samples); const i = a.findIndex(x => x.id === id); if (i >= 0) { a[i] = { ...a[i], ...u }; setAll(KEYS.samples, a); dbUpdate('samples', id, u); } },
   /**
-   * 샘플 삭제 — 로컬을 먼저 지우고 서버 삭제 결과를 돌려준다.
-   * 서버가 실패해도 화면에서는 사라지므로, 호출부가 결과를 보고 사용자에게 알려야 한다.
+   * 샘플 삭제 — 서버가 허용한 경우에만 캐시에서 제거한다.
    */
   deleteSample: async (id: string): Promise<{ ok: boolean; error?: string }> => {
-    setAll(KEYS.samples, getAll<Sample>(KEYS.samples).filter(x => x.id !== id));
     try {
       const { error } = await db.from('samples').delete().eq('id', id);
       if (error) { reportDbFailure('samples', 'delete', error.message); return { ok: false, error: error.message }; }
+      setAll(KEYS.samples, getAll<Sample>(KEYS.samples).filter(x => x.id !== id));
       return { ok: true };
     } catch (e: any) {
       reportDbFailure('samples', 'delete', String(e));
@@ -1651,7 +1665,7 @@ export const store = {
   addToMaterialCart: (
     styleNo: string,
     styleName: string,
-    bomMaterials: Array<{ itemName: string; spec?: string; unit: string; netQty: number; lossRate: number; vendorName?: string; isHqProvided: boolean; imageUrl?: string; unitPriceCny?: number }>,
+    bomMaterials: Array<{ itemName: string; spec?: string; unit: string; netQty: number; lossRate: number; vendorName?: string; isHqProvided: boolean; imageUrl?: string; unitPriceCny?: number;currency?:Currency;appliedRate?:number }>,
     orderQty: number,
     orderRef?: { id: string; orderNo: string }
   ) => {
@@ -1661,9 +1675,8 @@ export const store = {
       const perPcsQty = mat.netQty * (1 + (mat.lossRate ?? 0));
       const totalQty = Math.round(perPcsQty * orderQty * 1000) / 1000;
       // vendorName까지 포함해서 키 생성 → 같은 자재라도 거래처 다르면 별도 항목
-      const vendorKey = mat.vendorName || '';
-      const key = mat.itemName + '||' + mat.unit + '||' + vendorKey;
-      const idx = cart.findIndex(c => (c.materialName + '||' + c.unit + '||' + (c.vendorName || '')) === key);
+      const key=materialCartIdentity(mat);
+      const idx=cart.findIndex(c=>materialCartIdentity(c)===key);
       if (idx >= 0) {
         // 기존 항목 — 수량 합산, 발주 목록 추가
         const existingOrder = cart[idx].orders.find(o => orderRef ? o.orderId === orderRef.id : !o.orderId && o.styleNo === styleNo);
@@ -1689,6 +1702,7 @@ export const store = {
           isHqProvided: mat.isHqProvided,
           imageUrl: mat.imageUrl,
           unitPriceCny: (mat as any).unitPriceCny ?? 0,
+          currency:mat.currency,appliedRate:mat.appliedRate,
           orders: [{ ...(orderRef ? { orderId: orderRef.id, orderNo: orderRef.orderNo } : {}), styleNo, styleName, qty: totalQty }],
         });
       }
@@ -1697,27 +1711,51 @@ export const store = {
   },
 
   clearMaterialCart: () => setAll(KEYS.materialCart, []),
+  freezeMaterialCartPricing: (updates:Array<{item:CartItem;currency:Currency;appliedRate:number}>) => {
+    const cart=getAll<CartItem>(KEYS.materialCart);
+    const pricing=new Map(updates.map(update=>[materialCartIdentity(update.item),update]));
+    const merged=new Map<string,CartItem>();
+    for(const current of cart){
+      const update=pricing.get(materialCartIdentity(current));
+      if(update){current.currency=update.currency;current.appliedRate=update.appliedRate;}
+      const key=materialCartIdentity(current);
+      const previous=merged.get(key);
+      if(previous){
+        previous.qty=Math.round((previous.qty+current.qty)*1000)/1000;
+        previous.stockQty=Math.round(((previous.stockQty??0)+(current.stockQty??0))*1000)/1000;
+        previous.orders=[...(previous.orders||[]),...(current.orders||[])];
+      }else{merged.set(key,current);}
+    }
+    setAll(KEYS.materialCart,[...merged.values()]);
+  },
 
-  updateCartItemQty: (materialName: string, unit: string, qty: number) => {
+  updateCartItemQty: (materialName: string, unit: string, qty: number, identity?: CartItem) => {
     const cart = getAll<CartItem>(KEYS.materialCart);
-    const idx = cart.findIndex(c => c.materialName === materialName && c.unit === unit);
+    const matches=cart.filter(c=>identity?materialCartIdentity(c)===materialCartIdentity(identity):c.materialName===materialName&&c.unit===unit);
+    if(matches.length>1)throw Error('같은 이름의 자재가 여러 규격입니다. 해당 행을 선택해주세요.');
+    const idx=cart.indexOf(matches[0]);
     if (idx >= 0) {
       cart[idx].qty = qty;
       setAll(KEYS.materialCart, cart);
     }
   },
 
-  updateCartItemStock: (materialName: string, unit: string, stockQty: number) => {
+  updateCartItemStock: (materialName: string, unit: string, stockQty: number, identity?: CartItem) => {
     const cart = getAll<CartItem>(KEYS.materialCart);
-    const idx = cart.findIndex(c => c.materialName === materialName && c.unit === unit);
+    const matches=cart.filter(c=>identity?materialCartIdentity(c)===materialCartIdentity(identity):c.materialName===materialName&&c.unit===unit);
+    if(matches.length>1)throw Error('같은 이름의 자재가 여러 규격입니다. 해당 행을 선택해주세요.');
+    const idx=cart.indexOf(matches[0]);
     if (idx >= 0) {
       cart[idx].stockQty = stockQty;
       setAll(KEYS.materialCart, cart);
     }
   },
 
-  removeCartItem: (materialName: string, unit: string) => {
-    setAll(KEYS.materialCart, getAll<CartItem>(KEYS.materialCart).filter(c => !(c.materialName === materialName && c.unit === unit)));
+  removeCartItem: (materialName: string, unit: string, identity?: CartItem) => {
+    const cart=getAll<CartItem>(KEYS.materialCart);
+    const matches=cart.filter(c=>identity?materialCartIdentity(c)===materialCartIdentity(identity):c.materialName===materialName&&c.unit===unit);
+    if(matches.length>1)throw Error('같은 이름의 자재가 여러 규격입니다. 해당 행을 선택해주세요.');
+    setAll(KEYS.materialCart,cart.filter(c=>!matches.includes(c)));
   },
 
   // Auth helpers

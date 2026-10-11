@@ -83,3 +83,6 @@ DB15는 product_registration_settings, product_listings, product_listing_images,
 | 접근·링크 | 메뉴도 서버 권한 응답 후 표시. 비서실 링크는 ws=LUMEN으로 열며 직원에게 비서실 노출 없음 |
 
 Claude 수정판 지적 5건에 회귀 테스트를 추가해 통과했고, 실제 한정 재검토에서도 5건 모두 resolved입니다. 상세 결과·UncertainWrite 운영 확인 절차는 `CLAUDE_REVIEW_RESULT_PRODUCT_REGISTRATION_TARGETED.md`에 있습니다. 지원되지 않는 실입고 증거·정확한 hardcap은 위 제한대로 운영 차단입니다. **완료·운영 승인 선언 없음**.
+## 통합 ERP 후속 검증
+
+2026-10-11 대표 선택: **코드 통합·검증 후 클로드가 운영 적용**. 상품 등록 기능 검수와 전체 ERP의 운영 완료는 다릅니다. 통합본 변경·선행 마이그레이션·샘플 수락 담당 설정·564건 회귀와 35건 격리 SQL 검증·운영 보류사항은 `ERP_FINAL_ACCEPTANCE_2026-10-11.md` 및 Claude 최종 재검토 문서를 함께 확인하십시오. 이 절은 앞의 과거 실행 기록을 대체하지 않습니다.

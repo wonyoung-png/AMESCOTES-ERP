@@ -123,6 +123,8 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
   const [teams, setTeams] = useState<string[]>(Array.isArray(p.shareTeams) ? p.shareTeams : []);
   const toggleTeam = (t: string) => setTeams(v => v.includes(t) ? v.filter(x => x !== t) : [...v, t]);
 
+  const sampleLink=c.parsed?.sampleReview && c.result_ref?.table==='samples' && c.result_ref?.id;
+
   // 답변칸은 요청을 받은 사람 몫이다. 쓴 사람 본인에게 띄우면 자기 질문에 자기가 답하게 된다
   const canReply = c.kind === 'request_check' && c.status === 'open' && !!me && c.created_by !== me.id &&
     (c.assignee_id === me.id || canAct);
@@ -181,6 +183,7 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
     } catch { toast.error('사용 여부를 전달하지 못했습니다.'); } finally { setBusy(false); }
   };
 
+  if(sampleLink) return <Link href={`/samples?openId=${encodeURIComponent(sampleLink)}`} className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground mt-2">{c.status==='open'?'샘플 확인':'원본 샘플 보기'}</Link>;
   return (
     <>
       {c.kind === 'question' && p.answer && (

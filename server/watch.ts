@@ -12,6 +12,7 @@ import { allRows } from './work-records.js';
 import { productionRisks } from './production-risk.js';
 import { buildMonthlyCashPlan, statementTotal } from '../client/src/lib/cashPlan.js';
 import { orgTeam } from './org.js';
+import { operationalWatch, shipmentWatch } from './operational-watch.js';
 
 export type Watch = { facts: string[]; alerts: number };
 
@@ -40,20 +41,20 @@ export const campaignTeams = (team: string, workspace: string) => team === '디�
   : TASK_TEAM[team] || (orgTeam(team) ? [team] : []);
 
 /** 팀 → 감시 데이터. 한 표를 못 읽으면 그 표를 쓰는 팀만 "읽지 못함"으로 남기고 나머지는 진행 */
-export async function gatherWatch(read = restAsServer, readPms = pms): Promise<Map<string, Watch>> {
+export async function gatherWatch(read = restAsServer, readPms = pms, approvals?: Promise<any[]>): Promise<Map<string, Watch>> {
   const today = kstToday();
   const in30 = addDays(today, 30);
   const rows = (path: string) => allRows(path + '&order=id.asc', read);
-  const [orders, receipts, samples, stmts, settlements, payables, camps, subscriptions, lumen, aeta] = await Promise.all([
-    rows('production_orders?status=neq.초안&select=id,order_no,style_no,style_name,vendor_name,quantity,received_qty,status,delivery_date,confirmed_date,sent_at,confirmed_at,hq_supply_items,factory_unit_price_krw,trade_statement_id,workspace').catch(e => e as Error),
-    rows('receipt_logs?log_type=eq.inbound&select=id,order_id,log_type,qty').catch(e => e as Error),
-    rows('samples?select=id,style_no,style_name,stage,expected_date,assignee,billing_status,cost_krw,brand_code').catch(e => e as Error),
+  const [orders, receipts, samples, stmts, settlements, payables, camps, subscriptions, lumen, aeta, operations] = await Promise.all([
+    rows('production_orders?status=neq.초안&select=id,order_no,style_no,style_name,vendor_name,quantity,received_qty,defect_qty,shipped_qty,status,delivery_date,confirmed_date,sent_at,confirmed_at,hq_supply_items,factory_unit_price_krw,trade_statement_id,workspace').catch(e => e as Error),
+    rows('receipt_logs?log_type=in.(inbound,outbound_oem,outbound_3pl)&select=id,order_id,log_type,qty,defect_qty,destination').catch(e => e as Error),
+    rows('samples?select=id,style_no,style_name,stage,expected_date,assignee,billing_status,cost_krw,brand_code,completed_at,review_status,sample_unit_price,billing_statement_id').catch(e => e as Error),
     rows('trade_statements?status=in.(미청구,청구완료)&select=id,statement_no,vendor_name,issue_date,lines,status,workspace').catch(e => e as Error),
     rows('settlements?select=id,buyer_name,due_date,billed_amount_krw,collected_amount_krw,status').catch(e => e as Error),
     rows('payables?select=id,source_type,order_id,amount_krw,paid_amount_krw,due_date,status,memo').catch(e => e as Error),
     rows(`campaigns?or=(and(end_date.gte.${today},start_date.lte.${in30}),and(end_date.lt.${today},status.in.(active,onboarded)))&select=title,channel,start_date,end_date,status,workspace,tasks`).catch(e => e as Error),
     rows('subscriptions?status=neq.해지됨&select=service_name,average_amount,currency,status,next_billing_on,auto_renew,notice_by').catch(e => e as Error),
-    readPms('lumen'), readPms('aetaloof'),
+    readPms('lumen'), readPms('aetaloof'), operationalWatch(today, read, approvals).catch(e => e instanceof Error ? e : new Error(String(e))),
   ]);
   const out = new Map<string, Watch>();
   const add = (team: string, facts: string[], alerts = 0) => {
@@ -87,6 +88,8 @@ export async function gatherWatch(read = restAsServer, readPms = pms): Promise<M
     const noPrice = live.filter(o => !Number(o.factory_unit_price_krw));
     const mat = live.flatMap(o => (Array.isArray(o.hq_supply_items) ? o.hq_supply_items : [])
       .filter((i: any) => i?.purchaseStatus === '미구매').map((i: any) => `${o.order_no} ${i.itemName || ''}`));
+    const unsentMaterials = live.flatMap(o => (Array.isArray(o.hq_supply_items) ? o.hq_supply_items : [])
+      .filter((i: any) => i?.purchaseStatus === '구매완료').map((i: any) => `${o.order_no} ${i.itemName || ''}`));
     const unbilled = orders.filter(o => o.status === '입고완료' && !o.trade_statement_id);
     const line = (o: any) => `  · ${o.order_no} ${o.style_name || o.style_no || ''} / ${o.vendor_name || '공장 미정'} / 납기 ${o.delivery_date || '없음'} / ${o.status}`;
     add('생산관리', [
@@ -96,10 +99,13 @@ export async function gatherWatch(read = restAsServer, readPms = pms): Promise<M
       ...(past.length ? ['납기 지난 발주:', ...past.slice(0, 8).map(line)] : []),
       ...(due7.length ? ['7일 안 납기:', ...due7.slice(0, 8).map(line)] : []),
       `본사 제공 자재 미구매 ${mat.length}건${mat.length ? ': ' + mat.slice(0, 6).join(', ') : ''}`,
+      `본사 제공 자재 구매완료·미발송 ${unsentMaterials.length}건${unsentMaterials.length ? ': ' + unsentMaterials.slice(0, 6).join(', ') : ''} (구매 원본과 중복 가능 — 합산 금지)`,
     ], risks.filter(r => r.priority < 9 && r.priority !== 2).length + notSent.length + noReply.length
       // 7일 안 납기인데 본사 자재를 아직 안 샀으면 경고 (생산관리 기본 기준)
       + due7.filter(o => Array.isArray(o.hq_supply_items) && o.hq_supply_items.some((i: any) => i?.purchaseStatus === '미구매')).length);
     add('물류·CS', [`7일 안 입고 예정 발주 ${due7.length}건${due7.length ? ': ' + due7.slice(0, 6).map(o => `${o.order_no}(${o.delivery_date})`).join(', ') : ''}`]);
+    const shipping = shipmentWatch(orders, receipts, today);
+    add('물류·CS', shipping.facts, shipping.alerts);
     add('제품개발', [`공장 단가 없는 진행 발주 ${noPrice.length}건${noPrice.length ? ': ' + noPrice.slice(0, 6).map(o => o.order_no).join(', ') : ''}`], noPrice.length);
     const oem = live.filter(o => !o.workspace || o.workspace === 'OEM');
     const byStatus = oem.reduce((m: Record<string, number>, o) => (m[o.status] = (m[o.status] || 0) + 1, m), {});
@@ -107,17 +113,13 @@ export async function gatherWatch(read = restAsServer, readPms = pms): Promise<M
       `입고 끝났는데 거래명세표 없는 발주 ${unbilled.length}건${unbilled.length ? ': ' + unbilled.slice(0, 6).map(o => o.order_no).join(', ') : ''}`], unbilled.length);
   }
 
-  // ── 샘플 (지금 ERP 샘플은 OEM 바이어 것뿐 — 제품개발)
-  if (samples instanceof Error) failed('제품개발', '샘플', samples);
+  // 샘플 일정·지연은 operationalWatch에서 브랜드별로 집계한다. 여기서는 미청구만 집계.
+  if (samples instanceof Error) failed('경영지원', '샘플비', samples);
   else {
-    const prog = samples.filter(s => !['최종승인', '반려'].includes(s.stage));
-    const late = prog.filter(s => s.expected_date && s.expected_date < today);
-    add('제품개발', [
-      `진행 중 샘플 ${prog.length}건 — 예정일 지남 ${late.length}`,
-      ...late.slice(0, 8).map(s => `  · ${s.style_name || s.style_no} ${s.stage} / 예정 ${s.expected_date} / 담당 ${s.assignee || '-'}`),
-    ], late.length);
-    const sb = samples.filter(s => s.billing_status === '미청구');
-    add('경영지원', [`미청구 샘플비 ${sb.length}건 ${won(sb.reduce((v, s) => v + (Number(s.cost_krw) || 0), 0))}`]);
+    const sb = samples.filter(s => s.billing_status === '미청구'&&s.completed_at&&s.review_status==='accepted'&&!s.billing_statement_id);
+    const legacy=samples.filter(s=>s.billing_status==='미청구'&&!s.review_status);
+    add('경영지원', [`수락 완료 미청구 샘플비 ${sb.length}건 ${won(sb.reduce((v, s) => v + (Number(s.sample_unit_price) || 0), 0))}`,
+      `기존 미청구 샘플비 ${legacy.length}건 — 완료·수락 기록 확인 전이며 청구 예정액에 합산하지 않음`]);
   }
 
   // ── 청구·수금
@@ -199,5 +201,7 @@ export async function gatherWatch(read = restAsServer, readPms = pms): Promise<M
   add('국내 MD', [...L.dom, ...A.dom], L.late + A.late + unavailable);
   add('글로벌 MD', [...L.glob, ...A.glob], unavailable);
   add('리테일', [...L.off, ...A.off], unavailable);
+  if (operations instanceof Error) ['제품개발', '생산관리', '물류·CS', '국내 MD', '글로벌 MD', '루멘 디자인', '에탈루프 디자인'].forEach(t => failed(t, '원본 업무 점검', operations));
+  else for (const [team, w] of operations) add(team, w.facts, w.alerts);
   return out;
 }

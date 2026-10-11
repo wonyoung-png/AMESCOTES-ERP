@@ -12,6 +12,17 @@ import { toast } from 'sonner';
 import { Link } from 'wouter';
 import { parsePlannedExpense } from '@/lib/cashPlan';
 
+type DefectSnapshot = Record<string, any>;
+type ApprovalContext = { ready: boolean; canApprove: boolean; defects: DefectSnapshot[]; payables: DefectSnapshot[] };
+async function defectRequest(path: string, body?: object) {
+  const response = await fetch(path, { credentials: 'include', ...(body ? {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  } : {}) });
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result) throw new Error(result?.message || '불량 확정 기능 준비 전입니다 — 서버 연결과 승인 마이그레이션이 필요합니다.');
+  return result;
+}
+
 export default function PayablesManagement() {
   const [, tick] = useState(0);
   const refresh = () => tick(n => n + 1);
@@ -20,7 +31,32 @@ export default function PayablesManagement() {
   const payables = serverPayables || phase1.getPayables();
   const [paymentBusy, setPaymentBusy] = useState('');
   const [saveBusy, setSaveBusy] = useState(false);
-  const defects = phase1.getDefectCarryovers();
+  const approval = useQuery<ApprovalContext>({ queryKey: ['defect-approval-context'],
+    queryFn: () => defectRequest('/api/defects/approval-context'), retry: false });
+  const defects = approval.data?.defects.map(d => ({ id: d.id, orderNo: d.order_no, vendorName: d.vendor_name,
+    vendorId: d.vendor_id, amountKrw: Number(d.approved_amount_krw ?? d.amount_krw), qty: d.qty,
+    reason: d.approval_reason ?? d.reason, disposition: d.disposition as 'deduct' | 'rework' | 'repair', status: d.status,
+  })) || phase1.getDefectCarryovers();
+  const [approvalForm, setApprovalForm] = useState<{ defect: DefectSnapshot; payable?: DefectSnapshot; amount: number; reason: string; responsible: boolean } | null>(null);
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const eligiblePayables = approval.data?.payables.filter(p => approvalForm && p.vendor_id === approvalForm.defect.vendor_id
+    && p.source_type === 'order_receipt' && p.payee_type === 'factory_direct'
+    && (p.source_id === approvalForm.defect.id.slice(4) || p.receipt_log_ids?.includes(approvalForm.defect.id.slice(4)))
+    && ['pending', 'partial'].includes(p.status) && Number(p.amount_krw) > Number(p.paid_amount_krw)) || [];
+  const approveDefect = async () => {
+    if (!approvalForm?.payable || approvalBusy) return;
+    setApprovalBusy(true);
+    try {
+      const result = await defectRequest(`/api/defects/${encodeURIComponent(approvalForm.defect.id)}/approve`, {
+        payableId: approvalForm.payable.id, factoryResponsible: approvalForm.responsible, amount: approvalForm.amount,
+        reason: approvalForm.reason, expectedDefect: approvalForm.defect, expectedPayable: approvalForm.payable,
+      });
+      toast.success(`${result.retry ? '기존 확정 결과 확인' : '불량 차감 확정'}: ${formatKRW(result.approvedAmount)}`);
+      setApprovalForm(null);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['payables'] }), approval.refetch()]);
+    } catch (e: any) { toast.error(e.message || '불량 확정 실패'); }
+    finally { setApprovalBusy(false); }
+  };
   const vendors = store.getVendors();
 
   const [payModal, setPayModal] = useState(false);
@@ -56,7 +92,7 @@ export default function PayablesManagement() {
 
   const stats = useMemo(() => ({
     pending: payables.filter(p => p.status !== 'paid' && parsePlannedExpense(p.memo)?.stage !== '예상').reduce((s, p) => s + Math.max(0, p.amountKrw - p.paidAmountKrw), 0),
-    defectPending: defects.filter(d => d.status === 'pending').reduce((s, d) => s + d.amountKrw, 0),
+    defectPending: defects.filter(d => d.status === 'pending' && d.disposition === 'deduct').length,
     partial: payables.filter(p => p.status === 'partial').length,
     overdue: payables.filter(p => p.status !== 'paid' && parsePlannedExpense(p.memo)?.stage !== '예상' && p.dueDate && p.dueDate < new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })).length,
   }), [payables, defects, tick]);
@@ -111,6 +147,7 @@ export default function PayablesManagement() {
       </div>
 
       {isError && <p role="alert" className="text-sm text-[var(--system-orange)]">미지급 조회 실패 — 이전 자료일 수 있습니다. 새로고침 전에는 지급을 기록할 수 없습니다.</p>}
+      {approval.isError && <p role="alert" className="text-sm text-[var(--system-orange)]">{approval.error.message} <button className="underline" onClick={() => approval.refetch()}>다시 조회</button></p>}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <div className="bg-card rounded-lg border p-4">
@@ -118,8 +155,8 @@ export default function PayablesManagement() {
           <p className="text-2xl font-bold text-[var(--system-red)] tabular-nums">{formatKRW(stats.pending)}</p>
         </div>
         <div className="bg-card rounded-lg border p-4">
-          <p className="text-xs text-muted-foreground">불량 차감 대기</p>
-          <p className="text-2xl font-bold text-[var(--system-orange)] tabular-nums">{formatKRW(stats.defectPending)}</p>
+          <p className="text-xs text-muted-foreground">불량 차감 후보 · 확정 전 금액 미반영</p>
+          <p className="text-2xl font-bold text-[var(--system-orange)] tabular-nums">{stats.defectPending}건</p>
         </div>
         <div className="bg-card rounded-lg border p-4">
           <p className="text-xs text-muted-foreground">부분 지급</p>
@@ -204,7 +241,7 @@ export default function PayablesManagement() {
                   </span>
                 </td>
                 <td className="act">
-                  {p.status !== 'paid' && !isExpectedPlan && (
+                  {['pending', 'partial'].includes(p.status) && !isExpectedPlan && (
                     <div className="flex gap-1 items-center justify-end">
                       <Input className="h-7 w-24 text-xs" type="number" min="0"
                         value={payAmount[p.id] ?? ''}
@@ -224,7 +261,7 @@ export default function PayablesManagement() {
       </div>
 
       <div className="bg-card rounded-lg border overflow-hidden">
-        <div className="px-4 py-3 border-b font-semibold text-sm">불량 차감 이월</div>
+        <div className="px-4 py-3 border-b font-semibold text-sm">불량 후보 · 대표 확정 후 미지급 차감</div>
         <div className="overflow-x-auto">
         <table className="data-table min-w-[560px]">
           <thead>
@@ -233,14 +270,15 @@ export default function PayablesManagement() {
               <th>거래처</th>
               <th className="nw">처리</th>
               <th className="num">수량</th>
-              <th className="num">차감액</th>
+              <th className="num">후보 / 확정 금액</th>
               <th>사유</th>
               <th className="nw">상태</th>
+              <th>확정</th>
             </tr>
           </thead>
           <tbody>
             {shownDefects.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-10 text-muted-foreground text-sm">
+              <tr><td colSpan={8} className="text-center py-10 text-muted-foreground text-sm">
                 {filterOn ? '조건에 맞는 차감이 없습니다' : '불량 차감 이월이 없습니다'}
               </td></tr>
             )}
@@ -256,11 +294,11 @@ export default function PayablesManagement() {
                 <td className="font-medium">{d.vendorName}</td>
                 <td className="nw">
                   <span className={`text-[11px] px-1.5 py-0.5 rounded border ${
-                    (d.disposition || 'deduct') === 'deduct'
+                    d.disposition === 'deduct'
                       ? 'border-[var(--system-red)]/30 text-[var(--system-red)] bg-[var(--system-red)]/5'
                       : 'border-border text-muted-foreground bg-[var(--fill-quaternary)]'
                   }`}>
-                    {DEFECT_DISPOSITION_LABEL[d.disposition || 'deduct']}
+                    {(d.disposition && DEFECT_DISPOSITION_LABEL[d.disposition]) || '미확정 · 처리 선택 필요'}
                   </span>
                 </td>
                 <td className="num text-muted-foreground">{d.qty ? formatNumber(d.qty) : '—'}</td>
@@ -268,15 +306,51 @@ export default function PayablesManagement() {
                 <td className="text-muted-foreground">{d.reason}</td>
                 <td>
                   <span className={`text-xs px-2 py-0.5 rounded ${d.status === 'applied' ? 'bg-[var(--fill-quaternary)] text-[var(--system-green)]' : 'bg-[var(--fill-quaternary)] text-[var(--system-orange)]'}`}>
-                    {d.status === 'applied' ? '반영됨' : '대기'}
+                    {d.status === 'applied' ? '반영됨' : '미확정 후보'}
                   </span>
                 </td>
+                <td>{d.status === 'pending' && d.disposition === 'deduct' && <Button size="sm" variant="outline"
+                  disabled={!approval.data?.canApprove || approval.isFetching || approval.isError || isError || isLoading}
+                  onClick={() => {
+                    const snapshot = approval.data?.defects.find(row => row.id === d.id);
+                    if (snapshot) setApprovalForm({ defect: snapshot, amount: 0, reason: '', responsible: false });
+                  }}>실제 불량 확정</Button>}</td>
               </tr>
             ))}
           </tbody>
         </table>
         </div>
       </div>
+
+      <Dialog open={!!approvalForm} onOpenChange={open => { if (!open && !approvalBusy) setApprovalForm(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>실제 불량 · 공장 대금 차감 확정</DialogTitle></DialogHeader>
+          {approvalForm && <div className="space-y-3">
+            <p className="text-sm">{approvalForm.defect.order_no} · {approvalForm.defect.vendor_name} · 후보 {formatKRW(Number(approvalForm.defect.amount_krw))}</p>
+            <Label>같은 입고의 기존 미지급</Label>
+            <select className="w-full border rounded-md h-9 px-2 text-sm" value={approvalForm.payable?.id || ''} disabled={approvalBusy}
+              onChange={e => setApprovalForm({ ...approvalForm, payable: eligiblePayables.find(p => p.id === e.target.value) })}>
+              <option value="">미지급 선택</option>
+              {eligiblePayables.map(p => <option key={p.id} value={p.id}>{p.id} · 잔액 {formatKRW(Number(p.amount_krw) - Number(p.paid_amount_krw))}</option>)}
+            </select>
+            {!eligiblePayables.length && <p role="alert" className="text-sm">차감 가능한 공장 미지급이 없습니다. 입고 연결·미지급 등록을 확인해주세요.</p>}
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={approvalForm.responsible} disabled={approvalBusy}
+              onChange={e => setApprovalForm({ ...approvalForm, responsible: e.target.checked })} />공장 책임의 실제 불량임을 확인합니다</label>
+            <Label>확정 차감액 (KRW)</Label><Input type="number" min="1" step="1" disabled={approvalBusy} value={approvalForm.amount || ''}
+              onChange={e => setApprovalForm({ ...approvalForm, amount: Number(e.target.value) })} />
+            <Label>확정 사유</Label><Input maxLength={1000} disabled={approvalBusy} value={approvalForm.reason}
+              onChange={e => setApprovalForm({ ...approvalForm, reason: e.target.value })} />
+            <p className="text-xs text-muted-foreground">확정 금액만 미지급 잔액에서 한 번 차감됩니다. 재시도는 최초 확정 결과를 반환합니다.</p>
+          </div>}
+          <DialogFooter>
+            <Button variant="outline" disabled={approvalBusy} onClick={() => { setApprovalForm(null); approval.refetch(); }}>닫기 · 다시 조회</Button>
+            <Button onClick={approveDefect} disabled={approvalBusy || !approval.data?.canApprove || !approvalForm?.responsible
+              || !approvalForm.payable || !approvalForm.reason.trim() || !Number.isSafeInteger(approvalForm.amount) || approvalForm.amount <= 0
+              || approvalForm.amount > Number(approvalForm.payable.amount_krw) - Number(approvalForm.payable.paid_amount_krw)}>
+              {approvalBusy ? '확정 중…' : '확정하고 미지급 차감'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={payModal} onOpenChange={setPayModal}>
         <DialogContent>

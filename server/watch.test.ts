@@ -65,5 +65,6 @@ test('종료 확인 누락은 경고하지만 이미 종료한 행사 준비업�
     { title: '완료 행사', status: 'closed', tasks: [{ team: '디자인', label: '완료한 준비', dueDate: '2020-01-01' }], workspace: 'LUMEN' },
   ] }), pms);
   assert.match(w.get('마케팅')!.facts.join('\n'), /종료 확인 필요/);
-  assert.equal(w.has('루멘 디자인'), false);
+  // 브랜드 승인 점검도 디자인 팀에 표시되므로 팀 존재 자체는 준비 재촉 근거가 아니다.
+  assert.doesNotMatch(w.get('루멘 디자인')!.facts.join('\n'), /완료한 준비|준비 안 됨/);
 });

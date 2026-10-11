@@ -97,7 +97,7 @@ export interface DefectCarryover {
   qty?: number;
   reason: string;
   defectDate: string;
-  /** 차감 / 재작업 / 수정. 없으면 예전 데이터라 차감으로 본다 */
+  /** 차감 / 재작업 / 수정. 미지정 과거 데이터는 미확정이며 임의 차감하지 않는다 */
   disposition?: DefectDisposition;
   status: DefectStatus;
   appliedStatementId?: string;
@@ -111,6 +111,8 @@ export interface Payable {
   projectNo?: string;
   sourceType: 'purchase' | 'expense' | 'processing' | 'manual' | 'order_receipt';
   sourceId?: string;
+  sourceExpenseKey?: string;
+  expenseApprovalSnapshot?: Record<string, unknown>;
   amountKrw: number;
   paidAmountKrw: number;
   dueDate: string;
@@ -1664,7 +1666,7 @@ async function syncDefect(d: DefectCarryover) {
     vendor_name: d.vendorName,
     amount_krw: d.amountKrw,
     qty: d.qty,
-    disposition: d.disposition || 'deduct',
+    disposition: d.disposition || undefined,
     reason: d.reason,
     defect_date: d.defectDate,
     status: d.status,
@@ -1703,6 +1705,7 @@ async function syncPayable(p: Payable, isNew = false) {
 }
 
 const rowToPayable = (r: any): Payable => ({ id: r.id, vendorId: r.vendor_id, vendorName: r.vendor_name,
+  sourceExpenseKey: r.source_expense_key || undefined, expenseApprovalSnapshot: r.expense_approval_snapshot || undefined,
   projectNo: r.project_no, sourceType: r.source_type, sourceId: r.source_id, amountKrw: Number(r.amount_krw),
   paidAmountKrw: Number(r.paid_amount_krw || 0), dueDate: r.due_date, status: r.status, memo: r.memo,
   payeeType: r.payee_type, orderId: r.order_id, receiptLogIds: r.receipt_log_ids || [], createdAt: r.created_at });
@@ -1889,7 +1892,7 @@ export async function syncPhase1FromDb() {
         vendorName: r.vendor_name,
         amountKrw: r.amount_krw,
         qty: r.qty ?? undefined,
-        disposition: r.disposition || 'deduct',
+        disposition: r.disposition || undefined,
         reason: r.reason,
         defectDate: r.defect_date,
         status: r.status,
@@ -1907,6 +1910,8 @@ export async function syncPhase1FromDb() {
         projectNo: r.project_no,
         sourceType: r.source_type,
         sourceId: r.source_id,
+        sourceExpenseKey: r.source_expense_key || undefined,
+        expenseApprovalSnapshot: r.expense_approval_snapshot || undefined,
         amountKrw: r.amount_krw,
         paidAmountKrw: r.paid_amount_krw,
         dueDate: r.due_date,

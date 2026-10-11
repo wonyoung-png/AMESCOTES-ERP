@@ -30,6 +30,9 @@ import inventoryRouter from "./inventory.js";
 import productRegistrationRouter, { startProductRegistrationScheduler } from "./product-registration.js";
 import shopMonitorRouter, { startShopMonitor } from "./shop-monitor.js";
 import { readMonitorSnapshot } from "./channels/index.js";
+import sampleWorkflowRouter from "./sample-workflow.js";
+import defectApprovalRouter from "./defect-approval.js";
+import expensePayableRouter from "./expense-payable.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,6 +90,9 @@ async function startServer() {
   app.use(inventoryRouter);
   app.use(productRegistrationRouter);
   app.use(shopMonitorRouter);
+  app.use(sampleWorkflowRouter);
+  app.use(defectApprovalRouter);
+  app.use(expensePayableRouter);
 
   // OCR 라우터
   app.use(yardageOcrRouter);

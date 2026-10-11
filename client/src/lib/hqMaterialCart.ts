@@ -9,7 +9,7 @@
  * 컬러별로 따로 담는 것이 핵심이다. 컬러를 묶어 품명으로 중복 제거한 뒤
  * 총수량을 곱하면, 컬러마다 소요량이 다른 자재가 틀리게 나온다.
  */
-import { store, getBomForOrderFromList, type Bom, type BomLine, type ColorQty } from './store';
+import { store, getBomForOrderFromList, type Bom, type BomLine, type ColorQty, type Currency } from './store';
 
 /** 장바구니가 받는 모양 */
 export type CartMaterial = {
@@ -17,9 +17,13 @@ export type CartMaterial = {
   netQty: number; lossRate: number;
   vendorName?: string; isHqProvided: boolean;
   imageUrl?: string; unitPriceCny?: number;
+  currency?: Currency; appliedRate?: number;
 };
 
-const toCartMaterial = (l: BomLine): CartMaterial => ({
+// 공용 BomLine 타입이 확장되기 전에도 실제 자재 줄의 통화·환율을 전달한다.
+type ProcurementBomLine = BomLine & { currency?: Currency; appliedRate?: number };
+
+const toCartMaterial = (l: ProcurementBomLine): CartMaterial => ({
   itemName: l.itemName ?? '',
   spec: l.spec ?? '',
   unit: l.unit ?? '',
@@ -29,20 +33,47 @@ const toCartMaterial = (l: BomLine): CartMaterial => ({
   isHqProvided: true,
   imageUrl: (l as any).imageUrl,
   unitPriceCny: (l as any).unitPriceCny ?? (l as any).unitPrice ?? 0,
+  ...(l.currency === undefined ? {} : { currency: l.currency }),
+  ...(l.appliedRate === undefined ? {} : { appliedRate: l.appliedRate }),
 });
 
-const hqOnly = (lines?: BomLine[] | null) => (lines || []).filter(l => l?.isHqProvided).map(toCartMaterial);
+type ProcurementBom = Bom & {
+  preCurrency?: Currency; preExchangeRateCny?: number; preExchangeRateUsd?: number;
+  postExchangeRateCny?: number;
+};
+
+const hqOnly = (lines: BomLine[] | null | undefined, bom: ProcurementBom, isPost: boolean) =>
+  (lines || []).filter(l => l?.isHqProvided).map((l: ProcurementBomLine) => {
+    const currency = l.currency ?? (isPost ? bom.currency : bom.preCurrency ?? bom.currency);
+    const appliedRate = l.appliedRate ?? (currency === 'KRW' ? 1 : currency === 'USD'
+      ? (isPost ? bom.exchangeRateUsd ?? bom.preExchangeRateUsd : bom.preExchangeRateUsd ?? bom.exchangeRateUsd)
+      : currency === 'CNY'
+        ? (isPost ? bom.exchangeRateCny ?? bom.postExchangeRateCny ?? bom.snapshotCnyKrw
+          : bom.preExchangeRateCny ?? bom.snapshotCnyKrw)
+        : undefined);
+    return toCartMaterial({ ...l, currency, appliedRate });
+  });
+
+/** 호출부에서 발주 저장 실패와 구분하여 표시할 수 있는 자재 검증 오류. */
+export class MissingColorBomError extends Error {
+  readonly code = 'MISSING_COLOR_BOM';
+
+  constructor(readonly styleNo: string, readonly missingColors: string[]) {
+    super(`${styleNo || '해당 품목'}: ${missingColors.map(c => c || '(컬러명 없음)').join(', ')} 컬러의 BOM이 없습니다. BOM/원가에서 해당 컬러의 자재를 등록한 뒤 장바구니에 다시 담아 주세요.`);
+    this.name = 'MissingColorBomError';
+  }
+}
 
 /**
  * 컬러가 없는 BOM에서 쓸 자재 줄 — 사후 우선, 없으면 사전.
  * BomManagement 의 "사후원가 우선, 없으면 사전원가 폴백" 규칙과 같다.
  */
-function flatLines(bom: Bom): BomLine[] {
+function flatLines(bom: Bom): { lines: BomLine[]; isPost: boolean } {
   const b = bom as any;
-  if (b.postMaterials?.length) return b.postMaterials;
-  if (b.postColorBoms?.[0]?.lines?.length) return b.postColorBoms[0].lines;
-  if (b.colorBoms?.[0]?.lines?.length) return b.colorBoms[0].lines;
-  return b.lines || [];
+  if (b.postMaterials?.length) return { lines: b.postMaterials, isPost: true };
+  if (b.postColorBoms?.[0]?.lines?.length) return { lines: b.postColorBoms[0].lines, isPost: true };
+  if (b.colorBoms?.[0]?.lines?.length) return { lines: b.colorBoms[0].lines, isPost: false };
+  return { lines: b.lines || [], isPost: false };
 }
 
 /**
@@ -81,7 +112,7 @@ export function pickBomForOrder(
 function hqSignature(groups: ReturnType<typeof hqGroups>): string {
   // 장바구니에 실제로 실리는 칸을 전부 본다. 단가·사진만 달라도 담기는 결과가 달라진다 (코덱스 지적)
   const one = (m: CartMaterial) =>
-    [m.itemName, m.spec, m.unit, m.netQty, m.lossRate, m.vendorName, m.unitPriceCny, m.imageUrl].join('');
+    [m.itemName, m.spec, m.unit, m.netQty, m.lossRate, m.vendorName, m.unitPriceCny, m.imageUrl, m.currency, m.appliedRate].join('');
   return groups
     .map(g => [g.color, g.qty, ...g.mats.map(one).sort()].join(''))
     .sort()
@@ -90,30 +121,39 @@ function hqSignature(groups: ReturnType<typeof hqGroups>): string {
 
 /**
  * 컬러별로 "이 수량에 이 자재들" 묶음을 만든다. 담는 쪽과 보여주는 쪽이 같은 것을 쓴다.
+ * 양수 수량의 컬러 BOM 누락은 모든 묶음을 반환하기 전에 throw한다 (장바구니 변경 없음).
  */
 export function hqGroups(
   bom: Bom | null | undefined,
   colorQtys: ColorQty[] | undefined,
   totalQty: number,
 ): Array<{ color: string; qty: number; mats: CartMaterial[] }> {
-  if (!bom) return [];
+  const picked = (colorQtys || []).filter(cq => (cq?.qty || 0) > 0);
+  if (!bom) {
+    if (picked.length > 0) throw new MissingColorBomError('', picked.map(cq => cq.color));
+    return [];
+  }
   const colorBoms: any[] = (bom as any).postColorBoms?.length
     ? (bom as any).postColorBoms
     : ((bom as any).colorBoms || []);
-  const picked = (colorQtys || []).filter(cq => (cq?.qty || 0) > 0);
 
-  if (colorBoms.length > 0 && picked.length > 0) {
+  if (picked.length > 0) {
+    const matches = picked.map(cq => ({
+      cq,
+      hit: colorBoms.find((cb: any) => (cb?.color || '').trim() === (cq.color || '').trim()),
+    }));
+    const missingColors = matches.filter(({ hit }) => !hit).map(({ cq }) => cq.color);
+    if (missingColors.length > 0) throw new MissingColorBomError(bom.styleNo, missingColors);
     const out: Array<{ color: string; qty: number; mats: CartMaterial[] }> = [];
-    for (const cq of picked) {
-      const hit = colorBoms.find((cb: any) => (cb?.color || '').trim() === (cq.color || '').trim());
-      // 그 컬러의 BOM이 없으면 첫 컬러 것으로 갈음한다 — 안 담는 것보다 낫다
-      const mats = hqOnly(hit?.lines || colorBoms[0]?.lines);
+    for (const { cq, hit } of matches) {
+      const mats = hqOnly(hit.lines, bom, !!(bom as any).postColorBoms?.length);
       if (mats.length > 0) out.push({ color: cq.color, qty: cq.qty, mats });
     }
-    if (out.length > 0) return out;
+    return out;
   }
 
-  const mats = hqOnly(flatLines(bom));
+  const { lines, isPost } = flatLines(bom);
+  const mats = hqOnly(lines, bom, isPost);
   if (mats.length === 0 || totalQty <= 0) return [];
   return [{ color: '', qty: totalQty, mats }];
 }
@@ -127,7 +167,7 @@ export function hqMaterialsForDisplay(groups: ReturnType<typeof hqGroups>): Cart
   const out: CartMaterial[] = [];
   for (const g of groups) {
     for (const m of g.mats) {
-      const key = [m.itemName, m.spec, m.unit, m.vendorName].join('');
+      const key = [m.itemName, m.spec, m.unit, m.vendorName, m.currency, m.unitPriceCny, m.appliedRate].join('');
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(m);

@@ -46,3 +46,27 @@ test('지도는 오늘 공유받은 근거를 표시하되 팀 완료 건수에 
   assert.equal(a.stats.sharedToday, 1);
   assert.equal(a.stats.doneToday, 2);
 });
+
+test('대표 생산 의뢰와 자사몰 제안을 함께 표시하고 원본 연결·조회 실패를 보존한다', () => {
+  const helpers = html.slice(html.indexOf('function brandApprovalItems()'), html.indexOf('function home()'));
+  const shopRows = html.slice(html.indexOf('function shopDecisionRows()'), html.indexOf('function inbox()'));
+  const reviewUrl = html.slice(html.indexOf('function listingReviewUrl('), html.indexOf('function shopMonitorIssues('));
+  const dateHelper = html.slice(html.indexOf('const kst =')).split('\n')[0];
+  const inbox = html.slice(html.indexOf('function inbox()'), html.indexOf('function councilSay('));
+  const render = new Function('D', 'esc', dateHelper + '\n' + helpers + shopRows + reviewUrl + inbox + '\nreturn inbox();');
+  const esc = (v: unknown) => String(v).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
+  const d = { decide: [], captures: [], councils: [], erpUrl: 'https://erp.example.invalid', brandApprovals: [{ id: 'a&b', workspace: 'AETALOOF', title: '<script>', project_no: 'P' }], shopDecisions: [{ listingId: 'listing&1', text: '<shop proposal>', checkedAt: '2026-10-11T00:00:00Z' }] };
+  const output = render(d, esc);
+  assert.match(output, /ws=AETALOOF&amp;batch=a%26b/);
+  assert.match(output, /&lt;script>/);
+  assert.match(output, /자사몰 확인 제안/);
+  assert.match(output, /점검 기준/);
+  assert.match(output, /&lt;shop proposal>/);
+  assert.match(output, /product-registration\?ws=LUMEN&amp;listing=listing%261/);
+  assert.doesNotMatch(output, /<script>/);
+  const failure = render({ ...d, brandApprovals: null }, esc);
+  assert.match(failure, /조회 실패 — 판단 보류/);
+  assert.match(failure, /승인 대기 없음으로 판단하지 않습니다/);
+  assert.match(failure, /&lt;shop proposal>/);
+  assert.match(failure, /product-registration\?ws=LUMEN&amp;listing=listing%261/);
+});

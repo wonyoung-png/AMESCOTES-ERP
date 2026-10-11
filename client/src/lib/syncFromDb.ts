@@ -196,7 +196,7 @@ const TABLE_KEY_MAP: { table: string; key: string; converter?: (row: Record<stri
   }},
   { table: 'samples',           key: 'ames_samples' },
   { table: 'boms',              key: 'ames_boms', converter: convertBomRow },
-  { table: 'production_orders', key: 'ames_orders' },
+  { table: 'production_orders', key: 'ames_orders', converter: row => ({ ...toCamelCase(row), persistedUpdatedAt: row.updated_at }) },
 ];
 // 미지급·입출고·불량차감·발주손익은 syncPhase1FromDb()가 이미 내려받는다.
 // 자재구매(purchase_items)만 빠져 있었는데, 이건 통째로 덮어쓰면 서버에 없던

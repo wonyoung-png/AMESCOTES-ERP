@@ -30,6 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link, ShoppingCart, Printer, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Columns3, Factory, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { onSaveFail } from '@/lib/saveGuard';
+import { pendingSampleLinks, queueSampleLink, retrySampleLink, saveSampleItemLink, scopedSampleLinkStorage } from '@/lib/sampleItemLink';
 import * as XLSX from 'xlsx';
 
 // ─── 공장 원가표 일괄 업로드 타입 ───
@@ -551,7 +552,7 @@ export default function ItemMaster() {
   }>(null);
   const costSheetRef = useRef<HTMLInputElement>(null);
   // 원가표 통화 — 중국 공장은 보통 USD로 보낸다
-  const [costSheetCurrency, setCostSheetCurrency] = useState<'USD' | 'CNY' | 'KRW'>('USD');
+  const [costSheetCurrency, setCostSheetCurrency] = useState<'USD' | 'KRW'>('USD');
   const [editItem, setEditItem] = useState<Partial<Item>>({ ...emptyItem });
   const [isEdit, setIsEdit] = useState(false);
   // 변경사항 추적
@@ -853,7 +854,10 @@ export default function ItemMaster() {
             erpCategory: itemData.erpCategory,
             lineName: '',
             manufacturingCountry: '중국',
-            currency: 'CNY',
+            currency: 'USD',
+            preCurrency: 'USD',
+            exchangeRateUsd: store.getSettings().usdKrw,
+            preExchangeRateUsd: store.getSettings().usdKrw,
             snapshotCnyKrw: cnyKrwRate,
             exchangeRateCny: cnyKrwRate,
             lines: [],
@@ -997,7 +1001,11 @@ export default function ItemMaster() {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
       const existingBom = (boms as any[]).find(b => b.styleId === itemId || b.styleNo === (items as Item[]).find(i => i.id === itemId)?.styleNo);
-      const fallback = existingBom?.exchangeRateCny ?? 191;
+      if (existingBom && (existingBom.currency || 'CNY') === 'CNY') {
+        toast.error('과거 CNY 원가표는 일괄 업로드에서 변경할 수 없습니다. 원가 관리에서 별도 USD 원가를 작성해주세요.');
+        return;
+      }
+      const fallback = existingBom?.currency === 'KRW' ? 1 : existingBom?.exchangeRateUsd || store.getSettings().usdKrw;
       const { materials, parsedProcessingFee, parsedRate, postProcessLines } = parseExcelBomSheet(raw, fallback);
       setBatchCostItems(prev => prev.map(bi =>
         bi.item.id === itemId
@@ -1043,7 +1051,7 @@ export default function ItemMaster() {
             postMaterials: newPostMaterials,
             postProcessingFee: newProcessingFee,
             postProcessLines: newPostProcLines,
-            exchangeRateCny: exchangeRateCny || bi.bom.exchangeRateCny,
+            ...(bi.bom.currency === 'KRW' ? {} : { exchangeRateUsd: exchangeRateCny || bi.bom.exchangeRateUsd }),
             // 패킹자재·포장/검사비: 엑셀 업로드로 변경 안됨 — 기존 BOM 값 유지
             packagingCostKrw: bi.bom.packagingCostKrw ?? 0,
             packingCostKrw: bi.bom.packingCostKrw ?? 0,
@@ -1052,6 +1060,9 @@ export default function ItemMaster() {
           updatedBom = {
             id: genId(), styleNo: bi.item.styleNo, styleId: bi.item.id, styleName: bi.item.name,
             colorBoms: [],
+            currency: 'USD', preCurrency: 'USD',
+            exchangeRateUsd: exchangeRateCny || store.getSettings().usdKrw,
+            preExchangeRateUsd: exchangeRateCny || store.getSettings().usdKrw,
             postColorBoms: [{ color: '기본', lines: materials.map(l => ({ ...l, id: genId() })), postProcessLines: postProcessLines.map(l => ({ ...l, id: genId() })), processingFee: processingFee || 0 }],
             postMaterials: materials.map(l => ({ ...l, id: genId() })),
             postProcessingFee: processingFee || 0,
@@ -1575,10 +1586,13 @@ export default function ItemMaster() {
     setEditItem(prev => ({ ...prev, styleNo: generated }));
   }, [selectedVendorId, editItem.brandCode, registDate, editItem.category, editItem.erpCategory, manualStyleNo, isEdit, editItem.id, vendors, items]);
 
-  const openAdd = (prefill?: { styleNo?: string; buyerId?: string; season?: string; styleName?: string; imageUrl?: string }) => {
+  const sampleForNewItem = useRef<string | null>(null);
+  const openAdd = (prefill?: { styleNo?: string; buyerId?: string; season?: string; styleName?: string; imageUrl?: string; sampleId?: string }) => {
     // 샘플에서 넘어온 prefill 확인
     const storedPrefill = localStorage.getItem('ames_prefill_item');
     const pf = prefill || (storedPrefill ? JSON.parse(storedPrefill) : null);
+    sampleForNewItem.current = pf?.sampleId || null;
+    sessionStorage.removeItem('ames_link_sampleId');
     if (storedPrefill) localStorage.removeItem('ames_prefill_item');
 
     setEditItem({
@@ -1635,7 +1649,6 @@ export default function ItemMaster() {
           localStorage.removeItem('ames_prefill_item');
         } catch { /* 무시 */ }
       }
-      if (pf.sampleId) sessionStorage.setItem('ames_link_sampleId', pf.sampleId);
       openAdd(pf);
       navigate('/items', { replace: true });
       return;
@@ -1645,7 +1658,6 @@ export default function ItemMaster() {
     if (storedPrefill) {
       try {
         const pf = JSON.parse(storedPrefill);
-        if (pf.sampleId) sessionStorage.setItem('ames_link_sampleId', pf.sampleId);
         openAdd(pf);
       } catch {
         localStorage.removeItem('ames_prefill_item');
@@ -1694,7 +1706,7 @@ export default function ItemMaster() {
       const raw = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1, defval: null });
       const existing = (boms as any[]).find(b => b.styleId === editItem.id || b.styleNo === editItem.styleNo);
       const { materials, parsedProcessingFee, parsedRate, postProcessLines } =
-        parseExcelBomSheet(raw, existing?.exchangeRateCny ?? 191);
+        parseExcelBomSheet(raw, costSheetCurrency === 'KRW' ? 1 : existing?.exchangeRateUsd || store.getSettings().usdKrw);
       if (!materials.length) { toast.error('원가표에서 자재를 읽지 못했습니다'); return; }
       setCostSheetData({ materials, processingFee: parsedProcessingFee, exchangeRateCny: parsedRate, postProcessLines });
       setCostSheetName(file.name);
@@ -1717,6 +1729,8 @@ export default function ItemMaster() {
     const base = existing || {
       id: genId(), styleId: item.id, styleNo: item.styleNo, styleName: item.name,
       version: 1, season: item.season, lines: [], postProcessLines: [], processingFee: 0,
+      currency: costSheetCurrency, preCurrency: costSheetCurrency,
+      exchangeRateUsd: store.getSettings().usdKrw, preExchangeRateUsd: store.getSettings().usdKrw,
       snapshotCnyKrw: exchangeRateCny || 191, colorBoms: [], postColorBoms: [],
       productionMarginRate: 0.16, logisticsCostKrw: 0, packagingCostKrw: 0, packingCostKrw: 0,
       pnl: { discountRate: 0.05, platformFeeRate: 0.30, sgaRate: 0.10 },
@@ -1730,8 +1744,6 @@ export default function ItemMaster() {
           preProcessingFee: processingFee || 0,
           postProcessLines: withIds(postProcessLines),
           colorBoms: colors.map(color => ({ color, lines: withIds(materials), postProcessLines: withIds(postProcessLines), processingFee: processingFee || 0 })),
-          exchangeRateCny: exchangeRateCny || base.exchangeRateCny,
-          snapshotCnyKrw: exchangeRateCny || base.snapshotCnyKrw,
         }
       : {
           ...base,
@@ -1739,12 +1751,15 @@ export default function ItemMaster() {
           postProcessingFee: processingFee || 0,
           postProcessLines: withIds(postProcessLines),
           postColorBoms: colors.map(color => ({ color, lines: withIds(materials), postProcessLines: withIds(postProcessLines), processingFee: processingFee || 0 })),
-          exchangeRateCny: exchangeRateCny || base.exchangeRateCny,
-          snapshotCnyKrw: exchangeRateCny || base.snapshotCnyKrw,
         };
     // 원가표에 적힌 환율은 '그 통화 → KRW'. 고른 통화 자리에 넣는다
-    bom.currency = costSheetCurrency;
-    if (costSheetCurrency === 'USD') bom.exchangeRateUsd = exchangeRateCny || bom.exchangeRateUsd;
+    if (costSheetMode === 'pre') {
+      bom.preCurrency = costSheetCurrency;
+      if (costSheetCurrency === 'USD') bom.preExchangeRateUsd = exchangeRateCny || bom.preExchangeRateUsd || store.getSettings().usdKrw;
+    } else {
+      bom.currency = costSheetCurrency;
+      if (costSheetCurrency === 'USD') bom.exchangeRateUsd = exchangeRateCny || bom.exchangeRateUsd || store.getSettings().usdKrw;
+    }
     const { totalCostKrw, factoryUnitCostKrw } = calcBomCosts(bom);
     if (costSheetMode === 'post') { bom.postSubtotalKrw = totalCostKrw; bom.postTotalCostKrw = totalCostKrw; }
     if (factoryUnitCostKrw > 0) bom.pnl = { ...(bom.pnl || {}), factoryUnitCostKrw };
@@ -1759,8 +1774,37 @@ export default function ItemMaster() {
     toast.success(`${costSheetMode === 'pre' ? '사전' : '사후'}원가 반영 — 원가 ${formatKRW(totalCostKrw)}`);
   };
 
+  const linkStorage = () => scopedSampleLinkStorage(localStorage, store.getCurrentUser()?.id || '');
+  const retryLink = async (link: { sampleId: string; itemId: string; styleNo?: string }) => {
+    const { db } = await import('@/lib/db');
+    // Re-queue idempotently, including recovery after a transient storage failure.
+    const storage = linkStorage();
+    queueSampleLink(storage, link);
+    await retrySampleLink(storage, link, value => saveSampleItemLink(db, value));
+    queryClient.invalidateQueries({ queryKey: ['samples'] });
+  };
+  const notifyLinkFailure = (link: { sampleId: string; itemId: string; styleNo?: string }) => {
+    toast.warning(`품목 ${link.styleNo || link.itemId}은 저장됐지만 샘플 연결은 완료되지 않았습니다`, {
+      duration: 15000,
+      action: { label: '연결 재시도', onClick: () => {
+        retryLink(link).then(() => toast.success('샘플 연결이 완료되었습니다'))
+          .catch((e: Error) => toast.error(`샘플 연결 실패: ${e.message}`));
+      } },
+    });
+  };
+  useEffect(() => {
+    try { pendingSampleLinks(linkStorage()).forEach(notifyLinkFailure); }
+    catch { toast.error('샘플 연결 대기 정보를 읽지 못했습니다 — 원본 확인이 필요합니다'); }
+  }, []);
+
   const handleSave = () => {
     if (!editItem.styleNo || !editItem.name) { toast.error('스타일번호와 품명을 입력하세요'); return; }
+    if (!isEdit && sampleForNewItem.current) {
+      try {
+        const pending = pendingSampleLinks(linkStorage()).find(l => l.sampleId === sampleForNewItem.current);
+        if (pending) { notifyLinkFailure(pending); toast.error('이 샘플의 품목은 이미 등록되었습니다 — 연결만 재시도해주세요'); return; }
+      } catch { toast.error('샘플 연결 대기 정보를 확인하지 못했습니다 — 중복 등록을 방지하기 위해 저장하지 않았습니다'); return; }
+    }
     if (!isEdit) {
       const dup = (items as Item[]).find(it => it.styleNo === editItem.styleNo);
       if (dup) { toast.error(`스타일번호 '${editItem.styleNo}'는 이미 등록되어 있습니다`); return; }
@@ -1820,6 +1864,7 @@ export default function ItemMaster() {
           ...(isPack ? { baseCostKrw: packTotal } : {}),
         } as Item;
 
+    const linkedSampleId = !isEdit ? sampleForNewItem.current : null;
     upsertItem(itemData)
       .then(async () => {
         if (costSheetData) await applyCostSheet(itemData);
@@ -1838,20 +1883,13 @@ export default function ItemMaster() {
         }
         if (!isEdit) {
           // 샘플-품목 연결
-          const linkedSampleId = sessionStorage.getItem('ames_link_sampleId');
           if (linkedSampleId) {
+            const link = { sampleId: linkedSampleId, itemId: itemData.id, styleNo: itemData.styleNo };
             try {
-              const { upsertSample } = await import('@/lib/dbQueries');
-              const samples = (await import('@/lib/dbQueries').then(m => m.fetchSamples()));
-              const linkedSample = samples.find((s: any) => s.id === linkedSampleId);
-              if (linkedSample) {
-                await upsertSample({ ...linkedSample, styleId: itemData.id, styleNo: itemData.styleNo });
-                toast.success(`품목 등록 완료 — 샘플 "${linkedSample.styleName}"에 연결되었습니다`);
-              } else {
-                toast.success('품목이 등록되었습니다');
-              }
-            } catch { toast.success('품목이 등록되었습니다'); }
-            sessionStorage.removeItem('ames_link_sampleId');
+              queueSampleLink(linkStorage(), link);
+              await retryLink(link);
+              toast.success('품목 등록 및 샘플 연결이 완료되었습니다');
+            } catch { notifyLinkFailure(link); }
           } else {
             toast.success('품목이 등록되었습니다');
           }
@@ -3253,11 +3291,10 @@ export default function ItemMaster() {
                 </select>
                 <select
                   value={costSheetCurrency}
-                  onChange={e => setCostSheetCurrency(e.target.value as 'USD' | 'CNY' | 'KRW')}
+                  onChange={e => setCostSheetCurrency(e.target.value as 'USD' | 'KRW')}
                   className="h-8 text-xs border border-border rounded-md bg-card px-2"
                 >
                   <option value="USD">$ USD</option>
-                  <option value="CNY">¥ CNY</option>
                   <option value="KRW">₩ KRW</option>
                 </select>
                 <input ref={costSheetRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleCostSheetPick} />
