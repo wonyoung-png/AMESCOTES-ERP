@@ -11,7 +11,7 @@ function filter(conditions: string[], visibility: string) {
 export function workPageQuery(me: Actor, visibility: string, before?: WorkCursor) {
   const conditions = [`or(kind.neq.question,created_by.eq.${JSON.stringify(me.id)})`];
   if (before) {
-    if (!/^wc_[a-z0-9]{1,40}$/.test(before.id) || typeof before.created_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|\+00:00)$/.test(before.created_at) || !Number.isFinite(Date.parse(before.created_at))) throw new Error('invalid_cursor');
+    if (!/^wc_[a-z0-9]{1,40}$/.test(before.id) || typeof before.created_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(before.created_at) || !Number.isFinite(Date.parse(before.created_at))) throw new Error('invalid_cursor');
     conditions.push(`or(created_at.lt.${before.created_at},and(created_at.eq.${before.created_at},id.lt.${before.id}))`);
   }
   return `work_cards?select=*&order=created_at.desc,id.desc&limit=200&${filter(conditions, visibility)}`;

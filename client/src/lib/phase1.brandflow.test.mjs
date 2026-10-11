@@ -49,19 +49,19 @@ const mod = await import(
 const { phase1 } = mod;
 
 // ── 준비: 승인 완료 배치 1건, 라인 3개 (다산 경유 2 · 패키지공장 직발주 1)
-const batch = phase1.createBrandBatch('LUMEN', '검증용 발주');
+const batch = await phase1.createBrandBatch('LUMEN', '검증용 발주');
 phase1.updateBrandBatch(batch.id, { status: 'approved', approvalStep: 6 });
 const L = [
   { styleNo: 'LLL5F700B', styleName: '파니에 백', factoryId: 'F-A', factoryName: '다산', route: 'oem', qty: 50 },
   { styleNo: 'LLL5F780B', styleName: '마론백', factoryId: 'F-A', factoryName: '다산', route: 'oem', qty: 30 },
   { styleNo: 'LPKG-BOX', styleName: '패키지 박스', factoryId: 'F-B', factoryName: '패키지공장', route: 'direct', qty: 500 },
 ];
-L.forEach(l => phase1.addBrandLine(batch.id, {
+for (const l of L) await phase1.addBrandLine(batch.id, {
   ...l, colorQtys: [{ color: '기본', qty: l.qty }], productionOrigin: 'china', isEmployeePurchase: false,
-}));
+});
 
 // ── 1. 제목이 비어도 만들어져야 한다 (버튼이 죽은 것처럼 보이던 원인)
-const auto = phase1.createBrandBatch('LUMEN');
+const auto = await phase1.createBrandBatch('LUMEN');
 assert.ok(auto.title.trim(), '제목이 비면 발주번호로 지어야 한다');
 
 // ── 2. 발행 = (공장 × 경로)별 1장
@@ -91,7 +91,7 @@ phase1.markPOAccepted(oem.poNo);
 assert.equal(phase1.getInboundPOs().length, 0, '받은 발주서는 수주함에서 빠져야 한다');
 
 // ── 5. 승인 안 된 배치는 발행되지 않는다
-const draft = phase1.createBrandBatch('LUMEN', '작성중');
+const draft = await phase1.createBrandBatch('LUMEN', '작성중');
 assert.equal(phase1.issueBrandBatch(draft.id).length, 0, '승인 전에는 발행되면 안 된다');
 
 console.log('✓ 발행 2장(경유1·직발주1) · 수주함 경유만 · 수령 후 제외 · 미승인 차단 — 통과');

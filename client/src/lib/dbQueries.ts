@@ -967,8 +967,8 @@ export async function deleteMaterial(id: string) {
 // PURCHASE ITEMS
 // ─────────────────────────────────────────────
 
-export async function fetchPurchaseItems(): Promise<PurchaseItem[]> {
-  return withLocalFallback<PurchaseItem>(async () => {
+export async function fetchPurchaseItems(options: { strict?: boolean } = {}): Promise<PurchaseItem[]> {
+  const remote = async (): Promise<PurchaseItem[]> => {
   const { data, error } = await db
     .from('purchase_items')
     .select('*')
@@ -996,7 +996,8 @@ export async function fetchPurchaseItems(): Promise<PurchaseItem[]> {
     projectNo: row.project_no || undefined,
     styleNo: row.style_no || undefined,
   }));
-  }, () => store.getPurchaseItems());
+  };
+  return options.strict ? remote() : withLocalFallback(remote, () => store.getPurchaseItems());
 }
 
 export async function upsertPurchaseItem(item: Record<string, any>): Promise<void> {
@@ -1020,6 +1021,8 @@ export async function upsertPurchaseItem(item: Record<string, any>): Promise<voi
     memo: item.memo || null,
   };
   if (item.projectNo != null) row.project_no = item.projectNo;
+  const { error } = await db.from('purchase_items').upsert(row, { onConflict: 'id' });
+  if (error) throw error;
   // local 캐시 (프로젝트 손익 집계용)
   try {
     const key = 'ames_purchases';
@@ -1051,8 +1054,6 @@ export async function upsertPurchaseItem(item: Record<string, any>): Promise<voi
     else list.push(local);
     localStorage.setItem(key, JSON.stringify(list));
   } catch { /* ignore */ }
-  const { error } = await db.from('purchase_items').upsert(row, { onConflict: 'id' });
-  if (error) throw error;
 }
 
 export async function deletePurchaseItem(id: string): Promise<void> {

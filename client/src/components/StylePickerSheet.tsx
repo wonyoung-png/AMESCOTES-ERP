@@ -4,7 +4,7 @@
 // 드롭다운 하나로는 500개를 못 고른다. 그래서 사진 격자 + 검색 + 필터다.
 //
 // 공장·경로는 대부분 한 발주 안에서 같다. 위에서 한 번만 정하고 담은 것 전부에 건다.
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { store, normalizeColors, type Item } from '@/lib/store';
 import { calcPostSummary } from '@/lib/costing';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -37,7 +37,7 @@ export default function StylePickerSheet({
   open: boolean;
   onOpenChange: (o: boolean) => void;
   factories: { id: string; name: string }[];
-  onAdd: (lines: PickedLine[], factoryId: string, route: 'oem' | 'direct') => void;
+  onAdd: (lines: PickedLine[], factoryId: string, route: 'oem' | 'direct') => Promise<void>;
 }) {
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('all');
@@ -47,6 +47,8 @@ export default function StylePickerSheet({
   const [route, setRoute] = useState<'oem' | 'direct'>('oem');
   /** styleNo → { 컬러명: 수량 } */
   const [qtys, setQtys] = useState<Record<string, Record<string, number>>>({});
+  const [saving, setSaving] = useState(false);
+  const savePending = useRef(false);
 
   const items = useMemo(() => store.getItems(), [open]);
   const boms = useMemo(() => store.getBoms(), [open]);
@@ -100,27 +102,41 @@ export default function StylePickerSheet({
     (s, l) => s + l.unitCostKrw * l.colorQtys.reduce((t, c) => t + c.qty, 0), 0,
   );
 
-  const setQty = (styleNo: string, colorName: string, n: number) =>
+  const setQty = (styleNo: string, colorName: string, n: number) => {
+    if (savePending.current) return;
     setQtys(prev => ({ ...prev, [styleNo]: { ...(prev[styleNo] || {}), [colorName]: Math.max(0, n) } }));
+  };
 
-  const submit = () => {
-    onAdd(picked, factoryId, route);
-    setQtys({});
-    onOpenChange(false);
+  const submit = async () => {
+    if (savePending.current || picked.length === 0) return;
+    savePending.current = true;
+    setSaving(true);
+    try {
+      await onAdd(picked, factoryId, route);
+      setQtys({});
+      onOpenChange(false);
+    } catch {
+      // The page reports the save error; keep the inputs available for retry.
+    } finally {
+      savePending.current = false;
+      setSaving(false);
+    }
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-3xl flex flex-col p-0 gap-0">
+    <Sheet open={open} onOpenChange={nextOpen => { if (!savePending.current) onOpenChange(nextOpen); }}>
+      <SheetContent side="right" className="w-full sm:max-w-3xl flex flex-col p-0 gap-0"
+        onEscapeKeyDown={e => { if (savePending.current) e.preventDefault(); }}
+        onInteractOutside={e => { if (savePending.current) e.preventDefault(); }}>
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-border">
           <SheetTitle>발주 상품 담기</SheetTitle>
           <div className="flex items-center gap-2 pt-2">
-            <select value={factoryId} onChange={e => setFactoryId(e.target.value)}
+            <select value={factoryId} disabled={saving} onChange={e => { if (!savePending.current) setFactoryId(e.target.value); }}
               className="h-9 text-sm border border-border rounded-md bg-card px-2 min-w-[10rem]">
               <option value="">공장 미지정</option>
               {factories.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
-            <select value={route} onChange={e => setRoute(e.target.value as 'oem' | 'direct')}
+            <select value={route} disabled={saving} onChange={e => { if (!savePending.current) setRoute(e.target.value as 'oem' | 'direct'); }}
               className="h-9 text-sm border border-border rounded-md bg-card px-2">
               <option value="oem">AMESCOTES 경유</option>
               <option value="direct">공장 직발주</option>
@@ -133,21 +149,21 @@ export default function StylePickerSheet({
         <div className="px-5 py-3 border-b border-border space-y-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input value={q} onChange={e => setQ(e.target.value)}
+            <Input value={q} disabled={saving} onChange={e => { if (!savePending.current) setQ(e.target.value); }}
               placeholder="스타일번호 · 품명으로 검색" className="pl-9 h-9" />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <select value={cat} onChange={e => setCat(e.target.value)}
+            <select value={cat} disabled={saving} onChange={e => { if (!savePending.current) setCat(e.target.value); }}
               className="h-8 text-xs border border-border rounded-md bg-card px-2">
               <option value="all">전체 카테고리</option>
               {cats.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <select value={season} onChange={e => setSeason(e.target.value)}
+            <select value={season} disabled={saving} onChange={e => { if (!savePending.current) setSeason(e.target.value); }}
               className="h-8 text-xs border border-border rounded-md bg-card px-2">
               <option value="all">전체 시즌</option>
               {seasons.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
-            <select value={color} onChange={e => setColor(e.target.value)}
+            <select value={color} disabled={saving} onChange={e => { if (!savePending.current) setColor(e.target.value); }}
               className="h-8 text-xs border border-border rounded-md bg-card px-2">
               <option value="all">전체 컬러</option>
               {colors.map(c => <option key={c} value={c}>{c}</option>)}
@@ -189,7 +205,7 @@ export default function StylePickerSheet({
                         <div key={c.name} className="flex items-center gap-1.5">
                           <span className="flex-1 min-w-0 text-[11px] text-muted-foreground truncate">{c.name}</span>
                           <Input
-                            type="number" min={0} inputMode="numeric"
+                            type="number" min={0} inputMode="numeric" disabled={saving}
                             value={mine[c.name] || ''}
                             onChange={e => setQty(i.styleNo, c.name, Number(e.target.value) || 0)}
                             className="h-7 w-16 text-right text-xs"
@@ -217,8 +233,8 @@ export default function StylePickerSheet({
             </p>
             <p className="text-lg font-bold text-foreground tabular-nums">{won(totalKrw)}</p>
           </div>
-          <Button className="ml-auto" disabled={picked.length === 0} onClick={submit}>
-            발주에 담기
+          <Button className="ml-auto" disabled={saving || picked.length === 0} onClick={submit}>
+            {saving ? '저장 중…' : '발주에 담기'}
           </Button>
         </div>
       </SheetContent>

@@ -258,6 +258,13 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
   assert.equal((await harness.read('team_agent_runs?trigger=eq.schedule&select=id')).length, 2);
   assert.deepEqual(harness.calls, { classify: 4, answer: 1, report: 3 });
   pass('scheduled_report_clock_gate_failed_ai_retry_success_without_duplicate');
+  let capacity;
+  if (process.env.ERP_BROWSER_CAPACITY === '1') {
+    const { verifyBrowserCapacity } = await import('./work-browser-capacity.mjs');
+    capacity = await verifyBrowserCapacity({ browser, client, harness, password, bossContext: contexts.boss.context, ceoProof: api.ceoProof });
+    pass('25_browser_sessions_1000_actual_http_db_records_and_14_team_reports');
+    console.log('CAPACITY ' + JSON.stringify(capacity));
+  }
   for (const table of ['production_orders', 'trade_statements', 'settlements', 'payables']) assert.equal((await harness.read(table + '?select=id')).length, 0);
   assert.deepEqual(errors, []);
   pass('no_financial_rows_no_browser_runtime_errors');
@@ -265,10 +272,11 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
     schemaSnapshot: { extractedAt: snapshot.extractedAt, sourceVersion: snapshot.sourceVersion, sha256: snapshot.sha256 },
     frontend: 'actual Login/WorkHub/WorkChatWidget/OperationalCalendar/CEO console; test wrapper instead of full ERP shell',
     database: 'real local PostgreSQL and PostgREST 12.2.12; production schema only, no company rows', financialWrites: 0,
-    limits: ['No real Google OAuth', 'Scheduler tick simulated clock, one synthetic team; no wall-clock timer or 14-team load test', 'No live model', 'No production browser writes', 'No 25-user browser load test'], calls: harness.calls };
+    limits: ['No real Google OAuth', 'Scheduler tick simulated clock, no wall-clock timer', 'No live model', 'No production browser writes',
+      ...(capacity ? ['Capacity timing is local, not a production SLA'] : ['No 14-team or 25-user browser load test'])], capacity, calls: harness.calls };
 } catch (error) {
   failure = error;
-  console.error('BROWSER_CHAIN_FAILED: ' + error.message);
+  console.error('BROWSER_CHAIN_FAILED: ' + error.stack);
   if (debugPage) {
     let timer;
     try {

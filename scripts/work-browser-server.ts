@@ -13,8 +13,9 @@ import ceoRouter, { ceoHostGate, ceoHostLock } from '../server/ceo';
 import { restAsServer, requireUser } from '../server/auth';
 import { workHttpLlmCases } from './e2e-work-http';
 import { createAgentSchedulerTick } from '../server/agent-scheduler';
-import { completedScheduleTeams, runAgentsOnce } from '../server/agents';
+import { completedScheduleTeams, runAgentsOnce, fillScheduleTeams, loadReportContext, reportTeams } from '../server/agents';
 import { allRows } from '../server/work-records';
+import { ORG } from '../server/org';
 
 assert.equal(process.env.ERP_BROWSER_ISOLATED, '20261010');
 assert.equal(process.env.POSTGREST_URL, 'http://127.0.0.1:4192');
@@ -26,6 +27,9 @@ const nativeFetch = globalThis.fetch;
 export const calls = { classify: 0, answer: 0, report: 0 };
 export const blocked: string[] = [];
 let truncateNextReport = false;
+let capacityFixtures = false;
+export const enableCapacityFixtures = () => { capacityFixtures = true; };
+export const capacityTeams = ORG.map(team => team.key);
 export const failNextReport = () => { truncateNextReport = true; };
 export const inputs = workHttpLlmCases('2026-10-20');
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -37,15 +41,20 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     let output: string;
     if (system.includes('업무 카드로 바꾼다')) {
       calls.classify++;
-      const example = Object.values(inputs).find(value => value.text === message);
-      assert.ok(example, 'Unexpected classifier fixture');
-      output = JSON.stringify(example.response);
+      if (capacityFixtures && /^E2E_LOAD_\d{2}_\d{2}$/.test(message)) {
+        output = JSON.stringify({ kind: 'todo', relatedId: null, parsed: { summary: message, dueDate: '2099-12-31', shareTeams: [] } });
+      } else {
+        const example = Object.values(inputs).find(value => value.text === message);
+        assert.ok(example, 'Unexpected classifier fixture');
+        output = JSON.stringify(example.response);
+      }
     } else {
-      assert.match(message, /discountRate[^\d]*20/, 'Final decision must reach model prompt');
+      if (!capacityFixtures) assert.match(message, /discountRate[^\d]*20/, 'Final decision must reach model prompt');
       if (system.includes('팀 감독 에이전트')) {
         calls.report++;
         assert.match(message, /다른 팀에서 공유받은 근거/);
-        output = JSON.stringify({ headline: '10/20 확정 20% · 준비 미확인', summary: '· 최종 할인율은 20%입니다.\n· 마케팅·물류 준비 미확인입니다. 공유는 준비 완료 근거가 아닙니다.', needs: [] });
+        output = capacityFixtures ? JSON.stringify({ headline: '격리 부하검증 보고', summary: '· 합성 업무의 규칙 집계 검증입니다.\n· 외부 운영 자료는 미확인입니다.', needs: [] })
+          : JSON.stringify({ headline: '10/20 확정 20% · 준비 미확인', summary: '· 최종 할인율은 20%입니다.\n· 마케팅·물류 준비 미확인입니다. 공유는 준비 완료 근거가 아닙니다.', needs: [] });
       } else {
         calls.answer++;
         output = '최종 할인율은 20%입니다. 마케팅·물류 준비 미확인입니다.';
@@ -83,6 +92,11 @@ export const scheduledMarketingTick = createAgentSchedulerTick({
     for (const team of teams) saved += completedScheduleTeams(await runAgentsOnce('schedule', team) || []).length;
     return saved;
   },
+});
+export const scheduledAllTeamsTick = createAgentSchedulerTick({
+  completed: async (dayStart, signal) => completedScheduleTeams(await allRows(`team_agent_runs?trigger=eq.schedule&created_at=gte.${dayStart}&select=team,stats&order=created_at.asc,id.asc`, path => restAsServer(path, { signal }))),
+  targets: async () => reportTeams((await loadReportContext()).cards),
+  fill: fillScheduleTeams,
 });
 export const users = [
   { id: 'e2e_boss', email: 'wonyoung@atlm.kr', name: '테스트 대표', role: '대표', team: '대표실', position: '대표' },

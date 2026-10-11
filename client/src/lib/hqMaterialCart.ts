@@ -144,11 +144,12 @@ export function addHqMaterialsToCart(
   groups: ReturnType<typeof hqGroups>,
   styleNo: string,
   styleName: string,
+  orderRef?: { id: string; orderNo: string },
 ): number {
   try {
     let added = 0;
     for (const g of groups) {
-      store.addToMaterialCart(styleNo, styleName, g.mats, g.qty);
+      store.addToMaterialCart(styleNo, styleName, g.mats, g.qty, orderRef);
       added += g.mats.length;
     }
     return added;

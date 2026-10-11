@@ -68,7 +68,7 @@ export default function PurchaseMatching() {
   const queryClient = useQueryClient();
   const { data: purchases = [] } = useQuery({
     queryKey: ['purchaseItems'],
-    queryFn: fetchPurchaseItems,
+    queryFn: () => fetchPurchaseItems(),
   });
   const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
   const { data: allVendorsData = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });

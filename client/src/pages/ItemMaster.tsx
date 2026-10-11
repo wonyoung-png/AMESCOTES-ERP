@@ -6,7 +6,7 @@ import { calcPostSummary } from '@/lib/costing';
 import { nextOrderNo, parseRevision } from '@/lib/orderNo';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { store, genId, formatKRW, normalizeColors, type Item, type ItemColor, type Season, type Category, type ErpCategory, type PackingSize, type ProductionOrder, type ColorQty, type Vendor, normalizeBrands } from '@/lib/store';
-import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, fetchBomsLight, updateItemCostData, saveConfirmedSalePrice, fetchMaterials, fetchOrders } from '@/lib/dbQueries';
+import { fetchItems, upsertItem, upsertBom, deleteItem as deleteItemSB, fetchVendors, fetchBoms, fetchBomsLight, updateItemCostData, saveConfirmedSalePrice, fetchMaterials, fetchOrders, upsertOrder } from '@/lib/dbQueries';
 import { PackBomEditor } from '@/components/PackBomEditor';
 import {
   applyPackLinesToBom, createEmptyPackBom, linesFromPackBom, packLinesTotal, type PackBomLine,
@@ -3808,13 +3808,29 @@ function MultiBulkOrderModal({
   const [postOrderState, setPostOrderState] = useState<PostOrderState | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const isInputLocked = () => submitLockRef.current || batchAttemptRef.current !== null;
+  const changeFactory = (value: string) => {
+    if (isInputLocked()) return;
+    setFactoryId(value);
+  };
+  const changeOrderDate = (value: string) => {
+    if (isInputLocked()) return;
+    setOrderDate(value);
+  };
+  const changeDeliveryDate = (value: string) => {
+    if (isInputLocked()) return;
+    setDeliveryDate(value);
+  };
+
   const toggleItem = (itemId: string) => {
+    if (isInputLocked()) return;
     setItemStates(prev => prev.map(s =>
       s.item.id === itemId ? { ...s, enabled: !s.enabled } : s
     ));
   };
 
   const setColorQty = (itemId: string, colorName: string, qty: number) => {
+    if (isInputLocked()) return;
     setItemStates(prev => prev.map(s => {
       if (s.item.id !== itemId) return s;
       return {
@@ -3825,6 +3841,7 @@ function MultiBulkOrderModal({
   };
 
   const updateColorDetail = (itemId: string, colorName: string, field: keyof Omit<BulkColorQty, 'color' | 'qty'>, value: string) => {
+    if (isInputLocked()) return;
     setItemStates(prev => prev.map(s => {
       if (s.item.id !== itemId) return s;
       return {
@@ -3836,6 +3853,7 @@ function MultiBulkOrderModal({
 
   // 컬러 상세정보 변경 후 포커스 아웃 시 품목 마스터에 즉각 저장
   const saveColorDetailToMaster = (itemId: string, colorName: string, field: keyof Omit<BulkColorQty, 'color' | 'qty'>, value: string) => {
+    if (isInputLocked()) return;
     const currentItem = store.getItems().find(i => i.id === itemId);
     if (!currentItem) return;
     const currentColors = normalizeColors(currentItem.colors || []);
@@ -3855,6 +3873,7 @@ function MultiBulkOrderModal({
   };
 
   const addColorToItem = (itemId: string, colorName: string) => {
+    if (isInputLocked()) return;
     const trimmed = colorName.trim();
     if (!trimmed) return;
     // 품목 마스터에서 기존 컬러 정보 로드
@@ -3879,6 +3898,7 @@ function MultiBulkOrderModal({
   };
 
   const removeColorFromItem = (itemId: string, colorName: string) => {
+    if (isInputLocked()) return;
     setItemStates(prev => prev.map(s => {
       if (s.item.id !== itemId) return s;
       return { ...s, colorQtys: s.colorQtys.filter(cq => cq.color !== colorName) };
@@ -3920,113 +3940,157 @@ function MultiBulkOrderModal({
     return Object.values(summary);
   }, [itemStates]);
 
+  // 실패한 시도의 주문 ID/발주번호/수량을 보존해 같은 창에서 안전하게 이어간다.
+  const batchAttemptRef = useRef<{
+    states: BulkOrderItemState[];
+    factory: Vendor;
+    orderDate: string;
+    deliveryDate: string;
+    summary: typeof hqMaterialPreview;
+    entries: Map<string, {
+      order: ProductionOrder;
+      cartMaterials: Parameters<typeof store.addToMaterialCart>[2];
+      saved: boolean;
+      cartAdded: boolean;
+    }>;
+  } | null>(null);
+  const submitLockRef = useRef(false);
+
   const handleSubmit = async () => {
-    if (!factoryId) { toast.error('공장을 선택해주세요'); return; }
-    const factory = vendors.find(v => v.id === factoryId);
+    if (submitLockRef.current || postOrderState) return;
+    if (!batchAttemptRef.current && !factoryId) { toast.error('공장을 선택해주세요'); return; }
+    const factory = batchAttemptRef.current?.factory ?? vendors.find(v => v.id === factoryId);
     if (!factory) return;
 
-    const enabledStates = itemStates.filter(s => s.enabled);
+    const enabledStates = batchAttemptRef.current?.states ?? itemStates.filter(s => s.enabled);
     if (enabledStates.length === 0) { toast.error('발주할 품목을 하나 이상 선택해주세요'); return; }
 
     const hasQty = enabledStates.some(s => s.colorQtys.reduce((sum, cq) => sum + cq.qty, 0) > 0);
     if (!hasQty) { toast.error('수량을 입력해주세요'); return; }
 
+    submitLockRef.current = true;
     setSubmitting(true);
     try {
+      const attempt = batchAttemptRef.current ??= {
+        states: structuredClone(enabledStates.filter(s => s.colorQtys.reduce((sum, cq) => sum + cq.qty, 0) > 0)),
+        factory: structuredClone(factory), orderDate, deliveryDate,
+        summary: structuredClone(hqMaterialPreview), entries: new Map(),
+      };
       const createdOrders: ProductionOrder[] = [];
       // 채번은 서버 DB 발주 목록 기준 (localStorage의 store.getNextRevision을 쓰면
       // 캐시가 빈 새 PC에서 이미 존재하는 발주번호와 충돌한다 — CLAUDE.md 레드라인)
       const allOrders = await fetchOrders();
-      const issuedOrderNos = new Set<string>(); // 이번 일괄발주 안에서의 충돌도 방지
+      const issuedOrderNos = new Set(Array.from(attempt.entries.values(), e => e.order.orderNo));
 
-      for (const state of enabledStates) {
+      for (const state of attempt.states) {
         const totalQty = state.colorQtys.reduce((sum, cq) => sum + cq.qty, 0);
         if (totalQty <= 0) continue;
 
-        const orderNo = nextOrderNo(state.item.styleNo, allOrders as any[], issuedOrderNos);
-        const revision = parseRevision(orderNo);
-        const colorQtysForOrder: ColorQty[] = state.colorQtys.filter(cq => cq.qty > 0).map(cq => ({ color: cq.color, qty: cq.qty }));
+        let prepared = attempt.entries.get(state.item.id);
+        if (prepared?.saved && prepared.cartAdded) {
+          createdOrders.push(prepared.order);
+          continue;
+        }
+        if (!prepared) {
+          const orderNo = nextOrderNo(state.item.styleNo, allOrders as any[], issuedOrderNos);
+          const revision = parseRevision(orderNo);
+          const colorQtysForOrder: ColorQty[] = state.colorQtys.filter(cq => cq.qty > 0).map(cq => ({ color: cq.color, qty: cq.qty }));
 
-        await store.fetchAndCacheBom(state.item.styleNo);
-        const { bom, type: bomType } = store.getBomForOrder(state.item.styleNo);
-        const calc = store.calcMaterialRequirements(state.item.styleNo, totalQty, colorQtysForOrder);
-        const resolved = store.resolveFactoryUnitFromBom(bom, colorQtysForOrder);
-        const factoryUnitPriceCny = resolved.factoryUnitPriceCny || calc.factoryUnitPriceCny || 0;
-        const factoryUnitPriceKrw = resolved.factoryUnitPriceKrw > 0
-          ? resolved.factoryUnitPriceKrw
-          : (factoryUnitPriceCny > 0
-            ? Math.round(factoryUnitPriceCny * (resolved.rate || store.getSettings().cnyKrw || 191))
-            : 0);
+          await store.fetchAndCacheBom(state.item.styleNo);
+          const { bom, type: bomType } = store.getBomForOrder(state.item.styleNo);
+          const calc = store.calcMaterialRequirements(state.item.styleNo, totalQty, colorQtysForOrder);
+          const resolved = store.resolveFactoryUnitFromBom(bom, colorQtysForOrder);
+          const factoryUnitPriceCny = resolved.factoryUnitPriceCny || calc.factoryUnitPriceCny || 0;
+          const factoryUnitPriceKrw = resolved.factoryUnitPriceKrw > 0
+            ? resolved.factoryUnitPriceKrw
+            : (factoryUnitPriceCny > 0
+              ? Math.round(factoryUnitPriceCny * (resolved.rate || store.getSettings().cnyKrw || 191))
+              : 0);
 
-        const hqSupplyItems: ProductionOrder['hqSupplyItems'] = calc.hqProvided.map(h => ({
-          bomLineId: h.bomLineId,
-          itemName: h.itemName,
-          spec: h.spec,
-          unit: h.unit,
-          requiredQty: h.reqQty,
-          purchaseStatus: '미구매' as const,
-        }));
-
-        // 본사제공 자재 장바구니
-        // calc.hqProvided[].reqQty는 store.calcMaterialRequirements가 이미
-        // 컬러별 수량을 반영해 계산한 "총 소요량"이다. 여기서 다시 계산하면 안 된다.
-        // (예전엔 postColorBoms를 전 컬러 flatMap해서 아무 컬러의 netQty/lossRate를
-        //  집어와 총수량에 곱했다 — 컬러별 소요량이 다르면 자재가 부족해진다.
-        //  CLAUDE.md가 금지한 패턴)
-        // addToMaterialCart가 netQty × (1+lossRate) × orderQty로 다시 곱하므로,
-        // reqQty를 그대로 재현하도록 netQty = reqQty/총수량, lossRate = 0으로 넘긴다.
-        if (calc.hqProvided.length > 0 && bom) {
-          const priceByLine = new Map<string, number>();
-          for (const l of bomLinesForPricing(bom)) {
-            const price = (l as any).unitPriceCny ?? (l as any).unitPrice;
-            if (price === undefined) continue;
-            if (l.id) priceByLine.set(`id:${l.id}`, price);
-            if (l.itemName) priceByLine.set(`name:${l.itemName}`, price);
-          }
-          const cartMats = calc.hqProvided.map(h => ({
+          const hqSupplyItems: ProductionOrder['hqSupplyItems'] = calc.hqProvided.map(h => ({
+            bomLineId: h.bomLineId,
             itemName: h.itemName,
             spec: h.spec,
             unit: h.unit,
-            netQty: totalQty > 0 ? h.reqQty / totalQty : 0,
-            lossRate: 0, // reqQty에 로스가 이미 반영돼 있음 — 다시 곱하면 이중 적용
-            vendorName: h.vendorName,
-            isHqProvided: true as const,
-            imageUrl: h.imageUrl,
-            unitPriceCny: priceByLine.get(`id:${h.bomLineId}`) ?? priceByLine.get(`name:${h.itemName}`),
+            requiredQty: h.reqQty,
+            purchaseStatus: '미구매' as const,
           }));
-          store.addToMaterialCart(state.item.styleNo, state.item.name, cartMats, totalQty);
+
+          const orderId = genId();
+          let cartMaterials: Parameters<typeof store.addToMaterialCart>[2] = [];
+          // 본사제공 자재 장바구니
+          // calc.hqProvided[].reqQty는 store.calcMaterialRequirements가 이미
+          // 컬러별 수량을 반영해 계산한 "총 소요량"이다. 여기서 다시 계산하면 안 된다.
+          // (예전엔 postColorBoms를 전 컬러 flatMap해서 아무 컬러의 netQty/lossRate를
+          //  집어와 총수량에 곱했다 — 컬러별 소요량이 다르면 자재가 부족해진다.
+          //  CLAUDE.md가 금지한 패턴)
+          // addToMaterialCart가 netQty × (1+lossRate) × orderQty로 다시 곱하므로,
+          // reqQty를 그대로 재현하도록 netQty = reqQty/총수량, lossRate = 0으로 넘긴다.
+          if (calc.hqProvided.length > 0 && bom) {
+            const priceByLine = new Map<string, number>();
+            for (const l of bomLinesForPricing(bom)) {
+              const price = (l as any).unitPriceCny ?? (l as any).unitPrice;
+              if (price === undefined) continue;
+              if (l.id) priceByLine.set(`id:${l.id}`, price);
+              if (l.itemName) priceByLine.set(`name:${l.itemName}`, price);
+            }
+            const cartMats = calc.hqProvided.map(h => ({
+              itemName: h.itemName,
+              spec: h.spec,
+              unit: h.unit,
+              netQty: totalQty > 0 ? h.reqQty / totalQty : 0,
+              lossRate: 0, // reqQty에 로스가 이미 반영돼 있음 — 다시 곱하면 이중 적용
+              vendorName: h.vendorName,
+              isHqProvided: true as const,
+              imageUrl: h.imageUrl,
+              unitPriceCny: priceByLine.get(`id:${h.bomLineId}`) ?? priceByLine.get(`name:${h.itemName}`),
+            }));
+            cartMaterials = cartMats;
+          }
+
+          // 손익·전표 연결 키 = 발주번호 (orderNo). project_no 미발급
+          const newOrder: ProductionOrder = {
+            id: orderId,
+            orderNo,
+            workspace: 'OEM',
+            styleId: state.item.id,
+            styleNo: state.item.styleNo,
+            styleName: state.item.name,
+            season: state.item.season as Season,
+            revision,
+            isReorder: revision > 1,
+            qty: totalQty,
+            colorQtys: colorQtysForOrder,
+            vendorId: attempt.factory.id,
+            vendorName: attempt.factory.name,
+            orderDate: attempt.orderDate,
+            deliveryDate: attempt.deliveryDate || undefined,
+            status: '발주생성',
+            bomId: bom?.id,
+            bomType: bomType || undefined,
+            factoryUnitPriceCny: factoryUnitPriceCny || undefined,
+            factoryUnitPriceKrw: factoryUnitPriceKrw || undefined,
+            factoryCurrency: 'CNY',
+            hqSupplyItems,
+            attachments: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          prepared = { order: newOrder, cartMaterials, saved: false, cartAdded: false };
+          attempt.entries.set(state.item.id, prepared);
         }
-
-        // 손익·전표 연결 키 = 발주번호 (orderNo). project_no 미발급
-        const newOrder: ProductionOrder = {
-          id: genId(),
-          orderNo,
-          workspace: 'OEM',
-          styleId: state.item.id,
-          styleNo: state.item.styleNo,
-          styleName: state.item.name,
-          season: state.item.season as Season,
-          revision,
-          isReorder: revision > 1,
-          qty: totalQty,
-          colorQtys: colorQtysForOrder,
-          vendorId: factoryId,
-          vendorName: factory.name,
-          orderDate,
-          deliveryDate: deliveryDate || undefined,
-          status: '발주생성',
-          bomId: bom?.id,
-          bomType: bomType || undefined,
-          factoryUnitPriceCny: factoryUnitPriceCny || undefined,
-          factoryUnitPriceKrw: factoryUnitPriceKrw || undefined,
-          factoryCurrency: 'CNY',
-          hqSupplyItems,
-          attachments: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-
-        store.addOrder(newOrder);
+        const newOrder = prepared.order;
+        if (!prepared.saved) {
+          await upsertOrder(newOrder);
+          prepared.saved = true;
+        }
+        if (!prepared.cartAdded) {
+          if (prepared.cartMaterials.length) {
+            store.addToMaterialCart(newOrder.styleNo, newOrder.styleName, prepared.cartMaterials, newOrder.qty, newOrder);
+          }
+          prepared.cartAdded = true;
+        }
         createdOrders.push(newOrder);
 
         // 새 컬러 및 세부 정보를 품목 마스터에 반영
@@ -4071,9 +4135,19 @@ function MultiBulkOrderModal({
 
       setPostOrderState({
         orders: createdOrders,
-        hqMaterialSummary: hqMaterialPreview,
+        hqMaterialSummary: attempt.summary,
+      });
+    } catch (error) {
+      const attempt = batchAttemptRef.current;
+      const savedCount = attempt ? Array.from(attempt.entries.values()).filter(e => e.saved).length : 0;
+      toast.error(`발주 처리 중단: ${savedCount}/${attempt?.states.length ?? 0}건 저장됨. 같은 창에서 재시도하면 미완료 처리만 이어집니다.`, {
+        description: error instanceof Error ? error.message : String(error),
       });
     } finally {
+      if (batchAttemptRef.current && Array.from(batchAttemptRef.current.entries.values()).some(e => e.saved)) {
+        void queryClient.invalidateQueries({ queryKey: ['orders'] });
+      }
+      submitLockRef.current = false;
       setSubmitting(false);
     }
   };
@@ -4141,7 +4215,7 @@ function MultiBulkOrderModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={isOpen => { if (!isOpen && !submitLockRef.current) onClose(); }}>
       <DialogContent onInteractOutside={e => e.preventDefault()} className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -4150,12 +4224,17 @@ function MultiBulkOrderModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5">
+        {!submitting && batchAttemptRef.current && (
+          <p role="status" className="text-xs text-muted-foreground">
+            입력은 잠겨 있습니다. 재시도는 처음 입력한 내용으로 진행됩니다.
+          </p>
+        )}
+        <fieldset disabled={submitting || batchAttemptRef.current !== null} className="space-y-5 min-w-0">
           {/* 공장 / 날짜 */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">공장 선택 <span className="text-[var(--system-red)]">*</span></Label>
-              <Select value={factoryId} onValueChange={setFactoryId}>
+              <Select value={factoryId} onValueChange={changeFactory} disabled={submitting || batchAttemptRef.current !== null}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="공장 선택" />
                 </SelectTrigger>
@@ -4172,11 +4251,11 @@ function MultiBulkOrderModal({
             </div>
             <div className="space-y-1.5">
               <Label>발주일</Label>
-              <Input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} className="h-9" />
+              <Input type="date" value={orderDate} onChange={e => changeOrderDate(e.target.value)} className="h-9" />
             </div>
             <div className="space-y-1.5">
               <Label>납기일</Label>
-              <Input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} className="h-9" />
+              <Input type="date" value={deliveryDate} onChange={e => changeDeliveryDate(e.target.value)} className="h-9" />
             </div>
           </div>
 
@@ -4188,6 +4267,7 @@ function MultiBulkOrderModal({
                 <BulkOrderItemRow
                   key={state.item.id}
                   state={state}
+                  isInputLocked={isInputLocked}
                   onToggle={() => toggleItem(state.item.id)}
                   onSetColorQty={(color, qty) => setColorQty(state.item.id, color, qty)}
                   onUpdateColorDetail={(color, field, value) => updateColorDetail(state.item.id, color, field, value)}
@@ -4220,7 +4300,7 @@ function MultiBulkOrderModal({
               </div>
             </div>
           )}
-        </div>
+        </fieldset>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={submitting}>취소</Button>
@@ -4228,7 +4308,7 @@ function MultiBulkOrderModal({
             onClick={handleSubmit}
             disabled={submitting}
           >
-            {submitting ? '등록 중...' : '발주 등록'}
+            {submitting ? '등록 중...' : batchAttemptRef.current ? '원래 내용으로 재시도' : '발주 등록'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -4239,6 +4319,7 @@ function MultiBulkOrderModal({
 // 개별 품목 행 컴포넌트
 function BulkOrderItemRow({
   state,
+  isInputLocked,
   onToggle,
   onSetColorQty,
   onUpdateColorDetail,
@@ -4247,6 +4328,7 @@ function BulkOrderItemRow({
   onRemoveColor,
 }: {
   state: BulkOrderItemState;
+  isInputLocked: () => boolean;
   onToggle: () => void;
   onSetColorQty: (color: string, qty: number) => void;
   onUpdateColorDetail: (color: string, field: keyof Omit<BulkColorQty, 'color' | 'qty'>, value: string) => void;
@@ -4260,6 +4342,7 @@ function BulkOrderItemRow({
   const totalQty = state.colorQtys.reduce((sum, cq) => sum + cq.qty, 0);
 
   const toggleDetail = (colorName: string) => {
+    if (isInputLocked()) return;
     setOpenDetails(prev => {
       const next = new Set(prev);
       if (next.has(colorName)) next.delete(colorName);
@@ -4269,12 +4352,18 @@ function BulkOrderItemRow({
   };
 
   const handleAddColor = () => {
+    if (isInputLocked()) return;
     const trimmed = newColorInput.trim();
     if (!trimmed) return;
     onAddColor(trimmed);
     setNewColorInput('');
     // 새로 추가된 컬러의 세부 정보 토글 자동 펼침
     setOpenDetails(prev => new Set(prev).add(trimmed));
+  };
+
+  const changeNewColorInput = (value: string) => {
+    if (isInputLocked()) return;
+    setNewColorInput(value);
   };
 
   return (
@@ -4403,7 +4492,7 @@ function BulkOrderItemRow({
           <div className="flex items-center gap-1.5">
             <Input
               value={newColorInput}
-              onChange={e => setNewColorInput(e.target.value)}
+              onChange={e => changeNewColorInput(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault();

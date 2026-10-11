@@ -742,7 +742,7 @@ export interface CartItem {
   isHqProvided: boolean   // 본사제공 여부
   imageUrl?: string       // BOM 자재 이미지
   unitPriceCny?: number   // BOM 단가 (CNY)
-  orders: { styleNo: string; styleName: string; qty: number }[] // 담긴 발주 목록
+  orders: { orderId?: string; orderNo?: string; styleNo: string; styleName: string; qty: number }[] // 담긴 발주 목록
 }
 
 // ─── 사용자 / 인증 ───
@@ -1652,7 +1652,8 @@ export const store = {
     styleNo: string,
     styleName: string,
     bomMaterials: Array<{ itemName: string; spec?: string; unit: string; netQty: number; lossRate: number; vendorName?: string; isHqProvided: boolean; imageUrl?: string; unitPriceCny?: number }>,
-    orderQty: number
+    orderQty: number,
+    orderRef?: { id: string; orderNo: string }
   ) => {
     const cart = getAll<CartItem>(KEYS.materialCart);
     for (const mat of bomMaterials) {
@@ -1665,11 +1666,11 @@ export const store = {
       const idx = cart.findIndex(c => (c.materialName + '||' + c.unit + '||' + (c.vendorName || '')) === key);
       if (idx >= 0) {
         // 기존 항목 — 수량 합산, 발주 목록 추가
-        const existingOrder = cart[idx].orders.find(o => o.styleNo === styleNo);
+        const existingOrder = cart[idx].orders.find(o => orderRef ? o.orderId === orderRef.id : !o.orderId && o.styleNo === styleNo);
         if (existingOrder) {
           existingOrder.qty = Math.round((existingOrder.qty + totalQty) * 1000) / 1000;
         } else {
-          cart[idx].orders.push({ styleNo, styleName, qty: totalQty });
+          cart[idx].orders.push({ ...(orderRef ? { orderId: orderRef.id, orderNo: orderRef.orderNo } : {}), styleNo, styleName, qty: totalQty });
         }
         cart[idx].qty = Math.round((cart[idx].qty + totalQty) * 1000) / 1000;
         if (!cart[idx].imageUrl && mat.imageUrl) cart[idx].imageUrl = mat.imageUrl;
@@ -1688,7 +1689,7 @@ export const store = {
           isHqProvided: mat.isHqProvided,
           imageUrl: mat.imageUrl,
           unitPriceCny: (mat as any).unitPriceCny ?? 0,
-          orders: [{ styleNo, styleName, qty: totalQty }],
+          orders: [{ ...(orderRef ? { orderId: orderRef.id, orderNo: orderRef.orderNo } : {}), styleNo, styleName, qty: totalQty }],
         });
       }
     }

@@ -460,6 +460,7 @@ function setAll<T>(key: string, data: T[]): void {
   localStorage.setItem(key, JSON.stringify(data));
 }
 function uid() { return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`; }
+const brandDraftAttempts = new Map<string, { batch: BrandOrderBatch; project: Project }>();
 
 function generateProjectNo(workspace: Workspace, vendorCode?: string): string {
   const d = new Date();
@@ -467,7 +468,7 @@ function generateProjectNo(workspace: Workspace, vendorCode?: string): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   // projects 테이블은 프로젝트 탭(대형 프로젝트)과 공유한다. 그쪽 행엔 projectNo가 없다
-  const projects = getAll<Project>(KEYS.projects).filter(p => !!p.projectNo);
+  const projects = [...getAll<Project>(KEYS.projects), ...Array.from(brandDraftAttempts.values(), a => a.project)].filter(p => !!p.projectNo);
   if (workspace === 'OEM') {
     const code = (vendorCode || 'NW').toUpperCase().slice(0, 4);
     const year = d.getFullYear();
@@ -507,7 +508,7 @@ export function ensureProject(projectNo: string, workspace: Workspace, title?: s
 }
 
 async function syncProjectToDb(p: Project) {
-  await db.from('projects').upsert({
+  const { error } = await db.from('projects').upsert({
     id: p.id,
     project_no: p.projectNo,
     workspace: p.workspace,
@@ -516,6 +517,7 @@ async function syncProjectToDb(p: Project) {
     created_at: p.createdAt,
     updated_at: new Date().toISOString(),
   });
+  if (error) throw error;
 }
 
 function mapProductionAxis(status: string): OrderProdAxis {
@@ -837,12 +839,13 @@ export const phase1 = {
   },
   getBrandBatch: (id: string) => phase1.getBrandBatches().find(b => b.id === id),
 
-  createBrandBatch: (workspace: 'LUMEN' | 'AETALOOF', title?: string, weekLabel?: string, createdBy?: string) => {
+  createBrandBatch: async (workspace: 'LUMEN' | 'AETALOOF', title?: string, weekLabel?: string, createdBy?: string, attemptId = uid()) => {
+    let attempt = brandDraftAttempts.get(attemptId);
+    if (!attempt) {
     const projectNo = generateProjectNo(workspace);
     title = (title || '').trim() || `${projectNo} 발주`;
-    ensureProject(projectNo, workspace, title);
     const batch: BrandOrderBatch = {
-      id: uid(),
+      id: attemptId,
       workspace,
       projectNo,
       title,
@@ -854,11 +857,18 @@ export const phase1 = {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    const a = getAll<BrandOrderBatch>(KEYS.brandBatches);
-    a.push(batch);
+    attempt = { batch, project: { id: `${attemptId}-project`, projectNo, workspace, title, status: 'active', createdAt: batch.createdAt } };
+    brandDraftAttempts.set(attemptId, attempt);
+    }
+    if (attempt.batch.workspace !== workspace) throw new Error('저장 중인 발주의 브랜드가 다릅니다');
+    await syncProjectToDb(attempt.project);
+    await syncBrandBatch(attempt.batch);
+    const projects = getAll<Project>(KEYS.projects).filter(p => p.id !== attempt!.project.id);
+    projects.push(attempt.project); setAll(KEYS.projects, projects);
+    const a = getAll<BrandOrderBatch>(KEYS.brandBatches).filter(b => b.id !== attemptId);
+    a.push(attempt.batch);
     setAll(KEYS.brandBatches, a);
-    syncBrandBatch(batch).catch(reportSyncFail('브랜드 발주'));
-    return batch;
+    return attempt.batch;
   },
 
   updateBrandBatch: (id: string, u: Partial<BrandOrderBatch>) => {
@@ -870,19 +880,18 @@ export const phase1 = {
     syncBrandBatch(a[i]).catch(reportSyncFail('브랜드 발주'));
   },
 
-  addBrandLine: (batchId: string, line: Omit<BrandOrderLine, 'id' | 'batchId'>) => {
-    const row: BrandOrderLine = { ...line, id: uid(), batchId };
-    const a = getAll<BrandOrderLine>(KEYS.brandLines);
+  addBrandLine: async (batchId: string, line: Omit<BrandOrderLine, 'id' | 'batchId'>, attemptId = uid()) => {
+    const row: BrandOrderLine = { ...line, id: attemptId, batchId };
+    await syncBrandLine(row);
+    const a = getAll<BrandOrderLine>(KEYS.brandLines).filter(l => l.id !== attemptId);
     a.push(row);
     setAll(KEYS.brandLines, a);
-    syncBrandLine(row).catch(reportSyncFail('브랜드 발주 라인'));
     return row;
   },
-  deleteBrandLine: (id: string) => {
+  deleteBrandLine: async (id: string) => {
+    const { error } = await db.from('brand_order_lines').delete().eq('id', id);
+    if (error) throw error;
     setAll(KEYS.brandLines, getAll<BrandOrderLine>(KEYS.brandLines).filter(l => l.id !== id));
-    // 서버에서도 지워야 한다. 안 지우면 다음 조회 때 되살아난다
-    db.from('brand_order_lines').delete().eq('id', id)
-      .then(({ error }) => { if (error) reportSyncFail('발주 라인 삭제')(error); });
   },
 
   /**
@@ -909,14 +918,18 @@ export const phase1 = {
   },
 
   /** 발주 통째로 삭제 — 아직 안 나간 것만 */
-  deleteBrandBatch: (batchId: string): { ok: boolean; reason?: string } => {
+  deleteBrandBatch: async (batchId: string): Promise<{ ok: boolean; reason?: string }> => {
     const batch = phase1.getBrandBatch(batchId);
     if (!batch) return { ok: false, reason: '발주를 찾을 수 없습니다' };
     if (batch.status !== 'draft') return { ok: false, reason: '발주를 먼저 취소하세요' };
-    batch.lines.forEach(l => phase1.deleteBrandLine(l.id));
+    // 자식 라인·승인 로그는 DB의 ON DELETE CASCADE로 한 문장에서 함께 삭제한다.
+    // 상태 조건은 다른 화면에서 승인된 초안을 지우지 않도록 DB에서 다시 검사한다.
+    const { data, error } = await db.from('brand_order_batches').delete().eq('id', batchId).eq('status', 'draft').select('id');
+    if (error) throw error;
+    if (!data?.some((row: any) => row.id === batchId)) throw new Error('발주가 변경됐거나 이미 삭제됐습니다 — 다시 조회해주세요');
+    setAll(KEYS.brandLines, getAll<BrandOrderLine>(KEYS.brandLines).filter(l => l.batchId !== batchId));
+    setAll(KEYS.approvalLogs, getAll<ApprovalLog>(KEYS.approvalLogs).filter(l => l.batchId !== batchId));
     setAll(KEYS.brandBatches, getAll<BrandOrderBatch>(KEYS.brandBatches).filter(b => b.id !== batchId));
-    db.from('brand_order_batches').delete().eq('id', batchId)
-      .then(({ error }) => { if (error) reportSyncFail('발주 삭제')(error); });
     return { ok: true };
   },
 

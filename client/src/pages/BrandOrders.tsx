@@ -1,5 +1,5 @@
 // 리오더 · 오더관리 — R3 승인 + 차수별 입고·미지급 등록
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -45,6 +45,18 @@ export default function BrandOrders() {
   const [tickN, tick] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [workflowBusy, setWorkflowBusy] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const savePending = useRef(false);
+  const draftAttempt = useRef<{ workspace: string; id: string; title: string } | null>(null);
+  const lineAttempts = useRef(new Map<string, Map<string, { id: string; payload: string; saved: boolean }>>());
+  const [failedLineBatches, setFailedLineBatches] = useState(new Set<string>());
+  const hasUnsavedLines = (batchId: string) =>
+    [...(lineAttempts.current.get(batchId)?.values() || [])].some(attempt => !attempt.saved);
+  const clearLineFailure = (batchId: string) => setFailedLineBatches(previous => {
+    const next = new Set(previous);
+    next.delete(batchId);
+    return next;
+  });
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['orders'] });
     queryClient.invalidateQueries({ queryKey: ['brandOrders'] });
@@ -149,19 +161,31 @@ export default function BrandOrders() {
     return [...set];
   }, [items]);
 
-  const createBatch = () => {
+  const createBatch = async () => {
+    if (savePending.current || workflowBusy) return;
     // 제목을 강제하면 버튼이 안 눌린 것처럼 보인다. 비면 발주번호로 지어준다
-    const b = phase1.createBrandBatch(ws, newTitle.trim());
-    setNewTitle('');
-    setSelected(b);
-    setMainTab('approval');
-    refresh();
-    toast.success(`발주 생성 ${b.projectNo}`);
+    if (draftAttempt.current?.workspace !== ws) draftAttempt.current = { workspace: ws, id: genId(), title: newTitle };
+    savePending.current = true;
+    setSaveBusy(true);
+    try {
+      const b = await phase1.createBrandBatch(ws, draftAttempt.current.title.trim(), undefined, undefined, draftAttempt.current.id);
+      draftAttempt.current = null;
+      setNewTitle('');
+      setSelected(b);
+      setMainTab('approval');
+      refresh();
+      toast.success(`발주 생성 ${b.projectNo}`);
+    } catch (e: any) {
+      toast.error(e.message || '발주 저장 실패 — 다시 시도해주세요');
+    } finally {
+      savePending.current = false;
+      setSaveBusy(false);
+    }
   };
 
   /** 발주 취소 — 수주함이 받기 전이면 초안으로 되돌린다 */
   const cancelIssue = async () => {
-    if (!detail || workflowBusy) return;
+    if (!detail || workflowBusy || savePending.current) return;
     if (!confirm(`${detail.projectNo}를 작성 상태로 되돌립니다. 수정 후 대표 승인을 다시 받아야 합니다.`)) return;
     setWorkflowBusy(true);
     let saved = false;
@@ -179,45 +203,104 @@ export default function BrandOrders() {
   };
 
   /** 발주 삭제 — 안 나간 것만 */
-  const removeBatch = () => {
-    if (!detail) return;
+  const removeBatch = async () => {
+    if (!detail || workflowBusy || savePending.current) return;
     if (!confirm(`${detail.projectNo}를 삭제합니다. 담은 상품도 함께 지워집니다.`)) return;
-    const r = phase1.deleteBrandBatch(detail.id);
-    if (!r.ok) { toast.error(r.reason || '삭제 실패'); return; }
-    setSelected(null); refresh();
-    toast.success('발주 삭제');
+    savePending.current = true;
+    setSaveBusy(true);
+    try {
+      const r = await phase1.deleteBrandBatch(detail.id);
+      if (!r.ok) { toast.error(r.reason || '삭제 실패'); return; }
+      lineAttempts.current.delete(detail.id);
+      clearLineFailure(detail.id);
+      setSelected(null); refresh();
+      toast.success('발주 삭제');
+    } catch (e: any) {
+      toast.error(e.message || '삭제 실패');
+    } finally { savePending.current = false; setSaveBusy(false); }
   };
 
   /** 담은 상품 1줄 빼기 */
-  const removeLine = (lineId: string) => {
-    if (!detail) return;
-    phase1.deleteBrandLine(lineId);
-    refresh(); setSelected(phase1.getBrandBatch(detail.id) || null);
+  const removeLine = async (lineId: string) => {
+    if (!detail || workflowBusy || savePending.current) return;
+    if (!confirm('이 상품을 발주에서 삭제합니다.')) return;
+    savePending.current = true;
+    setSaveBusy(true);
+    try {
+      await phase1.deleteBrandLine(lineId);
+      // A removed partial success must be saved again if the picker is retried.
+      for (const attempt of lineAttempts.current.get(detail.id)?.values() || []) {
+        if (attempt.id === lineId) {
+          attempt.saved = false;
+          setFailedLineBatches(previous => new Set(previous).add(detail.id));
+        }
+      }
+      refresh(); setSelected(phase1.getBrandBatch(detail.id) || null);
+    } catch (e: any) {
+      toast.error(e.message || '상품 삭제 실패');
+    } finally { savePending.current = false; setSaveBusy(false); }
   };
 
   /** 시트에서 담아 온 것들 — 한 번에 라인으로 만든다 */
-  const addPicked = (lines: PickedLine[], factoryId: string, route: 'oem' | 'direct') => {
-    if (!detail) return;
+  const addPicked = async (lines: PickedLine[], factoryId: string, route: 'oem' | 'direct') => {
+    if (!detail || detail.status !== 'draft' || workflowBusy || savePending.current) {
+      throw new Error('저장 또는 발주 처리 중입니다. 다시 시도해주세요');
+    }
+    const batchId = detail.id;
+    const attempts = lineAttempts.current.get(batchId) || new Map<string, { id: string; payload: string; saved: boolean }>();
+    lineAttempts.current.set(batchId, attempts);
     const factoryName = factories.find(f => f.id === factoryId)?.name;
-    lines.forEach(l => phase1.addBrandLine(detail.id, {
-      styleNo: l.styleNo,
-      styleName: l.styleName,
-      colorQtys: l.colorQtys,
-      factoryId,
-      factoryName,
-      productionOrigin: 'china',
-      route,
-      isEmployeePurchase: false,
-      qty: l.colorQtys.reduce((s, c) => s + c.qty, 0),
-    }));
-    refresh();
-    setSelected(phase1.getBrandBatch(detail.id) || null);
-    toast.success(`${lines.length}개 품번 담았습니다`);
+    savePending.current = true;
+    setSaveBusy(true);
+    try {
+      // Register the entire submission first: a failure must also retain lines
+      // whose writes have not started yet.
+      const pendingLines = lines.map(l => {
+        const line = {
+          styleNo: l.styleNo,
+          styleName: l.styleName,
+          colorQtys: l.colorQtys,
+          factoryId,
+          factoryName,
+          productionOrigin: 'china' as const,
+          route,
+          isEmployeePurchase: false,
+          qty: l.colorQtys.reduce((s, c) => s + c.qty, 0),
+        };
+        const payload = JSON.stringify(line);
+        const attempt = attempts.get(l.styleNo) || { id: genId(), payload, saved: false };
+        attempts.set(l.styleNo, attempt);
+        if (attempt.payload !== payload) attempt.saved = false;
+        attempt.payload = payload;
+        return { line, attempt };
+      });
+      for (const { line, attempt } of pendingLines) {
+        if (attempt.saved) continue;
+        await phase1.addBrandLine(batchId, line, attempt.id);
+        attempt.saved = true;
+      }
+      if (hasUnsavedLines(batchId)) {
+        const remaining = [...attempts].filter(([, attempt]) => !attempt.saved).map(([styleNo]) => styleNo);
+        throw new Error(`미저장 상품을 다시 담아주세요: ${remaining.join(', ')}`);
+      }
+      lineAttempts.current.delete(batchId);
+      clearLineFailure(batchId);
+      refresh();
+      setSelected(phase1.getBrandBatch(batchId) || null);
+      setPickerOpen(false);
+      toast.success(`${lines.length}개 품번 담았습니다`);
+    } catch (e: any) {
+      setFailedLineBatches(previous => new Set(previous).add(batchId));
+      refresh();
+      toast.error(e.message || '상품 저장 실패 — 입력을 유지한 채 다시 시도해주세요');
+      // The picker must await onAdd and only clear its inputs after resolution.
+      throw e;
+    } finally { savePending.current = false; setSaveBusy(false); }
   };
 
   /** 발주서 발행 — 공장별로 1장. 이 번호가 AMESCOTES의 PO가 된다 */
   const approve = async () => {
-    if (!detail || workflowBusy) return;
+    if (!detail || workflowBusy || savePending.current || hasUnsavedLines(detail.id)) return;
     setWorkflowBusy(true);
     let saved = false;
     try {
@@ -236,7 +319,7 @@ export default function BrandOrders() {
   };
   const issue = async () => {
     if (!detail) return;
-    if (workflowBusy) return;
+    if (workflowBusy || savePending.current || hasUnsavedLines(detail.id)) return;
     setWorkflowBusy(true);
     let saved = false;
     try {
@@ -470,8 +553,10 @@ export default function BrandOrders() {
         <TabsContent value="approval" className="mt-4 space-y-4">
           {brandReadError && <p role="alert" className="text-sm text-[var(--system-orange)]">서버 목록을 조회하지 못했습니다. 이전 자료일 수 있으니 새로고침 후 확인해주세요.</p>}
           <div className="flex gap-2">
-            <Input placeholder="발주 제목 (예: 6월 2주차 리오더)" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="max-w-sm" />
-            <Button variant="secondary" onClick={createBatch}>+ 묶음 발주</Button>
+            <Input placeholder="발주 제목 (예: 6월 2주차 리오더)" value={newTitle}
+              onChange={e => { if (!savePending.current && draftAttempt.current?.workspace !== ws) setNewTitle(e.target.value); }}
+              className="max-w-sm" disabled={saveBusy || workflowBusy || draftAttempt.current?.workspace === ws} />
+            <Button variant="secondary" onClick={createBatch} disabled={saveBusy || workflowBusy}>+ 묶음 발주</Button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -481,6 +566,7 @@ export default function BrandOrders() {
               ) : batches.map(b => (
                 <button key={b.id} type="button"
                   className={`w-full text-left px-4 py-3 hover:bg-[var(--fill-quaternary)] ${selected?.id === b.id ? 'bg-primary/5' : ''}`}
+                  disabled={saveBusy || workflowBusy}
                   onClick={() => setSelected(b)}>
                   <p className="font-mono text-xs text-primary">{b.projectNo}</p>
                   <p className="font-medium text-sm">{b.title}</p>
@@ -524,7 +610,7 @@ export default function BrandOrders() {
                         );
                       })()}
                       {detail.status === 'issued' && !detail.lines.some(l => l.acceptedAt) && (
-                        <Button size="sm" variant="outline" className="h-7 text-xs ml-auto" onClick={cancelIssue} disabled={workflowBusy}>
+                        <Button size="sm" variant="outline" className="h-7 text-xs ml-auto" onClick={cancelIssue} disabled={workflowBusy || saveBusy}>
                           <Undo2 className="w-3 h-3 mr-1" />발주 취소
                         </Button>
                       )}
@@ -532,19 +618,19 @@ export default function BrandOrders() {
                   ) : (
                     <div className="flex items-center gap-2 flex-wrap">
                       {['draft', 'in_approval'].includes(detail.status) && getCurrentUser()?.role === '대표' && (
-                        <Button size="sm" onClick={approve} disabled={workflowBusy || detail.lines.length === 0}>대표 승인</Button>
+                        <Button size="sm" onClick={approve} disabled={workflowBusy || saveBusy || failedLineBatches.has(detail.id) || detail.lines.length === 0}>대표 승인</Button>
                       )}
-                      <Button size="sm" onClick={issue} disabled={workflowBusy || detail.status !== 'approved' || detail.lines.length === 0}>
+                      <Button size="sm" onClick={issue} disabled={workflowBusy || saveBusy || failedLineBatches.has(detail.id) || detail.status !== 'approved' || detail.lines.length === 0}>
                         <Send className="w-3 h-3 mr-1" />발주서 발행
                       </Button>
                       {['in_approval', 'approved'].includes(detail.status) && (
-                        <Button size="sm" variant="outline" onClick={cancelIssue} disabled={workflowBusy}>작성으로 되돌리기</Button>
+                        <Button size="sm" variant="outline" onClick={cancelIssue} disabled={workflowBusy || saveBusy}>작성으로 되돌리기</Button>
                       )}
                       <span className="text-[11px] text-muted-foreground">
                         AMESCOTES 수주함으로 넘어갑니다. 납기는 수주함에서 회신됩니다
                       </span>
                       <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs text-muted-foreground hover:text-[var(--system-red)]"
-                        onClick={removeBatch} disabled={workflowBusy || detail.status !== 'draft'}>
+                        onClick={removeBatch} disabled={workflowBusy || saveBusy || detail.status !== 'draft'}>
                         <Trash2 className="w-3 h-3 mr-1" />발주 삭제
                       </Button>
                     </div>
@@ -576,7 +662,7 @@ export default function BrandOrders() {
                             <td>{i === 0 ? ((l.route || 'oem') === 'direct' ? '직발주' : 'AMESCOTES') : ''}</td>
                             <td className="text-center">
                               {i === 0 && detail.status === 'draft' && (
-                                <button type="button" onClick={() => removeLine(l.id)}
+                                <button type="button" onClick={() => removeLine(l.id)} disabled={saveBusy || workflowBusy}
                                   title="이 상품 빼기"
                                   className="text-muted-foreground hover:text-[var(--system-red)] p-1">
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -592,7 +678,7 @@ export default function BrandOrders() {
 
                   {detail.status === 'draft' && (
                     <div className="border-t pt-4">
-                      <Button size="sm" onClick={() => setPickerOpen(true)}>
+                      <Button size="sm" disabled={saveBusy || workflowBusy} onClick={() => setPickerOpen(true)}>
                         <Package className="w-3 h-3 mr-1" />상품 담기
                       </Button>
                     </div>
@@ -791,7 +877,7 @@ export default function BrandOrders() {
 
       <StylePickerSheet
         open={pickerOpen}
-        onOpenChange={setPickerOpen}
+        onOpenChange={open => { if (!savePending.current) setPickerOpen(open); }}
         factories={factories}
         onAdd={addPicked}
       />

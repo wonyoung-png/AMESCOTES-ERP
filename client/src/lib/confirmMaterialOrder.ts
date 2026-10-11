@@ -46,13 +46,23 @@ export async function confirmMaterialOrder(
   // 발주필요수량이 0보다 큰 항목만 대상
   const targets = cartItems
     .map(item => ({ item, orderQty: Math.max(0, item.qty - (item.stockQty ?? 0)) }))
-    .filter(t => t.orderQty > 0);
+    .filter(t => t.orderQty > 0)
+    // 모든 귀속을 저장 전에 검증한다. 실패하면 DB와 장바구니 모두 그대로 유지한다.
+    .map(t => ({ ...t, allocations: resolveOrderWeights(t.item, orders, fallbackOrder) }));
 
   // ── 1단계: 서버 DB materials 저장 ──
+  // 구매는 공급처별로 나누되 자재 정본은 이름·단위별 한 번만 저장한다.
+  const materialGroups = new Map<string, { item: CartItem; orderQty: number; vendors: Set<string> }>();
+  for (const { item, orderQty } of targets) {
+    const key = JSON.stringify([item.materialName, item.unit]);
+    const group = materialGroups.get(key);
+    if (group) { group.orderQty = round3(group.orderQty + orderQty); group.vendors.add(item.vendorName || '미지정'); }
+    else materialGroups.set(key, { item, orderQty, vendors: new Set([item.vendorName || '미지정']) });
+  }
   const existingMaterials = await fetchMaterials();
   let materialCount = 0;
-  for (const { item, orderQty } of targets) {
-    const vendorName = item.vendorName || '미지정';
+  for (const { item, orderQty, vendors: supplierNames } of materialGroups.values()) {
+    const vendorName = [...supplierNames].join(', ');
     const existing = existingMaterials.find(
       (m: any) => m.name === item.materialName && m.unit === item.unit,
     );
@@ -70,32 +80,24 @@ export async function confirmMaterialOrder(
       orderVendorName: vendorName,
       vendorId:
         (existing as any)?.vendorId
-        || vendors.find(v => v.name === vendorName && v.type === '자재거래처')?.id,
+        || (supplierNames.size === 1 ? vendors.find(v => v.name === vendorName && v.type === '자재거래처')?.id : undefined),
       createdAt: (existing as any)?.createdAt || new Date().toISOString(),
     });
     materialCount++;
   }
 
   // ── 2단계: 자재구매 전표 생성 (발주별로 분리) ──
-  const existingPurchases = await fetchPurchaseItems();
-  // 이미 등록된 (발주번호 + 자재명 + 단위) 조합 — 루프 중에도 갱신해 재클릭 중복을 막는다
+  const existingPurchases = await fetchPurchaseItems({ strict: true });
+  // 공급처가 다르면 별도 구매다. 재시도만 기존 조합을 보존한다.
   const seen = new Set(
-    existingPurchases.map(p => `${p.orderNo}||${p.itemName}||${p.unit}`),
+    existingPurchases.map(p => JSON.stringify([p.orderNo, p.itemName, p.unit, p.vendorName || '미지정'])),
   );
 
   let purchaseCount = 0;
   const skippedNoOrder: string[] = [];
 
-  for (const { item, orderQty } of targets) {
-    // 이 자재가 걸린 발주들을 찾는다. 장바구니는 여러 발주가 합산된 구조라
-    // 반드시 발주별로 나눠 저장해야 손익이 섞이지 않는다.
-    const styleNos = Array.from(new Set(item.orders.map(o => o.styleNo)));
-    const matched = styleNos
-      .map(styleNo => orders.find(o => o.styleNo === styleNo))
-      .filter((o): o is ProductionOrder => !!o);
-
-    const targetOrders = matched.length > 0 ? matched : (fallbackOrder ? [fallbackOrder] : []);
-    if (targetOrders.length === 0) {
+  for (const { item, orderQty, allocations } of targets) {
+    if (allocations.length === 0) {
       // 발주번호를 모르면 저장하지 않는다.
       // 예전엔 스타일번호를 발주번호 자리에 넣어서 이후 조인이 전부 깨졌다.
       skippedNoOrder.push(item.materialName);
@@ -103,11 +105,11 @@ export async function confirmMaterialOrder(
     }
 
     // 소요수량을 발주 수량 비율대로 배분 (합계가 orderQty와 일치하도록 마지막에 잔여 배정)
-    const qtyByOrder = splitQtyByOrders(orderQty, item, targetOrders);
+    const qtyByOrder = splitQtyByOrders(orderQty, allocations);
 
     for (const { order, qty } of qtyByOrder) {
       if (qty <= 0) continue;
-      const key = `${order.orderNo}||${item.materialName}||${item.unit}`;
+      const key = JSON.stringify([order.orderNo, item.materialName, item.unit, item.vendorName || '미지정']);
       if (seen.has(key)) continue;
       seen.add(key);
 
@@ -141,6 +143,56 @@ export async function confirmMaterialOrder(
   return { materialCount, purchaseCount, skippedNoOrder };
 }
 
+type OrderWeight = { order: ProductionOrder; weight: number };
+// 공용 CartItem 타입에 귀속 필드가 추가되기 전에도 새 provenance를 읽을 수 있다.
+type CartOrderReference = CartItem['orders'][number] & { orderId?: string; orderNo?: string };
+
+function resolveOrderWeights(
+  item: CartItem,
+  orders: ProductionOrder[],
+  fallbackOrder?: ProductionOrder | null,
+): OrderWeight[] {
+  const candidates = [...orders];
+  if (fallbackOrder && !candidates.some(o => o.id === fallbackOrder.id)) {
+    candidates.push(fallbackOrder);
+  }
+  const weights = new Map<string, OrderWeight>();
+  let missing = false;
+  for (const ref of item.orders as CartOrderReference[]) {
+    const matches = ref.orderId
+      ? candidates.filter(o => o.id === ref.orderId)
+      : ref.orderNo
+        ? candidates.filter(o => o.orderNo === ref.orderNo)
+        : candidates.filter(o => o.styleNo === ref.styleNo);
+    if (matches.length > 1) {
+      throw new Error(`${item.materialName}: ${ref.styleNo}의 발주가 여러 건입니다. 주문 ID를 포함하여 장바구니에 다시 담아 주세요.`);
+    }
+    const order = matches[0];
+    if (!order) {
+      if (ref.orderId || ref.orderNo) throw new Error(`${item.materialName}: 주문 ${ref.orderId || ref.orderNo}의 발주를 찾을 수 없습니다.`);
+      missing = true;
+      continue;
+    }
+    if ((ref.orderId || ref.orderNo) && (order.styleNo !== ref.styleNo || (ref.orderNo && order.orderNo !== ref.orderNo))) {
+      throw new Error(`${item.materialName}: 주문 ID와 스타일번호가 일치하지 않습니다.`);
+    }
+    if (!Number.isFinite(ref.qty) || ref.qty < 0) {
+      throw new Error(`${item.materialName}: 발주별 소요수량이 올바르지 않습니다.`);
+    }
+    const entry = weights.get(order.id);
+    if (entry) entry.weight += ref.qty;
+    else weights.set(order.id, { order, weight: ref.qty });
+  }
+  if (missing) {
+    throw new Error(`${item.materialName}: 일부 발주의 귀속을 확인할 수 없습니다. 장바구니에 다시 담아 주세요.`);
+  }
+  if (item.orders.length === 0 && fallbackOrder) {
+    return [{ order: fallbackOrder, weight: item.qty }];
+  }
+  if (weights.size === 0) throw new Error(`${item.materialName}: 발주 귀속을 확인할 수 없습니다. 장바구니에 다시 담아 주세요.`);
+  return [...weights.values()];
+}
+
 /**
  * 자재 소요수량을 발주별로 배분한다.
  * 장바구니의 item.orders에 발주별 소요량이 있으면 그 비율로, 없으면 균등 배분.
@@ -148,29 +200,25 @@ export async function confirmMaterialOrder(
  */
 function splitQtyByOrders(
   totalQty: number,
-  item: CartItem,
-  targetOrders: ProductionOrder[],
+  allocations: OrderWeight[],
 ): Array<{ order: ProductionOrder; qty: number }> {
-  if (targetOrders.length === 1) return [{ order: targetOrders[0], qty: totalQty }];
+  if (allocations.length === 1) return [{ order: allocations[0].order, qty: totalQty }];
 
-  const weights = targetOrders.map(o => {
-    const hit = item.orders.find(x => x.styleNo === o.styleNo);
-    return hit?.qty ?? 0;
-  });
+  const weights = allocations.map(a => a.weight);
   const weightSum = weights.reduce((s, w) => s + w, 0);
 
   const result: Array<{ order: ProductionOrder; qty: number }> = [];
   let assigned = 0;
-  targetOrders.forEach((order, i) => {
-    const isLast = i === targetOrders.length - 1;
+  allocations.forEach(({ order }, i) => {
+    const isLast = i === allocations.length - 1;
     if (isLast) {
       result.push({ order, qty: round3(totalQty - assigned) }); // 잔여 전량 — 합계 보존
       return;
     }
     const share = weightSum > 0
       ? (totalQty * weights[i]) / weightSum
-      : totalQty / targetOrders.length;
-    const qty = round3(share);
+      : totalQty / allocations.length;
+    const qty = Math.min(round3(share), Math.max(0, round3(totalQty - assigned)));
     assigned += qty;
     result.push({ order, qty });
   });

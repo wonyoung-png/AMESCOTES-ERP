@@ -28,6 +28,17 @@ test('카드 경계는 시각·ID 둘 다 사용하고 잘못된 커서는 거�
   }
 });
 
+test('DB 시간대와 마이크로초를 그대로 유지하여 한국·해외 시간대 페이지를 조회한다', () => {
+  for (const timestamp of ['2026-10-11T10:15:30.558709+09:00', '2026-10-10T21:15:30.558709-04:00', '2026-10-11T01:15:30+00:00']) {
+    const q = condition(workPageQuery(actor, visibility, { id: 'wc_load251632', created_at: timestamp }));
+    assert.ok(q.includes(`created_at.lt.${timestamp}`));
+    assert.ok(q.includes(`created_at.eq.${timestamp}`));
+  }
+  for (const timestamp of ['2026-10-11T10:15:30+99:00', '2026-10-11T10:15:30+09:00)', '2026-10-11T10:15:30.1234567Z']) {
+    assert.throws(() => workPageQuery(actor, '', { id: 'wc_abc', created_at: timestamp }), /invalid_cursor/);
+  }
+});
+
 test('확인·할 일 중복은 OR로 한 번 세며 대표·팀장·본인의 일정 권한을 유지한다', () => {
   const q = condition(workCountQueries(actor, visibility).attention);
   assert.match(q, /or\(and\(created_by.neq."me",read_by.not.cs.\{"me"\}\),and\(status.eq.open/);

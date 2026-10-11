@@ -938,7 +938,7 @@ export default function ProductionOrders() {
         // 여기에 이게 없어서 일괄 발주한 건은 자재구매로 넘어가지 않았다
         const { bom: hqBom, ambiguous } = pickBomForOrder(boms as Bom[], item.styleNo, item.id, order.colorQtys, order.qty);
         if (ambiguous) hqAmbiguous.push(item.styleNo);
-        else hqAdded += addHqMaterialsToCart(hqGroups(hqBom, order.colorQtys, order.qty), item.styleNo, item.name);
+        else hqAdded += addHqMaterialsToCart(hqGroups(hqBom, order.colorQtys, order.qty), item.styleNo, item.name, order);
       } catch (e) {
         toast.error(`${item.styleNo} 발주 실패: ${(e as Error).message}`);
       }
@@ -1093,7 +1093,7 @@ export default function ProductionOrders() {
       // 어느 BOM 이 맞는지 코드로 가릴 수 없다. 조용히 아무거나 담으면 엉뚱한 자재를 산다
       toast.warning(`${order.styleNo} 는 자재가 다른 BOM 이 여러 개입니다. 자재는 직접 담아주세요`);
     } else {
-      addHqMaterialsToCart(_hqGroups, order.styleNo, order.styleName);
+      addHqMaterialsToCart(_hqGroups, order.styleNo, order.styleName, order);
     }
     refreshCart();
 
