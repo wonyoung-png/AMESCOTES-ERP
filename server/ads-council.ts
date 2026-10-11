@@ -667,6 +667,7 @@ const runnerAllowed = (req: Request) => {
 };
 export function createAdsRouter(service: Service = createAdsService()) {
   const router = Router();
+  let lastRunnerHeartbeat = -Infinity;
   // Worker boundary precedes employee session routes. GET polling writes only ERP lease state, never Meta.
   router.get("/api/ads-council/jobs/next", async (req, res) => {
     try {
@@ -674,13 +675,25 @@ export function createAdsRouter(service: Service = createAdsService()) {
         res.status(401).json({ error: "runner_unauthorized" });
         return;
       }
-      if (!service.io.enabled()) {
-        res.json({ job: null });
-        return;
-      }
       const runnerId = String(req.query.runnerId || "macmini");
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(runnerId)) {
         res.status(400).json({ error: "invalid_runner" });
+        return;
+      }
+      const now = service.io.now();
+      // Connectivity only: never imply model participation or claim a disabled job.
+      if (runnerId === "macmini" && +now - lastRunnerHeartbeat >= 60_000) {
+        const heartbeat = await service.io.rest("ads_analysis_notices?on_conflict=id", {
+          method: "POST", headers: { Prefer: "resolution=merge-duplicates" },
+          body: JSON.stringify({ id: "codex_runner", payload: {
+            kind: "codex_runner", state: "cleared", checkedAt: now.toISOString(),
+          }, updated_at: now.toISOString() }),
+        });
+        if (!heartbeat.ok) throw Error("ads_storage_unavailable");
+        lastRunnerHeartbeat = +now;
+      }
+      if (!service.io.enabled()) {
+        res.json({ job: null });
         return;
       }
       const j = await rpc(service.io.rest, "ads_claim_job", {
@@ -941,9 +954,15 @@ export async function adsOfficeSummary(
       rest,
       "ads_analysis_notices?select=payload&order=updated_at.desc&limit=4"
     );
+    const runnerSeen = notices.find(n => n.payload?.kind === "codex_runner")?.payload.checkedAt;
+    const runnerAge = typeof runnerSeen === "string" ? +now - Date.parse(runnerSeen) : NaN;
     return {
       state: "ok",
       day,
+      runner: {
+        state: !Number.isFinite(runnerAge) || runnerAge < 0 ? "unavailable" : runnerAge <= 300_000 ? "connected" : "stale",
+        checkedAt: Number.isFinite(runnerAge) && runnerAge >= 0 ? runnerSeen : null,
+      },
       analyses: rs
         .map(r => (r.payload ? rowRun(r) : r))
         .map(r => ({

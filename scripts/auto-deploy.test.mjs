@@ -58,4 +58,5 @@ test('installer and persistent runner contain no hardcoded credentials or execut
   assert.doesNotMatch(launcher,/eval\(|execSync|setenv/);
   assert.ok(installer.indexOf("refuse_existing_launch_agent")<installer.indexOf("config = private"));
   assert.doesNotMatch(installer,/'ADS_RUNNER_TOKEN'/);
+  assert.ok(installer.includes(".replace(b'\\r\\n', b'\\n')"));
 });

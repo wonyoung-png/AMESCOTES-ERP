@@ -1,5 +1,7 @@
 # LUMEN 상품 등록 — 구현 검수 인계
 
+> 최신 운영 설치/설정 상태: `ADS_ANALYSIS_FEEDBACK_SETUP_2026-10-12.md` 참조. 상품 등록 화면·DB는 운영 설치됐으나 실제 Cafe24/Shopify 상품 쓰기와 신규 인증은 미실행/금지 유지. 아래는 최초 코드 인계 당시 기록입니다.
+
 상태: **코드 통합·회귀 검증 통과 / Claude 실서버 검수 전**. 이 파일 이름은 요청된 인계 규약이며 운영 완료를 뜻하지 않습니다. 2026-10-11, 별도 worktree `AMESCOTES-ERP-council`, 브랜치 `product-registration`. 기존 작업 checkout, aws-migration, 운영 DB, 배포, 실제 Cafe24/Shopify 상품은 변경하지 않았습니다.
 
 ## 기능과 경계

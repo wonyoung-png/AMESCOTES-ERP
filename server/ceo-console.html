@@ -398,9 +398,10 @@ function adsOfficeRows() {
   const report = D.adsAnalysis;
   if (!report || report.state !== 'ok') return '<p class="empty">광고 분석 조회 실패 · 판단 보류</p>';
   const link = `${D.erpUrl}/ads-analysis?ws=LUMEN`;
+  const runner = `<p class="empty">Codex 러너 ${report.runner?.state === 'connected' ? '연결됨' : report.runner?.state === 'stale' ? '연결 지연 · 확인 필요' : '연결 확인 불가'} · ${esc(report.runner?.checkedAt || '접속 기록 없음')} · 모델 분석 참여 여부와 별개</p>`;
   const notices = (report.notices || []).map(n => `<div class="item"><span class="k req">연결 알림</span><div class="t"><p>${esc(n.title)}</p><small>데이터 접근 만료 ${esc(n.expiresOn)}</small></div><a class="btn" href="${esc(link)}" target="_blank" rel="noopener">확인 ↗</a></div>`).join('');
   const analyses = (report.analyses || []).map(a => `<div class="item"><div class="t"><p>${a.market === 'lm-kr' ? '국내' : '해외'} 광고 분석 · ${esc(a.status)}</p>${(a.summary || []).slice(0, 3).map(s => `<p>${esc(s)}</p>`).join('')}<small>${esc(a.checkedAt)} · 보고 당시 근거</small>${(a.alerts || []).map(x => `<p class="warn">${esc(x.message)}</p>`).join('')}</div><a class="btn" href="${esc(link + '&market=' + encodeURIComponent(a.market) + '&run=' + encodeURIComponent(a.id))}" target="_blank" rel="noopener">원본 ↗</a></div>`).join('');
-  return notices + (analyses || '<p class="empty">오늘 광고 분석 전 · 광고 자동 변경 없음</p>');
+  return runner + notices + (analyses || '<p class="empty">오늘 광고 분석 전 · 광고 자동 변경 없음</p>');
 }
 function home() {
   const today = D.today;

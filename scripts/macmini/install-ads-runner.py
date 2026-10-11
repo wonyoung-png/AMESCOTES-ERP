@@ -4,7 +4,6 @@ import json
 import os
 import pathlib
 import plistlib
-import shutil
 import stat
 import subprocess
 
@@ -56,7 +55,9 @@ try:
             target = runtime / name
             if target.is_symlink():
                 raise RuntimeError('invalid_runtime_path')
-            shutil.copyfile(source / name, target)
+            # Git archives can retain CRLF from older tracked shell files.
+            # POSIX sh -n accepts these but execution rejects `set -eu\r`.
+            target.write_bytes((source / name).read_bytes().replace(b'\r\n', b'\n'))
             target.chmod(0o700)
         plist.parent.mkdir(parents=True, exist_ok=True)
         with plist.open('xb') as out:

@@ -7,7 +7,8 @@ import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 
-const script = (await readFile(new URL('./ads-runner.sh', import.meta.url), 'utf8')).replaceAll('\r\n', '\n');
+const script = await readFile(new URL('./ads-runner.sh', import.meta.url), 'utf8');
+assert.equal(script.includes('\r'), false, 'Committed POSIX entrypoint must use LF; do not normalize defects inside tests');
 const plist = await readFile(new URL('./kr.atlm.ads-runner.plist.template', import.meta.url), 'utf8');
 const embedded = script.split("<<'ADS_RUNNER_NODE'\n")[1].split('\nADS_RUNNER_NODE')[0];
 const opinion = { model: 'codex', state: 'ok', conclusion: 'hold', evidence: [{ factId: 'roas', value: 2 }], confidence: 'low', actions: [] };

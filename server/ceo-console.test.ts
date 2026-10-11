@@ -4,6 +4,16 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const html = fs.readFileSync(new URL('./ceo-console.html', import.meta.url), 'utf8');
+test('비서실은 러너 연결과 실제 모델 참여를 구분하고 지연·미확인을 표시한다', () => {
+  const source = html.slice(html.indexOf('function adsOfficeRows()'), html.indexOf('function home()'));
+  const render = new Function('D','esc',source+';return adsOfficeRows();');
+  const esc = (v: unknown) => String(v).replaceAll('<','&lt;');
+  for (const [state,label] of [['connected','연결됨'],['stale','연결 지연'],['unavailable','연결 확인 불가']]) {
+    const result = render({erpUrl:'https://erp.example.invalid',adsAnalysis:{state:'ok',runner:{state,checkedAt:'<unsafe>'},analyses:[],notices:[]}},esc);
+    assert.match(result,new RegExp(label)); assert.match(result,/모델 분석 참여 여부와 별개/);
+    assert.match(result,/&lt;unsafe>/); assert.doesNotMatch(result,/<unsafe>/);
+  }
+});
 // 실제 배포 함수에 합성 데이터를 넣어 검증한다. DOM이나 실자료는 변경하지 않는다.
 const source = html.slice(html.indexOf('function agentList()'), html.indexOf('function mapView()'));
 const list = new Function('D', source + '\nreturn agentList();');

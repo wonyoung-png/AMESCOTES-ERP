@@ -22,6 +22,40 @@ import type {
   AdsOpinion,
 } from "../shared/ads-analysis";
 const now = new Date("2026-10-11T01:00:00Z");
+test("authenticated disabled runner records throttled connectivity only; failed storage is not success", async t => {
+  const previous = process.env.ADS_RUNNER_TOKEN;
+  process.env.ADS_RUNNER_TOKEN = 'synthetic-runner-token-32chars-only';
+  t.after(() => { if (previous === undefined) delete process.env.ADS_RUNNER_TOKEN; else process.env.ADS_RUNNER_TOKEN = previous; });
+  let clock = now, writes = 0, fail = false;
+  const service = createAdsService({ enabled: () => false, now: () => clock,
+    rest: (async (path: string, init: any) => {
+      assert.equal(path, 'ads_analysis_notices?on_conflict=id');
+      assert.equal(JSON.parse(init.body).id, 'codex_runner'); writes++;
+      return new Response('', {status: fail ? 500 : 200});
+    }) as any,
+  });
+  const app = express(); app.use(createAdsRouter(service));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const base = `http://127.0.0.1:${(server.address() as any).port}/api/ads-council/jobs/next?runnerId=macmini`;
+  const request = () => fetch(base, {headers:{Authorization:'Bearer synthetic-runner-token-32chars-only'}});
+  assert.equal((await fetch(base)).status, 401); assert.equal(writes, 0);
+  assert.deepEqual(await (await request()).json(), {job:null});
+  assert.deepEqual(await (await request()).json(), {job:null}); assert.equal(writes, 1);
+  clock = new Date(+now + 60_000); fail = true;
+  assert.equal((await request()).status, 503); assert.equal(writes, 2);
+  fail = false; assert.equal((await request()).status, 200); assert.equal(writes, 3);
+});
+
+test("office connectivity is distinct from model participation and detects missing/stale/future heartbeat", async () => {
+  for (const [offset, state] of [[30_000,'connected'],[240_000,'connected'],[301_000,'stale'],[-1000,'unavailable'],[NaN,'unavailable']] as const) {
+    const rest = (async (path: string) => new Response(JSON.stringify(path.startsWith('ads_analysis_notices?') && Number.isFinite(offset)
+      ? [{payload:{kind:'codex_runner',state:'cleared',checkedAt:new Date(+now-offset).toISOString()}}] : []))) as any;
+    const report = await adsOfficeSummary(rest, now);
+    assert.equal(report.runner?.state, state); assert.deepEqual(report.analyses, []); assert.deepEqual(report.notices, []);
+  }
+});
 test("disabled analysis still persists expiry notices at KST day rollover without paid/model/provider calls", async t => {
   t.mock.timers.enable({ apis: ["setInterval"] });
   let clock = new Date("2026-11-09T14:59:59Z");
