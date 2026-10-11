@@ -294,6 +294,8 @@ export async function runSubscriptionUsageChecks() {
       }
       continue;
     }
+    // 대표 10/11: 확인 필요한 것만 매월 묻는다. 확정(사용 중)은 갱신·통보 기한 때만.
+    if (s.status !== '검토 필요') continue;
     const monthly = !s.last_usage_checked_at || new Date(s.last_usage_checked_at).toISOString().slice(0, 7) < today.slice(0, 7);
     if (!monthly) continue;
     if (openChecks.some((x: any) => x.subscription_id === s.id)) continue;
