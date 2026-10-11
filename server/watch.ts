@@ -52,7 +52,7 @@ export async function gatherWatch(read = restAsServer, readPms = pms): Promise<M
     rows('settlements?select=id,buyer_name,due_date,billed_amount_krw,collected_amount_krw,status').catch(e => e as Error),
     rows('payables?select=id,source_type,order_id,amount_krw,paid_amount_krw,due_date,status,memo').catch(e => e as Error),
     rows(`campaigns?or=(and(end_date.gte.${today},start_date.lte.${in30}),and(end_date.lt.${today},status.in.(active,onboarded)))&select=title,channel,start_date,end_date,status,workspace,tasks`).catch(e => e as Error),
-    rows('subscriptions?status=neq.해지됨&select=service_name,average_amount,currency,status,next_billing_on').catch(e => e as Error),
+    rows('subscriptions?status=neq.해지됨&select=service_name,average_amount,currency,status,next_billing_on,auto_renew,notice_by').catch(e => e as Error),
     readPms('lumen'), readPms('aetaloof'),
   ]);
   const out = new Map<string, Watch>();
@@ -68,7 +68,9 @@ export async function gatherWatch(read = restAsServer, readPms = pms): Promise<M
     const review = subscriptions.filter(s => s.status === '검토 필요');
     const due7 = subscriptions.filter(s => s.next_billing_on && s.next_billing_on >= today && s.next_billing_on <= addDays(today, 7));
     const krw = subscriptions.filter(s => s.currency === 'KRW').reduce((n, s) => n + (Number(s.average_amount) || 0), 0);
+    const notice30 = subscriptions.filter(s => s.auto_renew && s.notice_by && s.notice_by >= today && s.notice_by <= in30);
     add('경영지원', [`검토 필요 구독 ${review.length}건, 이번 달 구독 합계 ${won(krw)}, 7일 안 결제 예정 ${due7.length}건`,
+      `해지 통보 기한 30일 이내 ${notice30.length}건`,
       ...due7.slice(0, 8).map(s => `  · ${s.next_billing_on} ${s.service_name} ${won(Number(s.average_amount) || 0)}`)], review.length);
   }
 

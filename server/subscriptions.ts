@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { CEO_EMAILS, currentUser, requireUser, restAsServer, userOf, type SessionUser } from './auth.js';
 import { detectSubscriptionCandidates, normalizeMerchant, type CardTransaction } from './subscription-detection.js';
-import { genId, kstToday, members, notify } from './work.js';
+import { genId, isTeamLeader, kstToday, members, notify } from './work.js';
 
 const router = Router();
 const text = (v: unknown, max = 200) => String(v ?? '').trim().slice(0, max);
@@ -10,6 +10,21 @@ const dateOk = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Dat
 const last4 = (v: unknown) => (text(v).replace(/\D/g, '').slice(-4) || null);
 const isSubscriptionAdmin = (u: SessionUser, team?: string) =>
   CEO_EMAILS.includes(u.email.toLowerCase()) || ['경영지원', '경영관리'].includes(team || '');
+
+export const contractNoticeBy = (termEndOn: string, noticeDays: number) =>
+  new Date(Date.parse(termEndOn + 'T00:00:00Z') - noticeDays * 864e5).toISOString().slice(0, 10);
+export const contractNoticeStage = (today: string, noticeBy: string) => {
+  const days = Math.round((Date.parse(noticeBy) - Date.parse(today)) / 864e5);
+  return days >= 0 && days <= 7 ? 'D-7' : days >= 0 && days <= 30 ? 'D-30' : null;
+};
+export const renewContractTerm = (termEndOn: string, months: number) => {
+  const d = new Date(termEndOn + 'T00:00:00Z');
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
+};
+export const isContractCancellation = (answer: string, autoRenew: boolean) => answer === '안 씀' && autoRenew;
+export const hasNoticeStage = (checks: Array<{ subscription_id: string; notice_stage?: string }>, subscriptionId: string, stage: string | null) =>
+  !!stage && checks.some(x => x.subscription_id === subscriptionId && x.notice_stage === stage);
 
 async function requireSubscriptionAdmin(req: Request, res: Response, next: NextFunction) {
   try {
@@ -142,6 +157,11 @@ router.patch('/api/subscriptions/:id', async (req, res) => {
     if (CATEGORIES.includes(req.body?.category)) body.category = req.body.category;
     if (dateOk(text(req.body?.nextBillingOn, 10))) body.next_billing_on = req.body.nextBillingOn;
     if ('ownerId' in (req.body || {})) body.owner_id = text(req.body.ownerId) || null;
+    if ('autoRenew' in (req.body || {})) body.auto_renew = req.body.autoRenew === true;
+    if ('termEndOn' in (req.body || {})) body.term_end_on = dateOk(text(req.body.termEndOn, 10)) ? req.body.termEndOn : null;
+    if ('renewalMonths' in (req.body || {})) { const n = Number(req.body.renewalMonths); if (Number.isInteger(n) && n > 0) body.renewal_months = n; }
+    if ('noticeDays' in (req.body || {})) { const n = Number(req.body.noticeDays); if (Number.isInteger(n) && n >= 0) body.notice_days = n; }
+    if ('ownerTeam' in (req.body || {})) body.owner_team = text(req.body.ownerTeam, 100) || null;
     for (const [from, to, max] of [['purpose','purpose',500], ['memo','memo',1000]] as const) if (from in (req.body || {})) body[to] = text(req.body[from], max) || null;
     const r = await restAsServer(`subscriptions?id=eq.${encodeURIComponent(req.params.id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
     res.status(r.ok ? 200 : 502).json(r.ok ? { ok: true, subscription: (await r.json())[0] } : { error: 'save_failed' });
@@ -150,13 +170,15 @@ router.patch('/api/subscriptions/:id', async (req, res) => {
 
 export async function runSubscriptionUsageChecks() {
   const today = kstToday(), now = new Date().toISOString();
-  const [subs, all, openChecks] = await Promise.all([
+  const [subs, all, openChecks, noticeChecks] = await Promise.all([
     db('subscriptions?status=in.(사용 중,검토 필요)&select=*'), members(),
     db('subscription_usage_checks?answered_at=is.null&select=*'),
+    db('subscription_usage_checks?notice_stage=not.is.null&select=*'),
   ]);
   const ceo = all.find(x => CEO_EMAILS.includes(x.email.toLowerCase()));
+  const supportLead = all.find(x => ['경영지원', '경영관리'].includes(x.team) && isTeamLeader(x));
   for (const check of openChecks) {
-    if (check.escalated_at || Date.now() - Date.parse(check.requested_at) < 7 * 864e5 || !ceo) continue;
+    if (check.notice_stage || check.escalated_at || Date.now() - Date.parse(check.requested_at) < 7 * 864e5 || !ceo) continue;
     const reassigned = await restAsServer(`work_cards?id=eq.${encodeURIComponent(check.work_card_id)}&status=eq.open`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ assignee_id: ceo.id, assignee_name: ceo.name, updated_at: now }) });
     if (!reassigned.ok || !(await reassigned.json())[0]) continue;
     const escalated = await restAsServer(`subscription_usage_checks?id=eq.${encodeURIComponent(check.id)}`, { method: 'PATCH', body: JSON.stringify({ escalated_at: now }) });
@@ -164,6 +186,48 @@ export async function runSubscriptionUsageChecks() {
     await notify([{ user_id: ceo.id, card_id: check.work_card_id, title: '구독 사용 확인이 7일째 답이 없습니다' }]);
   }
   for (const s of subs) {
+    if (s.auto_renew && s.term_end_on && s.notice_by && s.renewal_months) {
+      const contractChecks = noticeChecks.filter((x: any) => x.subscription_id === s.id);
+      const unansweredContractChecks = contractChecks.filter((x: any) => !x.answered_at);
+      if (s.notice_by < today && !s.cancel_requested_at) {
+        const answered = contractChecks.some((x: any) => x.answered_at);
+        if (!answered && ceo) {
+          const open = unansweredContractChecks[0];
+          let cardId = open?.work_card_id;
+          if (open && !open.escalated_at) {
+            const reassigned = await restAsServer(`work_cards?id=eq.${encodeURIComponent(cardId)}&status=eq.open`, { method: 'PATCH', body: JSON.stringify({ assignee_id: ceo.id, assignee_name: ceo.name, updated_at: now }) });
+            if (reassigned.ok) await restAsServer(`subscription_usage_checks?id=eq.${encodeURIComponent(open.id)}`, { method: 'PATCH', body: JSON.stringify({ escalated_at: now }) });
+          } else if (!open) {
+            cardId = genId('wc');
+            await restAsServer('work_cards', { method: 'POST', body: JSON.stringify({ id: cardId, created_by: 'subscription-watch', created_by_name: '구독 감시',
+              team: ceo.team || '경영지원', raw_text: `${s.service_name} 해지 통보 기한 ${s.notice_by} 경과 — 자동갱신 처리 확인`, kind: 'request_check', status: 'open',
+              parsed: { title: `${s.service_name} 해지 기한 경과`, subscriptionId: s.id }, assignee_id: ceo.id, assignee_name: ceo.name }) });
+          }
+          if (cardId) await notify([{ user_id: ceo.id, card_id: cardId, title: `${s.service_name} 해지 통보 기한을 놓쳤습니다` }]);
+        }
+        await restAsServer(`subscriptions?id=eq.${encodeURIComponent(s.id)}`, { method: 'PATCH', body: JSON.stringify({ term_end_on: renewContractTerm(s.term_end_on, Number(s.renewal_months)), updated_at: now }) });
+        continue;
+      }
+      const stage = contractNoticeStage(today, s.notice_by);
+      const already = hasNoticeStage(contractChecks, s.id, stage);
+      if (stage && !already && !s.cancel_requested_at) {
+        const owner = all.find(x => x.id === s.owner_id)
+          || all.find(x => x.team === s.owner_team && isTeamLeader(x)) || supportLead || ceo;
+        if (owner) {
+          const days = Math.round((Date.parse(s.notice_by) - Date.parse(today)) / 864e5);
+          const cardId = genId('wc'), checkId = genId('suc');
+          const raw = `${s.service_name} 해지 통보 기한 ${s.notice_by} (D-${days}). 계속/해지 요청 중 선택`;
+          const reserved = await restAsServer('subscription_usage_checks', { method: 'POST', body: JSON.stringify({ id: checkId, subscription_id: s.id, work_card_id: cardId, owner_id: owner.id, notice_stage: stage }) });
+          if (reserved.ok) {
+            const card = { id: cardId, created_by: 'subscription-watch', created_by_name: '구독 감시', team: owner.team || '경영지원', raw_text: raw,
+              kind: 'request_check', status: 'open', parsed: { title: `${s.service_name} 계약 확인`, subscriptionId: s.id, subscriptionCheck: true, contractNotice: true }, assignee_id: owner.id, assignee_name: owner.name };
+            const wr = await restAsServer('work_cards', { method: 'POST', body: JSON.stringify(card) });
+            if (wr.ok) await notify([{ user_id: owner.id, card_id: cardId, title: `${s.service_name} 해지 통보 확인`, body: raw }]);
+            else await restAsServer(`subscription_usage_checks?id=eq.${encodeURIComponent(checkId)}`, { method: 'DELETE' });
+          }
+        }
+      }
+    }
     const dueSoon = s.next_billing_on && s.next_billing_on >= today && Date.parse(s.next_billing_on) - Date.parse(today) <= 5 * 864e5;
     const monthly = !s.last_usage_checked_at || new Date(s.last_usage_checked_at).toISOString().slice(0, 7) < today.slice(0, 7);
     if (!dueSoon && !monthly) continue;
@@ -207,7 +271,16 @@ router.post('/api/subscription-checks/:cardId/answer', requireUser(), async (req
       res.status(detail.includes('already_answered') ? 409 : detail.includes('not_found') ? 404 : 502).json({ error: 'answer_update_failed' }); return;
     }
     const rpcResult = await result.json();
-    if (risky && ceo && rpcResult.newly_answered) await notify([{ user_id: ceo.id, card_id: req.params.cardId, title: '구독 검토가 필요합니다', body: answer }]);
+    if (rpcResult.cancel_requested && rpcResult.newly_answered) {
+      const supportLead = all.find(x => ['경영지원', '경영관리'].includes(x.team) && isTeamLeader(x)) || ceo;
+      if (supportLead) {
+        const cardId = genId('wc');
+        const raw = `${actor?.name || me.name} 요청: 구독 해지 통보 처리`;
+        const wr = await restAsServer('work_cards', { method: 'POST', body: JSON.stringify({ id: cardId, created_by: me.id, created_by_name: actor?.name || me.name,
+          team: supportLead.team || '경영지원', raw_text: raw, kind: 'task', status: 'open', parsed: { title: '해지 통보 처리', subscriptionId: check.subscription_id }, assignee_id: supportLead.id, assignee_name: supportLead.name }) });
+        if (wr.ok) await notify([{ user_id: supportLead.id, card_id: cardId, title: '구독 해지 통보 처리', body: raw }]);
+      }
+    } else if (risky && ceo && rpcResult.newly_answered) await notify([{ user_id: ceo.id, card_id: req.params.cardId, title: '구독 검토가 필요합니다', body: answer }]);
     res.json({ ok: true });
   } catch (e) { console.error('[subscriptions] 사용 확인 답변 실패', e); res.status(500).json({ error: 'internal' }); }
 });
