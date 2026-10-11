@@ -6,8 +6,9 @@ function reader(tables: Record<string, any[]>, fail = '') {
   return async (path: string) => {
     const [table, query] = path.split('?'); const p = new URLSearchParams(query);
     assert.equal(p.get('order') !== null, true);
-    if (table === 'brand_order_batches') assert.equal(p.get('status'), 'in.(draft,in_approval)');
-    return { ok: table !== fail, status: table === fail ? 503 : 200, json: async () => (tables[table] || []).slice(Number(p.get('offset')), Number(p.get('offset')) + 500) } as Response;
+    if (table === 'brand_order_batches') assert.ok(['in.(draft,in_approval)', 'in.(draft,in_approval,approved,issued)'].includes(p.get('status')!));
+    const rows = (tables[table] || []).filter(r => table !== 'brand_order_batches' || p.get('status')!.slice(4, -1).split(',').includes(r.status));
+    return { ok: table !== fail, status: table === fail ? 503 : 200, json: async () => rows.slice(Number(p.get('offset')), Number(p.get('offset')) + 500) } as Response;
   };
 }
 test('대표 승인 원본은 페이지 한도를 넘어 전수 조회하고 카드 생성을 요구하지 않는다', async () => {
@@ -64,7 +65,7 @@ test('표시에서 빠진 아홉 번째 원본 변경도 보고 근거를 갱신
 test('부분 입고·불량·OEM 및 3PL 출고를 차감하고 취소 발주를 제외한다', () => {
   const orders = [{ id: 'o', order_no: 'PO', quantity: 10, received_qty: 10, shipped_qty: 4, status: '입고완료', delivery_date: '2020-01-01' }, { id: 'cancel', received_qty: 5, status: '취소' }];
   const w = shipmentWatch(orders, [{ order_id: 'o', log_type: 'inbound', qty: 10, defect_qty: 2 }, { order_id: 'o', log_type: 'outbound_oem', qty: 3 }, { order_id: 'o', log_type: 'outbound_3pl', qty: 1 }], '2026-10-11');
-  assert.match(w.facts.join('\n'), /출고 4 \/ 정상품 출고 잔량 4/); assert.equal(w.alerts, 1);
+  assert.match(w.facts.join('\n'), /출고 4 \/ 정상품 출고 잔량 4/); assert.equal(w.alerts, 2);
   assert.match(w.facts.join('\n'), /고객 도착 미확인/);
 });
 test('출고 수량 불일치는 납품완료가 아니고 이력이 없을 때도 누적값을 보존한다', () => {

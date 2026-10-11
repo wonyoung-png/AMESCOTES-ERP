@@ -86,6 +86,8 @@ export async function gatherWatch(read = restAsServer, readPms = pms, approvals?
     const noPrice = live.filter(o => !Number(o.factory_unit_price_krw));
     const mat = live.flatMap(o => (Array.isArray(o.hq_supply_items) ? o.hq_supply_items : [])
       .filter((i: any) => i?.purchaseStatus === '미구매').map((i: any) => `${o.order_no} ${i.itemName || ''}`));
+    const unsentMaterials = live.flatMap(o => (Array.isArray(o.hq_supply_items) ? o.hq_supply_items : [])
+      .filter((i: any) => i?.purchaseStatus === '구매완료').map((i: any) => `${o.order_no} ${i.itemName || ''}`));
     const unbilled = orders.filter(o => o.status === '입고완료' && !o.trade_statement_id);
     const line = (o: any) => `  · ${o.order_no} ${o.style_name || o.style_no || ''} / ${o.vendor_name || '공장 미정'} / 납기 ${o.delivery_date || '없음'} / ${o.status}`;
     add('생산관리', [
@@ -95,6 +97,7 @@ export async function gatherWatch(read = restAsServer, readPms = pms, approvals?
       ...(past.length ? ['납기 지난 발주:', ...past.slice(0, 8).map(line)] : []),
       ...(due7.length ? ['7일 안 납기:', ...due7.slice(0, 8).map(line)] : []),
       `본사 제공 자재 미구매 ${mat.length}건${mat.length ? ': ' + mat.slice(0, 6).join(', ') : ''}`,
+      `본사 제공 자재 구매완료·미발송 ${unsentMaterials.length}건${unsentMaterials.length ? ': ' + unsentMaterials.slice(0, 6).join(', ') : ''} (구매 원본과 중복 가능 — 합산 금지)`,
     ], risks.filter(r => r.priority < 9 && r.priority !== 2).length + notSent.length + noReply.length
       // 7일 안 납기인데 본사 자재를 아직 안 샀으면 경고 (생산관리 기본 기준)
       + due7.filter(o => Array.isArray(o.hq_supply_items) && o.hq_supply_items.some((i: any) => i?.purchaseStatus === '미구매')).length);

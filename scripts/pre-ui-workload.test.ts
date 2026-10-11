@@ -218,12 +218,12 @@ test('real watch rules read 200 confirmed schedules; sharing does not complete p
     const [table, query] = path.split('?');
     assert.ok(Object.hasOwn(tables, table), `unexpected table: ${table}`);
     const params = new URLSearchParams(query);
-    assert.equal(params.get('order'), table === 'brand_order_batches' ? 'created_at.asc,id.asc' : 'id.asc');
+    assert.equal(params.get('order'), table === 'brand_order_batches' && params.get('status') === 'in.(draft,in_approval)' ? 'created_at.asc,id.asc' : 'id.asc');
     assert.equal(params.get('limit'), '500');
     const offset = Number(params.get('offset'));
     return { ok: true, status: 200, json: async () => tables[table].slice(offset, offset + 500), text: async () => '' };
   }, async brand => { brands.push(brand); return { sales: { daily30: [] }, inventory: {} }; });
-  assert.equal(calls.length, 15);
+  assert.equal(calls.length, 16);
   assert.deepEqual(brands.sort(), ['aetaloof', 'lumen']);
   assert.equal(watch.get('마케팅')!.alerts, 200);
   assert.equal(watch.get('물류·CS')!.alerts, 200);
