@@ -50,6 +50,14 @@ export const orgOf = (c: any, bossIds: Set<string>): string =>
 /** 대표 본인 업무 — 팀 에이전트가 감독할 대상이 아니다 */
 export const CEO_DESK = '대표실';
 
+export function reportHeadline(headline: string, evidence: any[], team: string) {
+  const refersToUnknown = evidence.some(c => c._campaignEvidence && c._campaignEvidence.state !== 'current'
+    && [c.confirmed_payload?.title, c.confirmed_payload?.channel].some(name =>
+      typeof name === 'string' && name.trim().length >= 2 && headline.includes(name.trim())));
+  return refersToUnknown && /\d+\s*%|\d+[월./-]\s*\d+/.test(headline)
+    ? `${team} · 현재 일정 미확인` : headline.trim();
+}
+
 /** 숫자 근거와 상태 — 규칙만으로 */
 export function judge(team: string, cards: any[], bossIds: Set<string>, today: string, watch?: Watch, now = new Date()) {
   const mine = cards.filter(c => c._org === team && c.kind !== 'question' && c.status !== 'cancelled');
@@ -106,6 +114,7 @@ ${org ? `이 팀이 맡은 일: ${org.focus}.\n` : ''}대표에게 이 팀이 �
 준비의 실제 완료·미완료를 보여주는 근거가 없으면 "${team} 준비 미확인 — 준비 진행 기록이 없습니다"라고 명시한다. 업무 카드가 없다는 이유로 "미준비", "준비하지 않았다", "미이행"이라고 추정하지 마라.
 업무 카드의 확정값과 운영캘린더의 draft 상태는 별개다. 확정 할인율을 미확정 초안값으로 되돌리거나 원문 제안과 확정값의 차이를 새 할인 결정 요청으로 보고하지 마라.
 ${CAMPAIGN_EVIDENCE_RULES}
+headline에도 동일한 근거 기준을 적용한다. 현재 캘린더가 미확인(조회 실패·항목 없음·연결 없음)이면 제목에는 과거 일정·할인율을 넣지 말고 "현재 일정 미확인"이라고 표시한다. 본문·needs에서 과거 날짜나 할인율을 언급할 때도 반드시 "당시 확정" 또는 "과거 기록"을 바로 붙여 현재값과 구분한다.
 상태는 이미 정해져 있다: ${status} (숫자 ${JSON.stringify(stats)}). 이 상태와 어긋나는 말을 하지 마라.
 JSON 하나만 출력한다.
 {"headline":"지도에 보일 한 줄, 30자 안, 지금 가장 중요한 일","summary":"3~5줄 보고, 마지막 줄은 팀원별 한 줄. 줄마다 '· '로 시작. 마크다운 금지","needs":[{"text":"대표가 결정·확인할 것 한 줄","cardId":"관련 카드 id 또는 생략"}]}
@@ -122,8 +131,11 @@ needs 는 정말 대표가 볼 것만, 없으면 []. 적혀 있지 않은 건 �
     if (!j || typeof j.headline !== 'string' || !j.headline.trim() || typeof j.summary !== 'string' || !j.summary.trim() ||
       !Array.isArray(j.needs) || j.needs.some((n: any) => !n || typeof n.text !== 'string' || !n.text.trim())) throw new Error('invalid_team_report');
     const ids = new Set([...selected, ...received].map(c => c.id));
+    // A fluent model can still put an old date in the map headline. The original
+    // evidence stays in the report, but unknown current values cannot look final.
+    const headline = reportHeadline(j.headline, [...selected, ...received], team);
     return {
-      headline: j.headline.trim().slice(0, 60),
+      headline: headline.slice(0, 60),
       summary: j.summary.trim().slice(0, 1200),
       reportAvailable: true,
       needs: (Array.isArray(j.needs) ? j.needs : []).slice(0, 5)

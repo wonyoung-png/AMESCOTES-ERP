@@ -51,7 +51,8 @@ for (const scenario of cases) for (const path of ['answer', 'team_report'] as co
         assert.equal(headers.get('x-api-key'), KEY, 'Only a synthetic model key is allowed');
         const body = JSON.parse(String(init?.body ?? await request?.clone().text()));
         prompts.push(body);
-        const output = path === 'answer' ? 'synthetic answer marker' : JSON.stringify({ headline: 'synthetic report marker', summary: '· synthetic fixture', needs: [] });
+        const output = path === 'answer' ? 'synthetic answer marker' : JSON.stringify({
+          headline: scenario.row ? 'synthetic report marker' : 'W컨셉 10/20 일정, 20% 할인', summary: '· synthetic fixture', needs: [] });
         return json({ id: 'fixture-message', type: 'message', role: 'assistant', model: body.model,
           content: [{ type: 'text', text: output }], stop_reason: 'end_turn', stop_sequence: null,
           usage: { input_tokens: 0, output_tokens: 0 } });
@@ -85,7 +86,8 @@ for (const scenario of cases) for (const path of ['answer', 'team_report'] as co
         const attached = await attachCampaignEvidence([card]);
         assert.equal(attached[0]._campaignEvidence.state, scenario.state);
         const result = await writeTeamReport('마케팅', [], [me], { open: 0, overdue: 0, alerts: 0 }, 'work', [], '', attached);
-        assert.equal(result.headline, 'synthetic report marker');
+        assert.equal(result.headline, scenario.row ? 'synthetic report marker' : '마케팅 · 현재 일정 미확인');
+        assert.match(prompts[0].system, /headline에도 동일한 근거 기준을 적용한다/);
       }
       assert.deepEqual(prohibited, []);
       assert.equal(linkedReads, scenario.state === 'unlinked' ? 0 : 1);

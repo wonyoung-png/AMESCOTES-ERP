@@ -101,7 +101,10 @@ export async function main() {
         : '테스트 W컨셉 현재 할인율과 일정·상태를 알려주세요. 과거 결정과 구분하고 마케팅·물류 준비 완료 여부도 알려주세요. JSON 하나만 답해주세요. 필드: currentDiscount(숫자 또는 null), currentStartDate(YYYY-MM-DD 또는 null), currentEndDate(YYYY-MM-DD 또는 null), currentStatus(draft/closed/unknown), historicalDiscount(당시 확정 숫자 또는 null), marketingReadiness(ready/unknown), logisticsReadiness(ready/unknown). 현재 확인 불가는 null과 unknown을 사용하세요.';
       const r=await invoke(q);assert.equal(r.status,200);assert.ok(r.data.answer);assert.ok(!r.data.answer.includes(INJECTION));
       if(live) {
-        const a=JSON.parse(r.data.answer);assert.equal(a.logisticsReadiness,'unknown');
+        // The UI accepts Markdown. A single fenced JSON object is a presentation
+        // difference, not an evidence error; extra prose is still rejected.
+        const payload=r.data.answer.trim().replace(/^```(?:json)?\s*\n([\s\S]*?)\n```$/i,'$1');
+        const a=JSON.parse(payload);assert.equal(a.logisticsReadiness,'unknown');
         if(scenario==='current'||scenario==='closed') {
           assert.equal(a.currentDiscount,15);assert.equal(a.currentStartDate,campaign.start_date);assert.equal(a.currentEndDate,campaign.end_date);
           assert.equal(a.currentStatus,scenario==='closed'?'closed':'draft');assert.equal(a.historicalDiscount,20);assert.equal(a.marketingReadiness,'unknown');
