@@ -206,6 +206,8 @@ export async function runSubscriptionUsageChecks() {
   ]);
   const ceo = all.find(x => CEO_EMAILS.includes(x.email.toLowerCase()));
   const supportLead = all.find(x => ['경영지원', '경영관리'].includes(x.team) && isTeamLeader(x));
+  // 담당자 → 담당 팀장 → 경영지원 팀장 → 대표 순 (대표에게 일괄로 몰리지 않게)
+  const ownerOf = (s: any) => all.find(x => x.id === s.owner_id) || all.find(x => x.team === s.owner_team && isTeamLeader(x)) || supportLead || ceo;
   for (const s of cancelledSubs) {
     const transaction = recentTransactions.find((x: any) => isPostCancellationPayment(s, x));
     if (!transaction || (!supportLead && !ceo)) continue;
@@ -256,8 +258,7 @@ export async function runSubscriptionUsageChecks() {
       // 이번 주기에 이미 답했으면(D-30 계속 씀) D-7 재질문 안 함
       const already = !!stage && contractChecks.some((x: any) => x.renewal_key === s.notice_by && (x.notice_stage === stage || x.answered_at));
       if (stage && !already && !s.cancel_requested_at) {
-        const owner = all.find(x => x.id === s.owner_id)
-          || all.find(x => x.team === s.owner_team && isTeamLeader(x)) || supportLead || ceo;
+        const owner = ownerOf(s);
         if (owner) {
           const days = Math.round((Date.parse(s.notice_by) - Date.parse(today)) / 864e5);
           const cardId = genId('wc'), checkId = genId('suc');
@@ -278,7 +279,7 @@ export async function runSubscriptionUsageChecks() {
       const stage = renewalStage(today, s.next_billing_on);
       const already = noticeChecks.some((x: any) => x.subscription_id === s.id && x.renewal_key === s.next_billing_on && (x.notice_stage === stage || x.answered_at));
       if (stage && !already) {
-        const owner = all.find(x => x.id === s.owner_id) || supportLead || ceo;
+        const owner = ownerOf(s);
         if (owner) {
           const cardId = genId('wc'), checkId = genId('suc');
           const amount = `${Number(s.latest_amount).toLocaleString()} ${s.currency}`;
@@ -296,7 +297,7 @@ export async function runSubscriptionUsageChecks() {
     const monthly = !s.last_usage_checked_at || new Date(s.last_usage_checked_at).toISOString().slice(0, 7) < today.slice(0, 7);
     if (!monthly) continue;
     if (openChecks.some((x: any) => x.subscription_id === s.id)) continue;
-    const owner = all.find(x => x.id === s.owner_id) || ceo;
+    const owner = ownerOf(s);
     if (!owner) continue;
     const cardId = genId('wc'), amount = `${Number(s.latest_amount).toLocaleString()} ${s.currency}`;
     const card = { id: cardId, created_by: 'subscription-watch', created_by_name: '구독 감시', team: owner.team || '경영지원',
