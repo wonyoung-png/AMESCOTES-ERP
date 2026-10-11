@@ -341,7 +341,7 @@ router.post('/api/subscription-checks/:cardId/answer', requireUser(), async (req
     }
     const rpcResult = await result.json();
     if (rpcResult.cancel_requested && rpcResult.newly_answered) {
-      const supportLead = all.find(x => ['경영지원', '경영관리'].includes(x.team) && isTeamLeader(x)) || ceo;
+      const supportLead = all.find(x => ['경영지원', '경영관리'].includes(x.team) && isTeamLeader(x)) || all.find(x => ['경영지원', '경영관리'].includes(x.team)) || ceo;
       if (supportLead) {
         const cardId = genId('wc');
         const raw = `${actor?.name || me.name} 요청: 구독 해지 통보 처리`;
