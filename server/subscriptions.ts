@@ -205,9 +205,11 @@ export async function runSubscriptionUsageChecks() {
     db('card_transactions?select=id,merchant_key,merchant_name,approved_on,amount,currency&order=approved_on.desc&limit=20000'),
   ]);
   const ceo = all.find(x => CEO_EMAILS.includes(x.email.toLowerCase()));
-  const supportLead = all.find(x => ['경영지원', '경영관리'].includes(x.team) && isTeamLeader(x));
+  // 팀장 계정이 없으면 같은 팀 아무나 (ERP 계정이 아직 일부만 등록됨)
+  const teamOwner = (team?: string) => team ? all.find(x => x.team === team && isTeamLeader(x)) || all.find(x => x.team === team) : undefined;
+  const supportLead = teamOwner('경영지원') || teamOwner('경영관리');
   // 담당자 → 담당 팀장 → 경영지원 팀장 → 대표 순 (대표에게 일괄로 몰리지 않게)
-  const ownerOf = (s: any) => all.find(x => x.id === s.owner_id) || all.find(x => x.team === s.owner_team && isTeamLeader(x)) || supportLead || ceo;
+  const ownerOf = (s: any) => all.find(x => x.id === s.owner_id) || teamOwner(s.owner_team) || supportLead || ceo;
   for (const s of cancelledSubs) {
     const transaction = recentTransactions.find((x: any) => isPostCancellationPayment(s, x));
     if (!transaction || (!supportLead && !ceo)) continue;
