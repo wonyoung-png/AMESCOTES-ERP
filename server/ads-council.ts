@@ -8,6 +8,7 @@ import {
   type SessionUser,
 } from "./auth.js";
 import { collectAdsSnapshot, metaOpinion } from "./ads-data.js";
+import { createCafe24ConnectRouter } from "./channels/cafe24-connect.js";
 import { isDecisionFact, modelSnapshot } from "./ads-context.js";
 import type {
   AdsMarket,
@@ -667,6 +668,7 @@ const runnerAllowed = (req: Request) => {
 };
 export function createAdsRouter(service: Service = createAdsService()) {
   const router = Router();
+  router.use(createCafe24ConnectRouter());
   let lastRunnerHeartbeat = -Infinity;
   // Worker boundary precedes employee session routes. GET polling writes only ERP lease state, never Meta.
   router.get("/api/ads-council/jobs/next", async (req, res) => {

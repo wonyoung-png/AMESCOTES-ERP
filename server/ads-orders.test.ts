@@ -15,6 +15,19 @@ const since = "2026-09-13",
   until = "2026-10-10";
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status });
+test('approved ads reader integrates credential grant without reopening merchant adapters',async()=> {
+  let grants=0, reads=0;
+  const result=await createAdsOrdersReader({
+    env:{SHOPIFY_SHOP_DOMAIN:'fixture.myshopify.com',SHOPIFY_CLIENT_ID:'fixture-id',SHOPIFY_CLIENT_SECRET:'fixture-secret',ADS_COMMERCE_AUTH_ENABLED:'true',PRODUCT_REGISTRATION_WRITES_ENABLED:'true'},
+    sleep:async()=>{}, fetch:(async(url,init)=> {
+      assert.equal(init?.method,'POST');
+      if(String(url).endsWith('/admin/oauth/access_token')) {grants++;return response({access_token:'fixture-token',expires_in:86399});}
+      reads++; assert.match(String(init?.body),/query AdsPaidOrders/);assert.doesNotMatch(String(init?.body),/mutation/);
+      return response({data:{orders:{nodes:[],pageInfo:{hasNextPage:false,endCursor:null}}}});
+    }) as typeof fetch,
+  })('lm-gl',since,until);
+  assert.equal(grants,1);assert.equal(reads,1);assert.equal(result.channels.shopify.state,'ok');
+});
 const order = (id = 1, patch: Record<string, unknown> = {}) => ({
   id: `gid://shopify/Order/${id}`,
   createdAt: "2026-10-10T23:59:59Z",
@@ -594,8 +607,8 @@ const cafeMapping = (shopNo = 1, market: "lm-kr" | "lm-gl" = "lm-kr") => ({
 const cafeEnv = {
   SHOPIFY_SHOP_DOMAIN: "mock.myshopify.com",
   SHOPIFY_ADMIN_TOKEN: "mock-only",
-  CAFE24_ERP_CLIENT_ID: "mock-app",
-  CAFE24_ERP_CLIENT_SECRET: "mock-secret",
+  CAFE24_ADS_CLIENT_ID: "mock-app",
+  CAFE24_ADS_CLIENT_SECRET: "mock-secret",
 };
 const tokens: TokenStore = {
   read: async () => ({

@@ -11,9 +11,10 @@ import {
 import { shopifyClient } from "./channels/shopify-client";
 import {
   cafe24Auth,
-  dbTokenStore as runtimeTokenStore,
+  dbAdsTokenStore as runtimeTokenStore,
   type TokenStore,
 } from "./channels/cafe24-auth";
+import { cafe24ReadToken } from "./channels/cafe24-connect";
 
 // Official schema, pinned by the existing Shopify client to 2026-10:
 // https://shopify.dev/docs/api/admin-graphql/2026-10/queries/orders
@@ -192,10 +193,13 @@ async function readCafe24(
   const ids = new Set<string>();
   try {
     if (rt.signal?.aborted) throw new ChannelError("channel_deadline_exceeded");
+    const allowRefresh = rt.env.CAFE24_ADS_OAUTH_REFRESH_ENABLED === "true";
     const token = await cafe24Auth(
-      rt,
-      options.runtimeTokenStore ?? runtimeTokenStore
-    ).token(false);
+      { ...rt, env: { ...rt.env, CAFE24_ERP_CLIENT_ID: rt.env.CAFE24_ADS_CLIENT_ID,
+        CAFE24_ERP_CLIENT_SECRET: rt.env.CAFE24_ADS_CLIENT_SECRET,
+        PRODUCT_REGISTRATION_OAUTH_REFRESH_ENABLED: allowRefresh ? "true" : "false" } },
+      options.runtimeTokenStore ?? runtimeTokenStore, cafe24ReadToken
+    ).token(allowRefresh);
     for (const mapping of selected) {
       let offset = 0;
       for (;;) {
@@ -333,7 +337,7 @@ export function createAdsOrdersReader(options: AdsOrdersOptions = {}) {
         PRODUCT_REGISTRATION_OAUTH_REFRESH_ENABLED: "false",
       },
     });
-    const client = shopifyClient(rt);
+    const client = shopifyClient(rt, true);
     const rows: AdsOrderRow[] = [];
     let complete = false,
       partial = false,

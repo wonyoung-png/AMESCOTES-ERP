@@ -11,11 +11,23 @@
 	email wonyoung@atlm.kr
 }
 
+(safe_access_log) {
+	output stdout
+	format filter {
+		wrap json
+		fields {
+			request>uri query {
+				delete code
+				delete state
+			}
+		}
+	}
+}
+
 (erp) {
 	encode zstd gzip
 	log {
-		output stdout
-		format json
+		import safe_access_log
 	}
 
 	handle_path /rest/v1/* {
@@ -43,8 +55,7 @@
 ceo.{$ROOT_DOMAIN} {
 	encode zstd gzip
 	log {
-		output stdout
-		format json
+		import safe_access_log
 	}
 	reverse_proxy app:4000 {
 		flush_interval -1
@@ -55,8 +66,7 @@ ceo.{$ROOT_DOMAIN} {
 daily.{$ROOT_DOMAIN} {
 	encode zstd gzip
 	log {
-		output stdout
-		format json
+		import safe_access_log
 	}
 	reverse_proxy daily:8000
 }
@@ -65,8 +75,7 @@ daily.{$ROOT_DOMAIN} {
 hr.{$ROOT_DOMAIN} {
 	encode zstd gzip
 	log {
-		output stdout
-		format json
+		import safe_access_log
 	}
 	reverse_proxy hr:8100
 }
