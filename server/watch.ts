@@ -12,6 +12,7 @@ import { allRows } from './work-records.js';
 import { productionRisks } from './production-risk.js';
 import { buildMonthlyCashPlan, statementTotal } from '../client/src/lib/cashPlan.js';
 import { orgTeam } from './org.js';
+import { operationalWatch, shipmentWatch } from './operational-watch.js';
 
 export type Watch = { facts: string[]; alerts: number };
 
@@ -40,20 +41,20 @@ export const campaignTeams = (team: string, workspace: string) => team === '디�
   : TASK_TEAM[team] || (orgTeam(team) ? [team] : []);
 
 /** 팀 → 감시 데이터. 한 표를 못 읽으면 그 표를 쓰는 팀만 "읽지 못함"으로 남기고 나머지는 진행 */
-export async function gatherWatch(read = restAsServer, readPms = pms): Promise<Map<string, Watch>> {
+export async function gatherWatch(read = restAsServer, readPms = pms, approvals?: Promise<any[]>): Promise<Map<string, Watch>> {
   const today = kstToday();
   const in30 = addDays(today, 30);
   const rows = (path: string) => allRows(path + '&order=id.asc', read);
-  const [orders, receipts, samples, stmts, settlements, payables, camps, subscriptions, lumen, aeta] = await Promise.all([
-    rows('production_orders?status=neq.초안&select=id,order_no,style_no,style_name,vendor_name,quantity,received_qty,status,delivery_date,confirmed_date,sent_at,confirmed_at,hq_supply_items,factory_unit_price_krw,trade_statement_id,workspace').catch(e => e as Error),
-    rows('receipt_logs?log_type=eq.inbound&select=id,order_id,log_type,qty').catch(e => e as Error),
+  const [orders, receipts, samples, stmts, settlements, payables, camps, subscriptions, lumen, aeta, operations] = await Promise.all([
+    rows('production_orders?status=neq.초안&select=id,order_no,style_no,style_name,vendor_name,quantity,received_qty,defect_qty,shipped_qty,status,delivery_date,confirmed_date,sent_at,confirmed_at,hq_supply_items,factory_unit_price_krw,trade_statement_id,workspace').catch(e => e as Error),
+    rows('receipt_logs?log_type=in.(inbound,outbound_oem,outbound_3pl)&select=id,order_id,log_type,qty,defect_qty,destination').catch(e => e as Error),
     rows('samples?select=id,style_no,style_name,stage,expected_date,assignee,billing_status,cost_krw,brand_code').catch(e => e as Error),
     rows('trade_statements?status=in.(미청구,청구완료)&select=id,statement_no,vendor_name,issue_date,lines,status,workspace').catch(e => e as Error),
     rows('settlements?select=id,buyer_name,due_date,billed_amount_krw,collected_amount_krw,status').catch(e => e as Error),
     rows('payables?select=id,source_type,order_id,amount_krw,paid_amount_krw,due_date,status,memo').catch(e => e as Error),
     rows(`campaigns?or=(and(end_date.gte.${today},start_date.lte.${in30}),and(end_date.lt.${today},status.in.(active,onboarded)))&select=title,channel,start_date,end_date,status,workspace,tasks`).catch(e => e as Error),
     rows('subscriptions?status=neq.해지됨&select=service_name,average_amount,currency,status,next_billing_on').catch(e => e as Error),
-    readPms('lumen'), readPms('aetaloof'),
+    readPms('lumen'), readPms('aetaloof'), operationalWatch(today, read, approvals).catch(e => e instanceof Error ? e : new Error(String(e))),
   ]);
   const out = new Map<string, Watch>();
   const add = (team: string, facts: string[], alerts = 0) => {
@@ -98,6 +99,8 @@ export async function gatherWatch(read = restAsServer, readPms = pms): Promise<M
       // 7일 안 납기인데 본사 자재를 아직 안 샀으면 경고 (생산관리 기본 기준)
       + due7.filter(o => Array.isArray(o.hq_supply_items) && o.hq_supply_items.some((i: any) => i?.purchaseStatus === '미구매')).length);
     add('물류·CS', [`7일 안 입고 예정 발주 ${due7.length}건${due7.length ? ': ' + due7.slice(0, 6).map(o => `${o.order_no}(${o.delivery_date})`).join(', ') : ''}`]);
+    const shipping = shipmentWatch(orders, receipts, today);
+    add('물류·CS', shipping.facts, shipping.alerts);
     add('제품개발', [`공장 단가 없는 진행 발주 ${noPrice.length}건${noPrice.length ? ': ' + noPrice.slice(0, 6).map(o => o.order_no).join(', ') : ''}`], noPrice.length);
     const oem = live.filter(o => !o.workspace || o.workspace === 'OEM');
     const byStatus = oem.reduce((m: Record<string, number>, o) => (m[o.status] = (m[o.status] || 0) + 1, m), {});
@@ -197,5 +200,7 @@ export async function gatherWatch(read = restAsServer, readPms = pms): Promise<M
   add('국내 MD', [...L.dom, ...A.dom], L.late + A.late + unavailable);
   add('글로벌 MD', [...L.glob, ...A.glob], unavailable);
   add('리테일', [...L.off, ...A.off], unavailable);
+  if (operations instanceof Error) ['제품개발', '생산관리', '물류·CS', '국내 MD', '글로벌 MD', '루멘 디자인', '에탈루프 디자인'].forEach(t => failed(t, '원본 업무 점검', operations));
+  else for (const [team, w] of operations) add(team, w.facts, w.alerts);
   return out;
 }

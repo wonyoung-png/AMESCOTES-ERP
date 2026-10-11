@@ -30,6 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Search, Pencil, Trash2, Package, Wand2, AlertCircle, X, Palette, BarChart2, Link, ShoppingCart, Printer, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Columns3, Factory, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { onSaveFail } from '@/lib/saveGuard';
+import { pendingSampleLinks, queueSampleLink, retrySampleLink, saveSampleItemLink, scopedSampleLinkStorage } from '@/lib/sampleItemLink';
 import * as XLSX from 'xlsx';
 
 // ─── 공장 원가표 일괄 업로드 타입 ───
@@ -1575,10 +1576,13 @@ export default function ItemMaster() {
     setEditItem(prev => ({ ...prev, styleNo: generated }));
   }, [selectedVendorId, editItem.brandCode, registDate, editItem.category, editItem.erpCategory, manualStyleNo, isEdit, editItem.id, vendors, items]);
 
-  const openAdd = (prefill?: { styleNo?: string; buyerId?: string; season?: string; styleName?: string; imageUrl?: string }) => {
+  const sampleForNewItem = useRef<string | null>(null);
+  const openAdd = (prefill?: { styleNo?: string; buyerId?: string; season?: string; styleName?: string; imageUrl?: string; sampleId?: string }) => {
     // 샘플에서 넘어온 prefill 확인
     const storedPrefill = localStorage.getItem('ames_prefill_item');
     const pf = prefill || (storedPrefill ? JSON.parse(storedPrefill) : null);
+    sampleForNewItem.current = pf?.sampleId || null;
+    sessionStorage.removeItem('ames_link_sampleId');
     if (storedPrefill) localStorage.removeItem('ames_prefill_item');
 
     setEditItem({
@@ -1635,7 +1639,6 @@ export default function ItemMaster() {
           localStorage.removeItem('ames_prefill_item');
         } catch { /* 무시 */ }
       }
-      if (pf.sampleId) sessionStorage.setItem('ames_link_sampleId', pf.sampleId);
       openAdd(pf);
       navigate('/items', { replace: true });
       return;
@@ -1645,7 +1648,6 @@ export default function ItemMaster() {
     if (storedPrefill) {
       try {
         const pf = JSON.parse(storedPrefill);
-        if (pf.sampleId) sessionStorage.setItem('ames_link_sampleId', pf.sampleId);
         openAdd(pf);
       } catch {
         localStorage.removeItem('ames_prefill_item');
@@ -1759,8 +1761,37 @@ export default function ItemMaster() {
     toast.success(`${costSheetMode === 'pre' ? '사전' : '사후'}원가 반영 — 원가 ${formatKRW(totalCostKrw)}`);
   };
 
+  const linkStorage = () => scopedSampleLinkStorage(localStorage, store.getCurrentUser()?.id || '');
+  const retryLink = async (link: { sampleId: string; itemId: string; styleNo?: string }) => {
+    const { db } = await import('@/lib/db');
+    // Re-queue idempotently, including recovery after a transient storage failure.
+    const storage = linkStorage();
+    queueSampleLink(storage, link);
+    await retrySampleLink(storage, link, value => saveSampleItemLink(db, value));
+    queryClient.invalidateQueries({ queryKey: ['samples'] });
+  };
+  const notifyLinkFailure = (link: { sampleId: string; itemId: string; styleNo?: string }) => {
+    toast.warning(`품목 ${link.styleNo || link.itemId}은 저장됐지만 샘플 연결은 완료되지 않았습니다`, {
+      duration: 15000,
+      action: { label: '연결 재시도', onClick: () => {
+        retryLink(link).then(() => toast.success('샘플 연결이 완료되었습니다'))
+          .catch((e: Error) => toast.error(`샘플 연결 실패: ${e.message}`));
+      } },
+    });
+  };
+  useEffect(() => {
+    try { pendingSampleLinks(linkStorage()).forEach(notifyLinkFailure); }
+    catch { toast.error('샘플 연결 대기 정보를 읽지 못했습니다 — 원본 확인이 필요합니다'); }
+  }, []);
+
   const handleSave = () => {
     if (!editItem.styleNo || !editItem.name) { toast.error('스타일번호와 품명을 입력하세요'); return; }
+    if (!isEdit && sampleForNewItem.current) {
+      try {
+        const pending = pendingSampleLinks(linkStorage()).find(l => l.sampleId === sampleForNewItem.current);
+        if (pending) { notifyLinkFailure(pending); toast.error('이 샘플의 품목은 이미 등록되었습니다 — 연결만 재시도해주세요'); return; }
+      } catch { toast.error('샘플 연결 대기 정보를 확인하지 못했습니다 — 중복 등록을 방지하기 위해 저장하지 않았습니다'); return; }
+    }
     if (!isEdit) {
       const dup = (items as Item[]).find(it => it.styleNo === editItem.styleNo);
       if (dup) { toast.error(`스타일번호 '${editItem.styleNo}'는 이미 등록되어 있습니다`); return; }
@@ -1820,6 +1851,7 @@ export default function ItemMaster() {
           ...(isPack ? { baseCostKrw: packTotal } : {}),
         } as Item;
 
+    const linkedSampleId = !isEdit ? sampleForNewItem.current : null;
     upsertItem(itemData)
       .then(async () => {
         if (costSheetData) await applyCostSheet(itemData);
@@ -1838,20 +1870,13 @@ export default function ItemMaster() {
         }
         if (!isEdit) {
           // 샘플-품목 연결
-          const linkedSampleId = sessionStorage.getItem('ames_link_sampleId');
           if (linkedSampleId) {
+            const link = { sampleId: linkedSampleId, itemId: itemData.id, styleNo: itemData.styleNo };
             try {
-              const { upsertSample } = await import('@/lib/dbQueries');
-              const samples = (await import('@/lib/dbQueries').then(m => m.fetchSamples()));
-              const linkedSample = samples.find((s: any) => s.id === linkedSampleId);
-              if (linkedSample) {
-                await upsertSample({ ...linkedSample, styleId: itemData.id, styleNo: itemData.styleNo });
-                toast.success(`품목 등록 완료 — 샘플 "${linkedSample.styleName}"에 연결되었습니다`);
-              } else {
-                toast.success('품목이 등록되었습니다');
-              }
-            } catch { toast.success('품목이 등록되었습니다'); }
-            sessionStorage.removeItem('ames_link_sampleId');
+              queueSampleLink(linkStorage(), link);
+              await retryLink(link);
+              toast.success('품목 등록 및 샘플 연결이 완료되었습니다');
+            } catch { notifyLinkFailure(link); }
           } else {
             toast.success('품목이 등록되었습니다');
           }

@@ -1,6 +1,6 @@
 // 리오더 · 오더관리 — R3 승인 + 차수별 입고·미지급 등록
-import { useMemo, useRef, useState } from 'react';
-import { Link } from 'wouter';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearch } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { store, formatNumber, genId, type OrderStatus, type ProductionOrder } from '@/lib/store';
@@ -41,7 +41,7 @@ export default function BrandOrders() {
   const ws = workspace === 'AETALOOF' ? 'AETALOOF' : 'LUMEN';
   const queryClient = useQueryClient();
   const { data: remoteOrders = [] } = useQuery({ queryKey: ['orders'], queryFn: fetchOrders });
-  const { data: pulled = 0, isError: brandReadError } = useQuery({ queryKey: ['brandOrders'], queryFn: pullBrandOrders });
+  const { data: pulled = 0, isError: brandReadError, isSuccess: brandLoaded, isFetching: brandLoading } = useQuery({ queryKey: ['brandOrders'], queryFn: pullBrandOrders });
   const [tickN, tick] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [workflowBusy, setWorkflowBusy] = useState(false);
@@ -76,6 +76,16 @@ export default function BrandOrders() {
 
   const [mainTab, setMainTab] = useState('mgmt');
   const [selected, setSelected] = useState<BrandOrderBatch | null>(null);
+  const requestedBatch = new URLSearchParams(useSearch()).get('batch');
+  const openedBatch = useRef<string | null>(null);
+  useEffect(() => {
+    if (!requestedBatch || openedBatch.current === requestedBatch || brandReadError || !brandLoaded || brandLoading) return;
+    setMainTab('approval');
+    const batch = batches.find(b => b.id === requestedBatch);
+    openedBatch.current = requestedBatch;
+    if (batch) setSelected(batch);
+    else toast.warning('해당 브랜드의 의뢰 원본을 찾지 못했습니다 — 최신 목록과 브랜드를 확인해주세요');
+  }, [requestedBatch, batches, brandReadError, brandLoaded, brandLoading]);
   const [newTitle, setNewTitle] = useState('');
 
   const [progressFilter, setProgressFilter] = useState<'active' | 'done' | 'all'>('active');

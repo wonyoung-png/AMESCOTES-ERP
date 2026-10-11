@@ -305,7 +305,7 @@ async function load() {
   restorePendingDirectives();
   document.getElementById('who').textContent = D.me.name + ' · ' + D.me.email;
   document.getElementById('erpLink').href = D.erpUrl;
-  const n = D.decide.length + D.captures.length + (D.councils || []).filter(c => c.status === 'concluded' && c.freshness === 'current').length;
+  const n = D.decide.length + D.captures.length + (D.brandApprovals || []).length + (D.councils || []).filter(c => c.status === 'concluded' && c.freshness === 'current').length;
   const nav = document.getElementById('navN'); nav.hidden = !n; nav.textContent = n;
   render();
   return true;
@@ -390,6 +390,10 @@ function captureForm(c) {
     </div>
   </div>`;
 }
+function brandApprovalItems() {
+  return (D.brandApprovals || []).map(b => `<div class="item"><span class="k req">생산 의뢰</span><div class="t"><p>${esc(b.workspace)} · ${esc(b.title || b.project_no)}</p><small>${esc(b.project_no)} · 대표 승인 대기 · ${esc(b.updated_at || '변경일 미확인')}</small></div><a class="btn" href="${esc(`${D.erpUrl}/brand-orders?ws=${encodeURIComponent(b.workspace)}&batch=${encodeURIComponent(b.id)}`)}" target="_blank" rel="noopener">원본 검토·승인 ↗</a></div>`);
+}
+
 function home() {
   const today = D.today;
   const overdue = D.teams.reduce((s, t) => s + t.overdue, 0);
@@ -397,7 +401,8 @@ function home() {
   const k = D.kpi && D.kpi.ok ? D.kpi : null;
   const dateLabel = new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'long',day:'numeric',weekday:'long'});
   const councilItems = (D.councils || []).filter(c => c.status === 'concluded' && c.freshness === 'current').map(c => `<div class="item"><span class="k">협의</span><div class="t"><p>${esc(c.conclusion?.ceo_decisions?.[0]?.question || '결론 확인')}</p><small>${esc(c.topic)} · 협의에 포함</small></div></div>`);
-  const decideTop = [...councilItems, ...D.decide.map(c => itemHtml(c, false)), ...D.captures.map(c => captureHtml(c, false))].slice(0, 5);
+  const decideTop = [...brandApprovalItems(), ...councilItems, ...D.decide.map(c => itemHtml(c, false)), ...D.captures.map(c => captureHtml(c, false))].slice(0, 5);
+  const decisions = D.decide.length + D.captures.length + councilItems.length + (D.brandApprovals || []).length;
   const teamCards = [...D.teams].sort((a,b) => (b.open + b.newToday) - (a.open + a.newToday)).map(t => {
     const dot = t.overdue || (D.watch || []).find(w => w.team === t.team)?.alerts ? 'warn' : (t.open || t.newToday) ? '' : 'idle';
     return `<div class="team"><h3><i class="${dot}"></i>${esc(t.team)}</h3>
@@ -419,15 +424,15 @@ function home() {
       </div></section>` : `<section class="sec"><div class="sec-h"><h2>LUMEN 매출</h2><span>브랜드 운영 데이터를 불러오지 못했습니다</span></div></section>`;
 
   return `<div class="cover" aria-hidden="true"></div>
-    <div class="hello"><h1>${esc(greet())}</h1><p>${esc(dateLabel)} · 결정할 것 ${D.decide.length + D.captures.length + councilItems.length}건이 기다리고 있어요</p></div>
+    <div class="hello"><h1>${esc(greet())}</h1><p>${esc(dateLabel)} · 결정할 것 ${decisions}건이 기다리고 있어요${D.brandApprovals === null ? ' · 생산 의뢰 승인 대기 조회 실패 — 판단 보류' : ''}</p></div>
     <div class="stats">
-      <div class="stat"><b>${D.decide.length + D.captures.length + councilItems.length}</b><span>결정할 것</span></div>
+      <div class="stat"><b>${decisions}</b><span>결정할 것${D.brandApprovals === null ? ' · 일부 조회 실패' : ''}</span></div>
       <div class="stat"><b>${openN}</b><span>팀 진행 중 업무</span></div>
       <div class="stat${overdue ? ' warn' : ''}"><b>${overdue}</b><span>마감 지난 할 일</span></div>
       <div class="stat"><b>${D.campaigns.length}</b><span>30일 안 기획전</span></div>
     </div>
     <section class="sec"><div class="sec-h"><h2>결정할 것</h2><span>먼저 올라온 순</span><a href="#inbox">모두 처리하기 →</a></div>
-      <div class="list">${decideTop.join('') || '<p class="empty">지금 결정할 것이 없어요</p>'}</div></section>
+      <div class="list">${decideTop.join('') || `<p class="empty">${D.brandApprovals === null ? '생산 의뢰 승인 대기 조회 실패 — 결정할 것이 없는지 확인할 수 없습니다' : '지금 결정할 것이 없어요'}</p>`}</div></section>
     <section class="sec"><div class="sec-h"><h2>현재 운영 점검</h2><span>조회 ${esc(new Date(D.checkedAt).toLocaleTimeString('ko-KR', {timeZone:'Asia/Seoul'}))} · 경고는 조건 수이며 중복 업무를 포함할 수 있습니다</span></div>
       <div class="list">${(D.watch || []).map(w => `<details class="item"><summary>${esc(w.team)} · ${w.alerts ? '확인 조건 ' + w.alerts + '개' : '설정된 기준에서 경고 없음'}</summary><div>${w.facts.map(f => `<p>${esc(f)}</p>`).join('')}</div></details>`).join('') || '<p class="empty">운영 점검 자료가 없습니다 — 판단 보류</p>'}</div>
       <div class="acts"><a class="btn" href="${esc(D.erpUrl)}/deadlines" target="_blank" rel="noopener">납기·입고 원본 ↗</a><a class="btn" href="${esc(D.erpUrl)}/cash-plan" target="_blank" rel="noopener">자금계획 원본 ↗</a><a class="btn" href="${esc(D.erpUrl)}/calendar" target="_blank" rel="noopener">운영캘린더 원본 ↗</a><a class="btn" href="${esc(D.erpUrl)}/work?view=captures" target="_blank" rel="noopener">접수 승인 원본 ↗</a></div></section>
@@ -447,7 +452,7 @@ function inbox() {
   ];
   const sec = groups.map(([t, list]) => `<section class="sec"><div class="sec-h"><h2>${t}</h2><span>${list.length}건</span></div>
     <div class="list">${list.map(c => itemHtml(c, true)).join('') || '<p class="empty">없어요</p>'}</div></section>`).join('');
-  return `<section class="sec"><div class="sec-h"><h2>협의 결론</h2><span>${councilDecisions.length}건</span><a href="#councils">전체 협의 보기 →</a></div><div class="list">${councilDecisions.map(c => `<div class="item"><span class="k">협의</span><div class="t"><p>${esc(c.conclusion?.ceo_decisions?.[0]?.question || '결론 확인')}</p><small>${esc(c.topic)} · ${esc(c.teams.join(' · '))} · 협의에 포함</small></div></div>`).join('') || '<p class="empty">없어요</p>'}</div></section>` + sec + `<section class="sec"><div class="sec-h"><h2>현장 접수 승인 대기</h2><span>${D.captures.length}건 · 사진·내용 확인하고 고쳐서 승인</span></div>
+  return `<section class="sec"><div class="sec-h"><h2>브랜드 생산 의뢰 승인 대기</h2><span>${D.brandApprovals === null ? '조회 실패 — 판단 보류' : (D.brandApprovals || []).length + '건'}</span></div><div class="list">${brandApprovalItems().join('') || `<p class="empty">${D.brandApprovals === null ? '불러오지 못했습니다 — 승인 대기 없음으로 판단하지 않습니다' : '없어요'}</p>`}</div></section><section class="sec"><div class="sec-h"><h2>협의 결론</h2><span>${councilDecisions.length}건</span><a href="#councils">전체 협의 보기 →</a></div><div class="list">${councilDecisions.map(c => `<div class="item"><span class="k">협의</span><div class="t"><p>${esc(c.conclusion?.ceo_decisions?.[0]?.question || '결론 확인')}</p><small>${esc(c.topic)} · ${esc(c.teams.join(' · '))} · 협의에 포함</small></div></div>`).join('') || '<p class="empty">없어요</p>'}</div></section>` + sec + `<section class="sec"><div class="sec-h"><h2>현장 접수 승인 대기</h2><span>${D.captures.length}건 · 사진·내용 확인하고 고쳐서 승인</span></div>
     <div class="list">${D.captures.map(c => captureHtml(c, true)).join('') || '<p class="empty">없어요</p>'}</div></section>`;
 }
 

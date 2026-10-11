@@ -169,7 +169,7 @@ async function recentCards(since: string): Promise<any[]> {
 }
 
 /** Both generation and freshness checks use the same untruncated source scope. */
-export async function loadReportContext(allowUnavailable = false) {
+export async function loadReportContext(allowUnavailable = false, brandApprovals?: Promise<any[]>) {
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
   const sourceErrors:string[]=[];
   const read = async<T>(label:string,promise:Promise<T>,fallback:T):Promise<T> => {
@@ -180,7 +180,7 @@ export async function loadReportContext(allowUnavailable = false) {
   };
   const [cards, all, watch, rules] = await Promise.all([
     read('업무 자료',recentCards(since).then(cards => attachCampaignEvidence(cards)),[]),
-    read('직원 업무 범위',members(true),[]),gatherWatch(),read('팀 감시 기준',loadRules(true),new Map<string,string>()),
+    read('직원 업무 범위',members(true),[]),gatherWatch(undefined, undefined, brandApprovals),read('팀 감시 기준',loadRules(true),new Map<string,string>()),
   ]);
   const bossIds = new Set(all.filter(m => CEO_EMAILS.includes(m.email.toLowerCase())).map(m => m.id));
   for (const c of cards) { c._dir=isDirective(c,bossIds); c._org=orgOf(c,bossIds); }
