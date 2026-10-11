@@ -245,7 +245,11 @@ async function gather(me: SessionUser) {
   });
 
   return { me, today, cards, open, decide, captures, campaigns, teams, members: all, kpi, councils, councilMessages,rules,
-    agents: agents.map(a => { const freshness=evidenceFreshness(a.stats?.evidence,teamEvidence(a.team,context));
+    agents: agents.map(a => { const freshness = a.team === '자사몰관리'
+        ? (a.model === 'rule-based' && a.stats?.reportAvailable === true
+          && a.stats?.evidence?.hash && Date.now() - Date.parse(a.stats.evidence.checkedAt) >= 0
+          && Date.now() - Date.parse(a.stats.evidence.checkedAt) < 25 * 3600e3 ? 'current' : 'stale')
+        : evidenceFreshness(a.stats?.evidence,teamEvidence(a.team,context));
       return {...a,freshness,stale:freshness!=='current',councilIncluded:councilTeams.has(a.team)}; }),
     watch: Array.from(watch, ([team, w]) => ({ team, ...w })), checkedAt: new Date().toISOString(),sourceErrors:context.sourceErrors,
     buyers: captures.length ? await buyerOptions() : [] };
@@ -280,6 +284,12 @@ router.get('/api/ceo/overview', requireCeo(), async (req: Request, res: Response
       recent: g.cards.slice(0, 20),
       kpi: g.kpi,
       agents: g.agents,
+      officeAgents: [{ team: '자사몰관리', division: '대표 직속', focus: '예약 공개·상품 정합성·프리오더 점검' }],
+      shopDecisions: g.agents.filter(a => a.team === '자사몰관리' && a.freshness === 'current')
+        .flatMap(a => a.needs.filter((n: any) => n.source === 'product_registration').map((n: any) => ({
+          text: String(n.text || ''), listingId: String(n.listingId || ''), issueId: String(n.issueId || ''),
+          checkedAt: a.created_at,
+        }))),
       councils: g.councils.map((c: any) => ({ ...c, messages: g.councilMessages.filter((m: any) => m.council_id === c.id) })),
       watch: g.watch,
       checkedAt: g.checkedAt,

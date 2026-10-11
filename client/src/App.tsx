@@ -15,6 +15,7 @@ import { isAuthenticated , restoreSession } from '@/lib/auth';
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 const ItemMaster = lazyPage(() => import("./pages/ItemMaster"));
+const ProductRegistration = lazyPage(() => import("./pages/ProductRegistration"));
 const QuickEntry = lazyPage(() => import("./pages/QuickEntry"));
 const CaptureUpload = lazyPage(() => import("./pages/CaptureUpload"));
 const WorkHub = lazyPage(() => import("./pages/WorkHub"));
@@ -151,6 +152,7 @@ function Router() {
         <Route path="/work" component={WorkHub} />
       <Route path="/my-calendar" component={MyCalendar} />
         <Route path="/items" component={ItemMaster} />
+        <Route path="/product-registration" component={ProductRegistration} />
         <Route path="/sales-summary" component={SalesSummary} />
         <Route path="/bom" component={BomManagement} />
         <Route path="/samples" component={SampleManagement} />

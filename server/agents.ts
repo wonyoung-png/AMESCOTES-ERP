@@ -20,7 +20,7 @@ import { createAgentSchedulerTick } from './agent-scheduler.js';
 export type AgentStatus = 'work' | 'idle' | 'warn' | 'report';
 export type AgentRun = {
   id: string; team: string; created_at: string; status: AgentStatus; headline: string; summary: string | null;
-  needs: Array<{ text: string; cardId?: string }>; stats: Record<string, any>; trigger: string;
+  needs: Array<{ text: string; cardId?: string }>; stats: Record<string, any>; trigger: string; model?: string;
 };
 
 export class AgentRunFailure extends Error {

@@ -305,7 +305,7 @@ async function load() {
   restorePendingDirectives();
   document.getElementById('who').textContent = D.me.name + ' · ' + D.me.email;
   document.getElementById('erpLink').href = D.erpUrl;
-  const n = D.decide.length + D.captures.length + (D.councils || []).filter(c => c.status === 'concluded' && c.freshness === 'current').length;
+  const n = D.decide.length + D.captures.length + (D.shopDecisions || []).length + (D.councils || []).filter(c => c.status === 'concluded' && c.freshness === 'current').length;
   const nav = document.getElementById('navN'); nav.hidden = !n; nav.textContent = n;
   render();
   return true;
@@ -397,7 +397,7 @@ function home() {
   const k = D.kpi && D.kpi.ok ? D.kpi : null;
   const dateLabel = new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'long',day:'numeric',weekday:'long'});
   const councilItems = (D.councils || []).filter(c => c.status === 'concluded' && c.freshness === 'current').map(c => `<div class="item"><span class="k">협의</span><div class="t"><p>${esc(c.conclusion?.ceo_decisions?.[0]?.question || '결론 확인')}</p><small>${esc(c.topic)} · 협의에 포함</small></div></div>`);
-  const decideTop = [...councilItems, ...D.decide.map(c => itemHtml(c, false)), ...D.captures.map(c => captureHtml(c, false))].slice(0, 5);
+  const decideTop = [...councilItems, ...shopDecisionRows(), ...D.decide.map(c => itemHtml(c, false)), ...D.captures.map(c => captureHtml(c, false))].slice(0, 5);
   const teamCards = [...D.teams].sort((a,b) => (b.open + b.newToday) - (a.open + a.newToday)).map(t => {
     const dot = t.overdue || (D.watch || []).find(w => w.team === t.team)?.alerts ? 'warn' : (t.open || t.newToday) ? '' : 'idle';
     return `<div class="team"><h3><i class="${dot}"></i>${esc(t.team)}</h3>
@@ -419,9 +419,9 @@ function home() {
       </div></section>` : `<section class="sec"><div class="sec-h"><h2>LUMEN 매출</h2><span>브랜드 운영 데이터를 불러오지 못했습니다</span></div></section>`;
 
   return `<div class="cover" aria-hidden="true"></div>
-    <div class="hello"><h1>${esc(greet())}</h1><p>${esc(dateLabel)} · 결정할 것 ${D.decide.length + D.captures.length + councilItems.length}건이 기다리고 있어요</p></div>
+    <div class="hello"><h1>${esc(greet())}</h1><p>${esc(dateLabel)} · 결정할 것 ${D.decide.length + D.captures.length + councilItems.length + (D.shopDecisions || []).length}건이 기다리고 있어요</p></div>
     <div class="stats">
-      <div class="stat"><b>${D.decide.length + D.captures.length + councilItems.length}</b><span>결정할 것</span></div>
+      <div class="stat"><b>${D.decide.length + D.captures.length + councilItems.length + (D.shopDecisions || []).length}</b><span>결정할 것</span></div>
       <div class="stat"><b>${openN}</b><span>팀 진행 중 업무</span></div>
       <div class="stat${overdue ? ' warn' : ''}"><b>${overdue}</b><span>마감 지난 할 일</span></div>
       <div class="stat"><b>${D.campaigns.length}</b><span>30일 안 기획전</span></div>
@@ -438,6 +438,14 @@ function home() {
     ${money}`;
 }
 
+function shopDecisionRows() {
+  return (D.shopDecisions || []).map(x => {
+    const href = listingReviewUrl(x.listingId);
+    return `<div class="item"><span class="k req">자사몰</span><div class="t"><p>${esc(x.text)}</p>
+      <small>${x.checkedAt ? esc(kst(x.checkedAt)) + ' 점검 기준 · ' : ''}수정안 검토·승인 후 반영</small>
+      ${href ? `<div class="cap-form"><a class="btn" href="${esc(href)}" target="_blank" rel="noopener">상품 등록 검토</a></div>` : ''}</div></div>`;
+  });
+}
 function inbox() {
   const councilDecisions = (D.councils || []).filter(c => c.status === 'concluded' && c.freshness === 'current');
   const groups = [
@@ -447,7 +455,9 @@ function inbox() {
   ];
   const sec = groups.map(([t, list]) => `<section class="sec"><div class="sec-h"><h2>${t}</h2><span>${list.length}건</span></div>
     <div class="list">${list.map(c => itemHtml(c, true)).join('') || '<p class="empty">없어요</p>'}</div></section>`).join('');
-  return `<section class="sec"><div class="sec-h"><h2>협의 결론</h2><span>${councilDecisions.length}건</span><a href="#councils">전체 협의 보기 →</a></div><div class="list">${councilDecisions.map(c => `<div class="item"><span class="k">협의</span><div class="t"><p>${esc(c.conclusion?.ceo_decisions?.[0]?.question || '결론 확인')}</p><small>${esc(c.topic)} · ${esc(c.teams.join(' · '))} · 협의에 포함</small></div></div>`).join('') || '<p class="empty">없어요</p>'}</div></section>` + sec + `<section class="sec"><div class="sec-h"><h2>현장 접수 승인 대기</h2><span>${D.captures.length}건 · 사진·내용 확인하고 고쳐서 승인</span></div>
+  return `<section class="sec"><div class="sec-h"><h2>협의 결론</h2><span>${councilDecisions.length}건</span><a href="#councils">전체 협의 보기 →</a></div><div class="list">${councilDecisions.map(c => `<div class="item"><span class="k">협의</span><div class="t"><p>${esc(c.conclusion?.ceo_decisions?.[0]?.question || '결론 확인')}</p><small>${esc(c.topic)} · ${esc(c.teams.join(' · '))} · 협의에 포함</small></div></div>`).join('') || '<p class="empty">없어요</p>'}</div></section>`
+    + `<section class="sec"><div class="sec-h"><h2>자사몰 확인 제안</h2><span>${(D.shopDecisions || []).length}건 · 읽기 전용 검토 링크</span></div><div class="list">${shopDecisionRows().join('') || '<p class="empty">장기 미해결 확인 제안이 없습니다.</p>'}</div></section>`
+    + sec + `<section class="sec"><div class="sec-h"><h2>현장 접수 승인 대기</h2><span>${D.captures.length}건 · 사진·내용 확인하고 고쳐서 승인</span></div>
     <div class="list">${D.captures.map(c => captureHtml(c, true)).join('') || '<p class="empty">없어요</p>'}</div></section>`;
 }
 
@@ -478,6 +488,7 @@ function render() {
   document.getElementById('view').innerHTML = `<div class="inner" style="padding:0">${D.sourceErrors?.length ? `<p class="hint warn">현재 조회 미확인: ${D.sourceErrors.map(esc).join(' · ')}. 저장된 보고는 과거 기록이며 최신 판단 근거로 사용하지 마세요.</p>` : ''}${v === 'inbox' ? inbox() : v === 'councils' ? councils() : v === 'map' ? mapView() : home()}</div>`;
   restoreDirectiveForms();
   syncAgentRunButtons();
+  if (v === 'map' && selTeam === '자사몰관리') void loadShopMonitorSettings();
 }
 
 function syncAgentRunButtons() {
@@ -509,16 +520,224 @@ function restoreDirectiveForms() {
 // ───────── 회사 지도
 const AST = { work:['작업 중','#e3efe8','#2f7a55'], idle:['대기','#efeff1','#5d5f64'], warn:['막힘','#fde4e1','#b3392f'], report:['보고 중','#fff1c9','#8a5a00'] };
 let selTeam = null;
+let shopMonitor = { owner: null, settings: null, draft: null, loading: false, saving: false,
+  running: false, request: null, notice: '', failed: false, loadError: '' };
+function shopMonitorOwner() {
+  if (shopMonitor.owner !== D.me.id) shopMonitor = { owner: D.me.id, settings: null, draft: null,
+    loading: false, saving: false, running: false, request: null, notice: '', failed: false, loadError: '' };
+  return shopMonitor;
+}
+async function shopMonitorApi(path, method = 'GET', body, timeout = 20000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const r = await fetch(path, { method, credentials: 'include', cache: 'no-store', signal: controller.signal,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined });
+    const data = await r.json().catch(() => { throw new Error('점검 응답을 읽지 못했습니다. 최신 보고를 확인해주세요.'); });
+    if (!r.ok) throw Object.assign(new Error(data?.message || (r.status === 403 ? '대표 권한을 확인하지 못했습니다. 다시 로그인해주세요.'
+      : r.status === 409 ? '이미 점검 중입니다. 최신 보고를 확인한 뒤 같은 요청으로 다시 확인해주세요.'
+      : '점검 요청 실패 (HTTP ' + r.status + '). 설정 또는 최신 보고를 다시 확인해주세요.')), { status: r.status });
+    return data;
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('응답 시간이 지났습니다. 서버 완료 여부는 확인되지 않았습니다. 최신 보고를 확인해주세요.');
+    throw err;
+  } finally { clearTimeout(timer); }
+}
+function monitorSettings(data) {
+  const s = data?.settings || data;
+  if (!s || typeof s.monitor_enabled !== 'boolean' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(s.daily_time)
+    || !/^([01]\d|2[0-3]):[0-5]\d$/.test(s.weekly_time) || !Number.isInteger(s.weekly_day) || s.weekly_day < 0 || s.weekly_day > 6)
+    throw new Error('일정 응답 형식을 확인하지 못했습니다. 설정을 다시 조회해주세요.');
+  return { monitor_enabled: s.monitor_enabled, daily_time: s.daily_time, weekly_day: s.weekly_day, weekly_time: s.weekly_time };
+}
+async function loadShopMonitorSettings(force = false) {
+  const state = shopMonitorOwner();
+  if (state.loading || state.saving || (!force && (state.settings || state.loadError))) return;
+  state.loading = true; state.loadError = ''; syncShopMonitorControls();
+  try {
+    const data = await shopMonitorApi('/api/shop-monitor/settings');
+    state.settings = monitorSettings(data);
+  } catch (err) { state.loadError = err.message; }
+  finally {
+    state.loading = false;
+    if (state === shopMonitor && D.me.id === state.owner && selTeam === '자사몰관리' && location.hash === '#map') render();
+  }
+}
+function listingReviewUrl(listingId) {
+  try {
+    const url = new URL('/product-registration', D.erpUrl || location.origin);
+    if (!['https:', 'http:'].includes(url.protocol)) return '';
+    url.searchParams.set('ws', 'LUMEN');
+    if (listingId) url.searchParams.set('listing', String(listingId));
+    return url.href;
+  } catch { return ''; }
+}
+function shopMonitorIssues(a) {
+  const issues = Array.isArray(a.stats?.top10) ? a.stats.top10 : [];
+  const needs = Array.isArray(a.needs) ? a.needs : [];
+  const rows = (items, proposals) => items.slice(0, 10).map(x => {
+    const listingId = x.listing_id || x.listingId;
+    const href = listingReviewUrl(listingId);
+    return `<li><span>${esc(x.message || x.text || x.kind || '상세 확인이 필요합니다')}</span>
+      ${href ? `<div class="cap-form"><a class="btn" href="${esc(href)}" target="_blank" rel="noopener">상품 등록 검토</a>
+        ${proposals ? `<a class="btn" href="${esc(href)}" target="_blank" rel="noopener" title="수정안 검토·승인이 필요한 복원 제안">ERP값으로 되돌리기</a>` : ''}
+        ${proposals ? '<p class="hint">복원 제안입니다. 상품 등록에서 수정안을 검토하고 승인받은 뒤 반영합니다.</p>' : ''}</div>` : ''}</li>`;
+  }).join('');
+  return `<div><div class="sec-h"><h2>점검 이슈</h2><span>보고 상위 10건</span></div>
+      ${issues.length ? `<ul>${rows(issues, true)}</ul>` : '<p class="sum">상세 이슈 목록이 없습니다. 보고 요약과 근거를 확인해주세요.</p>'}</div>
+    ${needs.length ? `<div><div class="sec-h"><h2>대표 확인 제안</h2><span>장기 미해결 이슈</span></div><ul>${rows(needs, true)}</ul></div>` : ''}`;
+}
+function shopMonitorDetail(a) {
+  const state = shopMonitorOwner(), s = state.draft || state.settings;
+  const st = AST[a.status] || AST.idle;
+  const locked = !s || state.loading || state.saving;
+  return `<section class="agent" aria-live="polite">
+    <div class="agent-h"><h3>자사몰관리 에이전트</h3><span class="pill" style="background:${st[1]};color:${st[2]}">${st[0]}</span>
+      <small>${a.created_at ? '점검 보고 ' + kst(a.created_at) : '점검 보고 전'} · KST</small></div>
+    <div class="cap-form"><div class="act"><label for="shop-mode">점검 범위</label>
+      <select id="shop-mode" ${state.running || state.request ? 'disabled' : ''}><option value="daily">일일 · 가벼운 점검</option><option value="weekly" ${state.request?.mode === 'weekly' ? 'selected' : ''}>주간 · 전수 점검</option></select>
+      <button class="btn pri" type="button" data-shop-run ${state.running || !state.settings ? 'disabled' : ''}>${state.running ? '점검 중…' : state.request ? '같은 요청 다시 확인' : '지금 점검'}</button>
+      <button class="btn" type="button" data-shop-refresh ${state.running ? 'disabled' : ''}>최신 보고 확인</button></div>
+      <div class="act"><button class="btn" type="button" data-shop-new ${!state.request || state.running ? 'hidden' : ''}>새 점검 요청 준비</button></div>
+      <p class="hint">ERP 등록 상품만 점검합니다. 재고는 채널별 수치로 확인하며 자동 수정하지 않습니다.</p>
+      <p id="shop-notice" class="hint ${state.failed ? 'warn' : ''}" role="${state.failed ? 'alert' : 'status'}" ${state.notice ? '' : 'hidden'}>${esc(state.notice)}</p></div>
+    <p class="head">${esc(a.headline)}</p>
+    <p><span class="k">${freshnessLabel(a)}</span> · ${a.created_at ? '보고 당시 점검 결과입니다.' : '아직 점검 결과가 없습니다.'}</p>
+    ${a.summary ? `<p class="sum">${esc(a.summary)}</p>` : ''}
+    ${shopMonitorIssues(a)}${facts(a)}
+    <form class="cap-form" data-shop-settings>
+      <div class="sec-h"><h2>정기 점검 일정</h2><span>대표 전용 · 한국시간 KST</span></div>
+      <p class="hint" id="shop-settings-status" role="${state.loadError ? 'alert' : 'status'}">${esc(state.loadError || (state.loading || !s ? '일정을 불러오는 중…' : '저장된 일정 · 변경 후 저장해주세요.'))}</p>
+      <fieldset ${locked ? 'disabled' : ''} style="border:0;padding:0;margin:0;min-width:0">
+        <legend>일일·주간 점검</legend>
+        <div class="act"><label><input name="monitor_enabled" type="checkbox" ${s?.monitor_enabled ? 'checked' : ''}> 정기 점검 사용</label></div>
+        <div class="act"><label for="shop-daily">매일 일일 점검</label><input id="shop-daily" name="daily_time" type="time" required value="${esc(s?.daily_time || '')}"></div>
+        <div class="act"><label for="shop-weekday">주간 전수 점검</label><select id="shop-weekday" name="weekly_day">${['일','월','화','수','목','금','토'].map((day, i) => `<option value="${i}" ${s?.weekly_day === i ? 'selected' : ''}>${day}요일</option>`).join('')}</select>
+          <label for="shop-weekly">시각</label><input id="shop-weekly" name="weekly_time" type="time" required value="${esc(s?.weekly_time || '')}"></div>
+        <div class="act"><button class="btn" type="submit">${state.saving ? '저장 중…' : '일정 저장'}</button></div>
+      </fieldset>
+      <div class="act"><button class="btn" type="button" data-shop-reload ${state.loading || state.saving ? 'disabled' : ''}>설정 다시 조회</button></div>
+    </form>
+  </section>`;
+}
+function syncShopMonitorControls() {
+  const state = shopMonitorOwner();
+  document.querySelectorAll('[data-shop-run]').forEach(b => { b.disabled = state.running || !state.settings; b.textContent = state.running ? '점검 중…' : state.request ? '같은 요청 다시 확인' : '지금 점검'; });
+  document.querySelectorAll('[data-shop-refresh]').forEach(b => { b.disabled = state.running; });
+  document.querySelectorAll('[data-shop-new]').forEach(b => { b.hidden = !state.request || state.running; });
+  const notice = document.getElementById('shop-notice');
+  if (notice) { notice.textContent = state.notice; notice.hidden = !state.notice; notice.classList.toggle('warn', state.failed); notice.setAttribute('role', state.failed ? 'alert' : 'status'); }
+  const form = document.querySelector('[data-shop-settings]');
+  if (form) {
+    form.querySelector('fieldset').disabled = state.loading || state.saving || !state.settings;
+    form.querySelector('button[type=submit]').textContent = state.saving ? '저장 중…' : '일정 저장';
+    form.querySelector('[data-shop-reload]').disabled = state.loading || state.saving;
+    const status = form.querySelector('#shop-settings-status');
+    if (state.loading) status.textContent = '일정을 불러오는 중…';
+  }
+  const mode = document.getElementById('shop-mode'); if (mode) mode.disabled = state.running || !!state.request;
+}
+function shopSettingsFromForm(form) {
+  const fields = form.elements;
+  return { monitor_enabled: fields.monitor_enabled.checked, daily_time: fields.daily_time.value,
+    weekly_day: Number(fields.weekly_day.value), weekly_time: fields.weekly_time.value };
+}
+document.getElementById('view').addEventListener('input', e => {
+  const form = e.target.closest('[data-shop-settings]');
+  if (form) shopMonitorOwner().draft = shopSettingsFromForm(form);
+});
+document.getElementById('view').addEventListener('change', e => {
+  const form = e.target.closest('[data-shop-settings]');
+  if (form) shopMonitorOwner().draft = shopSettingsFromForm(form);
+});
+document.getElementById('view').addEventListener('submit', async e => {
+  const form = e.target.closest('[data-shop-settings]'); if (!form) return;
+  e.preventDefault();
+  const state = shopMonitorOwner(); if (state.saving || state.loading || !state.settings || !form.reportValidity()) return;
+  const desired = monitorSettings({ settings: shopSettingsFromForm(form) });
+  state.draft = desired; state.saving = true; state.failed = false; state.notice = '일정 저장 중…'; syncShopMonitorControls();
+  try {
+    const saved = monitorSettings(await shopMonitorApi('/api/shop-monitor/settings', 'PUT', desired));
+    const confirmed = monitorSettings(await shopMonitorApi('/api/shop-monitor/settings'));
+    if (JSON.stringify(saved) !== JSON.stringify(desired) || JSON.stringify(confirmed) !== JSON.stringify(desired))
+      throw new Error('저장된 일정이 요청값과 다릅니다. 설정을 다시 조회해주세요.');
+    state.settings = confirmed; state.draft = null; state.loadError = ''; state.notice = '일정 저장·재조회 확인됨 (KST).';
+  } catch (err) {
+    state.failed = true; state.notice = '일정 저장 확인 불가 — ' + err.message;
+    if (err.status === 401 || err.status === 403) state.settings = null;
+  } finally {
+    state.saving = false;
+    if (state === shopMonitor) { syncShopMonitorControls(); if (selTeam === '자사몰관리' && location.hash === '#map') render(); }
+  }
+});
+document.getElementById('view').addEventListener('click', async e => {
+  const newRequest = e.target.closest('[data-shop-new]');
+  if (newRequest) {
+    const state = shopMonitorOwner(); if (state.running) return;
+    state.request = null; state.failed = true;
+    state.notice = '이전 요청의 완료 여부는 미확인입니다. 최신 보고를 확인하고 새 점검이 필요하면 지금 점검을 눌러주세요.';
+    syncShopMonitorControls(); return;
+  }
+  const reload = e.target.closest('[data-shop-reload]');
+  if (reload) { await loadShopMonitorSettings(true); return; }
+  const refresh = e.target.closest('[data-shop-refresh]');
+  if (refresh) {
+    const state = shopMonitorOwner(); refresh.disabled = true;
+    const ok = await load();
+    state.notice = ok ? '최신 보고를 조회했습니다. 점검 시각과 미확인 항목을 확인해주세요.' : '최신 보고를 조회하지 못했습니다. 새로고침 후 다시 확인해주세요.';
+    state.failed = !ok; syncShopMonitorControls(); refresh.disabled = false; return;
+  }
+  const button = e.target.closest('[data-shop-run]'); if (!button) return;
+  const state = shopMonitorOwner(); if (state.running || !state.settings) return;
+  const mode = document.getElementById('shop-mode')?.value;
+  if (!['daily', 'weekly'].includes(mode)) return;
+  state.request ||= { mode, request_id: crypto.randomUUID() };
+  state.running = true; state.failed = false; state.notice = '자사몰 점검 중… 0초'; syncShopMonitorControls();
+  const started = Date.now();
+  const tick = setInterval(() => {
+    state.notice = `자사몰 점검 중… ${Math.floor((Date.now() - started) / 1000)}초`;
+    if (state === shopMonitor) syncShopMonitorControls();
+  }, 1000);
+  try {
+    const result = await shopMonitorApi('/api/shop-monitor/run', 'POST', state.request, 150000);
+    clearInterval(tick);
+    if (result.duplicate === true && (result.state !== 'completed' || !result.report)) {
+      state.failed = true; state.notice = '같은 요청의 처리 기록이 있습니다. 실행·완료 여부는 최신 보고에서 확인해주세요.';
+    } else {
+      const report = result.report;
+      if (!report || report.team !== '자사몰관리' || report.model !== 'rule-based' || !report.stats?.reportAvailable
+        || typeof report.stats.complete !== 'boolean' || !['idle', 'warn'].includes(report.status))
+        throw new Error('저장된 점검 보고를 확인하지 못했습니다. 최신 보고를 조회해주세요.');
+      state.request = null; state.failed = !report.stats.complete;
+      state.notice = report.stats.complete ? '점검 보고 저장됨. 이슈와 확인 제안을 검토해주세요.' : '점검 보고 저장됨 · 일부 항목 미확인. 연결 상태와 보고 근거를 확인해주세요.';
+    }
+    const refreshed = await load();
+    if (!refreshed) { state.failed = true; state.notice += ' 최신 화면 조회 실패 — 새로고침 후 보고를 확인해주세요.'; }
+  } catch (err) {
+    clearInterval(tick); state.failed = true; state.notice = '점검 완료 확인 불가 — ' + err.message;
+    if (err.status === 400) state.request = null;
+    if (err.status === 401 || err.status === 403) state.settings = null;
+  } finally {
+    clearInterval(tick); state.running = false;
+    if (state === shopMonitor) syncShopMonitorControls();
+  }
+});
 function agentList() {
   // 조직도 순서대로 14팀. 점검 기록이 없는 팀도 보인다 (아직 점검 전). 어느 팀에도 못 붙인 업무가 있으면 '팀 미지정'
   const by = new Map((D.agents || []).map(a => [a.team, a]));
   const keys = D.org.teams.map(t => t.key);
+  (D.officeAgents || []).forEach(a => { if (!keys.includes(a.team)) keys.push(a.team); });
   const extra = D.teams.find(t => t.team === '팀 미지정' && (t.open || t.newToday));
   if (extra) keys.push(extra.team);
   return keys.map(k => {
     const t = D.teams.find(x => x.team === k) || { open: 0, overdue: 0, doneToday: 0, newToday: 0 };
     const org = D.org.teams.find(x => x.key === k);
     const a = by.get(k) || { team: k, status: t.open ? 'work' : 'idle', headline: '아직 점검 전이에요', summary: null, needs: [], stats: {}, created_at: null };
+    if ((D.officeAgents || []).some(x => x.team === k)) return {
+      ...a, division: '대표 직속', liveFacts: false,
+      headline: (a.freshness !== 'current' && a.created_at ? '[' + freshnessLabel(a) + '] ' : '') + a.headline,
+    };
     const w = (D.watch || []).find(x => x.team === k);
     return { ...a, division: org ? org.division : '대표 직속', status: t.overdue || w?.alerts ? 'warn'
       : D.decide.some(c => c.kind === 'request_check' && c._org === k) ? 'report' : t.open || t.newToday || t.sharedToday ? 'work' : 'idle',
@@ -557,7 +776,7 @@ function mapView() {
   }).join('');
   const a = list.find(x => x.team === selTeam);
   const st = a ? (AST[a.status] || AST.idle) : null;
-  const detail = a ? `<section class="agent" aria-live="polite">
+  const detail = a?.team === '자사몰관리' ? shopMonitorDetail(a) : a ? `<section class="agent" aria-live="polite">
       <div class="agent-h"><h3>${esc(a.team)} 에이전트</h3><span class="pill" style="background:${st[1]};color:${st[2]}">${st[0]}</span>
         <small>${a.created_at ? 'AI 보고 ' + kst(a.created_at) : 'AI 보고 전'} · 현재 조회 ${kst(D.checkedAt)}</small>
         <button class="btn" type="button" data-run="${esc(a.team)}">이 팀 지금 점검</button></div>
@@ -660,6 +879,7 @@ document.getElementById('view').addEventListener('click', async e => {
   const run = e.target.closest('button[data-run]');
   if (!run || agentRunBusy) return;
   const team = run.dataset.run || undefined;
+  if (team === '자사몰관리') return;
   agentRunBusy = { startedAt:Date.now() }; syncAgentRunButtons(); showAgentRunStatus('팀 점검 중입니다…');
   const tick = setInterval(syncAgentRunButtons, 500);
   let result, failure;

@@ -27,6 +27,9 @@ import brandWorkflowRouter from "./brand-workflow.js";
 import payablePaymentRouter from "./payable-payment.js";
 import receiptWorkflowRouter from "./receipt-workflow.js";
 import inventoryRouter from "./inventory.js";
+import productRegistrationRouter, { startProductRegistrationScheduler } from "./product-registration.js";
+import shopMonitorRouter, { startShopMonitor } from "./shop-monitor.js";
+import { readMonitorSnapshot } from "./channels/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -82,6 +85,8 @@ async function startServer() {
   app.use(payablePaymentRouter);
   app.use(receiptWorkflowRouter);
   app.use(inventoryRouter);
+  app.use(productRegistrationRouter);
+  app.use(shopMonitorRouter);
 
   // OCR 라우터
   app.use(yardageOcrRouter);
@@ -147,6 +152,8 @@ async function startServer() {
     startAgentScheduler(); // 팀 에이전트 아침 점검 (KST 08:30 이후 하루 한 번)
     startGcalSync(); // 직원 구글 캘린더 정기 동기화 (키 없으면 꺼짐)
     startWorkNotificationDelivery(); // 저장된 알림 의도만 재전송 (업무 재작성 없음)
+    startProductRegistrationScheduler();
+    startShopMonitor(readMonitorSnapshot);
   });
 }
 
