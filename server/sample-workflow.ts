@@ -19,14 +19,21 @@ const router = Router();
 router.get('/api/samples/workflow/context', deps.auth(), async (req, res) => {
   try {
     const response = await deps.write('rpc/sample_workflow_context', { method: 'POST', body: JSON.stringify({p_actor_id:userOf(req).id}) });
-    if(!response.ok){res.status(response.status===403?403:503).json({error:'sample_workflow_unavailable'});return;}
+    if(!response.ok){
+      const actor=userOf(req),detail=await response.text();
+      const isBoss=actor.role==='대표'&&actor.email.toLowerCase()==='wonyoung@atlm.kr';
+      if(isBoss&&['sample_reviewer_invalid','sample_lead_required','sample_lead_ambiguous'].some(code=>detail.includes(code))){
+        res.set('Cache-Control','no-store').json({actorId:actor.id,isBoss:true,ready:false,reviewerId:null,reviewerInvalid:true});return;
+      }
+      res.status(response.status===403?403:503).json({error:'sample_workflow_unavailable'});return;
+    }
     res.set('Cache-Control','no-store').json(await response.json());
   } catch { res.status(503).json({ error: 'sample_workflow_unavailable' }); }
 });
 router.patch('/api/samples/workflow/settings', deps.auth(), async (req,res) => {
   const body=req.body;
   if(!body || Object.keys(body).length!==1 || !Object.hasOwn(body,'reviewerId')
-    || (body.reviewerId!==null && (typeof body.reviewerId!=='string' || !/^[A-Za-z0-9_-]{1,100}$/.test(body.reviewerId)))) {
+    || (body.reviewerId!==null && (typeof body.reviewerId!=='string' || !/^[A-Za-z0-9_.@+-]{1,100}$/.test(body.reviewerId)))) {
     res.status(400).json({error:'invalid_sample_reviewer'});return;
   }
   try {

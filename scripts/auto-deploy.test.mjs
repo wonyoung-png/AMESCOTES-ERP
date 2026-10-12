@@ -7,25 +7,32 @@ import { spawnSync } from 'node:child_process';
 
 const source = await readFile(new URL('../deploy/migrate/auto-deploy.sh', import.meta.url), 'utf8');
 const shell = process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : '/bin/bash';
-for (const mode of ['success','buildfail','upfail','healthfail']) {
+for (const mode of ['success','buildfail','upfail','healthfail','caddyvalidatefail','caddyreloadfail','caddyvalidatefail-daily']) {
   test(`automatic pipeline mock: ${mode}, no operating resources`, async () => {
     const dir = await mkdtemp(join(tmpdir(),'ames-auto-test-'));
     try {
       await mkdir(join(dir,'.deployed')); await mkdir(join(dir,'src','erp','deploy','migrate'), {recursive:true});
       for (const n of ['erp','daily','hr']) await writeFile(join(dir,'.deployed',n),'old\n');
+      if(mode==='caddyvalidatefail-daily')await rm(join(dir,'.deployed','daily'));
       await writeFile(join(dir,'src','erp','deploy','migrate','Caddyfile'),'fixture');
       await writeFile(join(dir,'src','erp','deploy','migrate','docker-compose.yml'),'fixture');
+      await writeFile(join(dir,'Caddyfile'),'previous-fixture');
       const mock = `
 MODE=${mode}
 mock_up=0
 mock_alias=newimage
 mock_health=0
-git() { case "$*" in *"rev-parse origin/aws-migration"*) echo new;; *"rev-parse origin/"*) echo old;; *"rev-parse HEAD"*) case "$*" in *src/erp*) echo new;; *) echo old;; esac;; *log*) echo fixture;; *) return 0;; esac; }
+git() { case "$*" in *"rev-parse origin/aws-migration"*) echo new;; *"rev-parse origin/master"*) if [ "$MODE" = caddyvalidatefail-daily ]; then echo new; else echo old; fi;; *"rev-parse origin/"*) echo old;; *"rev-parse HEAD"*) case "$*" in *src/erp*) echo new;; *src/daily*) if [ -f "$APP/reset-daily" ]; then echo new; else echo old; fi;; *) echo old;; esac;; *"reset -q --hard new"*) case "$*" in *src/daily*) echo yes > "$APP/reset-daily";; esac;; *log*) echo fixture;; *) return 0;; esac; }
 docker() {
  case "$*" in
+  "compose ps -q caddy") echo fixture-caddy;;
+  "exec fixture-caddy caddy validate --config /tmp/erp-next-Caddyfile --adapter caddyfile") [ "$MODE" != caddyvalidatefail ] && [ "$MODE" != caddyvalidatefail-daily ];;
+  "exec fixture-caddy caddy reload --config /tmp/erp-next-Caddyfile --adapter caddyfile") [ "$MODE" != caddyreloadfail ];;
   "compose config --images app") echo fixture-image;;
   "inspect -f {{.Image}} app-app-1") echo oldimage;;
   "compose build app") [ "$MODE" != buildfail ];;
+  "inspect -f {{.State.Running}} app-daily-1") echo true;;
+  "inspect -f {{.RestartCount}} app-daily-1") echo 0;;
   "compose up -d app") mock_up=$((mock_up+1)); echo "$mock_up" > "$APP/up-count"; [ "$MODE" != upfail ] || [ "$mock_up" -gt 1 ];;
   "tag app-prev:latest fixture-image") echo restored > "$APP/restored"; mock_alias=oldimage;;
   *) return 0;;
@@ -41,6 +48,11 @@ flock() { :; }
       assert.equal(result.status,mode==='success'?0:1,result.stderr);
       const deployed=(await readFile(join(dir,'.deployed','erp'),'utf8')).trim();
       assert.equal(deployed,mode==='success'?'new':'old');
+      if(mode==='caddyvalidatefail-daily')assert.equal((await readFile(join(dir,'.deployed','daily'),'utf8')).trim(),'new');
+      if(mode==='caddyvalidatefail'||mode==='caddyreloadfail'){
+        assert.equal((await readFile(join(dir,'Caddyfile'),'utf8')).trim(),'previous-fixture');
+        assert.equal(await readFile(join(dir,'up-count'),'utf8').catch(()=>null),null);
+      }
       if (mode==='upfail'||mode==='healthfail') {
         assert.equal((await readFile(join(dir,'.deployed','erp.failed'),'utf8')).trim(),'new');
         assert.equal((await readFile(join(dir,'restored'),'utf8')).trim(),'restored');

@@ -13,6 +13,7 @@ import { manualFetchExchangeRate } from '@/hooks/useAutoExchangeRate';
 import { seedDemoIntegrationData, DEMO, DEMO_SEED_FLAG } from '@/lib/seedDemoData';
 import { seedLumenPackingData, getPackKits } from '@/lib/seedLumenPacking';
 import { seedLumen27ssRrp, getLumen27ssProductCount, LUMEN_27SS_SEED_FLAG } from '@/lib/seedLumen27ssRrp';
+import SampleReviewerSettings from '@/components/SampleReviewerSettings';
 
 const SEASONS: Season[] = ['25FW', '26SS', '26FW', '27SS'];
 
@@ -228,6 +229,7 @@ export default function ExchangeSettings() {
         </div>
       </div>
 
+      <SampleReviewerSettings />
       {/* 현재 환율 + 시스템 설정 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-card rounded-lg border border-border p-5">

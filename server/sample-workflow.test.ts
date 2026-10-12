@@ -17,11 +17,37 @@ async function serve(app:express.Express,work:(base:string)=>Promise<void>){
   const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
   try{await work(`http://127.0.0.1:${(server.address() as any).port}`);}finally{await new Promise<void>(r=>server.close(()=>r()));}
 }
+test('reviewer settings accept email-style IDs, reject malformed payload and use session actor',async()=>{
+ const writes:any[]=[];const app=express();app.use(express.json());app.use(createSampleWorkflowRouter({
+  auth:()=>((req:any,_res:any,next:any)=>{req.user={id:'synthetic-boss',role:'대표',email:'fixture@example.invalid'};next();}),
+  write:async(path,init)=>{writes.push({path,body:JSON.parse(String(init?.body))});return {ok:true,status:200,json:async()=>({isBoss:true,ready:true,reviewerId:'lead@example.invalid'}),text:async()=>''};},
+  notify:async()=>false,
+ }));
+ await serve(app,async base=>{
+  const patch=(body:any)=>fetch(base+'/api/samples/workflow/settings',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  assert.equal((await patch({reviewerId:'lead@example.invalid'})).status,200);
+  assert.equal(writes[0].body.p_actor_id,'synthetic-boss');assert.equal(writes[0].body.p_reviewer_id,'lead@example.invalid');
+  const before=writes.length;
+  for(const body of [{reviewerId:'bad/id'},{reviewerId:'a,b'},{reviewerId:''},{reviewerId:'a',actorId:'forged'}])assert.equal((await patch(body)).status,400);
+  assert.equal(writes.length,before);assert.equal((await patch({reviewerId:null})).status,200);
+ });
+});
 test('actual sample API rejects anonymous completion, approval and billing before any DB write',async()=>{
   const app=express();app.use(express.json());app.use(router);
   await serve(app,async base=>{for(const path of ['/api/samples/a/complete','/api/samples/a/accept','/api/samples/workflow/bill']){
     const r=await fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(r.status,401);
   }});
+});
+test('invalid reviewer recovery context is CEO-only and keeps ordinary workflow disabled',async()=>{
+ let boss=true;const app=express();app.use(express.json());app.use(createSampleWorkflowRouter({
+  auth:()=>((req:any,_res:any,next:any)=>{req.user={id:'test-actor',role:boss?'대표':'사원',email:'wonyoung@atlm.kr'};next();}),
+  write:async()=>({ok:false,status:409,json:async()=>({}),text:async()=> 'sample_reviewer_invalid'}),notify:async()=>false,
+ }));
+ await serve(app,async base=>{
+  let result=await fetch(base+'/api/samples/workflow/context');assert.equal(result.status,200);
+  const context=await result.json();assert.equal(context.reviewerInvalid,true);assert.equal(context.isBoss,true);assert.equal(context.ready,false);
+  boss=false;result=await fetch(base+'/api/samples/workflow/context');assert.equal(result.status,503);assert.equal((await result.json()).reviewerInvalid,undefined);
+ });
 });
 test('sample API takes actor only from session, guards selection, and fails closed without migration',async()=>{
   const writes:any[]=[];let unavailable=false;

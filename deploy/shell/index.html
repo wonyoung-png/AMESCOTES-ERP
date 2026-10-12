@@ -162,7 +162,7 @@
       </div>
 
       <nav class="apps">
-        <a class="app" href="https://54-116-241-64.sslip.io/">
+        <a class="app" data-system="erp" href="#">
           <span class="tile"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></span>
           <span class="meta">
             <span class="name">ERP</span>
@@ -170,15 +170,15 @@
           </span>
           <span class="go">열기 ↗</span>
         </a>
-        <a class="app" href="https://daily.54-116-241-64.sslip.io/app/">
+        <a class="app" data-system="brand" href="#">
           <span class="tile"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg></span>
           <span class="meta">
-            <span class="name">PMS</span>
+            <span class="name">브랜드 운영</span>
             <span class="desc">일일 매출 · 캠페인 · 재고 · 물류 — 판매 운영</span>
           </span>
           <span class="go">열기 ↗</span>
         </a>
-        <a class="app" href="https://hr.54-116-241-64.sslip.io/app/">
+        <a class="app" data-system="hr" href="#">
           <span class="tile"><svg viewBox="0 0 24 24"><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 7h18v13H3zM3 12h18"/></svg></span>
           <span class="meta">
             <span class="name">HR/Operation</span>
@@ -186,7 +186,7 @@
           </span>
           <span class="go">열기 ↗</span>
         </a>
-        <a class="app" id="usersLink" href="https://54-116-241-64.sslip.io/users">
+        <a class="app" id="usersLink" data-system="users" href="#">
           <span class="tile"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M15 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0M22 21v-2a4 4 0 0 0-3-3.87"/></svg></span>
           <span class="meta">
             <span class="name">사용자 관리</span>
@@ -204,7 +204,12 @@
   </main>
 
 <script>
-const ERP = 'https://54-116-241-64.sslip.io';
+// 런처를 제공한 os.<도메인>에서 형제 주소를 계산한다. 다른 서버에 인증을 보내지 않는다.
+const ROOT_DOMAIN = location.hostname.startsWith('os.') ? location.hostname.slice(3) : '';
+if (!ROOT_DOMAIN) throw new Error('정식 OS 도메인에서 열어주세요.');
+const ERP = 'https://erp.' + ROOT_DOMAIN;
+const serviceLinks = {erp:ERP+'/',brand:ERP+'/pms',hr:'https://hr.'+ROOT_DOMAIN+'/app/',users:ERP+'/users'};
+document.querySelectorAll('[data-system]').forEach(a=>a.href=serviceLinks[a.dataset.system]);
 const ADMINS = ['wonyoung@atlm.kr', 'wonyoung@atlm.co.kr', 'saintluxpgw@bgrow.co.kr'];
 const $ = id => document.getElementById(id);
 function show(view) {
@@ -219,7 +224,7 @@ function showLauncher(user) {
 }
 
 // ── 퀵 액션: 출퇴근 · 휴가 신청 (HR 서비스, SSO 쿠키) ──
-const HR = 'https://hr.54-116-241-64.sslip.io';
+const HR = 'https://hr.' + ROOT_DOMAIN;
 async function hrApi(path, init) {
   const r = await fetch(HR + '/api' + path, Object.assign({ credentials: 'include' }, init || {}));
   const j = await r.json().catch(() => ({}));

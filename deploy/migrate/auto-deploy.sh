@@ -72,14 +72,30 @@ done
 unset GIT_SSH_COMMAND
 [ -n "$CHANGED" ] || exit 0
 
+# ERP Caddy 실패가 다른 앱의 배포를 건너뛰게 하지 않는다.
+ERP_CADDY_FAILED=false
 # ERP 소스가 바뀌었으면 compose·Caddyfile 도 같이 따라온다
 if echo "$CHANGED" | grep -q erp; then
-  cp "$APP/src/erp/deploy/migrate/docker-compose.yml" "$APP/docker-compose.yml"
-  cp "$APP/src/erp/deploy/migrate/Caddyfile"          "$APP/Caddyfile"
+  # 검증 실패 시 기존 라우팅/앱을 유지한다. 복사만으로는 실행 설정이 갱신되지 않는다.
+  CADDY_ID=$(docker compose ps -q caddy)
+  if [ -z "$CADDY_ID" ] ||
+     ! docker cp "$APP/src/erp/deploy/migrate/Caddyfile" "$CADDY_ID:/tmp/erp-next-Caddyfile" >>"$LOG" 2>&1 ||
+     ! docker exec "$CADDY_ID" caddy validate --config /tmp/erp-next-Caddyfile --adapter caddyfile >>"$LOG" 2>&1; then
+    log "Caddy 설정 검증 실패 — ERP 기존 설정/앱 유지"; ERP_CADDY_FAILED=true
+  elif ! cp "$APP/Caddyfile" "$STATE/Caddyfile.previous" ||
+       ! cp "$APP/src/erp/deploy/migrate/Caddyfile" "$APP/Caddyfile"; then
+    log "Caddy 설정 복사 실패 — ERP 교체 보류"; ERP_CADDY_FAILED=true
+  elif ! docker exec "$CADDY_ID" caddy reload --config /tmp/erp-next-Caddyfile --adapter caddyfile >>"$LOG" 2>&1; then
+    cp "$STATE/Caddyfile.previous" "$APP/Caddyfile"
+    log "Caddy 설정 반영 실패 — ERP 기존 설정/앱 유지"; ERP_CADDY_FAILED=true
+  elif ! cp "$APP/src/erp/deploy/migrate/docker-compose.yml" "$APP/docker-compose.yml"; then
+    log "compose 복사 실패 — ERP 교체 보류"; ERP_CADDY_FAILED=true
+  fi
 fi
 
 FAILED=""
 for n in $CHANGED; do
+  if [ "$n" = erp ] && [ "$ERP_CADDY_FAILED" = true ]; then FAILED="$FAILED erp"; continue; fi
   SVC=$(svc_of "$n")
   # fetch 때 고정한 커밋. HEAD 를 다시 읽으면 그 사이 또 당겨졌을 수 있다
   AFTER_SHA=$(git -C "$APP/src/$n" rev-parse HEAD)
@@ -116,7 +132,7 @@ for n in $CHANGED; do
   fi
 done
 
-if echo "$CHANGED" | grep -q erp; then
+if echo "$CHANGED" | grep -q erp && [ "$ERP_CADDY_FAILED" = false ]; then
   docker compose up -d caddy >>"$LOG" 2>&1 || true
   # PostgREST 는 시작할 때 읽은 스키마만 안다. 새 테이블·함수를 만들어도 다시 읽히지
   # 않으면 "그런 함수 없다"며 404 를 돌려준다 — 접수함 승인이 이걸로 한 번 막혔다
