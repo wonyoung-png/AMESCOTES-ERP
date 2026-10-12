@@ -41,7 +41,8 @@ for(const phase of ['independent','cross_review']) {
     const env=Object.fromEntries(['PATH','HOME','USER','LOGNAME','TMPDIR'].filter(k=>process.env[k]).map(k=>[k,process.env[k]]));
     Object.assign(env,{ADS_API_URL:'http://127.0.0.1:'+server.address().port,ADS_RUNNER_ID:'aws-smoke',ADS_RUNNER_TOKEN:token});
     const code=await new Promise((resolve,reject)=>{
-      const child=spawn('/bin/sh',['/opt/ads-runner/ads-runner.sh','--once'],{env,stdio:'ignore'});
+      const child=spawn('/bin/sh',['/opt/ads-runner/ads-runner.sh','--once'],{env,stdio:['ignore','ignore','pipe']});
+      child.stderr.on('data',chunk=>{for(const line of chunk.toString().split('\n')) if(/^ads-runner: model failed: [a-z_]+$/.test(line)) console.log(line);});
       child.on('error',reject);child.on('exit',resolve);
     });
     if(failure) throw failure;

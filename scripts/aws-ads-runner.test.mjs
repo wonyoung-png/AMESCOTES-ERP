@@ -23,5 +23,7 @@ test('runner network guard precedes Docker and blocks metadata, private forwardi
   assert.match(guard,/DOCKER-USER -s 172\.27\.0\.0\/16/);
   assert.match(guard,/INPUT -s 172\.27\.0\.0\/16 -p tcp ! --dport 53 -j REJECT/);
   assert.match(guard,/--dport 53 -j ACCEPT/);
+  const compose=await readFile(new URL('../deploy/aws-runner/compose.yml',import.meta.url),'utf8');
+  assert.match(compose,/subnet: 172\.27\.0\.0\/16/);
   assert.doesNotMatch(guard,/iptables -F|iptables -P/);
 });

@@ -140,7 +140,12 @@ async function poll() {
     if (!object(job.task) || !['independent', 'cross_review'].includes(job.task.phase) ||
       typeof job.task.question !== 'string' || !object(job.task.plan) || !object(job.task.snapshot)) throw Error('invalid task');
     payload = { result: await analyze(job.task) };
-  } catch { payload = { error: 'runner_failed' }; }
+  } catch (error) {
+    const stage = { 'tool or invalid event': 'event_guard', 'invalid output': 'output_guard',
+      'codex failed': 'codex_failed', 'spawn failed': 'spawn_failed' }[error.message] || 'validation_failed';
+    log(`model failed: ${stage}`);
+    payload = { error: 'runner_failed' };
+  }
   if (!stopping) await request(`/api/ads-council/jobs/${encodeURIComponent(job.id)}/result`, { claimToken: job.claimToken, runnerId, ...payload });
 }
 do {
