@@ -217,7 +217,7 @@ export function CardActions({ c, me, onDone }: { c: Card; me: Me | null; onDone:
       {canReply && isSubscriptionCheck && (
         <div className="flex flex-wrap gap-2 mt-2">
           {['계속 씀','안 씀','모름'].map(answer => <button key={answer} type="button" disabled={busy}
-            onClick={() => answerSubscription(answer)} className="h-9 px-3 rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40">{answer}</button>)}
+            onClick={() => answerSubscription(answer)} className="h-9 px-3 rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40">{answer === '계속 씀' ? '사용 중' : answer}</button>)}
         </div>
       )}
       {canReply && !isSubscriptionCheck && (
