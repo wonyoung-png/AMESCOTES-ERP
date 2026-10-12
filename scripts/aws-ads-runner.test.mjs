@@ -21,6 +21,7 @@ test('runner network guard precedes Docker and blocks metadata, private forwardi
   assert.match(unit,/Before=docker.service/);
   assert.match(guard,/169\.254\.0\.0\/16/);
   assert.match(guard,/DOCKER-USER -s 172\.27\.0\.0\/16/);
-  assert.match(guard,/INPUT -s 172\.27\.0\.0\/16 -p tcp -j REJECT/);
+  assert.match(guard,/INPUT -s 172\.27\.0\.0\/16 -p tcp ! --dport 53 -j REJECT/);
+  assert.match(guard,/--dport 53 -j ACCEPT/);
   assert.doesNotMatch(guard,/iptables -F|iptables -P/);
 });
