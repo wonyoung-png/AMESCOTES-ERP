@@ -96,22 +96,33 @@ The private task snapshot file is ${snapshot}; identical contents are supplied b
 BEGIN_UNTRUSTED_ADS_TASK_JSON\n${JSON.stringify(safeTask)}\nEND_UNTRUSTED_ADS_TASK_JSON`;
     // Do not inherit runner/Meta tokens, NODE_OPTIONS, MCP/config hooks or cloud credentials.
     const env = Object.fromEntries(['PATH', 'HOME', 'USER', 'LOGNAME', 'TMPDIR', 'CODEX_HOME', 'SystemRoot'].filter(k => process.env[k]).map(k => [k, process.env[k]]));
+    let events = '', eventBytes = 0;
     await new Promise((resolve, reject) => {
       const child = spawn('codex', ['exec', '-s', 'read-only', '-m', 'gpt-6.1-sol', '-c', 'model_reasoning_effort=high',
         '--ignore-user-config', '--ignore-rules', '--ephemeral', '--disable', 'shell_tool', '--disable', 'unified_exec',
         '--disable', 'plugins', '--disable', 'remote_plugin', '--disable', 'hooks', '--disable', 'enable_mcp_apps',
-        '-c', 'web_search="disabled"', '--skip-git-repo-check', '-C', dir, '--output-schema', schema, '-o', output, '-'],
-      { cwd: dir, env, shell: false, detached: process.platform !== 'win32', stdio: ['pipe', 'ignore', 'ignore'] });
+        '-c', 'web_search="disabled"', '--json', '--skip-git-repo-check', '-C', dir, '--output-schema', schema, '-o', output, '-'],
+      { cwd: dir, env, shell: false, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'ignore'] });
       active = child;
+      child.stdout.on('data', chunk => {
+        eventBytes += chunk.length;
+        if (eventBytes > 2 * 1024 * 1024) { killChild(); return; }
+        events += chunk.toString('utf8');
+      });
       let timedOut = false;
       const timer = setTimeout(() => { timedOut = true; killChild(); }, timeout);
       child.on('error', () => { clearTimeout(timer); reject(Error('spawn failed')); });
       child.on('close', code => { clearTimeout(timer); active = undefined; code === 0 && !timedOut ? resolve() : reject(Error('codex failed')); });
       child.stdin.on('error', () => {}); child.stdin.end(prompt);
     });
+    const stream = events.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+    if (!stream.some(e => e.type === 'turn.completed') || eventBytes > 2 * 1024 * 1024 ||
+        stream.some(e => e.item && !['reasoning', 'agent_message'].includes(e.item.type))) throw Error('tool or invalid event');
     if (stopping || (await stat(output)).size > 2 * 1024 * 1024) throw Error('invalid output');
     const result = JSON.parse(await readFile(output, 'utf8'));
-    if (!validResult(result, task.phase) || JSON.stringify(result).length > 40000) throw Error('invalid output');
+    const encoded = JSON.stringify(result);
+    if (!validResult(result, task.phase) || encoded.length > 40000 || encoded.includes(token) ||
+        /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/.test(encoded)) throw Error('invalid output');
     return result;
   } finally { await rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); }
 }

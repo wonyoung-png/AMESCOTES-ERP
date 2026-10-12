@@ -1,0 +1,11 @@
+[Unit]
+Description=Dedicated AMES ads runner private-network egress guard
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/app/ads-runner/deploy/aws-runner/network-guard.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

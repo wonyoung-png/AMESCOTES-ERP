@@ -40,7 +40,8 @@ const taskFile=JSON.parse(await readFile('task.json','utf8'));
 await writeFile(${JSON.stringify(captured)},JSON.stringify({args,prompt,task:taskFile,env:process.env,
   dir:process.cwd(),mode:(await stat('task.json')).mode & 511}));
 if(config.hang){setInterval(()=>{},1000);}else if(config.fail){process.exit(1);}else{
-await writeFile(args[args.indexOf('-o')+1],config.raw ?? JSON.stringify(config.result ?? ${JSON.stringify(opinion)}));}
+await writeFile(args[args.indexOf('-o')+1],config.raw ?? JSON.stringify(config.result ?? ${JSON.stringify(opinion)}));
+console.log(config.events ?? JSON.stringify({type:'turn.completed'}));}
 `);
   const patched = embedded.replace("import { spawn } from 'node:child_process';", `import { spawn as realSpawn } from 'node:child_process';
 const spawn=(command,args,opts)=>realSpawn(process.execPath,[${JSON.stringify(fakePath)},...args],opts);`)
@@ -107,6 +108,10 @@ for (const [name, fake, config] of [
   ['nonzero exit', { fail: true }, {}], ['HTML model output', { raw: '<html>bad</html>' }, {}],
   ['wrong JSON shape', { result: { model: 'claude' } }, {}], ['time limit', { hang: true }, { ADS_RUNNER_TIMEOUT_MS: '300' }],
   ['server result size cap', { result: { ...opinion, conclusion: 'x'.repeat(40001) } }, {}],
+  ['tool invocation', { events: JSON.stringify({type:'item.completed',item:{type:'command_execution'}}) }, {}],
+  ['missing completion', { events: JSON.stringify({type:'turn.started'}) }, {}],
+  ['runner token leakage', { result: { ...opinion, conclusion: 'fixture-bearer-only-32chars-minimum' } }, {}],
+  ['JWT leakage', { result: { ...opinion, conclusion: 'eyJaaaaaaaaaaaa.bbbbbbbbbbbb.cccccccccccc' } }, {}],
 ]) test(`${name}: sanitized failure, one POST and private files cleaned`, async t => {
   const f = await fixture(t, { next: { job: job('independent') }, fake, config }); assert.equal(await f.completion, 0);
   assert.equal(f.requests.length, 2); assert.deepEqual(f.requests[1].body, { claimToken: 'claim-fixture', runnerId: 'macmini', error: 'runner_failed' });
