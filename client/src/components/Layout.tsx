@@ -550,6 +550,15 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             >
               OS 홈 <ArrowUpRight size={12} />
             </a>
+            <a
+              href="https://chat.google.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Google Chat 열기 (새 탭)"
+              className="inline-flex items-center gap-0.5 whitespace-nowrap text-muted-foreground hover:text-foreground"
+            >
+              Google Chat <ArrowUpRight size={12} aria-hidden="true" />
+            </a>
             {/* 대표 콘솔 — 링크만 숨김, 실제 접근 제한은 서버(server/ceo.ts)가 한다 */}
             {isCeo && (
               <a
