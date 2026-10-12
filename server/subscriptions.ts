@@ -125,7 +125,7 @@ router.post('/api/card-transactions/upload', async (req, res) => {
           first_paid_on: c.firstPaidOn, last_paid_on: c.lastPaidOn, updated_at: new Date().toISOString() }) });
       const cardFilter = c.cardLast4 ? `card_last4=eq.${c.cardLast4}` : 'card_last4=is.null';
       await restAsServer(`subscriptions?merchant_pattern=eq.${encodeURIComponent(c.merchantKey)}&${cardFilter}&currency=eq.${encodeURIComponent(c.currency)}&status=neq.해지됨`, {
-        method: 'PATCH', body: JSON.stringify({ latest_amount: c.latestAmount, average_amount: c.averageAmount, updated_at: new Date().toISOString() }),
+        method: 'PATCH', body: JSON.stringify({ latest_amount: c.latestAmount, average_amount: c.averageAmount, last_paid_on: c.lastPaidOn, updated_at: new Date().toISOString() }),
       });
     }
     res.json({ ok: true, accepted: records.length, rejected: raw.length - valid.length, candidates: candidates.length });
@@ -188,6 +188,7 @@ router.patch('/api/subscriptions/:id', async (req, res) => {
     if ('renewalMonths' in (req.body || {})) { const n = Number(req.body.renewalMonths); if (Number.isInteger(n) && n > 0) body.renewal_months = n; }
     if ('noticeDays' in (req.body || {})) { const n = Number(req.body.noticeDays); if (Number.isInteger(n) && n >= 0) body.notice_days = n; }
     if ('ownerTeam' in (req.body || {})) body.owner_team = text(req.body.ownerTeam, 100) || null;
+    if ('lastPaidOn' in (req.body || {})) body.last_paid_on = dateOk(text(req.body.lastPaidOn, 10)) ? req.body.lastPaidOn : null;
     if ('cancelRequestedAt' in (req.body || {})) {
       const d = text(req.body.cancelRequestedAt, 10);
       body.cancel_requested_at = dateOk(d) ? d + 'T00:00:00Z' : null;
