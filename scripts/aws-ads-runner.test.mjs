@@ -8,7 +8,7 @@ test('AWS runner is isolated, pinned, non-root and preserves existing logical le
   assert.match(docker,/@openai\/codex@0\.162\.1/); assert.match(docker,/USER node/);
   assert.match(docker,/install -y --no-install-recommends ca-certificates/);
   assert.doesNotMatch(docker,/NODE_TLS_REJECT_UNAUTHORIZED|SSL_VERIFY.*false/);
-  for(const text of ['read_only: true','cap_drop: [ALL]','no-new-privileges:true','restart: unless-stopped','mem_limit: 768m'])
+  for(const text of ['read_only: true','cap_drop: [ALL]','no-new-privileges:true','restart: "no"','mem_limit: 768m'])
     assert.ok(compose.includes(text));
   assert.doesNotMatch(compose,/privileged:|docker.sock|network_mode: host|env_file:|\.env|POSTGRES|META_ADS_TOKEN|ports:/);
   assert.match(prepare,/'runnerId': 'macmini'/); assert.match(prepare,/ADS_ANALYSIS_ENABLED.*!= 'true'/);
@@ -25,5 +25,9 @@ test('runner network guard precedes Docker and blocks metadata, private forwardi
   assert.match(guard,/--dport 53 -j ACCEPT/);
   const compose=await readFile(new URL('../deploy/aws-runner/compose.yml',import.meta.url),'utf8');
   assert.match(compose,/subnet: 172\.27\.0\.0\/16/);
+  const service=await readFile(new URL('../deploy/aws-runner/ames-ads-runner.service',import.meta.url),'utf8');
+  assert.match(service,/Requires=docker.service ames-ads-network-guard.service/);
+  assert.match(service,/ExecStartPre=.*check-network-guard.sh/);
+  assert.match(service,/Restart=always/);
   assert.doesNotMatch(guard,/iptables -F|iptables -P/);
 });

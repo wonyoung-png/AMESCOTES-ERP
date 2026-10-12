@@ -6,7 +6,8 @@ services:
     image: ames-ads-runner:20261012
     container_name: ames-ads-runner
     user: "1000:1000"
-    restart: unless-stopped
+    # systemd restarts only after the host network guard succeeds.
+    restart: "no"
     read_only: true
     init: true
     cap_drop: [ALL]

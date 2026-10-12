@@ -1,0 +1,17 @@
+[Unit]
+Description=Dedicated AMES read-only ads Codex runner
+Requires=docker.service ames-ads-network-guard.service
+After=docker.service ames-ads-network-guard.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStartPre=/opt/app/ads-runner/deploy/aws-runner/check-network-guard.sh
+ExecStart=/usr/bin/docker compose -p ames-ads --project-directory /opt/app/ads-runner -f /opt/app/ads-runner/deploy/aws-runner/compose.yml up --no-build --abort-on-container-exit runner
+ExecStop=/usr/bin/docker compose -p ames-ads --project-directory /opt/app/ads-runner -f /opt/app/ads-runner/deploy/aws-runner/compose.yml stop runner
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
