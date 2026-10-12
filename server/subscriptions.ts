@@ -188,6 +188,11 @@ router.patch('/api/subscriptions/:id', async (req, res) => {
     if ('renewalMonths' in (req.body || {})) { const n = Number(req.body.renewalMonths); if (Number.isInteger(n) && n > 0) body.renewal_months = n; }
     if ('noticeDays' in (req.body || {})) { const n = Number(req.body.noticeDays); if (Number.isInteger(n) && n >= 0) body.notice_days = n; }
     if ('ownerTeam' in (req.body || {})) body.owner_team = text(req.body.ownerTeam, 100) || null;
+    if ('cancelRequestedAt' in (req.body || {})) {
+      const d = text(req.body.cancelRequestedAt, 10);
+      body.cancel_requested_at = dateOk(d) ? d + 'T00:00:00Z' : null;
+      body.cancel_requested_by = dateOk(d) ? ((req as Request & { user?: SessionUser }).user?.id ?? (await currentUser(req))?.id ?? null) : null;
+    }
     for (const [from, to, max] of [['purpose','purpose',500], ['memo','memo',1000]] as const) if (from in (req.body || {})) body[to] = text(req.body[from], max) || null;
     const r = await restAsServer(`subscriptions?id=eq.${encodeURIComponent(req.params.id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
     res.status(r.ok ? 200 : 502).json(r.ok ? { ok: true, subscription: (await r.json())[0] } : { error: 'save_failed' });
