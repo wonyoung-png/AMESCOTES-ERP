@@ -14,3 +14,13 @@ test('AWS runner is isolated, pinned, non-root and preserves existing logical le
   assert.match(prepare,/'runnerId': 'macmini'/); assert.match(prepare,/ADS_ANALYSIS_ENABLED.*!= 'true'/);
   assert.match(prepare,/not target.exists\(\)/); assert.match(prepare,/0o600/);
 });
+
+test('runner network guard precedes Docker and blocks metadata, private forwarding and host TCP only for its subnet', async () => {
+  const guard=await readFile(new URL('../deploy/aws-runner/network-guard.sh',import.meta.url),'utf8');
+  const unit=await readFile(new URL('../deploy/aws-runner/ames-ads-network-guard.service',import.meta.url),'utf8');
+  assert.match(unit,/Before=docker.service/);
+  assert.match(guard,/169\.254\.0\.0\/16/);
+  assert.match(guard,/DOCKER-USER -s 172\.27\.0\.0\/16/);
+  assert.match(guard,/INPUT -s 172\.27\.0\.0\/16 -p tcp -j REJECT/);
+  assert.doesNotMatch(guard,/iptables -F|iptables -P/);
+});
