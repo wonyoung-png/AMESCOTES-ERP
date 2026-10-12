@@ -4,7 +4,7 @@ import {readFileSync,existsSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 
 test('existing ERP client files remain intact against the latest checked local baseline',()=>{
- const baseline='afe1279'; // Local aws-migration snapshot; not a claim about the live deployment.
+ const baseline='31ab72d'; // Read-only confirmed remote/live snapshot; new upstream changes must be preserved.
  const allowed=new Set(['client/src/pages/ExchangeSettings.tsx','client/src/pages/BomManagement.tsx','client/src/lib/hosts.ts']);
  const files=execFileSync('git',['ls-tree','-r','--name-only',baseline,'--','client'],{encoding:'utf8'}).trim().split('\n');
  for(const file of files){
