@@ -22,7 +22,7 @@ const excelDate = (v:unknown) => {
   const d = new Date(String(v)); return Number.isNaN(d.valueOf()) ? '' : d.toISOString().slice(0,10);
 };
 const daysUntil = (date?:string) => date ? Math.round((Date.parse(date)-Date.parse(new Date().toISOString().slice(0,10)))/864e5) : null;
-const categories=['AI 도구','마케팅','업무 도구','인프라','임대·리스','렌탈·유지보수','대행·자문','통신·보안','기타'];
+const categories=['AI 도구','마케팅','업무 도구','인프라','임대','리스','렌탈·유지보수','대행·자문','통신·보안','기타'];
 const deadline=(s:Sub)=>s.notice_by||(s.billing_cycle==='연'?s.next_billing_on:undefined);
 // 사용 확인 답변은 서버 enum('계속 씀'·'안 씀'·'모름') 그대로 두고 표시만 바꾼다
 const usageLabel=(v?:string)=>({'계속 씀':'사용 중'} as Record<string,string>)[v||'']||v||'미확인';

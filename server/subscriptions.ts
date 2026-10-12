@@ -132,7 +132,7 @@ router.post('/api/card-transactions/upload', async (req, res) => {
   } catch (e) { console.error('[subscriptions] 업로드 실패', e); res.status(500).json({ error: 'internal' }); }
 });
 
-const CATEGORIES = ['AI 도구','마케팅','업무 도구','인프라','임대·리스','렌탈·유지보수','대행·자문','통신·보안','기타'];
+const CATEGORIES = ['AI 도구','마케팅','업무 도구','인프라','임대','리스','렌탈·유지보수','대행·자문','통신·보안','기타'];
 const STATUSES = ['사용 중','검토 필요','해지 예정','해지됨'];
 router.post('/api/subscriptions/candidates/:id/confirm', async (req, res) => {
   try {
