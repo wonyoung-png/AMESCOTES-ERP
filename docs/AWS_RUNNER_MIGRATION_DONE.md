@@ -1,5 +1,27 @@
 # AWS 러너 이전 실제 실행 기록
 
+## 최종 현재 상태 (아래 중간 기록보다 우선)
+
+AWS 전용 로그인·물리 러너 전환·보안 보강·자동 복구 검증은 성공했습니다. 카페24 기존 앱 재인증과 전체 광고 업무 활성화는 미완료입니다. 직원 접근/ERP 앱 배포/운영 DB 마이그레이션은 진행하지 않았습니다.
+
+| 최종 검증 | 증거 |
+|---|---|
+| 실제 Codex 독립 분석·교차 검토, 도구 이벤트0 | 1ce86ffa-dd5b-4144-b7b3-72156dd43038, 두 단계 통과 |
+| 실제 상시 이미지 | sha256:709c1943c608d8960f31cbd7619707b7f4f2ab3b995d30b1c13b0ac1461d3968, 소스5220f16 |
+| 기동 전 guard 검사 + systemd 관리 재시작 | c2fae82d-8f06-4e69-92ca-652fb9cd0eb4, systemd active, Docker restart=no |
+| 고의 KILL 뒤 자동 복구·API200 | 5e711dd1-7ce8-499a-8674-2c53160c8444, 진행 작업0일 때 러너만 시험 |
+| IMDS/hostTCP 차단 및 공개 API200 | 1a5fee21-6ba5-44de-9a4b-490897da71d2 |
+| root 소유·다른 계정 쓰기 없음, IPv6 꺼짐, 자체 공인 경로 무인증403 | ba24a7f9-6576-418c-b3ac-81fc52acd417 |
+| 관련 회귀 | 33/33, 마지막 실패 분류 변경 후 worker31/31 추가 통과 |
+| 실제 Claude 검토 | 컷오버USD0.44 + 최종USD0.50 + 보강USD0.47 = USD1.41 |
+
+guard는 고정 전용 CIDR172.27.0.0/16에만 적용합니다. DNS53은 내부 DNS 경유 공개 도메인 해석을 위해 허용합니다. 별도 runner systemd unit이 guard를 Requires하고, 실제 CIDR/iptables 검사에 실패하면 기동하지 않습니다. Docker 자체를 guard에 종속시키지 않아 ERP 전체 기동을 막지 않습니다. 활성 source 디렉터리·root 실행 스크립트는 root 소유/0700으로 보강했습니다.
+초기 단순 Docker unless-stopped 방식은 최종적으로 systemd Restart=always + Docker restart=no로 교체했습니다. 성공 직후 systemd 시작과 Docker 재생성 사이 중간 출력은 이전 이미지였지만 후속 실제 컨테이너 ID/이미지 일치와 복구까지 확인했습니다.
+
+두 번의 보강 모델 시험 실패는 성공으로 계산하지 않습니다. 최초 DNS 차단 및 후속 cross_review CLI 실패가 있었고, 후속 실제 두 단계가 통과했습니다. CLI 이벤트 형식 자체는 정상으로 확인됐으므로 이전에 형식 문제로 추정한 것은 확정 원인이 아닙니다. 원문 CLI 오류/인증값은 외부 로그에 출력하지 않습니다. 도구0은 수신한 CLI event 스트림의 item.type 검사 범위이며 이미 실행된 도구의 영향을 되돌리는 장치는 아닙니다.
+
+호스트 재부팅은 다른 운영 업무 영향 때문에 미실행입니다. guard 및 Docker/runner service enabled 상태, unit 문법 검증과 러너 강제 종료 자동 복구로 확인했습니다. 실제 회사 대용량 광고 데이터, 서버 claim→finish→비서실 전체 흐름은 이번 합성 모델 시험과 별개이며 광고 enabled=false 유지입니다. 카페24 access 만료/refresh invalid_grant 재인증은 남았습니다.
+
 2026-10-12. 범위는 대표 승인한 기존 Cafe24 앱 주소 변경 및 Codex 러너 AWS 이전입니다. ERP 광고 전체 기능 활성화 완료와 구분합니다.
 
 ## 실행 및 검증
@@ -29,4 +51,4 @@ Cafe24 기존 앱 주문 count GET은 별도 Python import 방식에서 LocalPro
 
 ## 복구
 
-AWS 러너부터 stop한 다음 Mac `launchctl enable gui/501/kr.atlm.ads-runner`, 기존 plist bootstrap으로 복구합니다. 두 호스트 동시 모델 작업을 하지 않습니다. 인증/원본 plist는 삭제하지 않았습니다.
+`systemctl stop ames-ads-runner.service`와 AWS 러너 container stop을 확인한 다음에만 Mac `launchctl enable gui/501/kr.atlm.ads-runner`, 기존 plist bootstrap으로 복구합니다. 단순 container stop만 하면 systemd가 다시 시작하므로 service를 먼저 중지합니다. 두 호스트 동시 모델 작업을 하지 않습니다. 인증/원본 plist는 삭제하지 않았습니다.
