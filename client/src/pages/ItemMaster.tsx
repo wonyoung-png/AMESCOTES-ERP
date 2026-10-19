@@ -381,12 +381,22 @@ const ITEM_DEFAULT_COL_WIDTHS: Record<string, number> = {
   orderCount: 80, cumQty: 90, noOrder: 90, createdAt: 100, bom: 70, action: 70,
 };
 
+function itemBrandName(item: Item, vendor?: Vendor): string {
+  if (!vendor) return '';
+  const brands = normalizeBrands(vendor.brands);
+  const code = item.brandCode || item.styleNo?.split('-')[0];
+  const brand = brands.find(b => b.code && b.code === code);
+  if (brand) return brand.name;
+  if (brands.length === 1) return brands[0].name;
+  return vendor.name;
+}
+
 /** 열 설정 — 공장단가/KMSRP/실현배수/마진율은 기본 숨김 */
 const ITEM_COLUMN_DEFS: { key: string; label: string; defaultVisible: boolean }[] = [
   { key: 'image', label: '이미지', defaultVisible: true },
   { key: 'styleNo', label: '스타일번호', defaultVisible: true },
   { key: 'season', label: '시즌', defaultVisible: true },
-  { key: 'buyer', label: '바이어', defaultVisible: true },
+  { key: 'buyer', label: '브랜드', defaultVisible: true },
   { key: 'name', label: '품명', defaultVisible: true },
   { key: 'category', label: '카테고리', defaultVisible: true },
   { key: 'color', label: '컬러', defaultVisible: true },
@@ -1248,11 +1258,13 @@ export default function ItemMaster() {
 
   const filtered = useMemo(() => {
     let result = items.filter(item => {
-      const buyerName = vendors.find(v => v.id === item.buyerId)?.name || '';
+      const vendor = vendors.find(v => v.id === item.buyerId);
+      const buyerName = vendor?.name || '';
+      const brandName = itemBrandName(item, vendor);
       // 검색창 하나로 통일 — 스타일번호 · 품명(한/영) · 바이어를 한 번에 훑는다
       const q = search.trim().toLowerCase();
       const matchSearch = !q ||
-        [item.styleNo, item.buyerStyleNo, item.name, item.nameEn, buyerName].some(f => (f || '').toLowerCase().includes(q));
+        [item.styleNo, item.buyerStyleNo, item.name, item.nameEn, buyerName, brandName].some(f => (f || '').toLowerCase().includes(q));
       const matchSeason = filterSeason === '전체'
         || item.season === filterSeason
         || item.erpCategory === 'PACK'; // 패키지 키트는 시즌 공통
@@ -2413,7 +2425,7 @@ export default function ItemMaster() {
                   ),
                   showCol('buyer') && (
                   <th key="buyer" className="text-left px-4 py-3 text-[13px] font-semibold text-muted-foreground relative overflow-hidden whitespace-nowrap">
-                    바이어
+                    브랜드
                     <div onMouseDown={(e) => startResize(e, 'buyer')} className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary select-none z-10" />
                   </th>
                   ),
@@ -2607,7 +2619,7 @@ export default function ItemMaster() {
                       <td key="buyer" className="px-4 py-3">
                         {item.buyerId ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fill-tertiary)] text-foreground border border-border whitespace-nowrap">
-                            {vendorMap.get(item.buyerId)?.code || vendorMap.get(item.buyerId)?.name || '-'}
+                            {itemBrandName(item, vendorMap.get(item.buyerId)) || '-'}
                           </span>
                         ) : <span className="text-muted-foreground text-xs">-</span>}
                       </td>
