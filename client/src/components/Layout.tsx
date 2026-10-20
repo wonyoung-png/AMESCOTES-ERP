@@ -23,7 +23,7 @@ import {
   ChevronLeft, ChevronRight, DollarSign, LogOut, Layers,
   Menu, X, MoreHorizontal, Truck, Wallet, CalendarClock, CalendarDays,
   UserRound, Moon, Sun, ArrowUpRight,
-  LineChart, Image as ImageIcon, TrendingUp, Inbox, Warehouse, Star, MessageSquare, CreditCard,
+  LineChart, Image as ImageIcon, TrendingUp, Inbox, Warehouse, Star, MessageSquare, CreditCard, KeyRound,
 } from 'lucide-react';
 
 interface NavItem {
@@ -115,6 +115,7 @@ const navGroups: NavGroup[] = [
   {
     label: '관리',
     items: [
+      { path: '/company-accounts', label: '회사 계정', icon: <KeyRound size={17} />, table: '공유 계정 시트' },
       { path: '/settings', label: '관리·설정', icon: <Settings size={17} />, table: '환율 · 사용자 · 조직', adminOnly: true },
     ],
   },

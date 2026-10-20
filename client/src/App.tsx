@@ -53,6 +53,7 @@ const NotFound = lazyPage(() => import("./pages/NotFound"));
 const UserManagement = lazyPage(() => import("./pages/UserManagement"));
 const PmsWorkspace = lazyPage(() => import("./pages/PmsWorkspace"));
 const SubscriptionManagement = lazyPage(() => import("./pages/SubscriptionManagement"));
+const CompanyAccounts = lazyPage(() => import("./pages/CompanyAccounts"));
 
 import { ensureErpBootstrap } from "@/lib/ensureErpBootstrap";
 import { setDbWriteFailureHandler } from "@/lib/store";
@@ -183,6 +184,7 @@ function Router() {
         <Route path="/cost-comparison" component={CostComparison} />
         <Route path="/pms" component={PmsWorkspace} />
         <Route path="/subscriptions" component={SubscriptionManagement} />
+        <Route path="/company-accounts" component={CompanyAccounts} />
         <Route component={NotFound} />
       </Switch>
       </RouteContent>
