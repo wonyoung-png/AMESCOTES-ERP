@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Search, Pencil, Trash2, Building2, Clock, Loader2, Paperclip, Upload, Sparkles, Factory, ShoppingBag, Users, AlertCircle } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, Clock, Loader2, Paperclip, Upload, Sparkles, Factory, ShoppingBag, Users, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 // '해외공장'은 레거시 — 신규 등록은 '공장' + region='해외'. 기존 데이터 표시용으로만 남김
 const VENDOR_TYPES: VendorType[] = ['바이어', '자재거래처', '공장', '물류업체', '기타'];
@@ -36,6 +36,7 @@ const TYPE_COLOR: Record<VendorType, string> = {
 
 // 자재 유형 옵션
 const MATERIAL_TYPE_OPTIONS: ('장식' | '원단' | '가죽' | '기타')[] = ['장식', '원단', '가죽', '기타'];
+type VendorSortKey = 'name' | 'code';
 
 const EMPTY_VENDOR: Partial<Vendor> = {
   name: '', nameEn: '', nameCn: '', type: '바이어', region: '국내', country: '한국', currency: 'KRW',
@@ -77,12 +78,13 @@ const AI_TYPE_CHOICES: { type: VendorType; label: string; desc: string; icon: ty
 
 export default function VendorMaster() {
   const queryClient = useQueryClient();
-  const { data: vendors = [] } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
+  const { data: vendors = [], isLoading, isError } = useQuery({ queryKey: ['vendors'], queryFn: fetchVendors });
   const setVendors = (_v: Vendor[]) => {}; // no-op, replaced by useQuery
   const [search, setSearch] = usePersistedState('vendors.search', '');
   const [filterRegion, setFilterRegion] = usePersistedState<string>('vendors.filterRegion', 'all');
   const [filterType, setFilterType] = usePersistedState<string>('vendors.filterType', 'all');
   const [filterMaterialType, setFilterMaterialType] = usePersistedState<string>('vendors.filterMaterialType', 'all');
+  const [sort, setSort] = useState<{ key: VendorSortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   const [showModal, setShowModal] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [editVendor, setEditVendor] = useState<Partial<Vendor>>({ ...EMPTY_VENDOR });
@@ -226,8 +228,20 @@ export default function VendorMaster() {
           .some(f => (f || '').toLowerCase().includes(q))
       );
     }
-    return list;
-  }, [vendors, search, filterRegion, filterType, filterMaterialType]);
+    return [...list].sort((a, b) => {
+      const aValue = sort.key === 'name' ? a.name : (a.vendorCode || a.code || '');
+      const bValue = sort.key === 'name' ? b.name : (b.vendorCode || b.code || '');
+      const result = aValue.localeCompare(bValue, 'ko', { numeric: true, sensitivity: 'base' });
+      return (sort.direction === 'asc' ? result : -result) || a.id.localeCompare(b.id);
+    });
+  }, [vendors, search, filterRegion, filterType, filterMaterialType, sort]);
+
+  const toggleSort = (key: VendorSortKey) => {
+    setSort(current => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
 
   // SWIFT는 해외 탭에서만 보여준다 — 전체/국내 탭 화면은 동일하게 유지
   const showSwiftCol = filterRegion === '해외';
@@ -868,8 +882,10 @@ export default function VendorMaster() {
         {(['all', ...REGIONS] as const).map(r => (
           <button
             key={r}
+            type="button"
+            aria-pressed={filterRegion === r}
             onClick={() => setFilterRegion(r)}
-            className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`relative px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
               filterRegion === r
                 ? 'text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
@@ -891,8 +907,10 @@ export default function VendorMaster() {
         {(['all', ...VENDOR_TYPES] as const).map(t => (
           <button
             key={t}
+            type="button"
+            aria-pressed={filterType === t}
             onClick={() => { setFilterType(t); setFilterMaterialType('all'); }}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
               filterType === t
                 ? 'bg-card text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
@@ -914,8 +932,10 @@ export default function VendorMaster() {
             {(['all', ...MATERIAL_TYPE_OPTIONS] as const).map(t => (
               <button
                 key={t}
+                type="button"
+                aria-pressed={filterMaterialType === t}
                 onClick={() => setFilterMaterialType(t)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   filterMaterialType === t
                     ? 'bg-card text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
@@ -930,9 +950,11 @@ export default function VendorMaster() {
 
       {/* 검색 */}
       <div className="relative max-w-xs">
+        <Label htmlFor="vendor-master-search" className="sr-only">거래처 검색</Label>
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="거래처명 / 코드 검색" className="pl-9 h-9" />
+        <Input id="vendor-master-search" type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="거래처명 / 코드 검색" className="pl-9 h-9" />
       </div>
+      <p className="text-xs text-muted-foreground" aria-live="polite">{isLoading ? '거래처를 불러오는 중…' : isError ? '거래처를 불러오지 못했습니다' : `검색 결과 ${filtered.length}개`}</p>
 
       {/* 다중 선택 액션 바 */}
       {selectedIds.size > 0 && (
@@ -961,14 +983,23 @@ export default function VendorMaster() {
               <th className="w-10">
                 <input
                   type="checkbox"
+                  aria-label="검색 결과 전체 선택"
                   checked={isAllSelected}
                   ref={el => { if (el) el.indeterminate = isIndeterminate; }}
                   onChange={toggleSelectAll}
                   className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
                 />
               </th>
-              <th className="text-[13px] font-semibold text-muted-foreground">거래처명</th>
-              <th className="text-[13px] font-semibold text-muted-foreground">코드</th>
+              <th aria-sort={sort.key === 'name' ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-[13px] font-semibold text-muted-foreground">
+                <button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 rounded text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  거래처명 {sort.key === 'name' ? (sort.direction === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5" />}
+                </button>
+              </th>
+              <th aria-sort={sort.key === 'code' ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-[13px] font-semibold text-muted-foreground">
+                <button type="button" onClick={() => toggleSort('code')} className="inline-flex items-center gap-1 rounded text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  코드 {sort.key === 'code' ? (sort.direction === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />) : <ArrowUpDown className="w-3.5 h-3.5" />}
+                </button>
+              </th>
               <th className="text-[13px] font-semibold text-muted-foreground">유형</th>
               <th className="text-[13px] font-semibold text-muted-foreground">자재유형</th>
               <th className="text-[13px] font-semibold text-muted-foreground">담당자</th>
@@ -983,17 +1014,20 @@ export default function VendorMaster() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={10} className="text-center py-12 text-muted-foreground">
+              <tr><td colSpan={showSwiftCol ? 10 : 9} className="text-center py-12 text-muted-foreground">
                 <Building2 className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">등록된 거래처가 없습니다</p>
+                <p className="text-sm">{isLoading ? '거래처를 불러오는 중…' : isError ? '거래처 조회에 실패했습니다' : vendors.length === 0 ? '등록된 거래처가 없습니다' : '조건에 맞는 거래처가 없습니다'}</p>
+                {isError && <Button variant="outline" size="sm" className="mt-3" onClick={() => queryClient.invalidateQueries({ queryKey: ['vendors'] })}>다시 시도</Button>}
               </td></tr>
 ) : filtered.map(v => {
   const isChecked = selectedIds.has(v.id);
+  const brandNames = v.type === '바이어' ? normalizeBrands(v.brands).map(brand => brand.name).join(', ') : '';
   return (
               <tr key={v.id} className={`border-b border-border hover:bg-[var(--fill-quaternary)] ${isChecked ? 'bg-primary/5' : ''}`}>
                 <td>
                   <input
                     type="checkbox"
+                    aria-label={`${v.name} 선택`}
                     checked={isChecked}
                     onChange={() => toggleSelect(v.id)}
                     className="w-4 h-4 rounded border-border accent-primary cursor-pointer"
@@ -1001,13 +1035,18 @@ export default function VendorMaster() {
                 </td>
                 <td>
                   <div className="flex items-center gap-1.5">
-                    <p className="font-medium text-foreground">{v.name}</p>
+                    <p className="font-medium text-foreground max-w-[220px] truncate" title={v.name}>{v.name}</p>
                     {v.type === '자재거래처' && !v.contactName && !v.contactEmail && !v.contactPhone && (
                       <AlertCircle className="w-4 h-4 text-[var(--system-red)] cursor-help shrink-0" aria-label="기본 정보 미입력 — 거래처 마스터에서 연락처 정보 입력 필요" />
                     )}
                   </div>
-                  {v.nameEn && <p className="text-xs text-muted-foreground">{v.nameEn}</p>}
-                  {v.nameCn && <p className="text-xs text-muted-foreground">{v.nameCn}</p>}
+                  {v.nameEn && <p className="text-xs text-muted-foreground max-w-[220px] truncate" title={v.nameEn}>{v.nameEn}</p>}
+                  {v.nameCn && <p className="text-xs text-muted-foreground max-w-[220px] truncate" title={v.nameCn}>{v.nameCn}</p>}
+                  {brandNames && (
+                    <p className="text-xs text-muted-foreground max-w-[220px] truncate" title={brandNames}>
+                      브랜드: {brandNames}
+                    </p>
+                  )}
                 </td>
                 <td>
                   <div className="flex flex-col gap-1">
@@ -1047,7 +1086,7 @@ export default function VendorMaster() {
                   <p className="text-foreground">{v.contactName || '-'}</p>
                 </td>
                 <td className="text-muted-foreground text-xs">
-                  {v.contactEmail && <p>{v.contactEmail}</p>}
+                  {v.contactEmail && <p className="max-w-[200px] break-all">{v.contactEmail}</p>}
                   {v.contactPhone && <p>{v.contactPhone}</p>}
                   {!v.contactEmail && !v.contactPhone && (
                     <span className="flex items-center gap-1">
@@ -1074,10 +1113,10 @@ export default function VendorMaster() {
                 )}
                 <td className="ctr">
                   <div className="flex items-center justify-center gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(v)}>
+                    <Button variant="ghost" size="sm" aria-label={`${v.name} 수정`} className="h-9 w-9 p-0" onClick={() => openEdit(v)}>
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(v.id)}>
+                    <Button variant="ghost" size="sm" aria-label={`${v.name} 삭제`} className="h-9 w-9 p-0 text-muted-foreground hover:text-[var(--system-red)]" onClick={() => handleDelete(v.id)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
